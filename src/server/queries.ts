@@ -2,6 +2,7 @@ import "server-only";
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { sweepDueAuctions } from "@/server/sweep";
 import type { Database } from "@/lib/supabase/types";
 
 /**
@@ -92,6 +93,9 @@ function toCard(row: CardJoin): AuctionCardData {
 
 /** Home: live now + ending soon + recently listed. One round trip. */
 export const getHomeFeed = cache(async () => {
+  // Close anything overdue BEFORE we read, so a card can never show a "Live"
+  // badge next to an expired countdown. Throttled to one call per minute.
+  await sweepDueAuctions();
   const supabase = await createClient();
 
   const [live, ending, recent, categories] = await Promise.all([
@@ -139,6 +143,9 @@ export type BrowseFilters = {
 const PAGE_SIZE = 24;
 
 export const browseAuctions = cache(async (filters: BrowseFilters) => {
+  // Same reconcile-on-read nudge as the home feed; the throttle inside
+  // `sweepDueAuctions` makes this free in the common case.
+  await sweepDueAuctions();
   const supabase = await createClient();
   const page = Math.max(1, filters.page ?? 1);
 
