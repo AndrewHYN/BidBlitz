@@ -53,7 +53,7 @@ test.describe("concurrency", () => {
       const outcome = async (page: Page): Promise<boolean> => {
         const success = page.getByTestId("bid-success");
         const error = page.getByTestId("bid-error");
-        await expect(success.or(error)).toBeVisible({ timeout: 45_000 });
+        await expect(success.or(error).first()).toBeVisible({ timeout: 45_000 });
         return success.isVisible();
       };
       const [ok2, ok3] = await Promise.all([outcome(page2), outcome(page3)]);

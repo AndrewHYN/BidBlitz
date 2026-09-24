@@ -37,9 +37,6 @@ export type PlaceBidResult =
     }
   | { ok: false; rejection: BidRejection };
 
-/** Minimum gap between accepted bids from one user, per auction. */
-const MIN_BID_INTERVAL_MS = 800;
-
 export async function placeBidAction(input: {
   auctionId: string;
   amountMinor: string;
@@ -184,5 +181,3 @@ export async function placeBidAction(input: {
     outbidUserId: payload.outbid_user_id,
   };
 }
-
-export { MIN_BID_INTERVAL_MS };

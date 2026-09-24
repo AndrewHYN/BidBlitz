@@ -66,6 +66,10 @@ export function SettingsForm({
   }
 
   function handleSignOut() {
+    // `signingOut`/`setSigningOut` come from useTransition (line 40), so this
+    // is startTransition(fn) — NOT a setState updater. signOutAction ends in
+    // redirect("/"), whose NEXT_REDIRECT is rethrown so the router performs
+    // the navigation; every other failure surfaces as a toast.
     setSigningOut(async () => {
       try {
         await signOutAction();

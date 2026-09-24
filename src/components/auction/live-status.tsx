@@ -1,3 +1,5 @@
+"use client";
+
 import { StatusBadge } from "@/components/auction/status-badge";
 import { isClosed, CARD_ENDING_SOON_MS } from "@/lib/auction-status";
 import { useNow } from "@/components/clock-provider";

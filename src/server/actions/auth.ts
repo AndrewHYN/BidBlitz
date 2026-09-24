@@ -30,7 +30,10 @@ function friendlyAuthError(message: string): BidRejection {
   if (m.includes("rate limit")) {
     return { code: "rate_limited", message: "Too many attempts. Wait a moment and try again." };
   }
-  if (m.includes("unable to validate email")) {
+  if (m.includes("unable to validate email") || (m.includes("email address") && m.includes("invalid"))) {
+    // GoTrue returns `email_address_invalid` / "Email address ... is invalid"
+    // (seen live for reserved TLDs like .test) — say exactly that instead of
+    // the generic fallback.
     return { code: "invalid_amount", message: "Enter a valid email address." };
   }
   return { code: "unknown", message: "Sign in failed. Please try again." };

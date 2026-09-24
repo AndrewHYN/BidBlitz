@@ -38,8 +38,10 @@ export async function signIn(
   await page.context().clearCookies();
   await page.goto("/login");
 
+  // `.first()` matters: `login-form` CONTAINS `email-field`, so the union
+  // matches two nodes and Playwright's strict mode rejects the whole assertion.
   await expect(
-    page.getByTestId("login-form").or(page.getByTestId("email-field"))
+    page.getByTestId("login-form").or(page.getByTestId("email-field")).first()
   ).toBeVisible({ timeout: 30_000 });
   await page.getByTestId("email-field").fill(email);
   await page.getByTestId("password-field").fill(password);

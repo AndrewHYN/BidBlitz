@@ -9,7 +9,13 @@ export default defineConfig({
   workers: 1,
   timeout: 60_000,
   expect: { timeout: 15_000 },
-  retries: process.env.CI ? 1 : 0,
+  // One retry, locally too (not just on CI). This machine has ~3.9 GB RAM and
+  // the observed non-product failures are ambient: `net::ERR_NETWORK_IO_SUSPENDED`
+  // mid-navigation and "timeout while setting up page" (browser could not
+  // allocate a page). The same tests pass on the adjacent attempt and in the
+  // other project, so a one-off infra blip should not read as a product
+  // regression. A genuine defect fails both attempts and still reports red.
+  retries: 1,
   reporter: [["list"], ["html", { open: "never" }]],
   use: {
     baseURL,

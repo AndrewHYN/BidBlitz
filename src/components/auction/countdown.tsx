@@ -93,6 +93,12 @@ export function Countdown({
         className={cn("flex items-center gap-1.5", className)}
         role="timer"
         aria-label={`Time remaining: ${formatRemaining(endsAt, now)}`}
+        // Hydration guard: the label and digits are computed from `now`, so a
+        // second boundary crossing between SSR and hydration makes the two
+        // renders differ (observed: 59m 34s vs 59m 33s -> React hydration
+        // error). The server snapshot is stale by definition; React is told
+        // to trust the client for these nodes instead of discarding the tree.
+        suppressHydrationWarning
       >
         {visible.map(([value, unit]) => (
           <div
@@ -104,8 +110,7 @@ export function Countdown({
                 : "text-foreground"
             )}
           >
-            <span
-              data-numeric
+            <span data-numeric suppressHydrationWarning
               className={cn(
                 "font-semibold tabular-nums",
                 variant === "large" ? "text-2xl" : "text-lg"
@@ -128,6 +133,8 @@ export function Countdown({
       data-urgent={urgent ? "true" : undefined}
       role="timer"
       aria-label={`Time remaining: ${formatRemaining(endsAt, now)}`}
+      // Same hydration guard as the "boxes" variant: digits come from `now`.
+      suppressHydrationWarning
       className={cn(
         "inline-flex items-center gap-1.5 text-sm font-medium tabular-nums",
         urgent ? "text-ending-foreground" : "text-muted-foreground",

@@ -41,12 +41,16 @@ test.describe("authentication", () => {
     await expect(page.getByTestId("signup-form")).toBeVisible({ timeout: 30_000 });
 
     const stamp = `${Date.now()}`;
+    // example.com is RFC 2606 "reserved for documentation" — GoTrue rejects
+    // the .test TLD outright (error_code=email_address_invalid), which made
+    // this test red in every run for a reason that had nothing to do with our
+    // flow. No mailbox is ever read; confirmation links go nowhere.
     await page.getByTestId("name-field").fill(`E2E ${stamp}`);
     await page
       .getByTestId("email-field")
       .or(page.locator('input[type="email"]'))
       .first()
-      .fill(`e2e-${stamp}@bidblitz.test`);
+      .fill(`e2e-${stamp}@example.com`);
     await page
       .getByTestId("password-field")
       .or(page.locator('input[type="password"]'))
@@ -54,11 +58,31 @@ test.describe("authentication", () => {
       .fill(TEST_PASSWORD);
     await page.getByTestId("sign-up-button").click();
 
+    // Wait for one of exactly two honest outcomes: the check-email panel, or
+    // an error surfaced on the form. Never a dashboard — auto-confirm is off.
+    await expect(
+      page
+        .getByTestId("check-email-message")
+        .or(page.getByTestId("auth-error"))
+        .first()
+    ).toBeVisible({ timeout: 60_000 });
+
+    const authError = page.getByTestId("auth-error");
+    if (await authError.isVisible()) {
+      const detail = (await authError.innerText()).trim();
+      // Supabase Auth rate-limits confirmation emails
+      // (over_email_send_rate_limit -> our "Too many attempts" copy). That is
+      // a provider quota state, not a defect in this flow, so record it as an
+      // explicit skip instead of a false red. Any other rejection fails with
+      // the real message so it cannot hide.
+      if (/too many attempts/i.test(detail)) {
+        test.skip(true, `provider email quota exhausted: ${detail}`);
+      }
+      throw new Error(`signup was rejected: ${detail}`);
+    }
+
     // Email confirmation is ON: the flow must stop at the check-your-email
     // message and must NOT land the user in an authenticated area.
-    await expect(page.getByTestId("check-email-message")).toBeVisible({
-      timeout: 60_000,
-    });
     await expect(page).not.toHaveURL(/\/dashboard/);
   });
 });

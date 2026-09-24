@@ -44,7 +44,7 @@ test.describe("mobile shell", () => {
 
     const menuPanel = page.getByRole("dialog").or(page.getByRole("menu"));
     const navLinks = page.getByRole("navigation").getByRole("link");
-    await expect(menuPanel.or(navLinks.first())).toBeVisible({ timeout: 15_000 });
+    await expect(menuPanel.or(navLinks.first()).first()).toBeVisible({ timeout: 15_000 });
   });
 
   test("@mobile browse grid is usable without sideways scrolling", async ({
@@ -53,7 +53,7 @@ test.describe("mobile shell", () => {
     await page.goto("/browse");
     await expect(page.getByTestId("browse-filters")).toBeVisible({ timeout: 30_000 });
     await expect(
-      page.getByTestId("browse-grid").or(page.getByTestId("empty-state"))
+      page.getByTestId("browse-grid").or(page.getByTestId("empty-state")).first()
     ).toBeVisible({ timeout: 30_000 });
     await expectNoHorizontalOverflow(page);
   });
@@ -63,7 +63,7 @@ test.describe("mobile shell", () => {
   }) => {
     await page.goto("/browse");
     await expect(
-      page.getByTestId("browse-grid").or(page.getByTestId("empty-state"))
+      page.getByTestId("browse-grid").or(page.getByTestId("empty-state")).first()
     ).toBeVisible({ timeout: 30_000 });
 
     const cards = page.getByTestId("auction-card");

@@ -15,23 +15,23 @@ test.describe("empty states", () => {
 
     await page.goto("/dashboard/watchlist");
     await expect(
-      page.getByTestId("empty-state").or(page.getByTestId("watchlist-grid"))
+      page.getByTestId("empty-state").or(page.getByTestId("watchlist-grid")).first()
     ).toBeVisible({ timeout: 30_000 });
 
     await page.goto("/dashboard/transactions");
     await expect(
-      page.getByTestId("empty-state").or(page.getByTestId("transactions-table"))
+      page.getByTestId("empty-state").or(page.getByTestId("transactions-table")).first()
     ).toBeVisible({ timeout: 30_000 });
 
     await page.goto("/notifications");
     await expect(
-      page.getByTestId("empty-state").or(page.getByTestId("notifications-list"))
+      page.getByTestId("empty-state").or(page.getByTestId("notifications-list")).first()
     ).toBeVisible({ timeout: 30_000 });
 
     await page.goto("/browse");
     await expect(page.getByTestId("browse-filters")).toBeVisible({ timeout: 30_000 });
     await expect(
-      page.getByTestId("browse-grid").or(page.getByTestId("empty-state"))
+      page.getByTestId("browse-grid").or(page.getByTestId("empty-state")).first()
     ).toBeVisible({ timeout: 30_000 });
   });
 });
