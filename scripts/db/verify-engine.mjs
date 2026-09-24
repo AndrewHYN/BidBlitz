@@ -285,7 +285,9 @@ const auctionPayload = {
   anti_snipe_window_seconds: 30,
   anti_snipe_extension_seconds: 30,
   status: "DRAFT",
-  image_count: 1,
+  // image_count deliberately absent (migration 000008): clients hold no INSERT
+  // grant on it, and it is derived from auction_images by sync_image_count.
+  // The previous `image_count: 1` here faked a photo that did not exist.
 };
 
 // find the seller profile for our seller user
@@ -337,6 +339,48 @@ const postForced = rows(await sql(
 check("security: seller cannot hand-set winner/price/status",
   postForced.status === "DRAFT" && postForced.winner_id === null,
   `status=${postForced.status} (blocked: ${JSON.stringify(forcedWinner.data)})`);
+
+// ---- 4b. image_count is derived and cannot be faked -------------------------
+console.log("\n--- image_count (derived, migration 000008) ---");
+
+// (a) With no photo, publish must be refused. This is the rule that a faked
+//     `image_count: 1` used to sail straight past.
+const pubNoImg = await rest(`/rest/v1/rpc/publish_auction`, {
+  method: "POST", bearer: tok.seller,
+  body: { p_auction_id: auctionId },
+});
+const stillDraft = rows(await sql(
+  `select status from public.auctions where id='${auctionId}'`))[0];
+check("rule: publish is refused until a photo exists",
+  !pubNoImg.ok && /image_required/.test(JSON.stringify(pubNoImg.data))
+    && stillDraft.status === "DRAFT",
+  `status ${pubNoImg.status} / auction=${stillDraft.status}`);
+
+// (b) A real photo row moves the derived counter all by itself.
+const img = await rest(`/rest/v1/auction_images`, {
+  method: "POST", bearer: tok.seller,
+  body: {
+    auction_id: auctionId,
+    storage_path: `harness/${auctionId}/cover.jpg`,
+    position: 0,
+  },
+});
+const derivedCount = rows(await sql(
+  `select image_count from public.auctions where id='${auctionId}'`))[0];
+check("derived: an auction_images row sets image_count",
+  img.ok && derivedCount.image_count === 1,
+  `insert status ${img.status} / image_count=${derivedCount.image_count}`);
+
+// (c) ...and no client may move that counter by hand.
+const forgedCount = await rest(`/rest/v1/auctions?id=eq.${auctionId}`, {
+  method: "PATCH", bearer: tok.seller,
+  body: { image_count: 8 },
+});
+const afterForge = rows(await sql(
+  `select image_count from public.auctions where id='${auctionId}'`))[0];
+check("security: image_count is not client-writable",
+  !forgedCount.ok && afterForge.image_count === 1,
+  `status ${forgedCount.status} / image_count=${afterForge.image_count}`);
 
 const pub = await rest(`/rest/v1/rpc/publish_auction`, {
   method: "POST", bearer: tok.seller,

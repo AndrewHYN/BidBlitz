@@ -68,7 +68,8 @@ export async function createAuctionAction(input: unknown): Promise<
       anti_snipe_window_seconds: d.antiSnipeWindowSeconds,
       anti_snipe_extension_seconds: d.antiSnipeExtensionSeconds,
       status: "DRAFT",
-      image_count: 0,
+      // image_count is deliberately absent: it is derived by the database
+      // (sync_image_count trigger) and clients have no grant on it.
     })
     .select("id")
     .single();
@@ -144,14 +145,11 @@ export async function attachImagesAction(input: {
     .select("id", { count: "exact", head: true })
     .eq("auction_id", input.auctionId);
 
-  const total = count ?? rows.length;
-  await supabase
-    .from("auctions")
-    .update({ image_count: total })
-    .eq("id", input.auctionId);
-
+  // `auctions.image_count` is NOT written here. It is maintained by the
+  // sync_image_count trigger (migration 000008); clients hold no grant on it,
+  // so any attempt would raise auction_state_immutable and be swallowed.
   revalidatePath(`/sell/${input.auctionId}`);
-  return { ok: true, count: total };
+  return { ok: true, count: count ?? rows.length };
 }
 
 export async function publishAuctionAction(input: unknown): Promise<

@@ -1,0 +1,45 @@
+import Link from "next/link";
+import { LayoutGrid } from "lucide-react";
+
+import { EmptyState } from "@/components/auction/page-header";
+
+export type HomeCategory = {
+  slug: string;
+  name: string;
+  emoji: string | null;
+};
+
+/** "Browse by category" chips — each one is a ready-made /browse link. */
+export function CategoryChips({ categories }: { categories: HomeCategory[] }) {
+  if (categories.length === 0) {
+    return (
+      <nav data-testid="home-category-chips" aria-label="Browse by category">
+        <EmptyState
+          compact
+          icon={LayoutGrid}
+          title="No categories yet"
+          description="Categories will appear here as the catalog fills up."
+        />
+      </nav>
+    );
+  }
+
+  return (
+    <nav
+      data-testid="home-category-chips"
+      aria-label="Browse by category"
+      className="flex flex-wrap gap-2"
+    >
+      {categories.map((category) => (
+        <Link
+          key={category.slug}
+          href={`/browse?category=${encodeURIComponent(category.slug)}`}
+          className="inline-flex items-center gap-1.5 rounded-full border bg-card px-3 py-1.5 text-sm font-medium transition-colors hover:border-primary/40 hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+        >
+          {category.emoji && <span aria-hidden>{category.emoji}</span>}
+          {category.name}
+        </Link>
+      ))}
+    </nav>
+  );
+}
