@@ -140,7 +140,13 @@ export async function submitReviewAction(input: unknown): Promise<SimpleResult> 
   const { reviewSchema } = await import("@/lib/validation");
   const parsed = reviewSchema.safeParse(input);
   if (!parsed.success) {
-    return { ok: false, rejection: { code: "invalid_request_id", message: "Invalid review." } };
+    return {
+      ok: false,
+      rejection: {
+        code: "invalid_request_id",
+        message: parsed.error.issues[0]?.message ?? "Invalid review.",
+      },
+    };
   }
 
   const { data: tx, error: txError } = await supabase
@@ -181,6 +187,18 @@ export async function submitReviewAction(input: unknown): Promise<SimpleResult> 
     };
   }
 
-  revalidatePath(`/profile/${reviewee}`);
+  // Profile routes are keyed by USERNAME, not id — revalidate the real path
+  // (and the pages that render this review) so nothing shows stale state.
+  const { data: revieweeProfile } = await supabase
+    .from("profiles")
+    .select("username")
+    .eq("id", reviewee)
+    .maybeSingle();
+
+  revalidatePath("/dashboard/transactions");
+  revalidatePath("/dashboard");
+  if (revieweeProfile?.username) {
+    revalidatePath(`/profile/${revieweeProfile.username}`);
+  }
   return { ok: true };
 }

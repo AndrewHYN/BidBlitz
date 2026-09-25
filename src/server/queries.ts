@@ -432,17 +432,27 @@ export const getSelling = cache(async (userId: string) => {
 
 export const getTransactions = cache(async (userId: string) => {
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("transactions")
-    .select(
-      `id, auction_id, seller_id, buyer_id, currency, gross_minor, fee_bps,
-       fee_minor, net_minor, status, provider, created_at,
-       auctions:auction_id(title)`
-    )
-    .or(`seller_id.eq.${userId},buyer_id.eq.${userId}`)
-    .order("created_at", { ascending: false });
+  const [{ data }, { data: myReviews }] = await Promise.all([
+    supabase
+      .from("transactions")
+      .select(
+        `id, auction_id, seller_id, buyer_id, currency, gross_minor, fee_bps,
+         fee_minor, net_minor, status, provider, created_at,
+         auctions:auction_id(title)`
+      )
+      .or(`seller_id.eq.${userId},buyer_id.eq.${userId}`)
+      .order("created_at", { ascending: false }),
+    // Which of these sales the viewer has already reviewed — the UI shows
+    // "Reviewed" instead of offering a second (server-rejected) attempt.
+    supabase
+      .from("reviews")
+      .select("transaction_id")
+      .eq("reviewer_id", userId),
+  ]);
 
-  return (data ?? []) as unknown as Array<{
+  const reviewed = new Set((myReviews ?? []).map((r) => r.transaction_id));
+
+  return ((data ?? []) as unknown as Array<{
     id: string;
     auction_id: string;
     seller_id: string;
@@ -456,7 +466,7 @@ export const getTransactions = cache(async (userId: string) => {
     provider: string | null;
     created_at: string;
     auctions: { title: string } | null;
-  }>;
+  }>).map((row) => ({ ...row, reviewed: reviewed.has(row.id) }));
 });
 
 export const getProfileByUsername = cache(async (username: string) => {

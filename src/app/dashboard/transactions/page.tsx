@@ -1,12 +1,13 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { ReceiptText } from "lucide-react";
+import { Check, ReceiptText } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getTransactions } from "@/server/queries";
 import { EmptyState, PageHeader } from "@/components/auction/page-header";
 import { Money } from "@/components/auction/money";
 import { TransactionBadge } from "@/components/auction/status-badge";
+import { ReviewDialog } from "@/components/dashboard/review-dialog";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -74,6 +75,7 @@ export default async function TransactionsPage() {
                 <TableHead>Proceeds</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Recorded</TableHead>
+                <TableHead>Review</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -106,6 +108,25 @@ export default async function TransactionsPage() {
                     <TransactionBadge status={row.status} />
                   </TableCell>
                   <TableCell className="text-muted-foreground">{formatDate(row.created_at)}</TableCell>
+                  <TableCell>
+                    {row.reviewed ? (
+                      <span
+                        data-testid="review-submitted"
+                        className="inline-flex items-center gap-1 text-xs text-muted-foreground"
+                      >
+                        <Check className="size-3.5" aria-hidden />
+                        Reviewed
+                      </span>
+                    ) : (
+                      <ReviewDialog
+                        transactionId={row.id}
+                        auctionTitle={row.auctions?.title ?? "this auction"}
+                        counterpartyRole={
+                          row.seller_id === user.id ? "buyer" : "seller"
+                        }
+                      />
+                    )}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>

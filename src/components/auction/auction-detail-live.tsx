@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { WifiOff } from "lucide-react";
 import { toast } from "sonner";
 
 import { BidPanel, type ServerEcho } from "@/components/auction/bid-panel";
@@ -96,6 +97,19 @@ export function AuctionDetailLive({
     onEvent: handleEvent,
   });
 
+  // A handshake that refuses to settle is worth saying out loud: the page
+  // keeps rendering from its mirror, but it may be seconds behind. Only the
+  // timers live in the effect body — setState always runs from a callback.
+  const [connectingLong, setConnectingLong] = useState(false);
+  useEffect(() => {
+    if (state.connection === "online") {
+      const reset = window.setTimeout(() => setConnectingLong(false), 0);
+      return () => window.clearTimeout(reset);
+    }
+    const timer = window.setTimeout(() => setConnectingLong(true), 4_000);
+    return () => window.clearTimeout(timer);
+  }, [state.connection]);
+
   useUserRealtime(
     viewerId,
     useCallback(
@@ -171,6 +185,17 @@ export function AuctionDetailLive({
     void settleIfDueAction(auctionId).finally(() => router.refresh());
   }, [live.status, auctionId, router]);
 
+  // Offline is definitive; "connecting" only earns a banner once it stalls.
+  // Only while bidding matters — a finished auction needs no heartbeat.
+  const connectionWarning =
+    live.status !== "LIVE" && live.status !== "SCHEDULED"
+      ? null
+      : state.connection === "offline"
+        ? "offline"
+        : state.connection === "connecting" && connectingLong
+          ? "connecting"
+          : null;
+
   return (
     <div className="space-y-4 rounded-xl border bg-card p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -186,6 +211,21 @@ export function AuctionDetailLive({
           />
         </div>
       </div>
+
+      {connectionWarning && (
+        <p
+          role="status"
+          data-testid="realtime-connection-banner"
+          className="flex items-start gap-2 rounded-lg border border-ending/40 bg-ending/10 px-3 py-2 text-sm"
+        >
+          <WifiOff className="mt-0.5 size-4 shrink-0" aria-hidden />
+          <span>
+            {connectionWarning === "offline"
+              ? "Live updates dropped — reconnecting. This page may be a few seconds behind until it recovers."
+              : "Still connecting to live updates…"}
+          </span>
+        </p>
+      )}
 
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div data-testid="current-bid">

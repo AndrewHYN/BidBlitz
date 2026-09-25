@@ -34,6 +34,10 @@ export function WatchButton({
       const result = await toggleWatchAction({ auctionId, watched: next });
       if (result.ok) {
         setWatched(result.watched);
+        toast.success(
+          result.watched ? "Added to your watchlist" : "Removed from your watchlist",
+          { description: result.watched ? "Find it under Dashboard → Watchlist." : undefined }
+        );
         if (viewerId === null) router.refresh();
         return;
       }

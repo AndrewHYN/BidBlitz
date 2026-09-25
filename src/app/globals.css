@@ -59,13 +59,8 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 
   --animate-pulse-slow: pulse 2.4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-  --animate-rise: rise 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
   --animate-flash: flash 0.7s cubic-bezier(0.16, 1, 0.3, 1);
 
-  @keyframes rise {
-    from { opacity: 0; transform: translateY(6px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
   @keyframes flash {
     0% { background-color: color-mix(in oklab, var(--ending) 45%, transparent); }
     100% { background-color: transparent; }
@@ -201,5 +196,21 @@
 
   .text-balance {
     text-wrap: balance;
+  }
+}
+
+/* Unlayered on purpose: this must beat every layered animation/transition,
+   including Motion's inline-driven styles are handled in the components via
+   useReducedMotion — this covers CSS keyframes (pulse, flash, tw-animate). */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

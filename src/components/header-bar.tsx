@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useMounted } from "@/hooks/use-mounted";
 import {
   Bell,
@@ -41,15 +41,30 @@ export type HeaderUser = {
 
 const NAV = [
   { label: "Browse", href: "/browse" },
-  { label: "How it works", href: "/help" },
+  { label: "Help", href: "/help" },
+] as const;
+
+/** Desktop shows the two anchors; the full set lives in the mobile drawer. */
+const DESKTOP_AUTH_NAV = [
+  { label: "Dashboard", href: "/dashboard", exact: true },
+  { label: "Watchlist", href: "/dashboard/watchlist", exact: true },
 ] as const;
 
 const AUTH_NAV = [
-  { label: "Dashboard", href: "/dashboard" },
-  { label: "Watchlist", href: "/dashboard/watchlist" },
-  { label: "Bidding", href: "/dashboard/buying" },
-  { label: "Selling", href: "/dashboard/selling" },
+  { label: "Dashboard", href: "/dashboard", exact: true },
+  { label: "Watchlist", href: "/dashboard/watchlist", exact: true },
+  { label: "Bidding", href: "/dashboard/buying", exact: true },
+  { label: "Selling", href: "/dashboard/selling", exact: true },
 ] as const;
+
+/**
+ * Active state: sections match their subtree (/help covers /help/fees), the
+ * dashboard tabs are exact so only the tab you are on lights up.
+ */
+function isActive(pathname: string, href: string, exact = false): boolean {
+  if (exact) return pathname === href;
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
 
 function initials(name: string) {
   return name
@@ -90,8 +105,28 @@ export function HeaderBar({
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const reduceMotion = useReducedMotion();
   const [open, setOpen] = useState(false);
   const [term, setTerm] = useState("");
+
+  // Escape closes the drawer; a history navigation (back/forward) closes it
+  // too, so it can never hang open over a page it does not belong to. Both
+  // are listener callbacks — the sanctioned place for state updates.
+  useEffect(() => {
+    if (!open) return;
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setOpen(false);
+    }
+    function onPopState() {
+      setOpen(false);
+    }
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("popstate", onPopState);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("popstate", onPopState);
+    };
+  }, [open]);
 
   function submitSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -101,6 +136,52 @@ export function HeaderBar({
   }
 
   const links = user ? [...NAV, ...AUTH_NAV] : NAV;
+  const desktopLinks = user ? [...NAV, ...DESKTOP_AUTH_NAV] : NAV;
+  /** Any in-header navigation also closes the drawer. */
+  const closeMenu = () => setOpen(false);
+
+  const drawerContent = (
+    <div className="page-container space-y-3 py-4">
+      <form onSubmit={submitSearch} className="md:hidden">
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={term}
+            onChange={(e) => setTerm(e.target.value)}
+            placeholder="Search auctions…"
+            aria-label="Search auctions"
+            className="pl-9"
+          />
+        </div>
+      </form>
+
+      <nav aria-label="Mobile" className="grid gap-1">
+        {links.map((l) => (
+          <Link
+            key={l.href}
+            href={l.href}
+            onClick={() => setOpen(false)}
+            aria-current={isActive(pathname, l.href, "exact" in l && l.exact) ? "page" : undefined}
+            className={cn(
+              "rounded-md px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+              isActive(pathname, l.href, "exact" in l && l.exact) &&
+                "bg-accent text-accent-foreground"
+            )}
+          >
+            {l.label}
+          </Link>
+        ))}
+      </nav>
+
+      {user && (
+        <Button asChild size="sm" className="w-full">
+          <Link href="/sell" onClick={() => setOpen(false)}>
+            <Plus className="size-4" /> List an item
+          </Link>
+        </Button>
+      )}
+    </div>
+  );
 
   return (
     <header className="sticky top-0 z-40 border-b bg-background/85 backdrop-blur-md">
@@ -112,12 +193,17 @@ export function HeaderBar({
           className="lg:hidden"
           aria-label={open ? "Close menu" : "Open menu"}
           aria-expanded={open}
+          aria-controls="mobile-menu"
           onClick={() => setOpen((v) => !v)}
         >
           {open ? <X className="size-5" /> : <Menu className="size-5" />}
         </Button>
 
-        <Link href="/" className="flex shrink-0 items-center gap-2 font-semibold tracking-tight">
+        <Link
+          href="/"
+          onClick={closeMenu}
+          className="flex shrink-0 items-center gap-2 font-semibold tracking-tight"
+        >
           <span className="grid size-8 place-items-center rounded-lg bg-primary text-primary-foreground shadow-sm">
             <Gavel className="size-4" />
           </span>
@@ -125,13 +211,15 @@ export function HeaderBar({
         </Link>
 
         <nav aria-label="Primary" className="ml-2 hidden items-center gap-1 lg:flex">
-          {NAV.map((l) => (
+          {desktopLinks.map((l) => (
             <Link
               key={l.href}
               href={l.href}
+              aria-current={isActive(pathname, l.href, "exact" in l && l.exact) ? "page" : undefined}
               className={cn(
                 "rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground",
-                pathname.startsWith(l.href) && "bg-accent text-accent-foreground"
+                isActive(pathname, l.href, "exact" in l && l.exact) &&
+                  "bg-accent text-accent-foreground"
               )}
             >
               {l.label}
@@ -164,7 +252,7 @@ export function HeaderBar({
                 aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ""}`}
                 className="relative"
               >
-                <Link href="/notifications">
+                <Link href="/notifications" onClick={closeMenu}>
                   <Bell className="size-4" />
                   {unreadCount > 0 && (
                     <span
@@ -178,7 +266,7 @@ export function HeaderBar({
               </Button>
 
               <Button asChild size="sm" className="hidden gap-1.5 sm:inline-flex">
-                <Link href="/sell">
+                <Link href="/sell" onClick={closeMenu}>
                   <Plus className="size-4" /> Sell
                 </Link>
               </Button>
@@ -206,12 +294,15 @@ export function HeaderBar({
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem asChild>
-                    <Link href={user.username ? `/profile/${user.username}` : "/settings"}>
+                    <Link
+                      href={user.username ? `/profile/${user.username}` : "/settings"}
+                      onClick={closeMenu}
+                    >
                       <UserIcon className="size-4" /> Profile
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
-                    <Link href="/dashboard/transactions">
+                    <Link href="/dashboard/transactions" onClick={closeMenu}>
                       <Gavel className="size-4" /> Transactions
                     </Link>
                   </DropdownMenuItem>
@@ -219,6 +310,7 @@ export function HeaderBar({
                   <DropdownMenuItem
                     onSelect={(e) => {
                       e.preventDefault();
+                      closeMenu();
                       void signOutAction();
                     }}
                   >
@@ -230,67 +322,40 @@ export function HeaderBar({
           ) : (
             <>
               <Button asChild variant="ghost" size="sm">
-                <Link href="/login">Sign in</Link>
+                <Link href="/login" onClick={closeMenu}>
+                  Sign in
+                </Link>
               </Button>
               <Button asChild size="sm">
-                <Link href="/signup">Join</Link>
+                <Link href="/signup" onClick={closeMenu}>
+                  Join
+                </Link>
               </Button>
             </>
           )}
         </div>
       </div>
 
-      {/* mobile drawer */}
-      <AnimatePresence initial={false}>
-        {open && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-            className="overflow-hidden border-t lg:hidden"
-          >
-            <div className="page-container space-y-3 py-4">
-              <form onSubmit={submitSearch} className="md:hidden">
-                <div className="relative">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    value={term}
-                    onChange={(e) => setTerm(e.target.value)}
-                    placeholder="Search auctions…"
-                    aria-label="Search auctions"
-                    className="pl-9"
-                  />
-                </div>
-              </form>
-
-              <nav aria-label="Mobile" className="grid gap-1">
-                {links.map((l) => (
-                  <Link
-                    key={l.href}
-                    href={l.href}
-                    onClick={() => setOpen(false)}
-                    className={cn(
-                      "rounded-md px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-                      pathname.startsWith(l.href) && "bg-accent text-accent-foreground"
-                    )}
-                  >
-                    {l.label}
-                  </Link>
-                ))}
-              </nav>
-
-              {user && (
-                <Button asChild size="sm" className="w-full">
-                  <Link href="/sell" onClick={() => setOpen(false)}>
-                    <Plus className="size-4" /> List an item
-                  </Link>
-                </Button>
-              )}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* mobile drawer — transform/opacity only, standing down for reduced motion */}
+      {open &&
+        (reduceMotion ? (
+          <div id="mobile-menu" className="border-t lg:hidden">
+            {drawerContent}
+          </div>
+        ) : (
+          <AnimatePresence initial={false}>
+            <motion.div
+              id="mobile-menu"
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+              className="overflow-hidden border-t lg:hidden"
+            >
+              {drawerContent}
+            </motion.div>
+          </AnimatePresence>
+        ))}
     </header>
   );
 }
