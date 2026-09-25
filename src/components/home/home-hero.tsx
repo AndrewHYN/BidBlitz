@@ -30,14 +30,15 @@ export function HomeHero() {
         className="relative px-6 py-12 sm:px-10 sm:py-16"
       >
         <p className="text-xs font-semibold tracking-widest text-primary uppercase">
-          Live auctions · honest settlement
+          List it. Start the blitz. Get your price.
         </p>
         <h1 className="mt-3 max-w-2xl text-3xl font-semibold tracking-tight text-balance sm:text-5xl">
           Bid live. Win the deal.
         </h1>
         <p className="mt-4 max-w-xl text-sm text-muted-foreground sm:text-base">
-          Real-time bidding with server-authoritative pricing, anti-snipe
-          protection and transparent fees — no surprises when the hammer falls.
+          A live auction marketplace with real closing times: sellers list
+          items, buyers compete bid by bid, and the price climbs until the
+          clock runs out. When it hits zero, the highest bidder wins.
         </p>
 
         {/* Plain GET form: the first search works before any JS hydrates. */}

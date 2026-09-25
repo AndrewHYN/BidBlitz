@@ -68,7 +68,7 @@ export function ReviewList({ reviews }: { reviews: ProfileReview[] }) {
       <EmptyState
         icon={Star}
         title="No reviews yet"
-        description="Reviews appear after completed sales."
+        description="Reviews appear after auctions settle."
         compact
       />
     );
@@ -117,7 +117,7 @@ export function ReviewList({ reviews }: { reviews: ProfileReview[] }) {
                   </span>
                 )
               ) : (
-                <span>Verified buyer</span>
+                <span>Verified participant</span>
               )}
               {auction?.title && (
                 <>

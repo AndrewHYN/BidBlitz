@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 export const metadata: Metadata = {
   title: "Watchlist",
   description: "Auctions you are keeping an eye on.",
+  robots: { index: false, follow: false },
 };
 
 export default async function WatchlistPage() {

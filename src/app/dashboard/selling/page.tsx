@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Tag } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
@@ -9,6 +10,12 @@ import { Button } from "@/components/ui/button";
 import { SettleButton } from "@/components/dashboard/settle-button";
 import { SaleSummary } from "@/components/dashboard/sale-summary";
 import { isClosed } from "@/lib/auction-status";
+
+export const metadata: Metadata = {
+  title: "Selling",
+  description: "Your listed auctions, sales and proceeds.",
+  robots: { index: false, follow: false },
+};
 
 export default async function SellingPage() {
   const supabase = await createClient();

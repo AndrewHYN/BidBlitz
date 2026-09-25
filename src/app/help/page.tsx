@@ -7,6 +7,7 @@ export const metadata: Metadata = {
   title: "Help",
   description:
     "How BidBlitz works: fees, bidding rules and what happens when an auction ends.",
+  alternates: { canonical: "/help" },
 };
 
 const TOPICS = [

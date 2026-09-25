@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { ReceiptText } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
@@ -16,6 +17,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { isPaymentConfigured } from "@/server/payments/provider";
+
+export const metadata: Metadata = {
+  title: "Transactions",
+  description: "Settled sales you were part of, with the exact fee breakdown.",
+  robots: { index: false, follow: false },
+};
 
 /** Rendered server-side once, so the row never re-formats during hydration. */
 function formatDate(iso: string): string {

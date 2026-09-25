@@ -16,6 +16,7 @@ import { isPaymentConfigured } from "@/server/payments/provider";
 export const metadata: Metadata = {
   title: "Dashboard",
   description: "Your bidding, selling and settlement activity on BidBlitz.",
+  robots: { index: false, follow: false },
 };
 
 function Stat({

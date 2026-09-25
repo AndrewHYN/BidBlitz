@@ -113,8 +113,31 @@ export function BidPanel({
 
   const scheduled = status === "SCHEDULED";
   const pastEnd = !scheduled && endsAt !== null && Date.parse(endsAt) <= now;
-  const closed = isClosed(status) || pastEnd;
+  const settled = isClosed(status);
+  // Clock passed but the server has not recorded the outcome yet: never
+  // claim a winner (or "no bids") before the settlement says so.
+  const pendingSettlement = pastEnd && !settled;
+  const closed = settled || pastEnd;
   const biddable = isBiddable(status, endsAt, now);
+
+  /** Guarded bigint comparison — minor units are integers; anything else = unknown. */
+  function compareMinor(
+    a: string | number | null | undefined,
+    b: string | number | null | undefined
+  ): number | null {
+    if (a === null || a === undefined || b === null || b === undefined) return null;
+    try {
+      const left = BigInt(a);
+      const right = BigInt(b);
+      return left === right ? 0 : left > right ? 1 : -1;
+    } catch {
+      return null;
+    }
+  }
+
+  const outbidComparison = compareMinor(currentBidMinor, myHighestBidMinor);
+  const viewerOutbid = outbidComparison === 1 && !success;
+  const viewerLeading = outbidComparison === 0 && myHighestBidMinor !== null;
 
   /**
    * The floor: computed with the shared bigint helper, then raised to any
@@ -249,11 +272,30 @@ export function BidPanel({
         <div className="flex items-center gap-2">
           <Trophy className="size-4 text-muted-foreground" aria-hidden />
           <h2 className="font-semibold">
-            {winnerId ? "Auction ended" : "Auction closed"}
+            {pendingSettlement
+              ? "Bidding has closed"
+              : winnerId
+                ? "Auction ended"
+                : "Auction closed"}
           </h2>
         </div>
 
-        {winnerId ? (
+        {pendingSettlement ? (
+          <div role="status" className="space-y-1">
+            <p className="font-medium">Recording the final result…</p>
+            <p className="text-sm text-muted-foreground">
+              {currentBidMinor !== null && currentBidMinor !== undefined ? (
+                <>
+                  The clock ran out with a top bid of{" "}
+                  <Money minor={currentBidMinor} currency={currency} />. The
+                  winner is confirmed on the server in a moment.
+                </>
+              ) : (
+                <>The clock ran out with no bids — the auction is closed.</>
+              )}
+            </p>
+          </div>
+        ) : winnerId ? (
           <div className="space-y-1">
             <p className="font-medium">
               {viewerId === winnerId
@@ -270,8 +312,18 @@ export function BidPanel({
               />
             </p>
           </div>
+        ) : status === "CANCELLED" ? (
+          <p className="text-sm text-muted-foreground">
+            This auction was cancelled.
+          </p>
+        ) : currentBidMinor === null || currentBidMinor === undefined ? (
+          <p className="text-sm text-muted-foreground">
+            No bids were placed — this auction closed unsold.
+          </p>
         ) : (
-          <p className="text-sm text-muted-foreground">No bids</p>
+          <p className="text-sm text-muted-foreground">
+            This auction closed without a sale.
+          </p>
         )}
 
         {transactionStatus && (
@@ -362,6 +414,30 @@ export function BidPanel({
         <h2 className="font-semibold">Place your bid</h2>
       </div>
 
+      {viewerOutbid && (
+        <div
+          data-testid="outbid-status"
+          role="status"
+          className="rounded-lg border border-ending/40 bg-ending/10 px-3 py-2 text-sm"
+        >
+          You&apos;ve been outbid — the top bid is now{" "}
+          <Money minor={currentBidMinor} currency={currency} />. Bid again to
+          take the lead.
+        </div>
+      )}
+
+      {viewerLeading && (
+        <div
+          data-testid="leading-status"
+          role="status"
+          className="rounded-lg border border-live/40 bg-live/10 px-3 py-2 text-sm"
+        >
+          You&apos;re the highest bidder at{" "}
+          <Money minor={currentBidMinor} currency={currency} />. The auction is
+          still live — anyone can outbid you before the clock runs out.
+        </div>
+      )}
+
       <div className="space-y-1.5">
         <Label htmlFor="bid-amount">Your bid</Label>
         <div className="flex gap-2">
@@ -423,6 +499,23 @@ export function BidPanel({
           <Money minor={floor} currency={currency} />.
         </p>
       )}
+
+      <p className="text-xs text-muted-foreground">
+        Bids are final.{" "}
+        <Link
+          href="/help/rules"
+          className="font-medium text-primary hover:underline"
+        >
+          Bidding rules
+        </Link>{" "}
+        ·{" "}
+        <Link
+          href="/help/fees"
+          className="font-medium text-primary hover:underline"
+        >
+          Fees
+        </Link>
+      </p>
     </form>
   );
 }

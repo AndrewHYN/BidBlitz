@@ -7,6 +7,7 @@ export const metadata: Metadata = {
   title: "Terms of Use",
   description:
     "How BidBlitz works for buyers and sellers: bids are final, auctions close on the clock, platform fees are disclosed, and what both sides agree to.",
+  alternates: { canonical: "/terms" },
 };
 
 const LAST_UPDATED = "25 September 2026";

@@ -16,6 +16,7 @@ import { isPaymentConfigured } from "@/server/payments/provider";
 export const metadata: Metadata = {
   title: "Admin",
   description: "Open reports and platform fee settings on BidBlitz.",
+  robots: { index: false, follow: false },
 };
 
 type ReportRow = {

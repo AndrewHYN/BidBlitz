@@ -15,10 +15,11 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { username } = await params;
   const data = await getProfileByUsername(username);
-  if (!data) return { title: "Profile" };
+  if (!data) return { title: "Profile", robots: { index: false } };
   return {
     title: `${data.profile.display_name} (@${data.profile.username})`,
     description: data.profile.bio ?? undefined,
+    alternates: { canonical: `/profile/${data.profile.username}` },
   };
 }
 

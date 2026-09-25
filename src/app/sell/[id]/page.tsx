@@ -18,6 +18,7 @@ import { DeleteDraftButton } from "@/components/sell/delete-draft-button";
 export const metadata: Metadata = {
   title: "Finish your listing",
   description: "Add photos, review the terms and publish your BidBlitz auction.",
+  robots: { index: false, follow: false },
 };
 
 /** Statuses where photos can still be attached (mirrors the storage policy). */

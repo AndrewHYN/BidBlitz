@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { SearchX, TriangleAlert } from "lucide-react";
 
 import { browseAuctions, getCategories } from "@/server/queries";
@@ -11,6 +12,13 @@ import {
   type BrowseFilterValues,
 } from "@/components/browse/browse-filters";
 import { BrowsePagination } from "@/components/browse/browse-pagination";
+
+export const metadata: Metadata = {
+  title: "Browse auctions",
+  description:
+    "Filter live and upcoming auctions by keyword, category, condition and price. Every filter lands in the URL, so results are shareable.",
+  alternates: { canonical: "/browse" },
+};
 
 type RawSearchParams = Record<string, string | string[] | undefined>;
 

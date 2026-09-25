@@ -64,11 +64,9 @@ const STATUS_LABELS: Record<string, string> = {
 const TRANSACTION_LABELS: Record<string, string> = {
   AWAITING_PAYMENT: "Awaiting payment",
   PAID: "Paid",
-  SHIPPED: "Shipped",
-  COMPLETE: "Complete",
+  SETTLED: "Settled",
   REFUNDED: "Refunded",
   FAILED: "Failed",
-  DISPUTED: "Disputed",
 };
 
 export function StatusBadge({
@@ -110,16 +108,16 @@ export function TransactionBadge({
   className?: string;
 }) {
   const tone: BadgeTone =
-    status === "COMPLETE"
+    status === "PAID" || status === "SETTLED"
       ? "sold"
-      : status === "FAILED" || status === "DISPUTED"
+      : status === "FAILED"
         ? "cancelled"
         : status === "AWAITING_PAYMENT"
           ? "ending"
           : "neutral";
 
   return (
-    <span className={cn(badgeVariants({ tone }), className)}>
+    <span data-status={status} className={cn(badgeVariants({ tone }), className)}>
       {TRANSACTION_LABELS[status] ?? status}
     </span>
   );

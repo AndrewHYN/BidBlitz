@@ -7,6 +7,7 @@ export const metadata: Metadata = {
   title: "Bidding rules",
   description:
     "How bidding works on BidBlitz: bids are final, the servers decide the outcome, and anti-snipe protection guards the ending.",
+  alternates: { canonical: "/help/rules" },
 };
 
 const RULES = [

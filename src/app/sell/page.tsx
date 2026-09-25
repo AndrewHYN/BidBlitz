@@ -8,6 +8,7 @@ import { SellForm } from "@/components/sell/sell-form";
 export const metadata: Metadata = {
   title: "Sell",
   description: "Create a listing and start a live auction on BidBlitz.",
+  robots: { index: false, follow: false },
 };
 
 /**

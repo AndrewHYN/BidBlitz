@@ -45,7 +45,7 @@ export function ReportDialog({ auctionId }: { auctionId: string }) {
       const result = await reportAction(parsed.data);
       if (result.ok) {
         toast.success("Report received", {
-          description: "Our moderation team will review this auction.",
+          description: "The BidBlitz team will review this listing.",
         });
         setReason("");
         setOpen(false);
@@ -84,8 +84,8 @@ export function ReportDialog({ auctionId }: { auctionId: string }) {
         <DialogHeader>
           <DialogTitle>Report this auction</DialogTitle>
           <DialogDescription>
-            Tell us what&apos;s wrong. Reports are confidential and reviewed by
-            a human.
+            Tell us what&apos;s wrong. Reports go to the BidBlitz team and are
+            never shown to the seller.
           </DialogDescription>
         </DialogHeader>
 

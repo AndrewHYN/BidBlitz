@@ -7,6 +7,7 @@ import { SettingsForm } from "@/components/auth/settings-form";
 export const metadata: Metadata = {
   title: "Settings",
   description: "Manage your BidBlitz profile and account.",
+  robots: { index: false, follow: false },
 };
 
 export default async function SettingsPage() {

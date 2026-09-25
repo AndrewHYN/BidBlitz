@@ -7,6 +7,7 @@ export const metadata: Metadata = {
   title: "Privacy Policy",
   description:
     "What personal data BidBlitz actually collects, why it is used, who can see it, and how to reach us about it.",
+  alternates: { canonical: "/privacy" },
 };
 
 const LAST_UPDATED = "25 September 2026";

@@ -10,6 +10,7 @@ import { MarkAllReadButton } from "@/components/notifications/mark-all-read-butt
 export const metadata: Metadata = {
   title: "Notifications",
   description: "Bids, outbids, wins and settlements on BidBlitz.",
+  robots: { index: false, follow: false },
 };
 
 export default async function NotificationsPage() {
@@ -38,7 +39,7 @@ export default async function NotificationsPage() {
           <EmptyState
             icon={Bell}
             title="No notifications yet"
-            description="Bids, outbids and settlement results land here the moment they happen."
+            description="Bids, outbids and settlement results land here."
           />
         ) : (
           <NotificationsList items={items} />

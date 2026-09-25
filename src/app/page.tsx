@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { TriangleAlert } from "lucide-react";
 
 import { getHomeFeed } from "@/server/queries";
@@ -7,6 +8,10 @@ import { Button } from "@/components/ui/button";
 import { HomeHero } from "@/components/home/home-hero";
 import { CategoryChips } from "@/components/home/category-chips";
 import { AuctionRail } from "@/components/home/auction-rail";
+
+export const metadata: Metadata = {
+  alternates: { canonical: "/" },
+};
 
 /**
  * Discovery home: hero + search, category chips, then the three rails the
@@ -51,7 +56,7 @@ export default async function HomePage() {
             auctions={feed.live}
             testid="home-live"
             emptyTitle="No live auctions right now"
-            emptyDescription="New sales go live every day — check back in a moment."
+            emptyDescription="Nothing is open for bidding at this moment — new auctions show up here as soon as they go live."
           />
           <AuctionRail
             title="Recently listed"

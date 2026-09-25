@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Gavel } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
@@ -9,6 +10,12 @@ import { Money } from "@/components/auction/money";
 import { Button } from "@/components/ui/button";
 import { isClosed } from "@/lib/auction-status";
 import type { AuctionCardData } from "@/server/queries";
+
+export const metadata: Metadata = {
+  title: "Bidding",
+  description: "Auctions you are bidding on and wins to follow up on.",
+  robots: { index: false, follow: false },
+};
 
 type BuyingRow = AuctionCardData & {
   myBidMinor: number;

@@ -8,6 +8,7 @@ import { previewFeeMinor } from "@/lib/money";
 export const metadata: Metadata = {
   title: "Fees",
   description: "The BidBlitz platform fee, how it is computed, and what settlement does.",
+  alternates: { canonical: "/help/fees" },
 };
 
 /**
