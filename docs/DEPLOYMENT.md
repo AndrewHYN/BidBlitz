@@ -33,6 +33,19 @@ Build command, output directory and framework are left at their detected
 defaults. Do not add a custom `install` command; `package-lock.json` is
 committed and npm ci is used automatically.
 
+### Domain truth (this project)
+
+| Role | URL | Notes |
+| --- | --- | --- |
+| Production / canonical | `https://bid-blitz-ten.vercel.app` | The project's only domain (Project → Domains). Pushes to `main` build and promote here. |
+| Frozen deployment URL | `https://bid-blitz-q9l25rfxv-andrewhyn.vercel.app` | Immutable URL of one earlier deployment. It cannot be aliased or updated — `vercel alias set` refuses deployment URLs — so it is permanently frozen at that build and its then-current env. Never link users here. |
+
+`NEXT_PUBLIC_SITE_URL` is `https://bid-blitz-ten.vercel.app/`. Vercel snapshots
+environment variables **per deployment**, so a changed value only takes effect
+from the next git push onward (it is inlined into the bundle at build time). It
+drives canonical URLs, Open Graph tags, and the sign-up confirmation
+`emailRedirectTo` (`src/server/actions/auth.ts`).
+
 ## 2. Supabase: allow the deployed origin
 
 Auth will silently fail until the deployed URL is permitted. In the Supabase
@@ -46,12 +59,19 @@ Dashboard → **Authentication → URL Configuration**:
 The callback route validates the `next` parameter against a single-slash,
 non-absolute path, so it cannot be used as an open redirect.
 
-This project has both applied already, through the Management API
-(`PATCH /v1/projects/{ref}/config/auth`):
+This project's live values, read back through the Management API
+(`GET /v1/projects/{ref}/config/auth`):
 
-- **Site URL** = `https://bid-blitz-q9l25rfxv-andrewhyn.vercel.app`
+- **Site URL** = `https://bid-blitz-q9l25rfxv-andrewhyn.vercel.app` — the
+  *fallback* redirect (frozen deployment URL, see §1). Confirmation links do not
+  depend on it: the client passes
+  `emailRedirectTo = ${NEXT_PUBLIC_SITE_URL}/auth/callback`
+  (`src/server/actions/auth.ts`), which resolves to production. Pointing Site
+  URL at the canonical domain too is a one-call `PATCH` when convenient.
 - **Redirect URLs** (comma-separated) =
   `https://bid-blitz-q9l25rfxv-andrewhyn.vercel.app/**,https://bid-blitz*-andrewhyn.vercel.app/**,http://localhost:3000/**`
+  — the wildcard already covers `https://bid-blitz-ten.vercel.app/**`
+  (production) and every preview of this project.
 
 Two details worth keeping:
 
@@ -115,6 +135,9 @@ Run these against the deployed URL before calling it shipped:
    auto-login), then confirm and sign in.
 5. Place a bid from two sessions → the loser gets outbid feedback, the loser's
    bid never appears as the current price.
+6. `GET /auction/<id>` HTML → `og:url` and the `rel=canonical` link start with
+   `NEXT_PUBLIC_SITE_URL` (a stale domain means the env change predates the
+   running build: environment snapshots are per deployment, so push again).
 
 ## 5. Explicitly not configured
 
@@ -140,7 +163,7 @@ Inspect the live state (authenticated CLI, `vercel login` first if needed):
 vercel project protection bid-blitz --format json
 ```
 
-On this project the launch-time state was:
+On this project the initial (pre-QA) state was:
 
 ```json
 { "ssoProtection": { "deploymentType": "all_except_custom_domains" },
@@ -167,13 +190,14 @@ deployments stay protected.) Verify with the `project protection` command
 above, then re-run the §4 smoke checks. `gitForkProtection` is unrelated and
 stays on.
 
-> This project ran its release QA (HTTP smoke, Playwright desktop + mobile,
-> visual pass) with `deploymentType` temporarily set to `preview`, and the
-> original `all_except_custom_domains` state was restored afterwards per the
-> release run's instruction to leave no stray security changes. **Production is
-> therefore gated again after QA** — flip the switch (dashboard: Settings →
-> Security → Deployment Protection, or the PATCH above) before real users
-> arrive, or real traffic will bounce to the Vercel login page.
+> **Verified release state (release audit 2026-09-25):** `deploymentType` is
+> `preview` — production (`bid-blitz-ten.vercel.app`) is publicly reachable for
+> real users while preview deployments stay protected, and `gitForkProtection`
+> stays on. This is the intended launch state; release QA (HTTP smoke, Playwright
+> desktop + mobile, visual pass) ran against the live domain in exactly this
+> state. If `all_except_custom_domains` is ever set again, production on
+> `*.vercel.app` is gated (302 to `vercel.com/sso-api`) and the site must not be
+> described as publicly live until it is switched back with the PATCH above.
 
 ## Troubleshooting
 
