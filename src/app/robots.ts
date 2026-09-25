@@ -1,6 +1,8 @@
 import type { MetadataRoute } from "next";
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+// Normalize away a trailing slash (the deployed env has one) so the sitemap
+// reference is single-slash regardless of how the variable is formatted.
+const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000").replace(/\/+$/, "");
 
 /**
  * Public marketplace surfaces are crawlable; every auth-gated surface

@@ -70,7 +70,9 @@ export async function signUpAction(input: {
     password: input.password,
     options: {
       data: { display_name: input.displayName.trim() },
-      emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/auth/callback`,
+      // The deployed env ends in "/", so strip it — otherwise confirmation
+      // links point at "//auth/callback" and can miss the route entirely.
+      emailRedirectTo: `${(process.env.NEXT_PUBLIC_SITE_URL ?? "").replace(/\/+$/, "")}/auth/callback`,
     },
   });
 
