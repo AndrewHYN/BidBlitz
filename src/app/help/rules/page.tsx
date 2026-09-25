@@ -6,7 +6,7 @@ import { PageHeader, SectionHeading } from "@/components/auction/page-header";
 export const metadata: Metadata = {
   title: "Bidding rules",
   description:
-    "How bidding works on BidBlitz: final bids, server-authoritative state, anti-sniping and idempotency.",
+    "How bidding works on BidBlitz: bids are final, the servers decide the outcome, and anti-snipe protection guards the ending.",
 };
 
 const RULES = [
@@ -17,8 +17,8 @@ const RULES = [
   },
   {
     icon: Scale,
-    title: "The server is authoritative",
-    body: "Price, winner and end time are decided by the server, not your browser. The countdown on your screen is decoration; the database clock is the referee.",
+    title: "The servers have the final say",
+    body: "Price, winner and end time are decided on BidBlitz's servers, not in your browser. The countdown on your screen is a visual guide — the official clock is the referee.",
   },
   {
     icon: Coins,
@@ -28,12 +28,12 @@ const RULES = [
   {
     icon: Timer,
     title: "Anti-sniping protects the ending",
-    body: "A bid placed inside the final anti-snipe window extends the auction by the auction's anti-snipe extension — applied server-side, inside the same lock that records your bid, so the end time can never race the price.",
+    body: "If a bid lands inside the protected final window, the auction is extended by its anti-snipe extension. The extra time is added at the same moment the bid is recorded, so the clock and the price can never disagree.",
   },
   {
     icon: Undo2,
-    title: "Duplicate submissions are idempotent",
-    body: "Double-tap, retry or flaky network: the same submission is recognised by its request id and returns the original result. It never becomes a second bid.",
+    title: "Double-taps never double-bid",
+    body: "Every bid submission carries its own reference, so a retry or a flaky connection returns the original result instead of placing a second bid.",
   },
   {
     icon: FileCheck,
@@ -42,8 +42,8 @@ const RULES = [
   },
   {
     icon: Lock,
-    title: "Terms are frozen after publishing",
-    body: "Once an auction is published, its terms — price, increment, duration, description — can't be edited. What bidders saw is what they get.",
+    title: "Deal terms are locked at publish",
+    body: "Once an auction is published, its starting price, bid increment, duration and closing time are frozen — nobody, not even the seller, can quietly change them. Bids and the anti-snipe extension are the only things that can move the price or the clock.",
   },
 ] as const;
 
@@ -53,7 +53,7 @@ export default function HelpRulesPage() {
       <div className="mx-auto w-full max-w-3xl space-y-10">
         <PageHeader
           title="Bidding rules"
-          description="The rules the auction engine actually enforces — in Postgres, on every bid."
+          description="The rules the auction engine enforces on every single bid."
         />
 
         <section className="space-y-4">

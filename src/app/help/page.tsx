@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, Coins, Handshake, Scale } from "lucide-react";
+import { ArrowRight, Coins, Handshake, Mail, Phone, Scale, ShieldAlert } from "lucide-react";
 import { PageHeader, SectionHeading } from "@/components/auction/page-header";
 
 export const metadata: Metadata = {
@@ -92,6 +92,55 @@ export default function HelpPage() {
                 can write them, and they show up on each profile.
               </li>
             </ol>
+          </div>
+        </section>
+
+        <section id="contact" className="scroll-mt-24 space-y-4">
+          <SectionHeading title="Contact us" />
+          <div className="space-y-3 rounded-xl border bg-card p-5 text-sm leading-relaxed sm:p-6">
+            <p>
+              A question, or something on the site that looks wrong? Reach us
+              directly:
+            </p>
+            <ul className="space-y-2">
+              <li className="flex items-center gap-2">
+                <Phone className="size-4 shrink-0 text-primary" aria-hidden />
+                <a
+                  href="tel:0789335669"
+                  className="font-medium text-primary hover:underline"
+                >
+                  0789335669
+                </a>
+              </li>
+              <li className="flex items-center gap-2">
+                <Mail className="size-4 shrink-0 text-primary" aria-hidden />
+                <a
+                  href="mailto:hyndrrx0@gmail.com"
+                  className="font-medium text-primary hover:underline"
+                >
+                  hyndrrx0@gmail.com
+                </a>
+              </li>
+            </ul>
+            <p className="flex items-start gap-2 text-muted-foreground">
+              <ShieldAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
+              <span>
+                See a suspicious listing? Open the auction and use the{" "}
+                <strong className="text-foreground">Report</strong> button —
+                reports go straight to the BidBlitz team for review.
+              </span>
+            </p>
+            <p className="text-xs text-muted-foreground">
+              See also:{" "}
+              <Link href="/terms" className="font-medium text-primary hover:underline">
+                Terms of Use
+              </Link>{" "}
+              and{" "}
+              <Link href="/privacy" className="font-medium text-primary hover:underline">
+                Privacy Policy
+              </Link>
+              .
+            </p>
           </div>
         </section>
       </div>

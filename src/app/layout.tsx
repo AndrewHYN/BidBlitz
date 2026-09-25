@@ -24,13 +24,13 @@ export const metadata: Metadata = {
     template: "%s · BidBlitz",
   },
   description:
-    "A competitive auction marketplace with server-authoritative bidding, anti-snipe protection, live updates and transparent fees.",
+    "BidBlitz is a live auction marketplace: sellers list items with a real closing time, buyers compete bid by bid, and one transparent platform fee applies to sold auctions.",
   openGraph: {
     type: "website",
     siteName: "BidBlitz",
     title: "BidBlitz — live auctions, honest settlement",
     description:
-      "Bid on live auctions with real-time updates, anti-snipe protection and transparent fees.",
+      "Live auctions with real closing times: list an item, bid against other buyers in real time, and win when the clock runs out.",
     url: siteUrl,
   },
   twitter: { card: "summary_large_image", title: "BidBlitz", description: "Live competitive auctions." },

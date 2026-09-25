@@ -313,7 +313,7 @@ export function SellForm({ categories }: { categories: CategoryOption[] }) {
 
         <div className="grid gap-5 sm:grid-cols-2">
           <div className="space-y-1.5">
-            <Label htmlFor="sell-anti-snipe-window">Anti-snipe window (seconds)</Label>
+            <Label htmlFor="sell-anti-snipe-window">Anti-snipe window</Label>
             <Input
               id="sell-anti-snipe-window"
               type="number"
@@ -323,12 +323,15 @@ export function SellForm({ categories }: { categories: CategoryOption[] }) {
               onChange={(event) => setAntiSnipeWindow(event.target.value)}
               aria-invalid={errors.antiSnipeWindowSeconds ? true : undefined}
               aria-describedby={
-                errors.antiSnipeWindowSeconds ? "sell-anti-snipe-window-error" : undefined
+                errors.antiSnipeWindowSeconds
+                  ? "sell-anti-snipe-window-hint sell-anti-snipe-window-error"
+                  : "sell-anti-snipe-window-hint"
               }
               data-testid="sell-anti-snipe-window"
             />
-            <p className="text-xs text-muted-foreground">
-              Bids in this final window push the end time back.
+            <p id="sell-anti-snipe-window-hint" className="text-xs text-muted-foreground">
+              Seconds before the close that get protection — a bid in here
+              pushes the end time back.
             </p>
             <FieldError
               id="sell-anti-snipe-window-error"
@@ -338,7 +341,7 @@ export function SellForm({ categories }: { categories: CategoryOption[] }) {
 
           <div className="space-y-1.5">
             <Label htmlFor="sell-anti-snipe-extension">
-              Anti-snipe extension (seconds)
+              Anti-snipe extension
             </Label>
             <Input
               id="sell-anti-snipe-extension"
@@ -350,13 +353,13 @@ export function SellForm({ categories }: { categories: CategoryOption[] }) {
               aria-invalid={errors.antiSnipeExtensionSeconds ? true : undefined}
               aria-describedby={
                 errors.antiSnipeExtensionSeconds
-                  ? "sell-anti-snipe-extension-error"
-                  : undefined
+                  ? "sell-anti-snipe-extension-hint sell-anti-snipe-extension-error"
+                  : "sell-anti-snipe-extension-hint"
               }
               data-testid="sell-anti-snipe-extension"
             />
-            <p className="text-xs text-muted-foreground">
-              How much time a last-second bid adds to the clock.
+            <p id="sell-anti-snipe-extension-hint" className="text-xs text-muted-foreground">
+              Seconds added to the clock when a protected bid lands.
             </p>
             <FieldError
               id="sell-anti-snipe-extension-error"

@@ -35,14 +35,14 @@ export function SaleSummary({
 
       <dl className="mt-3 grid grid-cols-3 gap-3">
         <div>
-          <dt className="text-xs text-muted-foreground">Gross</dt>
+          <dt className="text-xs text-muted-foreground">Winning price</dt>
           <dd className="font-medium">
             <Money minor={transaction.gross_minor} currency={transaction.currency} />
           </dd>
         </div>
         <div>
           <dt className="text-xs text-muted-foreground">
-            Fee{feeBps !== null ? ` (${feeBps} bps)` : ""}
+            Fee{feeBps !== null ? ` (${feeBps / 100}%)` : ""}
           </dt>
           <dd className="font-medium">
             <Money minor={transaction.fee_minor} currency={transaction.currency} />

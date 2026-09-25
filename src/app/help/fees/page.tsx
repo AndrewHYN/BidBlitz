@@ -67,24 +67,14 @@ export default function HelpFeesPage() {
           <div className="space-y-3 rounded-xl border bg-card p-5 text-sm leading-relaxed sm:p-6">
             <p>
               BidBlitz charges a platform fee of{" "}
-              <strong>500 basis points — 5%</strong> — on the winning price of
-              a sold auction. That default lives in the{" "}
-              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
-                fee_settings
-              </code>{" "}
-              table in the database and is deducted from the seller&apos;s
-              proceeds; buyers pay exactly their winning bid.
+              <strong>5% on the winning price</strong> of a sold auction. The
+              fee is deducted from the seller&apos;s proceeds — buyers pay
+              exactly their winning bid, nothing extra.
             </p>
             <p>
-              The fee shown anywhere in the app is a preview.{" "}
-              <strong>
-                The authoritative fee is computed in Postgres
-              </strong>{" "}
-              when the auction settles, and persisted on the transaction row (
-              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">fee_bps</code>,{" "}
-              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">fee_minor</code>,{" "}
-              <code className="rounded bg-muted px-1.5 py-0.5 text-xs">net_minor</code>)
-              so the record can never disagree with the math.
+              The fee is worked out once, when the auction closes, and saved on
+              the transaction itself. That way the record always matches the
+              maths, and both buyer and seller see the same numbers afterwards.
             </p>
           </div>
         </section>
@@ -95,19 +85,19 @@ export default function HelpFeesPage() {
             action={
               <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <ReceiptText className="size-3.5" aria-hidden />
-                500 bps = 5%
+                5% platform fee
               </span>
             }
           />
           <div className="divide-y rounded-xl border bg-card px-5 py-1 sm:px-6">
             <ExampleRow
-              label="Gross (winning bid)"
+              label="Winning bid"
               note="What the winning bid comes to"
               value={<Money minor={GROSS_MINOR} currency="USD" />}
             />
             <ExampleRow
               label="Platform fee"
-              note="5% of the gross, rounded half-up in integer math"
+              note="5% of the winning bid"
               value={
                 <span>
                   −<Money minor={FEE_MINOR} currency="USD" />
@@ -116,19 +106,16 @@ export default function HelpFeesPage() {
             />
             <ExampleRow
               label="Net to seller"
-              note="Persisted on the transaction"
+              note="Recorded on the transaction"
               value={<Money minor={NET_MINOR} currency="USD" />}
               emphasis
             />
           </div>
           <p className="text-xs text-muted-foreground">
-            Gross <Money minor={GROSS_MINOR} currency="USD" /> → fee{" "}
-            <Money minor={FEE_MINOR} currency="USD" /> → net{" "}
-            <Money minor={NET_MINOR} currency="USD" />. Computed with{" "}
-            <code className="rounded bg-muted px-1">
-              previewFeeMinor(gross, 500)
-            </code>
-            , the display mirror of the SQL that does it for real.
+            A <Money minor={GROSS_MINOR} currency="USD" /> sale costs the seller{" "}
+            <Money minor={FEE_MINOR} currency="USD" /> in fees, leaving{" "}
+            <Money minor={NET_MINOR} currency="USD" /> — always rounded to the
+            nearest cent.
           </p>
         </section>
 
@@ -144,10 +131,10 @@ export default function HelpFeesPage() {
           />
           <div className="space-y-3 rounded-xl border bg-card p-5 text-sm leading-relaxed sm:p-6">
             <p>
-              When an auction settles, a transaction is created in{" "}
-              <strong>AWAITING_PAYMENT</strong> status with the gross, fee and
-              net recorded. It stays in that state until a payment provider is
-              connected.
+              When an auction settles, a transaction is created with the winning
+              price, fee and net amount recorded. It starts as{" "}
+              <strong>Awaiting payment</strong> and stays in that state until a
+              payment provider is connected.
             </p>
             <p>
               <strong>No payment provider is configured yet</strong> — so no

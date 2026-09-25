@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/select";
 import { CONDITIONS, conditionLabels, SORTS } from "@/lib/validation";
 import { categoryIcon } from "@/lib/category-icons";
+import { formatMoney, money, parseMoneyToMinor } from "@/lib/money";
 
 /**
  * Filter bar for /browse. Every change builds a fresh, shareable URL and
@@ -65,6 +66,20 @@ export function buildBrowseUrl(values: BrowseFilterValues): string {
   return `/browse?${params.toString()}`;
 }
 
+/**
+ * The URL keeps whole minor units (the server contract), but the controls
+ * speak dollars — customers should never have to know what a minor unit is.
+ * `minorToDollars("1250") -> "12.50"`, `parseMoneyToMinor("12.50") -> 1250n`.
+ */
+function minorToDollars(minor: string): string {
+  if (!minor) return "";
+  try {
+    return formatMoney(money(minor)).replace(/[^0-9.]/g, "");
+  } catch {
+    return "";
+  }
+}
+
 export function BrowseFilters({
   initial,
   categories,
@@ -74,14 +89,69 @@ export function BrowseFilters({
 }) {
   const router = useRouter();
   const [values, setValues] = useState(initial);
+  // Price drafts live in dollars and only reach the URL when committed
+  // (blur or submit), so typing never triggers a navigation per keystroke.
+  const [minDraft, setMinDraft] = useState(() => minorToDollars(initial.min));
+  const [maxDraft, setMaxDraft] = useState(() => minorToDollars(initial.max));
+  const [priceError, setPriceError] = useState<string | null>(null);
+
+  const PRICE_ERROR = "Enter a price in dollars, e.g. 25 or 12.50.";
+
+  /** Fold whatever is typed into the price boxes into the next URL state. */
+  function foldDrafts(next: BrowseFilterValues): {
+    merged: BrowseFilterValues;
+    invalid: boolean;
+  } {
+    const merged = { ...next };
+    let invalid = false;
+    const drafts = [
+      ["min", minDraft] as const,
+      ["max", maxDraft] as const,
+    ];
+    for (const [which, draft] of drafts) {
+      const trimmed = draft.trim();
+      if (trimmed === "") {
+        // A cleared box means "no limit" — drop any committed value.
+        if (merged[which] !== "") merged[which] = "";
+        continue;
+      }
+      const minor = parseMoneyToMinor(trimmed);
+      if (minor === null) {
+        invalid = true;
+        continue;
+      }
+      merged[which] = minor.toString();
+    }
+    return { merged, invalid };
+  }
 
   function apply(next: BrowseFilterValues) {
-    setValues(next);
-    router.replace(buildBrowseUrl(next));
+    const { merged, invalid } = foldDrafts(next);
+    setPriceError(invalid ? PRICE_ERROR : null);
+    setValues(merged);
+    router.replace(buildBrowseUrl(merged));
   }
 
   function patch(part: Partial<BrowseFilterValues>) {
     apply({ ...values, ...part });
+  }
+
+  function commitPrice(which: "min" | "max") {
+    const draft = (which === "min" ? minDraft : maxDraft).trim();
+    if (draft === "") {
+      setPriceError(null);
+      if (values[which] !== "") apply({ ...values, [which]: "" });
+      return;
+    }
+    const minor = parseMoneyToMinor(draft);
+    if (minor === null) {
+      // Keep what was typed so it can be fixed — the message says how.
+      setPriceError(PRICE_ERROR);
+      return;
+    }
+    setPriceError(null);
+    const asMinor = minor.toString();
+    if (asMinor !== values[which]) apply({ ...values, [which]: asMinor });
   }
 
   function submitSearch(event: React.FormEvent<HTMLFormElement>) {
@@ -199,14 +269,20 @@ export function BrowseFilters({
             <Label htmlFor="browse-min">Min price</Label>
             <Input
               id="browse-min"
-              type="number"
-              min={0}
-              step={1}
-              inputMode="numeric"
-              value={values.min}
-              onChange={(event) => patch({ min: event.target.value })}
-              placeholder="0"
-              aria-describedby="browse-price-hint"
+              type="text"
+              inputMode="decimal"
+              autoComplete="off"
+              value={minDraft}
+              onChange={(event) => {
+                setMinDraft(event.target.value);
+                setPriceError(null);
+              }}
+              onBlur={() => commitPrice("min")}
+              placeholder="From"
+              aria-invalid={priceError ? true : undefined}
+              aria-describedby={
+                priceError ? "browse-price-hint browse-price-error" : "browse-price-hint"
+              }
             />
           </div>
 
@@ -214,23 +290,41 @@ export function BrowseFilters({
             <Label htmlFor="browse-max">Max price</Label>
             <Input
               id="browse-max"
-              type="number"
-              min={0}
-              step={1}
-              inputMode="numeric"
-              value={values.max}
-              onChange={(event) => patch({ max: event.target.value })}
-              placeholder="Any"
-              aria-describedby="browse-price-hint"
+              type="text"
+              inputMode="decimal"
+              autoComplete="off"
+              value={maxDraft}
+              onChange={(event) => {
+                setMaxDraft(event.target.value);
+                setPriceError(null);
+              }}
+              onBlur={() => commitPrice("max")}
+              placeholder="To"
+              aria-invalid={priceError ? true : undefined}
+              aria-describedby={
+                priceError ? "browse-price-hint browse-price-error" : "browse-price-hint"
+              }
             />
           </div>
         </div>
       </form>
 
       <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-3">
-        <p id="browse-price-hint" className="text-xs text-muted-foreground">
-          Prices are whole minor units (cents) — 1000 means $10.00.
-        </p>
+        <div className="space-y-1">
+          <p id="browse-price-hint" className="text-xs text-muted-foreground">
+            Prices in dollars — e.g. 25 or 12.50. Filters by each
+            auction&apos;s current price.
+          </p>
+          {priceError && (
+            <p
+              id="browse-price-error"
+              role="alert"
+              className="text-xs font-medium text-destructive"
+            >
+              {priceError}
+            </p>
+          )}
+        </div>
         <Button asChild variant="ghost" size="sm">
           <Link href="/browse" aria-label="Clear all filters">
             <X aria-hidden />

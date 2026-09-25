@@ -41,7 +41,7 @@ export default async function TransactionsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Transactions"
-        description="Every settled sale you were part of, with the exact fee maths."
+        description="Every settled sale you were part of, with the exact fee breakdown."
       />
 
       <div>
@@ -49,7 +49,7 @@ export default async function TransactionsPage() {
           <EmptyState
             icon={ReceiptText}
             title="No transactions yet"
-            description="A row appears here as soon as one of your auctions settles."
+            description="A row appears here as soon as an auction you won or sold settles."
             action={
               <Button asChild>
                 <Link href="/dashboard/selling">Go to selling</Link>
@@ -62,7 +62,7 @@ export default async function TransactionsPage() {
               <TableRow>
                 <TableHead>Auction</TableHead>
                 <TableHead>Your side</TableHead>
-                <TableHead>Gross</TableHead>
+                <TableHead>Winning price</TableHead>
                 <TableHead>Fee</TableHead>
                 <TableHead>Proceeds</TableHead>
                 <TableHead>Status</TableHead>
@@ -89,7 +89,7 @@ export default async function TransactionsPage() {
                       <Money minor={row.fee_minor} currency={row.currency} />
                     </span>
                     <span className="ml-1 text-xs text-muted-foreground">
-                      ({row.fee_bps} bps)
+                      ({row.fee_bps / 100}% fee)
                     </span>
                   </TableCell>
                   <TableCell className="font-medium" data-numeric>
