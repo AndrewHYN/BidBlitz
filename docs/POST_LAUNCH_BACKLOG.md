@@ -44,7 +44,31 @@ Potential post-launch revenue:
 
 Do not build these prematurely if they slow down proving the marketplace.
 
-## PRODUCT REMINDERS
+## DEFERRED IN THE LAUNCH PASS (P3 — intentional, not blockers)
+
+Carried out of the "BidBlitz Launch/Product Pass" audit; each is safe to leave
+until there is a reason:
+
+- **Auth allow-list cleanup** — `uri_allow_list` keeps the two
+  `*-andrewhyn.vercel.app` patterns for the frozen deployment URL (§ DEPLOYMENT
+  domain truth). When that URL is permanently retired, delete both; keep the
+  production and localhost patterns.
+- **Manual confirmation-email check** — Supabase redirect acceptance for
+  production is verified by Management API read-back (config is authoritative),
+  but a full round-trip means receiving one real confirmation email. Do it once
+  by signing up on production: the link must land on
+  `https://bid-blitz-ten.vercel.app/auth/callback`, not the site root.
+- **E2E gap: price filters → URL params** — browse price inputs now edit in
+  dollars but write minor units to the URL (server contract). No e2e covers
+  that translation yet; add one alongside any future filter work.
+- **E2E gap: realtime connection banner** — the offline/stalled banner
+  (`realtime-connection-banner`) needs a simulated channel failure; not covered
+  by the current suite.
+- **E2E gap: review flow** — leaving a review needs a settled transaction with
+  two accounts and a revalidated table; not covered by the current suite.
+- **Review policy when payments land** — today any transaction row can be
+  reviewed (matching RLS). Once real payments exist, decide whether refunded or
+  failed transactions should hide the review affordance.
 
 Never add:
 - fake counters

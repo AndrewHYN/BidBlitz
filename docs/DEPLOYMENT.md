@@ -62,22 +62,30 @@ non-absolute path, so it cannot be used as an open redirect.
 This project's live values, read back through the Management API
 (`GET /v1/projects/{ref}/config/auth`):
 
-- **Site URL** = `https://bid-blitz-q9l25rfxv-andrewhyn.vercel.app` — the
-  *fallback* redirect (frozen deployment URL, see §1). Confirmation links do not
-  depend on it: the client passes
+- **Site URL** = `https://bid-blitz-ten.vercel.app` — the canonical production
+  domain (§1). It is the fallback landing when no explicit
+  `emailRedirectTo` is honoured. Confirmation links pass
   `emailRedirectTo = ${NEXT_PUBLIC_SITE_URL}/auth/callback`
-  (`src/server/actions/auth.ts`), which resolves to production. Pointing Site
-  URL at the canonical domain too is a one-call `PATCH` when convenient.
-- **Redirect URLs** (comma-separated) =
-  `https://bid-blitz-q9l25rfxv-andrewhyn.vercel.app/**,https://bid-blitz*-andrewhyn.vercel.app/**,http://localhost:3000/**`
-  — the wildcard already covers `https://bid-blitz-ten.vercel.app/**`
-  (production) and every preview of this project.
+  (`src/server/actions/auth.ts`): production resolves it from the Vercel env,
+  local dev from the gitignored `.env.local`
+  (`NEXT_PUBLIC_SITE_URL=http://localhost:3000`). The Site URL was moved off
+  the frozen deployment URL to production during the launch pass (Phase 17)
+  with a single `PATCH /v1/projects/{ref}/config/auth` and confirmed by
+  read-back.
+- **Redirect URLs** (the `uri_allow_list` field, comma-separated) =
+  `https://bid-blitz-ten.vercel.app/**,https://bid-blitz-q9l25rfxv-andrewhyn.vercel.app/**,https://bid-blitz*-andrewhyn.vercel.app/**,http://localhost:3000/**`
+  — production first, then every pre-existing pattern **preserved verbatim**.
+  Note the correction: the older `bid-blitz*-andrewhyn.vercel.app/**` wildcard
+  does **not** cover the production alias (it lacks the `-andrewhyn` suffix),
+  which is why the explicit production pattern was prepended rather than
+  assumed. A redirect outside this list is rejected by GoTrue, so any future
+  domain (e.g. a custom domain) must be added here as well as in Vercel.
 
 Two details worth keeping:
 
 - The `**` is load-bearing: GoTrue compiles the patterns with `.` and `/` as
   glob separators, so a single `*` cannot cross the `/auth/callback` path
-  boundary. All three patterns stay on origins this project controls
+  boundary. All four patterns stay on origins this project controls
   (production, its own Vercel previews, localhost), so a confirmation link can
   never hand tokens to a foreign host.
 - **Leaked-password protection (HaveIBeenPwned) is not enabled.** The API
