@@ -247,6 +247,10 @@ if (testIds.length) {
   await sql(`delete from public.reviews where reviewer_id in (${list}) or reviewee_id in (${list})`);
   await sql(`delete from public.transactions where seller_id in (${list}) or buyer_id in (${list})`);
   await sql(`delete from public.bids where bidder_id in (${list})`);
+  // Image rows first: explicit even if the FK cascades — a row whose object
+  // never existed renders as a broken image on browse/detail.
+  await sql(`delete from public.auction_images
+              where auction_id in (select id from public.auctions where seller_id in (${list}))`);
   await sql(`delete from public.auctions where seller_id in (${list})`);
   await sql(`delete from public.notifications where user_id in (${list})`);
   await sql(`delete from public.watchlist where user_id in (${list})`);
@@ -771,6 +775,12 @@ if (reportId) {
   check("security: admin CAN triage a report (merged admin policy intact)", false,
     "report row missing");
 }
+
+// ---------------------------------------------------------------------------
+// The auction_images row inserted for the image_count checks is a fixture, not
+// a listing photo: no object ever backs `harness/<id>/cover.jpg`. Remove it
+// before leaving so production never shows a broken image for a row we made.
+await sql(`delete from public.auction_images where auction_id='${auctionId}'`);
 
 // ---------------------------------------------------------------------------
 console.log("\n" + "=".repeat(64));

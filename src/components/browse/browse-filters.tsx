@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { CONDITIONS, conditionLabels, SORTS } from "@/lib/validation";
+import { categoryIcon } from "@/lib/category-icons";
 
 /**
  * Filter bar for /browse. Every change builds a fresh, shareable URL and
@@ -133,12 +134,15 @@ export function BrowseFilters({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL}>All categories</SelectItem>
-                {categories.map((category) => (
-                  <SelectItem key={category.slug} value={category.slug}>
-                    {category.emoji ? `${category.emoji} ` : ""}
-                    {category.name}
-                  </SelectItem>
-                ))}
+                {categories.map((category) => {
+                  const Icon = categoryIcon(category.slug);
+                  return (
+                    <SelectItem key={category.slug} value={category.slug}>
+                      <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                      {category.name}
+                    </SelectItem>
+                  );
+                })}
               </SelectContent>
             </Select>
           </div>

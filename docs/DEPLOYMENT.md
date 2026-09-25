@@ -116,10 +116,61 @@ successful" is never rendered** without a real provider confirming a charge. To
 activate one, implement `src/server/payments/provider.ts` — no auction, fee or
 transaction code changes.
 
+## 6. Vercel Deployment Protection (SSO) — why every URL 302s
+
+If **every** path on the production domain — `/`, `/api/time`, the cron route —
+answers `302 Location: https://vercel.com/sso-api?...` and the browser lands on
+a "Protected Deployment" login page, the application never ran. That response
+is issued by Vercel's edge, before any function or page is invoked. It is a
+platform setting, not an app or auth bug: nothing in `middleware`, the API
+routes or Supabase can see or fix it.
+
+Inspect the live state (authenticated CLI, `vercel login` first if needed):
+
+```sh
+vercel project protection bid-blitz --format json
+```
+
+On this project the launch-time state was:
+
+```json
+{ "ssoProtection": { "deploymentType": "all_except_custom_domains" },
+  "gitForkProtection": true }
+```
+
+`all_except_custom_domains` protects every `*.vercel.app` deployment —
+production included — so the site, `/api/time` and `GET /api/cron/settle` are
+all unreachable for users and for Vercel's own cron.
+
+To make production public while keeping previews gated, PATCH the project with
+a token that can edit it (the CLI credential store works:
+
+`%APPDATA%\com.vercel.cli\Data\auth.json` → `token`, process env only):
+
+```sh
+PATCH https://api.vercel.com/v9/projects/<projectId>
+{ "ssoProtection": { "deploymentType": "preview" } }
+```
+
+(`vercel project protection disable <name> --sso` is the CLI toggle for the
+same setting; `preview` is preferred over a full disable so preview
+deployments stay protected.) Verify with the `project protection` command
+above, then re-run the §4 smoke checks. `gitForkProtection` is unrelated and
+stays on.
+
+> This project ran its release QA (HTTP smoke, Playwright desktop + mobile,
+> visual pass) with `deploymentType` temporarily set to `preview`, and the
+> original `all_except_custom_domains` state was restored afterwards per the
+> release run's instruction to leave no stray security changes. **Production is
+> therefore gated again after QA** — flip the switch (dashboard: Settings →
+> Security → Deployment Protection, or the PATCH above) before real users
+> arrive, or real traffic will bounce to the Vercel login page.
+
 ## Troubleshooting
 
 | Symptom | Cause |
 | --- | --- |
+| Every URL 302s to `vercel.com/sso-api` | Vercel Authentication enabled for the deployment. Platform setting — §6, not application code. |
 | Deploy rejected citing cron | Schedule is more frequent than once per day on a Hobby plan. See §3. |
 | Sign-in loop, or `?error=callback` | Deployed origin missing from Supabase **Redirect URLs** (§2). |
 | `SUPABASE_SECRET_KEY is not configured` | Secret missing from Vercel, or it was (incorrectly) prefixed `NEXT_PUBLIC_`. |

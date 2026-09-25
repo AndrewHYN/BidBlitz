@@ -1,11 +1,17 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import type { Metadata } from "next";
 import { Eye } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getWatchlist } from "@/server/queries";
 import { AuctionCard } from "@/components/auction/auction-card";
 import { EmptyState, PageHeader } from "@/components/auction/page-header";
 import { Button } from "@/components/ui/button";
+
+export const metadata: Metadata = {
+  title: "Watchlist",
+  description: "Auctions you are keeping an eye on.",
+};
 
 export default async function WatchlistPage() {
   const supabase = await createClient();

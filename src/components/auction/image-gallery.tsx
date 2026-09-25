@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ImageIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ImageWithFallback } from "@/components/auction/image-with-fallback";
 
 /**
  * Main image + thumbnail strip. The server hands over fully-resolved URLs so
@@ -48,12 +49,23 @@ export function ImageGallery({
   return (
     <div data-testid="auction-gallery" className="space-y-3">
       <div className="relative aspect-[4/3] overflow-hidden rounded-xl border bg-muted">
-        {/* Supabase public bucket; plain img keeps remote-pattern config out of the build. */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+        {/* key by photo: a failed load must reset when the user switches. */}
+        <ImageWithFallback
+          key={active.id}
           src={active.url}
           alt={`${title} — photo ${activeIndex + 1} of ${images.length}`}
           className="size-full object-cover"
+          fallback={
+            <div className="grid size-full place-items-center bg-muted/40 text-center">
+              <div className="space-y-2 px-6 py-8">
+                <ImageIcon className="mx-auto size-8 text-muted-foreground/60" aria-hidden />
+                <p className="text-sm font-medium">Photo unavailable</p>
+                <p className="text-xs text-muted-foreground">
+                  This listing&apos;s image could not be loaded.
+                </p>
+              </div>
+            </div>
+          }
         />
         <span className="absolute right-2 bottom-2 rounded-md bg-background/90 px-2 py-0.5 text-xs tabular-nums backdrop-blur-sm">
           {activeIndex + 1} / {images.length}
@@ -77,8 +89,17 @@ export function ImageGallery({
                   : "opacity-70 hover:opacity-100"
               )}
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={img.url} alt="" className="size-full object-cover" />
+              <ImageWithFallback
+                key={img.id}
+                src={img.url}
+                alt=""
+                className="size-full object-cover"
+                fallback={
+                  <div className="grid size-full place-items-center bg-muted">
+                    <ImageIcon className="size-4 text-muted-foreground/60" aria-hidden />
+                  </div>
+                }
+              />
             </button>
           ))}
         </div>

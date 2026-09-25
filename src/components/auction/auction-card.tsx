@@ -3,6 +3,7 @@ import { Gavel, MapPin, ImageIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { AuctionCardData } from "@/server/queries";
 import { Money } from "@/components/auction/money";
+import { ImageWithFallback } from "@/components/auction/image-with-fallback";
 import { Countdown } from "@/components/auction/countdown";
 import { LiveStatus } from "@/components/auction/live-status";
 import { isClosed } from "@/lib/auction-status";
@@ -44,20 +45,17 @@ export function AuctionCard({
       data-auction-id={auction.id}
     >
       <div className="relative aspect-[4/3] overflow-hidden bg-muted">
-        {auction.imageUrl ? (
-          // Supabase public bucket; plain img keeps remote-pattern config out of the build.
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={auction.imageUrl}
-            alt=""
-            loading="lazy"
-            className="size-full object-cover transition-transform duration-500 group-hover:scale-105"
-          />
-        ) : (
-          <div className="grid size-full place-items-center bg-gradient-to-br from-muted via-muted to-accent">
-            <ImageIcon className="size-8 text-muted-foreground/60" aria-hidden />
-          </div>
-        )}
+        <ImageWithFallback
+          src={auction.imageUrl}
+          alt=""
+          loading="lazy"
+          className="size-full object-cover transition-transform duration-500 group-hover:scale-105"
+          fallback={
+            <div className="grid size-full place-items-center bg-gradient-to-br from-muted via-muted to-accent">
+              <ImageIcon className="size-8 text-muted-foreground/60" aria-hidden />
+            </div>
+          }
+        />
 
         <div className="absolute left-2 top-2 flex flex-wrap gap-1.5">
           <LiveStatus status={auction.status} endsAt={auction.endsAt} />
