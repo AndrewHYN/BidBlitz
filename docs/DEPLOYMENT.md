@@ -93,6 +93,15 @@ route refuses everything when `CRON_SECRET` is unset (it will not accept
 `Bearer undefined`), which degrades to a 401 rather than an unauthenticated
 sweep.
 
+**Retrieval gotcha:** if the variable was created with `visibility: secret`,
+`vercel env pull` writes the literal placeholder `[SENSITIVE]` instead of the
+value — sending that placeholder gets a 401 and looks like a broken cron.
+Environment changes are also snapshotted per deployment, so after any rotation
+you must create a **new deployment** (a git push; CLI redeploys do not take the
+production alias) before the route accepts the new value. Keep the value in the
+gitignored `.env.local` for local verification, exactly like
+`.env.example` describes.
+
 ## 4. Post-deploy verification
 
 Run these against the deployed URL before calling it shipped:

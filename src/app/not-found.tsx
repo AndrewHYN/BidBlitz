@@ -1,14 +1,10 @@
 import Link from "next/link";
-import type { Metadata } from "next";
 import { Gavel, SearchX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-// The custom 404 must not inherit the home page's title; verified against the
-// live build after deploy.
-export const metadata: Metadata = {
-  title: "Page not found",
-  description: "The page you were looking for doesn't exist or has moved.",
-};
+// No metadata export here: this Next version ignores metadata in
+// not-found.tsx (verified against the live build — the title stays the
+// root default). Per-route titles belong on real pages.
 
 export default function NotFound() {
   return (
