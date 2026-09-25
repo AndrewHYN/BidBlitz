@@ -61,7 +61,16 @@ export default async function AdminPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login?next=/admin");
 
-  const { data: isAdmin } = await supabase.rpc("is_admin");
+  // Same fact the old `is_admin()` RPC returned: whether THIS session's user
+  // carries the admin flag. Read straight from the profile row (RLS: everyone
+  // may read profiles), because migration 000010 moved that function out of
+  // the exposed API schema.
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("is_admin")
+    .eq("id", user.id)
+    .maybeSingle();
+  const isAdmin = profile?.is_admin ?? false;
 
   // Not an admin: say so and run NO moderation queries. The report and fee
   // reads below never execute for a caller who failed this check.

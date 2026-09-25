@@ -55,6 +55,9 @@ async function sql(query) {
     method: "POST",
     headers: { Authorization: `Bearer ${TOKEN}`, "Content-Type": "application/json" },
     body: JSON.stringify({ query }),
+    // This environment suffers intermittent network stalls (Windows suspends
+    // network I/O). Fail loudly instead of hanging the run forever.
+    signal: AbortSignal.timeout(60_000),
   });
   const body = await res.text();
   if (!res.ok) throw new Error(`SQL ${res.status}: ${body}`);
@@ -70,17 +73,28 @@ function rows(x) {
   return [];
 }
 
-async function rest(path, { method = "GET", key = PUB, bearer, body, headers = {} } = {}) {
-  const res = await fetch(`${URL_}${path}`, {
-    method,
-    headers: {
-      apikey: key,
-      Authorization: `Bearer ${bearer ?? key}`,
-      ...(body ? { "Content-Type": "application/json" } : {}),
-      ...headers,
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  });
+async function rest(path, { method = "GET", key = PUB, bearer, body, raw, headers = {} } = {}) {
+  let res;
+  try {
+    res = await fetch(`${URL_}${path}`, {
+      method,
+      headers: {
+        apikey: key,
+        Authorization: `Bearer ${bearer ?? key}`,
+        ...(body ? { "Content-Type": "application/json" } : {}),
+        ...headers,
+      },
+      body: body ? (raw ? body : JSON.stringify(body)) : undefined,
+      // A stalled request must fail THIS check, not hang the whole run.
+      signal: AbortSignal.timeout(30_000),
+    });
+  } catch (e) {
+    return {
+      status: 0,
+      ok: false,
+      data: { transport_error: `${e?.name ?? "Error"}: ${e?.message ?? e}` },
+    };
+  }
   const text = await res.text();
   let data = null;
   try { data = text ? JSON.parse(text) : null; } catch { data = text; }
@@ -236,6 +250,7 @@ if (testIds.length) {
   await sql(`delete from public.auctions where seller_id in (${list})`);
   await sql(`delete from public.notifications where user_id in (${list})`);
   await sql(`delete from public.watchlist where user_id in (${list})`);
+  await sql(`delete from public.reports where reporter_id in (${list})`);
   console.log(`  reset state for ${testIds.length} test users`);
 }
 
@@ -389,6 +404,37 @@ const pub = await rest(`/rest/v1/rpc/publish_auction`, {
 check("seller: publish_auction transitions DRAFT -> LIVE", pub.ok && pub.data?.status === "LIVE",
   JSON.stringify(pub.data));
 
+// Cross-user Storage access (release gate): the bucket is public-read, but
+// only the auction owner may write into <auction_id>/* — and only while the
+// auction is open. Checked here, while the auction is genuinely LIVE.
+const storagePath = `${auctionId}/harness-probe.jpg`;
+const jpegBytes = Buffer.from([
+  0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01,
+  0x01, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0xff, 0xd9,
+]);
+const foreignUpload = await rest(`/storage/v1/object/auction-images/${storagePath}`, {
+  method: "POST", bearer: tok.buyer2,
+  headers: { "Content-Type": "image/jpeg" },
+  body: jpegBytes, raw: true,
+});
+// The Storage API reports an RLS denial as HTTP 400 with a statusCode 403
+// envelope, so assert on the authoritative body message, not the HTTP code.
+const foreignBody = JSON.stringify(foreignUpload.data ?? "");
+check("security: a non-owner cannot write into another auction's storage folder",
+  !foreignUpload.ok && /row-level security/i.test(foreignBody),
+  `status ${foreignUpload.status} ${foreignBody.slice(0, 160)}`);
+
+const ownUpload = await rest(`/storage/v1/object/auction-images/${storagePath}`, {
+  method: "POST", bearer: tok.seller,
+  headers: { "Content-Type": "image/jpeg" },
+  body: jpegBytes, raw: true,
+});
+const storageCleanup = await rest(`/storage/v1/object/auction-images/${storagePath}`, {
+  method: "DELETE", bearer: tok.seller,
+});
+check("storage: the owner's own upload still works (policy intact)",
+  ownUpload.ok, `status ${ownUpload.status} cleanup=${storageCleanup.status}`);
+
 // ---- 5. business rules -----------------------------------------------------
 console.log("\n--- bid business rules ---");
 
@@ -496,7 +542,14 @@ if (accepted === 1) {
 
 // ---- 10. anti-sniping -----------------------------------------------------
 console.log("\n--- anti-sniping ---");
-await sql(`update public.auctions set ends_at = now() + interval '10 seconds'
+// This machine suffers multi-second network stalls, so the closing window is
+// widened (ends_at +90s against a 120s window): the test must measure the
+// ENGINE's extension rule, never this environment's latency. The assertion —
+// a bid landing inside anti_snipe_window_seconds extends ends_at on the
+// server — is unchanged.
+await sql(`update public.auctions
+              set ends_at = now() + interval '90 seconds',
+                  anti_snipe_window_seconds = 120
             where id='${auctionId}'`);
 
 const before = rows(await sql(`select ends_at from public.auctions where id='${auctionId}'`))[0];
@@ -508,7 +561,7 @@ const afterSnipe = rows(await sql(`select ends_at, extension_count from public.a
 const extended = new Date(afterSnipe.ends_at).getTime() > new Date(before.ends_at).getTime();
 check("anti-snipe: bid inside the closing window extends ends_at on the server",
   snipe.ok && snipe.data?.extended === true && extended,
-  `extended=${snipe.data?.extended} ext_count=${afterSnipe.extension_count}`);
+  `extended=${snipe.data?.extended} ext_count=${afterSnipe.extension_count} status=${snipe.status} resp=${JSON.stringify(snipe.data)?.slice(0, 200)}`);
 check("anti-snipe: extension recorded + broadcast by the response",
   Number(afterSnipe.extension_count) >= 1 && snipe.data?.extension_seconds === 30,
   `ext=${afterSnipe.extension_count}s/${snipe.data?.extension_seconds}s`);
@@ -639,6 +692,85 @@ const payloadStillIntact = rows(await sql(
 check("notifications: payload is not client-writable",
   !forge.ok && Number(payloadStillIntact) >= 1,
   `status=${forge.status} intact=${payloadStillIntact}`);
+
+// ---- 13. release security gates (migration 000010 + launch checklist) ------
+console.log("\n--- release security gates ---");
+
+// Internal helpers moved to the `private` schema must have NO PostgREST route.
+const movedRpc = await rest(`/rest/v1/rpc/is_admin`, {
+  method: "POST", bearer: tok.buyer1,
+});
+check("security: internal helpers are off the public RPC surface (private schema)",
+  !movedRpc.ok, `status ${movedRpc.status}`);
+
+// Anonymous execution of the engine, beyond place_bid (covered above).
+const anonAllowed = [];
+for (const fn of ["publish_auction", "settle_auction", "settle_due_auctions"]) {
+  const r = await rest(`/rest/v1/rpc/${fn}`, {
+    method: "POST",
+    body: fn === "settle_due_auctions" ? { p_limit: 1 } : { p_auction_id: auctionId },
+  });
+  if (r.ok) anonAllowed.push(fn);
+}
+check("rule: anonymous cannot execute publish/settle functions",
+  anonAllowed.length === 0,
+  anonAllowed.length ? `allowed: ${anonAllowed.join(",")}` : "all rejected");
+
+// A signed-in stranger must see nobody else's notifications.
+const ownNotifs = await rest(`/rest/v1/notifications?user_id=eq.${buyer1Id}&select=id`,
+  { bearer: tok.buyer1 });
+const notifPeek = await rest(`/rest/v1/notifications?user_id=eq.${buyer1Id}&select=id`,
+  { bearer: tok.buyer3 });
+check("RLS: a signed-in stranger cannot read someone else's notifications",
+  ownNotifs.ok && ownNotifs.data.length > 0 && notifPeek.ok && notifPeek.data.length === 0,
+  `owner=${ownNotifs.data?.length ?? "?"} stranger=${notifPeek.data?.length ?? "?"}`);
+
+// Unauthorized admin action: report triage is admin-only, and the merged
+// admin policy (000010) must still grant admins their full authority.
+const report = await rest(`/rest/v1/reports`, {
+  method: "POST", bearer: tok.buyer1,
+  headers: { Prefer: "return=representation" },
+  body: {
+    reporter_id: buyer1Id,
+    target_type: "auction",
+    target_id: auctionId,
+    reason: "harness: exercising report authorization",
+  },
+});
+check("rule: a user can file a report against a listing", report.ok,
+  `status ${report.status}`);
+const reportId = report.data?.[0]?.id;
+
+if (reportId) {
+  const nonAdminTriage = await rest(`/rest/v1/reports?id=eq.${reportId}`, {
+    method: "PATCH", bearer: tok.buyer2,
+    headers: { Prefer: "return=representation" },
+    body: { status: "DISMISSED" },
+  });
+  const beforeState = rows(await sql(
+    `select status from public.reports where id='${reportId}'`))[0];
+  const nonAdminRows = Array.isArray(nonAdminTriage.data) ? nonAdminTriage.data.length : 0;
+  check("security: non-admin cannot triage a report",
+    nonAdminTriage.ok && nonAdminRows === 0 && beforeState?.status === "OPEN",
+    `updated=${nonAdminRows} status=${beforeState?.status}`);
+
+  await sql(`update public.profiles set is_admin = true where id='${buyer2Id}'`);
+  const adminTriage = await rest(`/rest/v1/reports?id=eq.${reportId}`, {
+    method: "PATCH", bearer: tok.buyer2,
+    headers: { Prefer: "return=representation" },
+    body: { status: "DISMISSED" },
+  });
+  const afterAdmin = rows(await sql(
+    `select status from public.reports where id='${reportId}'`))[0];
+  await sql(`update public.profiles set is_admin = false where id='${buyer2Id}'`);
+  check("security: admin CAN triage a report (merged admin policy intact)",
+    adminTriage.ok && afterAdmin?.status === "DISMISSED",
+    `status=${afterAdmin?.status} blocked=${JSON.stringify(adminTriage.data)?.slice(0, 120)}`);
+} else {
+  check("security: non-admin cannot triage a report", false, "report row missing");
+  check("security: admin CAN triage a report (merged admin policy intact)", false,
+    "report row missing");
+}
 
 // ---------------------------------------------------------------------------
 console.log("\n" + "=".repeat(64));

@@ -238,3 +238,92 @@ the rotated token away: one round trip per page view, indefinitely.
   forever" failure mode is gone.
 - Anonymous traffic pays no measurable cost: no config → pass through; valid
   session → no network call at all.
+
+## ADR-010: Launch security hardening — `private` schema, `search_path = ''`, advisor dispositions
+
+Status: Accepted
+
+### Context
+
+The final pre-launch advisor pass (`GET /v1/projects/{ref}/advisors/security`
+and `/advisors/performance`) reported 23 security and 38 performance findings.
+The substantive ones: SECURITY DEFINER helpers executable by `anon` through
+`/rest/v1/rpc`, four functions with no fixed `search_path`, `pg_trgm` installed
+in `public`, 15 RLS policies re-evaluating `auth.uid()` per row, four unindexed
+foreign keys, five actions carrying two permissive policies each, and one pair
+of identical indexes.
+
+### Decision
+
+1. **A `private` schema that PostgREST does not expose.** Policy helpers
+   (`is_admin`, `is_seller_of`, `can_view_auction`) and trigger functions
+   (`handle_new_user`, `sync_email_verified`, `sync_image_count`,
+   `touch_updated_at`, `auctions_protect_state`) moved there with
+   `ALTER FUNCTION ... SET SCHEMA`, which preserves object OIDs — so every
+   trigger and policy that captured them keeps working. RLS predicates resolve
+   functions by OID; `/rest/v1/rpc/*` routes only `public`, so the functions
+   vanish from the API surface (verified: `rpc/is_admin` → `404 PGRST202`).
+   `anon`/`authenticated` keep `EXECUTE` on the two helpers their own policies
+   evaluate (`is_admin`, `can_view_auction`), which is unreachable via
+   PostgREST anyway; `is_seller_of` is authenticated-only.
+
+2. **`SET search_path = ''` on every function we own**, with schema-qualified
+   references (`public.*`, `private.*`, `auth.uid()`, `public.auction_status_t`
+   casts). A SECURITY DEFINER function on a mutable search_path resolves
+   objects against whatever the calling role can create first; `''` removes
+   that attack class. Migration 000010 ends with a guard that raises if any
+   function in `public`/`private` still lacks a fixed `search_path`.
+
+3. **App change, not just SQL.** The admin UI called `supabase.rpc("is_admin")`.
+   With the function moved, both call sites read `profiles.is_admin` on the
+   caller's own row — the same fact, through normal row policies — and the
+   stale entry was removed from `src/lib/supabase/types.ts`.
+
+4. **The sweep is service_role-only.** `settle_due_auctions` is invoked
+   exclusively by admin-key paths (`src/server/sweep.ts`, `/api/cron/settle`),
+   so its `authenticated` EXECUTE grant was revoked. The per-auction
+   `settle_auction()` the seller UI calls keeps its authenticated grant.
+
+5. **`pg_trgm` moved to `extensions`.** The GIN index on `auctions.title`
+   references its operator class by OID and is unaffected; no query calls
+   `similarity()`/`show_trgm()` (search runs on `search_vector` + `ilike`).
+
+6. **RLS performance, semantics untouched.** Every `auth.uid()` in policies
+   became `(select auth.uid())` — evaluated once per statement; `auth.uid()`
+   cannot change within a statement. `auctions_admin` and
+   `profiles_admin_update` merged into their base policies as an
+   `OR private.is_admin()` arm: the permissive union is identical, admin
+   authority is preserved (harness: "admin CAN triage a report"), and
+   `multiple_permissive_policies` drops to zero.
+
+7. **Four covering indexes** for the unindexed FKs (`auctions.current_bidder_id`,
+   `auctions.winner_id`, `notifications.auction_id`, `reviews.reviewer_id` —
+   each a real dashboard/detail access path) and the duplicate
+   `auctions_ending_soon_idx` dropped (identical to `auctions_live_ends_idx`).
+
+### Advisor dispositions (re-measured after apply)
+
+- **Security: 23 → 5**, every remaining item reviewed:
+  - 4 × `authenticated_security_definer_function_executable` for
+    `place_bid`, `publish_auction`, `cancel_auction`, `settle_auction` —
+    this *is* the product's RPC surface. Each function re-checks identity,
+    ownership and state before acting and all four are proven by the
+    57-check engine harness; revoking would delete bidding itself.
+  - 1 × `auth_leaked_password_protection` — GoTrue answers HTTP 402:
+    HaveIBeenPwned checks are gated to Pro plans and up. Documented as a
+    manual action in the final report.
+- **Performance: 38 → 15**, all `unused_index` INFO. The four new FK indexes
+  read zero on an idle database; they index real query shapes (buyer
+  "winning" dashboard, winner page, per-auction notifications, "my reviews").
+  No HIGH findings; `auth_rls_initplan`, `unindexed_foreign_keys`,
+  `multiple_permissive_policies` and `duplicate_index` are all zero.
+
+### Consequences
+
+- `anon` can no longer invoke any SECURITY DEFINER function through the API;
+  internal functions have no API route at all.
+- Fresh databases and the live project converge: 000010 is guarded and
+  idempotent (`to_regprocedure` checks, `if exists`, extension-schema probe),
+  and the harness rebuilds from all ten migrations green (57/57).
+- The `private` schema must stay out of PostgREST's exposed-schema setting;
+  if it were ever added, `anon_security_definer_*` findings would return.

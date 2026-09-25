@@ -3,7 +3,10 @@
 /**
  * Admin-only mutations live in their own `"use server"` module so nothing on
  * this surface can be reached without the same checks: Zod first, then the
- * caller's own session, then `is_admin()` — RLS backs all three.
+ * caller's own session, then `profiles.is_admin` on that session's own row —
+ * RLS backs all three. (The `is_admin()` SQL function moved to the `private`
+ * schema in migration 000010, so it is no longer a PostgREST RPC; the column
+ * read below is the same fact, fetched through the normal row policies.)
  */
 
 import { revalidatePath } from "next/cache";
@@ -32,8 +35,12 @@ export async function updateReportStatusAction(
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, message: "Sign in." };
 
-  const { data: admin } = await supabase.rpc("is_admin");
-  if (!admin) return { ok: false, message: "Admins only." };
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("is_admin")
+    .eq("id", user.id)
+    .maybeSingle();
+  if (!profile?.is_admin) return { ok: false, message: "Admins only." };
 
   // Status only: resolutions are typed by humans, never by this button.
   const { error } = await supabase

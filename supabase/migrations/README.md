@@ -13,9 +13,12 @@ Apply order is the filename prefix:
 | `20260924000007_notifications_selfservice.sql` | Restore the UPDATE grant behind `notifications_mark_read` (mark-as-read 403'd) |
 | `20260924000008_image_count_derived.sql` | `image_count` derived from `auction_images` by trigger; clients lose the write (publish was impossible before this) |
 | `20260924000009_seed_categories.sql` | Seed the 10-row category taxonomy — the table was created empty, so the sell form had nothing to pick |
+| `20260924000010_release_security_hardening.sql` | Pre-launch advisor pass: internal functions moved to a non-exposed `private` schema, `search_path = ''` on every function we own, least-privilege EXECUTE grants, `(select auth.uid())` in all policies, admin-policy merge, four FK indexes, duplicate index dropped, `pg_trgm` → `extensions` (see ADR-010) |
 
 Each file opens with an honest "why this migration exists" changelog; rows
 6–9 are fixes for defects found by running the product, not planned work.
+Row 10 is planned pre-launch hardening and ends with a guard that aborts if
+any function of ours is left without a fixed `search_path`.
 
 ## How they are applied
 

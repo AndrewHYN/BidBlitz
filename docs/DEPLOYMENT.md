@@ -46,6 +46,24 @@ Dashboard → **Authentication → URL Configuration**:
 The callback route validates the `next` parameter against a single-slash,
 non-absolute path, so it cannot be used as an open redirect.
 
+This project has both applied already, through the Management API
+(`PATCH /v1/projects/{ref}/config/auth`):
+
+- **Site URL** = `https://bid-blitz-q9l25rfxv-andrewhyn.vercel.app`
+- **Redirect URLs** (comma-separated) =
+  `https://bid-blitz-q9l25rfxv-andrewhyn.vercel.app/**,https://bid-blitz*-andrewhyn.vercel.app/**,http://localhost:3000/**`
+
+Two details worth keeping:
+
+- The `**` is load-bearing: GoTrue compiles the patterns with `.` and `/` as
+  glob separators, so a single `*` cannot cross the `/auth/callback` path
+  boundary. All three patterns stay on origins this project controls
+  (production, its own Vercel previews, localhost), so a confirmation link can
+  never hand tokens to a foreign host.
+- **Leaked-password protection (HaveIBeenPwned) is not enabled.** The API
+  answers `HTTP 402` — the feature is gated to Pro plans and up. It remains
+  the one `auth_leaked_password_protection` advisor warning; see ADR-010.
+
 Confirm the project's email settings match the intended signup behaviour: the
 project ships with **email confirmation ON**, which means `signUpAction` returns
 success *without* a session and the UI shows a truthful "check your email"

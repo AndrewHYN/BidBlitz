@@ -41,16 +41,23 @@ test.describe("authentication", () => {
     await expect(page.getByTestId("signup-form")).toBeVisible({ timeout: 30_000 });
 
     const stamp = `${Date.now()}`;
-    // example.com is RFC 2606 "reserved for documentation" — GoTrue rejects
-    // the .test TLD outright (error_code=email_address_invalid), which made
-    // this test red in every run for a reason that had nothing to do with our
-    // flow. No mailbox is ever read; confirmation links go nowhere.
+    // Ground truth (probed 2026-09-25 against this project's GoTrue):
+    //   e2e-<ts>@example.com -> 400 email_address_invalid
+    //   e2e-<ts>@gmail.com   -> 200 signup + confirmation email accepted
+    // GoTrue's mailer email validation blocklists example.com in
+    // invalidHostMap (validateclient.go) — RFC 2606 addresses are rejected
+    // with "Email address ... is invalid", which our friendlyAuthError maps
+    // to "Enter a valid email address." The .test TLD is blocked the same way
+    // (invalidHostSuffixes). gmail.com is in hostAllowList (MX checks
+    // skipped); the only extra rule is a >=6 char local part, which the
+    // e2e-<stamp> name satisfies. No mailbox is ever read; confirmation
+    // links go nowhere.
     await page.getByTestId("name-field").fill(`E2E ${stamp}`);
     await page
       .getByTestId("email-field")
       .or(page.locator('input[type="email"]'))
       .first()
-      .fill(`e2e-${stamp}@example.com`);
+      .fill(`e2e-${stamp}@gmail.com`);
     await page
       .getByTestId("password-field")
       .or(page.locator('input[type="password"]'))

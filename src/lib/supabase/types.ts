@@ -186,7 +186,9 @@ export interface Database {
       settle_auction: { Args: { p_auction_id: string }; Returns: Json };
       settle_due_auctions: { Args: { p_limit?: number }; Returns: number };
       server_now: { Args: Record<string, never>; Returns: string };
-      is_admin: { Args: Record<string, never>; Returns: boolean };
+      // is_admin intentionally absent: the function lives in the `private`
+      // schema (migration 000010) and has no PostgREST route. Admin UI reads
+      // `profiles.is_admin` on the caller's own row instead.
       auction_effective_status: {
         Args: { p_status: AuctionStatus; p_starts_at: string; p_ends_at: string; p_now?: string };
         Returns: string;
