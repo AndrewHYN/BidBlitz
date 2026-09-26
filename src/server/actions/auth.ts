@@ -9,6 +9,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { absoluteUrl } from "@/lib/site-url";
 import type { BidRejection } from "@/server/errors";
 
 export type AuthResult = { ok: true } | { ok: false; rejection: BidRejection };
@@ -70,9 +71,9 @@ export async function signUpAction(input: {
     password: input.password,
     options: {
       data: { display_name: input.displayName.trim() },
-      // The deployed env ends in "/", so strip it — otherwise confirmation
-      // links point at "//auth/callback" and can miss the route entirely.
-      emailRedirectTo: `${(process.env.NEXT_PUBLIC_SITE_URL ?? "").replace(/\/+$/, "")}/auth/callback`,
+      // Canonical origin, trailing slash stripped (site-url.ts) — otherwise
+      // confirmation links point at "//auth/callback" and miss the route.
+      emailRedirectTo: absoluteUrl("/auth/callback"),
     },
   });
 

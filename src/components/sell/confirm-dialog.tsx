@@ -25,6 +25,8 @@ export function ConfirmDialog({
   onConfirm,
   pending,
   error,
+  confirmVariant = "destructive",
+  confirmTestId,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -35,6 +37,10 @@ export function ConfirmDialog({
   onConfirm: () => void;
   pending: boolean;
   error: string | null;
+  /** Destructive by default (delete/cancel); "default" for consequential-but-
+   *  positive actions like publishing. */
+  confirmVariant?: "destructive" | "default";
+  confirmTestId?: string;
 }) {
   return (
     <Dialog
@@ -69,9 +75,10 @@ export function ConfirmDialog({
           </Button>
           <Button
             type="button"
-            variant="destructive"
+            variant={confirmVariant}
             onClick={onConfirm}
             disabled={pending}
+            data-testid={confirmTestId}
           >
             {pending ? "Working…" : confirmLabel}
           </Button>

@@ -176,21 +176,33 @@ export async function createListing(
   }
 
   await publish.click();
-  await page.waitForURL(/\/auction\//, { timeout: 15_000 }).catch(() => undefined);
+  // Publishing locks the terms irreversibly, so it asks once first.
+  const confirm = page.getByTestId("publish-confirm");
+  await expect(confirm).toBeVisible({ timeout: 5_000 });
+  await confirm.click();
 
-  // Fallback: publishing demanded an image the disabled-state did not
-  // advertise — attach one and retry once.
-  if (!page.url().includes("/auction/") && (await upload.count()) > 0) {
-    const errored = await page.getByTestId("sell-field-error").isVisible();
-    if (errored) {
+  // Success is the launched panel (countdown + share controls) — the page
+  // deliberately stays at /sell/[id], so there is no URL to wait for.
+  const success = page.getByTestId("publish-success");
+  try {
+    await expect(success).toBeVisible({ timeout: 30_000 });
+  } catch {
+    // One bounded recovery: the server re-checked the image gate after the
+    // upload (or the dialog surfaced an error). Close it, attach one photo
+    // and retry exactly once — a second failure fails the test honestly.
+    const cancel = page.getByRole("button", { name: /not yet/i });
+    if (await cancel.isVisible().catch(() => false)) await cancel.click();
+    if ((await upload.count()) > 0) {
       await upload.setInputFiles({
         name: "listing.png",
         mimeType: "image/png",
         buffer: TINY_PNG,
       });
       await page.waitForTimeout(1_500);
-      await publish.click().catch(() => undefined);
-      await page.waitForURL(/\/auction\//, { timeout: 30_000 }).catch(() => undefined);
+      await publish.click();
+      await expect(confirm).toBeVisible({ timeout: 5_000 });
+      await confirm.click();
+      await expect(success).toBeVisible({ timeout: 30_000 });
     }
   }
 

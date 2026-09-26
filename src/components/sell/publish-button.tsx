@@ -4,9 +4,12 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Rocket } from "lucide-react";
+import { toast } from "sonner";
 import { publishAuctionAction } from "@/server/actions/auction";
 import { Countdown } from "@/components/auction/countdown";
+import { ShareButton } from "@/components/auction/share-button";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/sell/confirm-dialog";
 import { isClosed } from "@/lib/auction-status";
 import { formatMoney, money } from "@/lib/money";
 import { renderRejectionMessage } from "@/server/errors";
@@ -16,16 +19,20 @@ import { renderRejectionMessage } from "@/server/errors";
  *
  * The database is the authority: `publish_auction` refuses any auction with
  * `image_count < 1`, so the button mirrors that rule instead of waiting to be
- * told off. Once the engine accepts, the button is replaced by a countdown —
- * there is nothing left to click.
+ * told off. Publishing is IRREVERSIBLE (terms freeze at this moment), so the
+ * action asks once, states exactly what locks, and then reports the result:
+ * the button is replaced by a countdown plus share controls — there is
+ * nothing left to click.
  */
 export function PublishButton({
   auctionId,
+  title,
   imageCount,
   status,
   endsAt,
 }: {
   auctionId: string;
+  title: string;
   imageCount: number;
   status: string;
   endsAt: string | null;
@@ -33,6 +40,7 @@ export function PublishButton({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [launched, setLaunched] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   function handlePublish() {
@@ -44,7 +52,11 @@ export function PublishButton({
           setError(renderRejectionMessage(result.rejection, (minor) => formatMoney(money(minor))));
           return;
         }
+        setConfirmOpen(false);
         setLaunched(true);
+        toast.success("Your auction is live", {
+          description: "Share it to get your first bids in.",
+        });
         router.refresh();
       } catch {
         setError("Something went wrong while publishing. Please try again.");
@@ -61,16 +73,26 @@ export function PublishButton({
         ? "Scheduled — waiting for the clock to start"
         : "Live now";
 
+    const shareable = status === "LIVE" || status === "SCHEDULED";
+
     return (
-      <div className="space-y-3">
+      <div className="space-y-3" data-testid="publish-success">
         <p className="flex items-center gap-2 text-sm font-medium">
           <Rocket className="size-4 text-primary" aria-hidden />
           {label}
         </p>
         {endsAt && <Countdown endsAt={endsAt} status={status} variant="boxes" />}
-        <Button asChild variant="outline" size="sm">
-          <Link href={`/auction/${auctionId}`}>View the live listing</Link>
-        </Button>
+        {shareable && (
+          <p className="text-sm text-muted-foreground">
+            Share your auction to get the first bids in.
+          </p>
+        )}
+        <div className="flex flex-wrap items-center gap-2">
+          <Button asChild variant="outline" size="sm">
+            <Link href={`/auction/${auctionId}`}>View the live listing</Link>
+          </Button>
+          {shareable && <ShareButton auctionId={auctionId} title={title} size="sm" />}
+        </div>
       </div>
     );
   }
@@ -81,14 +103,31 @@ export function PublishButton({
     <div className="space-y-3">
       <Button
         type="button"
-        onClick={handlePublish}
+        onClick={() => {
+          setError(null);
+          setConfirmOpen(true);
+        }}
         disabled={blocked || pending}
         aria-describedby={blocked ? "publish-disabled-reason" : undefined}
         data-testid="publish-button"
       >
         <Rocket className="size-4" aria-hidden />
-        {pending ? "Publishing…" : "Publish auction"}
+        Publish auction
       </Button>
+
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title="Publish this auction?"
+        description="Bidding starts immediately. Your terms are locked from that moment — price, bid increment, duration and the closing time can't be changed afterwards."
+        confirmLabel="Publish auction"
+        cancelLabel="Not yet"
+        confirmVariant="default"
+        confirmTestId="publish-confirm"
+        onConfirm={handlePublish}
+        pending={pending}
+        error={error}
+      />
 
       {blocked && (
         <p
@@ -100,7 +139,7 @@ export function PublishButton({
         </p>
       )}
 
-      {error && (
+      {error && !confirmOpen && (
         <div
           role="alert"
           className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"

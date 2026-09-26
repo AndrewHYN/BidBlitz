@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   exponentFor,
+  feePercentLabel,
   formatMoney,
   money,
   nextMinimumBid,
@@ -131,5 +132,19 @@ describe("previewFeeMinor()", () => {
     expect(previewFeeMinor(100n, 20000)).toBe(100n);
     expect(previewFeeMinor(100n, 0, 500n)).toBe(100n);
     expect(previewFeeMinor(0n, 500)).toBe(0n);
+  });
+});
+
+describe("feePercentLabel()", () => {
+  it("labels whole basis-point rates without float division", () => {
+    expect(feePercentLabel(500)).toBe("5%");
+    expect(feePercentLabel(0)).toBe("0%");
+    expect(feePercentLabel(2500)).toBe("25%");
+  });
+
+  it("keeps fractional rates exact and trailing-zero free", () => {
+    expect(feePercentLabel(1250)).toBe("12.5%");
+    expect(feePercentLabel(333)).toBe("3.33%");
+    expect(feePercentLabel(1050)).toBe("10.5%");
   });
 });

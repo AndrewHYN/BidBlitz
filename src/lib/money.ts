@@ -99,3 +99,17 @@ export function previewFeeMinor(
   const fee = halfUp > minFeeMinor ? halfUp : minFeeMinor;
   return fee > grossMinor ? grossMinor : fee;
 }
+
+/**
+ * Human label for a basis-point rate: 500 -> "5%", 1250 -> "12.5%",
+ * 333 -> "3.33%". BigInt-only — no float division anywhere near a fee,
+ * and the truncation is deterministic (bps values are integers by schema).
+ */
+export function feePercentLabel(feeBps: number): string {
+  const bps = BigInt(feeBps);
+  const whole = bps / 100n;
+  const frac = bps % 100n;
+  if (frac === 0n) return `${whole}%`;
+  const digits = frac.toString().padStart(2, "0").replace(/0+$/, "");
+  return `${whole}.${digits}%`;
+}

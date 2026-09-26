@@ -9,7 +9,7 @@ import {
   conditionLabels,
   DURATIONS,
 } from "@/lib/validation";
-import { formatMoney, money, parseMoneyToMinor } from "@/lib/money";
+import { formatMoney, money, parseMoneyToMinor, feePercentLabel } from "@/lib/money";
 import { renderRejectionMessage } from "@/server/errors";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -67,7 +67,14 @@ function FieldError({ id, messages }: { id?: string; messages?: string[] }) {
   );
 }
 
-export function SellForm({ categories }: { categories: CategoryOption[] }) {
+export function SellForm({
+  categories,
+  feeBps,
+}: {
+  categories: CategoryOption[];
+  /** Live rate from fee_settings; null = omit the percent rather than guess. */
+  feeBps: number | null;
+}) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [errors, setErrors] = useState<IssueMap>({});
@@ -259,10 +266,15 @@ export function SellForm({ categories }: { categories: CategoryOption[] }) {
               placeholder="0.00"
               aria-invalid={errors.startingBidMinor ? true : undefined}
               aria-describedby={
-                errors.startingBidMinor ? "sell-starting-bid-error" : undefined
+                errors.startingBidMinor
+                  ? "sell-starting-bid-hint sell-starting-bid-error"
+                  : "sell-starting-bid-hint"
               }
               data-testid="sell-starting-bid"
             />
+            <p id="sell-starting-bid-hint" className="text-xs text-muted-foreground">
+              Any amount above zero — bidding starts here.
+            </p>
             <FieldError id="sell-starting-bid-error" messages={errors.startingBidMinor} />
           </div>
 
@@ -276,12 +288,26 @@ export function SellForm({ categories }: { categories: CategoryOption[] }) {
               autoComplete="off"
               placeholder="0.00"
               aria-invalid={errors.bidIncrementMinor ? true : undefined}
-              aria-describedby={errors.bidIncrementMinor ? "sell-increment-error" : undefined}
+              aria-describedby={
+                errors.bidIncrementMinor
+                  ? "sell-increment-hint sell-increment-error"
+                  : "sell-increment-hint"
+              }
               data-testid="sell-increment"
             />
+            <p id="sell-increment-hint" className="text-xs text-muted-foreground">
+              Added on top of the current bid every time someone bids.
+            </p>
             <FieldError id="sell-increment-error" messages={errors.bidIncrementMinor} />
           </div>
         </div>
+
+        <p className="rounded-lg border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+          When this auction sells, BidBlitz takes{" "}
+          {feeBps !== null ? <strong>{feePercentLabel(feeBps)}</strong> : "a platform fee"}{" "}
+          of the winning price out of your proceeds — buyers pay exactly their winning bid,
+          nothing extra. You keep the rest.
+        </p>
       </section>
 
       <section className="space-y-5" aria-labelledby="sell-timing-heading">

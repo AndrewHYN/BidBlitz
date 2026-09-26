@@ -69,6 +69,9 @@ export function ImageUploader({
   const [entries, setEntries] = useState<UploaderImage[]>(() => images);
   const [pending, startTransition] = useTransition();
   const [notice, setNotice] = useState<string | null>(null);
+  // Which file of this batch is in flight right now (1-based). Driven by the
+  // upload loop itself — a real position, never an animated guess.
+  const [uploadStep, setUploadStep] = useState<{ index: number; total: number } | null>(null);
   const [inputKey, setInputKey] = useState(0);
 
   const full = entries.length >= MAX_IMAGES;
@@ -110,19 +113,29 @@ export function ImageUploader({
         const base = [...entries];
         const added: UploaderImage[] = [];
 
-        for (const file of usable) {
+        for (let i = 0; i < usable.length; i++) {
+          const file = usable[i];
+          setUploadStep({ index: i + 1, total: usable.length });
           const storagePath = `${auctionId}/${lowestFreeIndex([...base, ...added])}.${extensionFor(file)}`;
           const { error } = await supabase.storage
             .from(BUCKET)
             .upload(storagePath, file, { upsert: true, contentType: file.type });
           if (error) {
-            setNotice(`Couldn’t upload “${file.name}”: ${error.message}`);
+            // The storage message can leak internals (policies, bucket
+            // config). Log it for us; say something actionable to the seller.
+            console.error("[image-uploader] upload failed:", error.message);
+            setNotice(
+              `Couldn’t upload “${file.name}”.` +
+                (added.length > 0 ? " The photos already added are kept —" : "") +
+                " pick that photo again to retry."
+            );
             break;
           }
           const { data } = supabase.storage.from(BUCKET).getPublicUrl(storagePath);
           added.push({ key: storagePath, storagePath, url: data.publicUrl });
         }
 
+        setUploadStep(null);
         setInputKey((key) => key + 1);
         if (added.length === 0) return;
 
@@ -138,6 +151,7 @@ export function ImageUploader({
         }
         router.refresh();
       } catch {
+        setUploadStep(null);
         setNotice("Something went wrong while uploading. Please try again.");
       }
     });
@@ -228,6 +242,15 @@ export function ImageUploader({
         <p className="text-xs text-muted-foreground">
           {entries.length} of {MAX_IMAGES} photos · JPEG, PNG, WebP, AVIF or GIF up to {MAX_MB} MB each.
         </p>
+        {pending && uploadStep && (
+          <p
+            role="status"
+            data-testid="upload-progress"
+            className="text-xs font-medium text-muted-foreground"
+          >
+            Uploading photo {uploadStep.index} of {uploadStep.total}…
+          </p>
+        )}
       </div>
 
       {full && (

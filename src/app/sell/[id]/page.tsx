@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowLeft, Images, Rocket, TriangleAlert } from "lucide-react";
+import { ArrowLeft, Eye, Images, Rocket, TriangleAlert } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { getAuctionDetail, imageUrlFor } from "@/server/queries";
+import { getAuctionDetail, getFeeBps, imageUrlFor } from "@/server/queries";
 import { EmptyState, PageHeader, SectionHeading } from "@/components/auction/page-header";
 import { LiveStatus } from "@/components/auction/live-status";
 import { Money } from "@/components/auction/money";
+import { feePercentLabel } from "@/lib/money";
 import { ConditionBadge } from "@/components/auction/status-badge";
 import { DURATIONS, conditionLabels } from "@/lib/validation";
 import { isClosed } from "@/lib/auction-status";
@@ -43,6 +44,7 @@ export default async function SellDraftPage({
   if (!detail) notFound();
   const { auction } = detail;
   if (auction.seller_id !== user.id) notFound();
+  const feeBps = await getFeeBps();
 
   const images = [...auction.auction_images]
     .sort((a, b) => a.position - b.position)
@@ -65,13 +67,22 @@ export default async function SellDraftPage({
         title={auction.title}
         description="Add photos, check the terms, then start the blitz."
         actions={
-          <Link
-            href="/dashboard/selling"
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground"
-          >
-            <ArrowLeft className="size-4" aria-hidden />
-            Back to selling
-          </Link>
+          <div className="flex flex-wrap items-center gap-4">
+            <Link
+              href={`/auction/${auction.id}`}
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground"
+            >
+              <Eye className="size-4" aria-hidden />
+              Preview as a buyer
+            </Link>
+            <Link
+              href="/dashboard/selling"
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground"
+            >
+              <ArrowLeft className="size-4" aria-hidden />
+              Back to selling
+            </Link>
+          </div>
         }
       />
 
@@ -205,11 +216,21 @@ export default async function SellDraftPage({
             <div className="mt-4">
               <PublishButton
                 auctionId={auction.id}
+                title={auction.title}
                 imageCount={auction.image_count}
                 status={auction.status}
                 endsAt={auction.ends_at}
               />
             </div>
+            <p className="mt-4 text-xs text-muted-foreground">
+              If it sells, BidBlitz takes{" "}
+              {feeBps !== null ? (
+                <strong className="font-semibold">{feePercentLabel(feeBps)}</strong>
+              ) : (
+                "a platform fee"
+              )}{" "}
+              of the winning price from your proceeds. Buyers pay their winning bid.
+            </p>
           </section>
 
           {(canCancel || canDelete) && (

@@ -1,9 +1,8 @@
 import type { MetadataRoute } from "next";
 import { createClient } from "@/lib/supabase/server";
+import { SITE_URL } from "@/lib/site-url";
 
-// Vercel's env value carries a trailing slash; every consumer below appends
-// its own "/", so normalize once here to keep sitemap/robots URLs single-slash.
-const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000").replace(/\/+$/, "");
+const siteUrl = SITE_URL;
 
 // The auction list must reflect the live database, not the build snapshot.
 export const dynamic = "force-dynamic";

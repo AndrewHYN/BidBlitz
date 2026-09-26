@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getCategories } from "@/server/queries";
+import { getCategories, getFeeBps } from "@/server/queries";
 import { PageHeader } from "@/components/auction/page-header";
 import { SellForm } from "@/components/sell/sell-form";
 
@@ -23,6 +23,7 @@ export default async function SellPage() {
   if (!user) redirect("/login?next=/sell");
 
   const categories = await getCategories();
+  const feeBps = await getFeeBps();
 
   return (
     <div className="page-container py-10 sm:py-14">
@@ -32,6 +33,7 @@ export default async function SellPage() {
       />
       <div className="mt-8 max-w-3xl">
         <SellForm
+          feeBps={feeBps}
           categories={categories.map((category: { id: number; name: string }) => ({
             id: category.id,
             name: category.name,

@@ -308,6 +308,24 @@ export const getCategories = cache(async () => {
   return data ?? [];
 });
 
+/**
+ * The current platform fee rate, in basis points, read from the single row
+ * in `fee_settings` (world-readable on purpose: it IS public policy).
+ * Display surfaces (sell flow, fee notes) must state THE rate the engine
+ * will actually charge — never a hardcoded copy of it.
+ * `null` means "no rate readable right now": callers then omit the percent
+ * instead of inventing one.
+ */
+export const getFeeBps = cache(async (): Promise<number | null> => {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("fee_settings")
+    .select("fee_bps")
+    .eq("id", 1)
+    .maybeSingle();
+  return data?.fee_bps ?? null;
+});
+
 export const getWatchlist = cache(async (userId: string) => {
   const supabase = await createClient();
   const { data } = await supabase
