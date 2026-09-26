@@ -776,6 +776,242 @@ if (reportId) {
     "report row missing");
 }
 
+// ---- 14. phase 2: commercial loop ------------------------------------------
+console.log("\n--- phase 2: commerce loop ---");
+
+// The transaction THIS run's settlement wrote (section 11).
+const phase2Tx = rows(await sql(
+  `select id, gross_minor, fee_bps, currency, status from public.transactions
+    where auction_id='${auctionId}'`))[0];
+
+if (phase2Tx) {
+  check("commerce: settlement left the truthful AWAITING_PAYMENT record",
+    phase2Tx.status === "AWAITING_PAYMENT", `status=${phase2Tx.status}`);
+
+  // BOTH parties are asked to review the completed interaction, deep-linked
+  // to the exact transaction (the reader routes to /dashboard/transactions).
+  const reviewReqs = rows(await sql(
+    `select user_id, payload->>'transaction_id' as txid
+       from public.notifications
+      where auction_id='${auctionId}' and type='REVIEW_REQUEST'`));
+  check("notifications: REVIEW_REQUEST asks both sides, linked to the transaction",
+    reviewReqs.length === 2 &&
+      reviewReqs.some((r) => r.user_id === buyer3Id) &&
+      reviewReqs.some((r) => r.user_id === sellerId) &&
+      reviewReqs.every((r) => r.txid === phase2Tx.id),
+    `rows=${reviewReqs.length}`);
+
+  // Rating aggregates: delta-safe (the profile may carry reviews from earlier
+  // runs), and the harness's own review is removed again — it is a fixture,
+  // never a fake review left in production data.
+  await sql(`delete from public.reviews where transaction_id='${phase2Tx.id}'`);
+  const beforeRating = rows(await sql(
+    `select rating_sum, rating_count from public.profiles where id='${sellerId}'`))[0];
+  await sql(`
+    insert into public.reviews (transaction_id, auction_id, reviewer_id, reviewee_id, rating)
+    values ('${phase2Tx.id}', '${auctionId}', '${buyer3Id}', '${sellerId}', 5)`);
+  const afterInsert = rows(await sql(
+    `select rating_sum, rating_count from public.profiles where id='${sellerId}'`))[0];
+  check("trust: a review updates the seller's rating aggregate",
+    Number(afterInsert.rating_sum) === Number(beforeRating.rating_sum) + 5 &&
+      Number(afterInsert.rating_count) === Number(beforeRating.rating_count) + 1,
+    `${beforeRating.rating_sum}/${beforeRating.rating_count} -> ` +
+      `${afterInsert.rating_sum}/${afterInsert.rating_count}`);
+
+  await sql(`delete from public.reviews where transaction_id='${phase2Tx.id}'`);
+  const afterDelete = rows(await sql(
+    `select rating_sum, rating_count from public.profiles where id='${sellerId}'`))[0];
+  check("trust: removing a review recomputes the aggregate back exactly",
+    Number(afterDelete.rating_sum) === Number(beforeRating.rating_sum) &&
+      Number(afterDelete.rating_count) === Number(beforeRating.rating_count),
+    `${afterDelete.rating_sum}/${afterDelete.rating_count}`);
+} else {
+  check("commerce: settlement left the truthful AWAITING_PAYMENT record", false,
+    "no transaction row from the settlement above");
+  check("notifications: REVIEW_REQUEST asks both sides, linked to the transaction", false,
+    "no transaction row from the settlement above");
+  check("trust: a review updates the seller's rating aggregate", false,
+    "no transaction row from the settlement above");
+  check("trust: removing a review recomputes the aggregate back exactly", false,
+    "no transaction row from the settlement above");
+}
+
+// ---- 14b. ENDING_SOON producer ---------------------------------------------
+// A synthetic LIVE auction inside its final window (duration 7200s => the
+// window is the last 720s; ends in 5 minutes), with buyer1 watching it.
+const soonAuction = rows(await sql(`
+  insert into public.auctions
+    (seller_id, title, description, condition, location,
+     starting_bid_minor, bid_increment_minor, status, starts_at, ends_at,
+     duration_seconds)
+  values
+    ('${sellerId}', 'Harness ending-soon fixture',
+     'Synthetic fixture created by the engine verification; never listed.',
+     'good', 'harness', 100, 10, 'LIVE',
+     now() - interval '9 minutes', now() + interval '5 minutes', 7200)
+  returning id`))[0]?.id;
+
+await sql(`insert into public.watchlist (user_id, auction_id)
+           values ('${buyer1Id}', '${soonAuction}') on conflict do nothing`);
+
+// EXECUTE is service_role only: anon and signed-in users have no route.
+const soonAnon = await rest(`/rest/v1/rpc/notify_ending_soon`, {
+  method: "POST", body: { p_limit: 50 },
+});
+const soonAuthed = await rest(`/rest/v1/rpc/notify_ending_soon`, {
+  method: "POST", bearer: tok.buyer1, body: { p_limit: 50 },
+});
+check("security: ending-soon RPC is service_role only",
+  !soonAnon.ok && !soonAuthed.ok,
+  `anon=${soonAnon.status} authed=${soonAuthed.status}`);
+
+const soonRun1 = await rest(`/rest/v1/rpc/notify_ending_soon`, {
+  method: "POST", key: SEC, body: { p_limit: 100 },
+});
+const soonRows1 = rows(await sql(
+  `select count(*)::int as n from public.notifications
+    where user_id='${buyer1Id}' and auction_id='${soonAuction}'
+      and type='ENDING_SOON'`))[0]?.n;
+check("notifications: ending-soon reaches a watcher inside the final window",
+  soonRun1.ok && Number(soonRows1) === 1,
+  `rpc=${soonRun1.status} rows=${soonRows1} data=${JSON.stringify(soonRun1.data)?.slice(0, 80)}`);
+
+await rest(`/rest/v1/rpc/notify_ending_soon`, {
+  method: "POST", key: SEC, body: { p_limit: 100 },
+});
+const soonRows2 = rows(await sql(
+  `select count(*)::int as n from public.notifications
+    where user_id='${buyer1Id}' and auction_id='${soonAuction}'
+      and type='ENDING_SOON'`))[0]?.n;
+check("notifications: ending-soon is delivered exactly once per auction per user",
+  Number(soonRows2) === 1, `rows=${soonRows2}`);
+
+// ---- 14c. payment webhook seam ---------------------------------------------
+// Synthetic transaction for the seam tests — its own audit rows, its own
+// notifications, all removed below so no fabricated payment survives.
+const payTx = rows(await sql(`
+  insert into public.transactions
+    (auction_id, seller_id, buyer_id, currency,
+     gross_minor, fee_bps, fee_minor, net_minor, status)
+  values ('${soonAuction}', '${sellerId}', '${buyer1Id}', 'USD',
+          2500, 500, 125, 2375, 'AWAITING_PAYMENT')
+  returning id, status`))[0];
+
+const anonEvents = await rest(`/rest/v1/payment_events?select=id`);
+check("payments: webhook audit log has no PostgREST surface for clients",
+  !anonEvents.ok || (Array.isArray(anonEvents.data) ? anonEvents.data.length : 0) === 0,
+  `status=${anonEvents.status}`);
+
+const payAnon = await rest(`/rest/v1/rpc/mark_transaction_paid`, {
+  method: "POST",
+  body: {
+    p_transaction_id: payTx.id, p_provider: "harness", p_provider_reference: "r0",
+    p_amount_minor: 2500, p_currency: "USD", p_event_id: "evt-anon",
+  },
+});
+const payAuthed = await rest(`/rest/v1/rpc/mark_transaction_paid`, {
+  method: "POST", bearer: tok.buyer1,
+  body: {
+    p_transaction_id: payTx.id, p_provider: "harness", p_provider_reference: "r1",
+    p_amount_minor: 2500, p_currency: "USD", p_event_id: "evt-authed",
+  },
+});
+check("payments: mark_paid is service_role only (anon and signed-in denied)",
+  !payAnon.ok && !payAuthed.ok,
+  `anon=${payAnon.status} authed=${payAuthed.status}`);
+
+const mismatch = await rest(`/rest/v1/rpc/mark_transaction_paid`, {
+  method: "POST", key: SEC,
+  body: {
+    p_transaction_id: payTx.id, p_provider: "harness", p_provider_reference: "r2",
+    p_amount_minor: 9999, p_currency: "USD", p_event_id: "evt-mismatch",
+  },
+});
+const stillAwaiting = rows(await sql(
+  `select status from public.transactions where id='${payTx.id}'`))[0];
+check("payments: a mismatched amount is rejected and nothing is written",
+  !mismatch.ok && stillAwaiting?.status === "AWAITING_PAYMENT",
+  `status=${stillAwaiting?.status} body=${JSON.stringify(mismatch.data)?.slice(0, 120)}`);
+
+const evtId = `evt-${randomUUID()}`;
+const paid = await rest(`/rest/v1/rpc/mark_transaction_paid`, {
+  method: "POST", key: SEC,
+  body: {
+    p_transaction_id: payTx.id, p_provider: "harness_pay",
+    p_provider_reference: "ref-1", p_amount_minor: 2500, p_currency: "USD",
+    p_event_id: evtId, p_payload: { harness: true },
+  },
+});
+const paidRow = rows(await sql(
+  `select status, provider from public.transactions where id='${payTx.id}'`))[0];
+const eventRows = rows(await sql(
+  `select count(*)::int as n from public.payment_events
+    where transaction_id='${payTx.id}'`))[0]?.n;
+check("payments: verified event marks AWAITING_PAYMENT -> PAID with an audit row",
+  paid.ok && paidRow?.status === "PAID" && paidRow?.provider === "harness_pay" &&
+    Number(eventRows) === 1,
+  `status=${paidRow?.status} events=${eventRows} body=${JSON.stringify(paid.data)?.slice(0, 140)}`);
+
+const replay = await rest(`/rest/v1/rpc/mark_transaction_paid`, {
+  method: "POST", key: SEC,
+  body: {
+    p_transaction_id: payTx.id, p_provider: "harness_pay",
+    p_provider_reference: "ref-1", p_amount_minor: 2500, p_currency: "USD",
+    p_event_id: evtId, p_payload: { harness: true },
+  },
+});
+const eventsAfterReplay = rows(await sql(
+  `select count(*)::int as n from public.payment_events
+    where transaction_id='${payTx.id}'`))[0]?.n;
+check("payments: replaying the event is idempotent (already_paid, one audit row)",
+  replay.ok && replay.data?.already_paid === true && Number(eventsAfterReplay) === 1,
+  `body=${JSON.stringify(replay.data)?.slice(0, 140)} events=${eventsAfterReplay}`);
+
+let moneyErr = "";
+try {
+  await sql(`update public.transactions set gross_minor = gross_minor + 1
+              where id='${payTx.id}'`);
+} catch (e) {
+  moneyErr = `${e?.message ?? e}`;
+}
+check("payments: transaction money columns are immutable for EVERY role",
+  moneyErr.includes("transaction_money_immutable"),
+  moneyErr.slice(0, 160) || "update succeeded — NOT immutable");
+
+let transitionErr = "";
+try {
+  await sql(`update public.transactions set status='AWAITING_PAYMENT'
+              where id='${payTx.id}'`);
+} catch (e) {
+  transitionErr = `${e?.message ?? e}`;
+}
+check("payments: status refuses transitions outside the allowlist",
+  transitionErr.includes("transaction_invalid_transition"),
+  transitionErr.slice(0, 160) || "illegal transition succeeded");
+
+let legalOk = true;
+let legalErr = "";
+try {
+  await sql(`update public.transactions set status='SETTLED'
+              where id='${payTx.id}'`);
+} catch (e) {
+  legalOk = false;
+  legalErr = `${e?.message ?? e}`;
+}
+const legalRow = rows(await sql(
+  `select status from public.transactions where id='${payTx.id}'`))[0];
+check("payments: PAID -> SETTLED stays a legal lifecycle transition",
+  legalOk && legalRow?.status === "SETTLED",
+  `status=${legalRow?.status} ${legalErr.slice(0, 120)}`);
+
+// Remove every synthetic artifact: fixtures never survive into production
+// data (no fabricated payment, no fabricated notifications, no fake listing).
+await sql(`delete from public.payment_events where transaction_id='${payTx.id}'`);
+await sql(`delete from public.notifications where auction_id='${soonAuction}'`);
+await sql(`delete from public.watchlist where auction_id='${soonAuction}'`);
+await sql(`delete from public.transactions where id='${payTx.id}'`);
+await sql(`delete from public.auctions where id='${soonAuction}'`);
+
 // ---------------------------------------------------------------------------
 // The auction_images row inserted for the image_count checks is a fixture, not
 // a listing photo: no object ever backs `harness/<id>/cover.jpg`. Remove it
