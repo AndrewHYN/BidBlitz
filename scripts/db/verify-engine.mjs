@@ -1004,19 +1004,301 @@ check("payments: PAID -> SETTLED stays a legal lifecycle transition",
   legalOk && legalRow?.status === "SETTLED",
   `status=${legalRow?.status} ${legalErr.slice(0, 120)}`);
 
+// ---- 14d. failure + refund writers (Phase 3) -------------------------------
+// A real provider also reports payments that never happened and money that
+// was returned. Both transitions already existed in the freeze trigger but
+// had no server-authoritative writer, so they could never be exercised. These
+// checks prove the writers, their idempotency, their privilege boundary, and
+// the two verifications that decide whether an event is about this sale at
+// all (amount and currency).
+async function payFixture(title) {
+  const auction = rows(await sql(`
+    insert into public.auctions
+      (seller_id, title, description, condition, location,
+       starting_bid_minor, bid_increment_minor, status, starts_at, ends_at,
+       duration_seconds)
+    values
+      ('${sellerId}', '${title}',
+       'Synthetic fixture created by the engine verification; never listed.',
+       'good', 'harness', 100, 10, 'LIVE',
+       now() - interval '9 minutes', now() + interval '5 minutes', 7200)
+    returning id`))[0]?.id;
+  const tx = rows(await sql(`
+    insert into public.transactions
+      (auction_id, seller_id, buyer_id, currency,
+       gross_minor, fee_bps, fee_minor, net_minor, status)
+    values ('${auction}', '${sellerId}', '${buyer1Id}', 'USD',
+            2500, 500, 125, 2375, 'AWAITING_PAYMENT')
+    returning id, status`))[0];
+  return { auction, tx };
+}
+
+const failFixture = await payFixture("Harness failed-payment fixture");
+const failTx = failFixture.tx;
+
+const failAnon = await rest(`/rest/v1/rpc/mark_transaction_failed`, {
+  method: "POST", body: {
+    p_transaction_id: failTx.id, p_provider: "harness",
+    p_provider_reference: "rf", p_event_id: "evt-anon-fail",
+  },
+});
+const failAuthed = await rest(`/rest/v1/rpc/mark_transaction_failed`, {
+  method: "POST", bearer: tok.buyer1,
+  body: {
+    p_transaction_id: failTx.id, p_provider: "harness",
+    p_provider_reference: "rf", p_event_id: "evt-authed-fail",
+  },
+});
+check("payments: mark_failed is service_role only (anon and signed-in denied)",
+  !failAnon.ok && !failAuthed.ok,
+  `anon=${failAnon.status} authed=${failAuthed.status}`);
+
+const recAnon = await rest(`/rest/v1/rpc/record_payment_event`, {
+  method: "POST", body: {
+    p_provider: "harness", p_event_id: "evt-anon-rec",
+    p_transaction_id: failTx.id,
+  },
+});
+const recAuthed = await rest(`/rest/v1/rpc/record_payment_event`, {
+  method: "POST", bearer: tok.buyer1,
+  body: {
+    p_provider: "harness", p_event_id: "evt-authed-rec",
+    p_transaction_id: failTx.id,
+  },
+});
+check("payments: record_payment_event is service_role only (audit log has no client path)",
+  !recAnon.ok && !recAuthed.ok,
+  `anon=${recAnon.status} authed=${recAuthed.status}`);
+
+const wrongCurrency = await rest(`/rest/v1/rpc/mark_transaction_paid`, {
+  method: "POST", key: SEC,
+  body: {
+    p_transaction_id: failTx.id, p_provider: "harness",
+    p_provider_reference: "rc", p_amount_minor: 2500, p_currency: "EUR",
+    p_event_id: `evt-${randomUUID()}`,
+  },
+});
+const currencyRow = rows(await sql(
+  `select status from public.transactions where id='${failTx.id}'`))[0];
+check("payments: a mismatched currency is rejected and nothing is written",
+  !wrongCurrency.ok && currencyRow?.status === "AWAITING_PAYMENT",
+  `status=${currencyRow?.status} body=${JSON.stringify(wrongCurrency.data)?.slice(0, 120)}`);
+
+const unknownTx = await rest(`/rest/v1/rpc/mark_transaction_paid`, {
+  method: "POST", key: SEC,
+  body: {
+    p_transaction_id: "00000000-0000-0000-0000-000000000000",
+    p_provider: "harness", p_provider_reference: "rx",
+    p_amount_minor: 2500, p_currency: "USD", p_event_id: `evt-${randomUUID()}`,
+  },
+});
+check("payments: an unknown transaction is refused, never invented",
+  !unknownTx.ok && String(unknownTx.data?.message ?? "").includes("transaction_not_found"),
+  JSON.stringify(unknownTx.data)?.slice(0, 140));
+
+const failEvt = `evt-${randomUUID()}`;
+const failBody = {
+  p_transaction_id: failTx.id, p_provider: "harness",
+  p_provider_reference: "ref-fail", p_event_id: failEvt,
+  p_payload: { harness: true },
+};
+const failed = await rest(`/rest/v1/rpc/mark_transaction_failed`, {
+  method: "POST", key: SEC, body: failBody,
+});
+const failedRow = rows(await sql(
+  `select status, provider from public.transactions where id='${failTx.id}'`))[0];
+const failEvents = rows(await sql(
+  `select count(*)::int as n from public.payment_events
+    where transaction_id='${failTx.id}'`))[0]?.n;
+check("payments: AWAITING_PAYMENT -> FAILED is an explicit, audited transition",
+  failed.ok && failedRow?.status === "FAILED" && Number(failEvents) === 1,
+  `status=${failedRow?.status} events=${failEvents} body=${JSON.stringify(failed.data)?.slice(0, 140)}`);
+
+const failReplay = await rest(`/rest/v1/rpc/mark_transaction_failed`, {
+  method: "POST", key: SEC, body: failBody,
+});
+const failEvents2 = rows(await sql(
+  `select count(*)::int as n from public.payment_events
+    where transaction_id='${failTx.id}'`))[0]?.n;
+check("payments: replaying a failure is idempotent (already_failed, one audit row)",
+  failReplay.ok && failReplay.data?.already_failed === true &&
+    Number(failEvents2) === 1,
+  `body=${JSON.stringify(failReplay.data)?.slice(0, 140)} events=${failEvents2}`);
+
+const paidAfterFail = await rest(`/rest/v1/rpc/mark_transaction_paid`, {
+  method: "POST", key: SEC,
+  body: {
+    p_transaction_id: failTx.id, p_provider: "harness",
+    p_provider_reference: "ref-late", p_amount_minor: 2500, p_currency: "USD",
+    p_event_id: `evt-${randomUUID()}`,
+  },
+});
+check("payments: a FAILED transaction can never be resurrected as PAID",
+  !paidAfterFail.ok &&
+    String(paidAfterFail.data?.message ?? "").includes("payment_invalid_transition"),
+  JSON.stringify(paidAfterFail.data)?.slice(0, 140));
+
+const refundOnFailed = await rest(`/rest/v1/rpc/mark_transaction_refunded`, {
+  method: "POST", key: SEC,
+  body: {
+    p_transaction_id: failTx.id, p_provider: "harness",
+    p_event_id: `evt-${randomUUID()}`,
+  },
+});
+check("payments: a FAILED transaction can never be refunded",
+  !refundOnFailed.ok &&
+    String(refundOnFailed.data?.message ?? "").includes("payment_invalid_transition"),
+  JSON.stringify(refundOnFailed.data)?.slice(0, 140));
+
+// Audit-only provider events (in-flight status, dispute) are recorded exactly
+// once, without touching the transaction.
+const recEvt = `evt-${randomUUID()}`;
+const recBody = {
+  p_provider: "harness", p_event_id: recEvt,
+  p_transaction_id: failTx.id, p_payload: { status: "Disputed" },
+};
+const rec1 = await rest(`/rest/v1/rpc/record_payment_event`, {
+  method: "POST", key: SEC, body: recBody,
+});
+const rec2 = await rest(`/rest/v1/rpc/record_payment_event`, {
+  method: "POST", key: SEC, body: recBody,
+});
+const failStatusAfterRec = rows(await sql(
+  `select status from public.transactions where id='${failTx.id}'`))[0];
+check("payments: an audit-only event is recorded exactly once and changes nothing",
+  rec1.ok && rec1.data?.recorded === true && rec2.ok &&
+    rec2.data?.recorded === false && failStatusAfterRec?.status === "FAILED",
+  `first=${rec1.data?.recorded} second=${rec2.data?.recorded} status=${failStatusAfterRec?.status}`);
+
+const refundFixture = await payFixture("Harness refund fixture");
+const refundTx = refundFixture.tx;
+
+const refundPaid = await rest(`/rest/v1/rpc/mark_transaction_paid`, {
+  method: "POST", key: SEC,
+  body: {
+    p_transaction_id: refundTx.id, p_provider: "harness",
+    p_provider_reference: "ref-ok", p_amount_minor: 2500, p_currency: "USD",
+    p_event_id: `evt-${randomUUID()}`,
+  },
+});
+const refundPaidRow = rows(await sql(
+  `select status from public.transactions where id='${refundTx.id}'`))[0];
+check("payments: refund fixture reached PAID (precondition for the refund path)",
+  refundPaid.ok && refundPaidRow?.status === "PAID",
+  `status=${refundPaidRow?.status} body=${JSON.stringify(refundPaid.data)?.slice(0, 140)}`);
+
+const refundAnon = await rest(`/rest/v1/rpc/mark_transaction_refunded`, {
+  method: "POST", body: {
+    p_transaction_id: refundTx.id, p_provider: "harness",
+    p_event_id: "evt-anon-refund",
+  },
+});
+const refundAuthed = await rest(`/rest/v1/rpc/mark_transaction_refunded`, {
+  method: "POST", bearer: tok.buyer1,
+  body: {
+    p_transaction_id: refundTx.id, p_provider: "harness",
+    p_event_id: "evt-authed-refund",
+  },
+});
+check("payments: mark_refunded is service_role only (anon and signed-in denied)",
+  !refundAnon.ok && !refundAuthed.ok,
+  `anon=${refundAnon.status} authed=${refundAuthed.status}`);
+
+const refundEvt = `evt-${randomUUID()}`;
+const refundBody = {
+  p_transaction_id: refundTx.id, p_provider: "harness",
+  p_event_id: refundEvt, p_payload: { reason: "buyer returned the item" },
+};
+const refunded = await rest(`/rest/v1/rpc/mark_transaction_refunded`, {
+  method: "POST", key: SEC, body: refundBody,
+});
+const refundedRow = rows(await sql(
+  `select status, provider, provider_reference from public.transactions
+    where id='${refundTx.id}'`))[0];
+const refundEvents = rows(await sql(
+  `select count(*)::int as n from public.payment_events
+    where transaction_id='${refundTx.id}'`))[0]?.n;
+// Two events total: the payment that made it PAID, then the refund itself.
+check("payments: PAID -> REFUNDED is an explicit, audited transition",
+  refunded.ok && refundedRow?.status === "REFUNDED" &&
+    refundedRow?.provider === "harness" &&
+    refundedRow?.provider_reference === "ref-ok" &&
+    Number(refundEvents) === 2,
+  `status=${refundedRow?.status} provider=${refundedRow?.provider} ` +
+    `ref=${refundedRow?.provider_reference} events=${refundEvents} ` +
+    `body=${JSON.stringify(refunded.data)?.slice(0, 140)}`);
+
+const refundReplay = await rest(`/rest/v1/rpc/mark_transaction_refunded`, {
+  method: "POST", key: SEC, body: refundBody,
+});
+const refundEvents2 = rows(await sql(
+  `select count(*)::int as n from public.payment_events
+    where transaction_id='${refundTx.id}'`))[0]?.n;
+check("payments: replaying a refund is idempotent (already_refunded, no extra audit row)",
+  refundReplay.ok && refundReplay.data?.already_refunded === true &&
+    Number(refundEvents2) === 2,
+  `body=${JSON.stringify(refundReplay.data)?.slice(0, 140)} events=${refundEvents2}`);
+
 // Remove every synthetic artifact: fixtures never survive into production
 // data (no fabricated payment, no fabricated notifications, no fake listing).
 await sql(`delete from public.payment_events where transaction_id='${payTx.id}'`);
+await sql(`delete from public.payment_events where transaction_id='${failTx.id}'`);
+await sql(`delete from public.payment_events where transaction_id='${refundTx.id}'`);
 await sql(`delete from public.notifications where auction_id='${soonAuction}'`);
+await sql(`delete from public.notifications where auction_id='${failFixture.auction}'`);
+await sql(`delete from public.notifications where auction_id='${refundFixture.auction}'`);
 await sql(`delete from public.watchlist where auction_id='${soonAuction}'`);
 await sql(`delete from public.transactions where id='${payTx.id}'`);
+await sql(`delete from public.transactions where id='${failTx.id}'`);
+await sql(`delete from public.transactions where id='${refundTx.id}'`);
 await sql(`delete from public.auctions where id='${soonAuction}'`);
+await sql(`delete from public.auctions where id='${failFixture.auction}'`);
+await sql(`delete from public.auctions where id='${refundFixture.auction}'`);
 
 // ---------------------------------------------------------------------------
 // The auction_images row inserted for the image_count checks is a fixture, not
 // a listing photo: no object ever backs `harness/<id>/cover.jpg`. Remove it
 // before leaving so production never shows a broken image for a row we made.
+//
+// The main fixture auction itself goes too — and everything that accumulated
+// on it (bids, its settled sale, review/notification/report rows). The reset at
+// the start of the NEXT run would eventually take it, but "eventually" means a
+// fabricated SOLD listing and a fabricated AWAITING_PAYMENT transaction sit in
+// production data in between, which is exactly the kind of thing this project
+// refuses to ship. Fixtures are removed here, and then asserted gone.
+const fixtureTxIds = `(select id from public.transactions where auction_id='${auctionId}')`;
+await sql(`delete from public.payment_events where transaction_id in ${fixtureTxIds}`);
+await sql(`delete from public.reviews where transaction_id in ${fixtureTxIds}`);
+await sql(`delete from public.notifications where auction_id='${auctionId}'`);
+await sql(`delete from public.watchlist where auction_id='${auctionId}'`);
+await sql(`delete from public.reports
+            where target_type='auction' and target_id='${auctionId}'`);
+await sql(`delete from public.transactions where auction_id='${auctionId}'`);
+await sql(`delete from public.bids where auction_id='${auctionId}'`);
 await sql(`delete from public.auction_images where auction_id='${auctionId}'`);
+await sql(`delete from public.auctions where id='${auctionId}'`);
+
+// A finished run must leave no synthetic residue at all — this is the check
+// that makes the cleanup a promise rather than a hope.
+const testUserSubquery =
+  `(select id from auth.users where email like '%@bidblitz.test')`;
+const residue = rows(await sql(
+  `select
+     (select count(*)::int from public.auctions
+       where seller_id in ${testUserSubquery}) as auctions,
+     (select count(*)::int from public.transactions
+       where seller_id in ${testUserSubquery}
+          or buyer_id in ${testUserSubquery}) as transactions,
+     (select count(*)::int from public.payment_events pe
+       left join public.transactions t on t.id = pe.transaction_id
+      where t.id is null
+         or t.seller_id in ${testUserSubquery}
+         or t.buyer_id in ${testUserSubquery}) as payment_events`))[0];
+check("cleanup: no synthetic fixture survives in production data",
+  Number(residue?.auctions) === 0 && Number(residue?.transactions) === 0 &&
+    Number(residue?.payment_events) === 0,
+  `auctions=${residue?.auctions} transactions=${residue?.transactions} ` +
+    `payment_events=${residue?.payment_events}`);
 
 // ---------------------------------------------------------------------------
 console.log("\n" + "=".repeat(64));
