@@ -44,6 +44,34 @@ function json(body: Record<string, unknown>, status: number): Response {
   });
 }
 
+/**
+ * GET — a reachability probe, and nothing else.
+ *
+ * Paynow validates the two callback URLs handed to it during `initiatetransaction`:
+ * within three seconds of initiating we observed it GET `returnurl` (answered 200
+ * by the transactions page) and GET `resulturl`, which answered 405 because this
+ * file had no GET handler. Paynow subsequently recorded three test payments as
+ * Paid and never attempted a single status update against this endpoint.
+ *
+ * Answering GET with 200 is therefore both harmless and necessary, and it is safe
+ * by construction: a GET here reads no request body, consults no provider, takes
+ * no locks and touches no row. Every status update still arrives by POST and must
+ * pass signature, amount and state verification before anything can move.
+ *
+ * The body deliberately names itself a probe and carries no `status`, `paid` or
+ * amount field, so nothing here can be mistaken for — or used as — a confirmation.
+ */
+export function GET(): Response {
+  return json(
+    {
+      ok: true,
+      method: "GET",
+      note: "reachability check only — status updates are accepted by POST",
+    },
+    200
+  );
+}
+
 export async function POST(request: Request): Promise<Response> {
   const provider = ensurePaymentProvider();
 

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   PaymentPayloadError,
   PaymentProviderNotConfiguredError,
@@ -10,7 +10,7 @@ import {
   type PaymentProvider,
   type WebhookContext,
 } from "@/server/payments/provider";
-import { POST } from "./route";
+import { GET, POST } from "./route";
 
 /**
  * The webhook contract, asserted as a whole.
@@ -242,5 +242,36 @@ describe("POST /api/payments/webhook — outcomes", () => {
     expect(Object.keys(body)).toEqual(["ok"]);
     expect(body).not.toHaveProperty("status");
     expect(body).not.toHaveProperty("paid");
+  });
+});
+
+describe("GET /api/payments/webhook — reachability probe", () => {
+  it("answers 200 even when no provider is configured", async () => {
+    setPaymentProvider(new NoopPaymentProvider());
+
+    const response = await GET();
+
+    expect(response.status).toBe(200);
+  });
+
+  it("reads no body, consults no provider, and is never cached", async () => {
+    const confirm = vi.fn(async () => ({ handled: true }));
+    setPaymentProvider(fakeProvider(confirm));
+
+    const response = await GET();
+
+    expect(confirm).not.toHaveBeenCalled();
+    expect(response.headers.get("cache-control")).toBe("no-store, max-age=0");
+  });
+
+  it("never returns a body that could be read as a payment confirmation", async () => {
+    const body = await read(await GET());
+
+    expect(body.method).toBe("GET");
+    expect(body).not.toHaveProperty("status");
+    expect(body).not.toHaveProperty("paid");
+    expect(body).not.toHaveProperty("amount");
+    expect(body).not.toHaveProperty("transactionId");
+    expect(body).not.toHaveProperty("provider");
   });
 });
