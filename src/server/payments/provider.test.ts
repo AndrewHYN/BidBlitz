@@ -8,9 +8,13 @@ import {
   type CreateIntentInput,
   type PaymentIntent,
   type PaymentProvider,
+  type WebhookContext,
 } from "./provider";
 
 const noop = new NoopPaymentProvider();
+
+/** What the registry most recently handed to `confirm()` — context included. */
+let lastContext: WebhookContext | undefined;
 
 const fake: PaymentProvider = {
   capabilities: {
@@ -29,8 +33,9 @@ const fake: PaymentProvider = {
       status: "requires_action",
     };
   },
-  async confirm(): Promise<{ handled: boolean }> {
-    return { handled: true };
+  async confirm(payload: unknown, context?: WebhookContext): Promise<{ handled: boolean }> {
+    lastContext = context;
+    return { handled: payload !== null };
   },
   async cancel(): Promise<void> {
     /* nothing to cancel in the fake */
@@ -38,6 +43,7 @@ const fake: PaymentProvider = {
 };
 
 afterEach(() => {
+  lastContext = undefined;
   setPaymentProvider(new NoopPaymentProvider());
 });
 
@@ -58,7 +64,9 @@ describe("NoopPaymentProvider", () => {
   });
 
   it("confirms nothing", async () => {
-    await expect(noop.confirm()).resolves.toEqual({ handled: false });
+    await expect(noop.confirm({ ignored: true })).resolves.toEqual({
+      handled: false,
+    });
   });
 
   it("cancels nothing without throwing", async () => {
@@ -99,5 +107,30 @@ describe("payment provider registry", () => {
       currency: "USD",
       status: "requires_action",
     });
+  });
+
+  it("hands confirm() the raw body and headers for signature verification", async () => {
+    setPaymentProvider(fake);
+
+    const rawBody = JSON.stringify({ event: "payment.succeeded" });
+    const result = await getPaymentProvider().confirm(
+      JSON.parse(rawBody),
+      { rawBody, headers: { "x-signature": "sig-1" } }
+    );
+
+    expect(result).toEqual({ handled: true });
+    // Byte-for-byte the body that arrived — never a re-serialized copy,
+    // because signature schemes hash exactly what was transmitted.
+    expect(lastContext).toEqual({
+      rawBody,
+      headers: { "x-signature": "sig-1" },
+    });
+  });
+
+  it("keeps confirm() callable without a context (the Noop path)", async () => {
+    await expect(noop.confirm({ any: "payload" })).resolves.toEqual({
+      handled: false,
+    });
+    await expect(noop.confirm({})).resolves.toEqual({ handled: false });
   });
 });

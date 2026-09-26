@@ -3,12 +3,14 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Gavel } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { getBuying } from "@/server/queries";
+import { getBuying, getTransactions } from "@/server/queries";
 import { AuctionCard } from "@/components/auction/auction-card";
 import { EmptyState, PageHeader } from "@/components/auction/page-header";
 import { Money } from "@/components/auction/money";
+import { TransactionBadge } from "@/components/auction/status-badge";
 import { Button } from "@/components/ui/button";
 import { isClosed } from "@/lib/auction-status";
+import { isPaymentConfigured } from "@/server/payments/provider";
 import type { AuctionCardData } from "@/server/queries";
 
 export const metadata: Metadata = {
@@ -62,7 +64,13 @@ export default async function BuyingPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login?next=/dashboard/buying");
 
+  // Sequential on purpose: `getBuying` must read settlement FIRST, so the
+  // transactions read that follows can only see the same win or a newer one —
+  // never a stale "no transaction yet" for a row already marked "You won".
   const items = await getBuying(user.id);
+  const transactions = await getTransactions(user.id);
+  const txByAuction = new Map(transactions.map((row) => [row.auction_id, row]));
+  const configured = isPaymentConfigured();
 
   return (
     <div className="space-y-6">
@@ -85,27 +93,60 @@ export default async function BuyingPage() {
           />
         ) : (
           <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {items.map((item) => (
-              <li key={item.id}>
-                <AuctionCard
-                  auction={item}
-                  badge={badgeFor(item)}
-                  meta={
-                    <div
-                      data-testid="my-bid"
-                      className="flex items-center justify-between gap-2"
-                    >
-                      <span className="text-muted-foreground">Your bid</span>
-                      {/* `getBuying` doesn't project currency; the sell schema
-                          pins every auction to USD, which is `<Money>`'s default. */}
-                      <span className="font-medium" data-numeric>
-                        <Money minor={item.myBidMinor} />
-                      </span>
-                    </div>
-                  }
-                />
-              </li>
-            ))}
+            {items.map((item) => {
+              const tx = item.won ? txByAuction.get(item.id) : undefined;
+              return (
+                <li key={item.id}>
+                  <AuctionCard
+                    auction={item}
+                    badge={badgeFor(item)}
+                    meta={
+                      <div className="space-y-2">
+                        <div
+                          data-testid="my-bid"
+                          className="flex items-center justify-between gap-2"
+                        >
+                          <span className="text-muted-foreground">Your bid</span>
+                          {/* `getBuying` doesn't project currency; the sell schema
+                              pins every auction to USD, which is `<Money>`'s default. */}
+                          <span className="font-medium" data-numeric>
+                            <Money minor={item.myBidMinor} />
+                          </span>
+                        </div>
+                        {/* Won rows carry their financial state: the badge, the
+                            route to the full record, and — truthfully gated —
+                            the fact that nothing can be charged yet. */}
+                        {tx && (
+                          <div
+                            className="space-y-1 border-t pt-2"
+                            data-testid="buying-payment-state"
+                          >
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="text-xs text-muted-foreground">
+                                Payment
+                              </span>
+                              <TransactionBadge status={tx.status} />
+                              <Link
+                                href="/dashboard/transactions"
+                                className="text-xs font-medium text-primary hover:underline"
+                              >
+                                View transaction
+                              </Link>
+                            </div>
+                            {!configured && (
+                              <p className="text-xs text-muted-foreground">
+                                No payment provider is configured yet, so
+                                nothing has been charged.
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    }
+                  />
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>

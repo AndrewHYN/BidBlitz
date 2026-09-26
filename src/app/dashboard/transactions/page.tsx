@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getTransactions } from "@/server/queries";
 import { EmptyState, PageHeader } from "@/components/auction/page-header";
 import { Money } from "@/components/auction/money";
+import { feePercentLabel } from "@/lib/money";
 import { TransactionBadge } from "@/components/auction/status-badge";
 import { ReviewDialog } from "@/components/dashboard/review-dialog";
 import { Button } from "@/components/ui/button";
@@ -98,7 +99,7 @@ export default async function TransactionsPage() {
                       <Money minor={row.fee_minor} currency={row.currency} />
                     </span>
                     <span className="ml-1 text-xs text-muted-foreground">
-                      ({row.fee_bps / 100}% fee)
+                      ({feePercentLabel(row.fee_bps)} fee)
                     </span>
                   </TableCell>
                   <TableCell className="font-medium" data-numeric>

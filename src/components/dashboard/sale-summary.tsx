@@ -1,4 +1,5 @@
 import { isPaymentConfigured } from "@/server/payments/provider";
+import { feePercentLabel } from "@/lib/money";
 import { Money } from "@/components/auction/money";
 import { TransactionBadge } from "@/components/auction/status-badge";
 
@@ -42,7 +43,7 @@ export function SaleSummary({
         </div>
         <div>
           <dt className="text-xs text-muted-foreground">
-            Fee{feeBps !== null ? ` (${feeBps / 100}%)` : ""}
+            Fee{feeBps !== null ? ` (${feePercentLabel(feeBps)})` : ""}
           </dt>
           <dd className="font-medium">
             <Money minor={transaction.fee_minor} currency={transaction.currency} />
