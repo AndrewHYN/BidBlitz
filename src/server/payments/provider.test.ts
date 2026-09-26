@@ -21,7 +21,7 @@ const fake: PaymentProvider = {
     id: "fake",
     displayName: "Fake provider",
     configured: true,
-    supportsautomaticCapture: false,
+    supportsCancellation: false,
     currencies: ["USD"],
   },
   async createIntent(input: CreateIntentInput): Promise<PaymentIntent> {

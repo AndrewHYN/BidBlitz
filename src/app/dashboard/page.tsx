@@ -11,7 +11,7 @@ import { Money } from "@/components/auction/money";
 import { TransactionBadge } from "@/components/auction/status-badge";
 import { Button } from "@/components/ui/button";
 import { SettleButton } from "@/components/dashboard/settle-button";
-import { isPaymentConfigured } from "@/server/payments/provider";
+import { isPaymentProviderConfigured } from "@/server/payments/config";
 
 export const metadata: Metadata = {
   title: "Dashboard",
@@ -233,7 +233,7 @@ export default async function DashboardOverviewPage() {
           </ul>
         )}
 
-        {!isPaymentConfigured() && (
+        {!isPaymentProviderConfigured() && (
           <p className="text-xs text-muted-foreground">
             No payment provider is configured yet, so no money has moved.
           </p>

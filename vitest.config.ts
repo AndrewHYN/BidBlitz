@@ -5,6 +5,9 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "src"),
+      // Next aliases this marker itself; vitest cannot, and the package is
+      // not installed standalone. See test/server-only-stub.ts.
+      "server-only": path.resolve(__dirname, "test/server-only-stub.ts"),
     },
   },
   test: {

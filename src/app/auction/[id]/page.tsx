@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { MapPin } from "lucide-react";
 
 import { getAuctionDetail, imageUrlFor } from "@/server/queries";
-import { isPaymentConfigured } from "@/server/payments/provider";
+import { isPaymentProviderConfigured } from "@/server/payments/config";
 import { nextMinimumBid } from "@/lib/money";
 import { conditionLabels } from "@/lib/validation";
 import { ImageGallery, type GalleryImage } from "@/components/auction/image-gallery";
@@ -153,7 +153,7 @@ export default async function AuctionPage({ params }: Props) {
             bidIncrementMinor={auction.bid_increment_minor}
             myHighestBidMinor={myHighestBidMinor}
             transactionStatus={transaction?.status ?? null}
-            paymentConfigured={isPaymentConfigured()}
+            paymentConfigured={isPaymentProviderConfigured()}
           />
 
           <div className="flex flex-wrap items-center gap-2">

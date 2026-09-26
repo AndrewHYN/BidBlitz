@@ -10,7 +10,7 @@ import { Money } from "@/components/auction/money";
 import { TransactionBadge } from "@/components/auction/status-badge";
 import { Button } from "@/components/ui/button";
 import { isClosed } from "@/lib/auction-status";
-import { isPaymentConfigured } from "@/server/payments/provider";
+import { isPaymentProviderConfigured } from "@/server/payments/config";
 import type { AuctionCardData } from "@/server/queries";
 
 export const metadata: Metadata = {
@@ -70,7 +70,7 @@ export default async function BuyingPage() {
   const items = await getBuying(user.id);
   const transactions = await getTransactions(user.id);
   const txByAuction = new Map(transactions.map((row) => [row.auction_id, row]));
-  const configured = isPaymentConfigured();
+  const configured = isPaymentProviderConfigured();
 
   return (
     <div className="space-y-6">

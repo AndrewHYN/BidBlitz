@@ -18,7 +18,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { isPaymentConfigured } from "@/server/payments/provider";
+import { isPaymentProviderConfigured } from "@/server/payments/config";
+import { PayButton } from "@/components/dashboard/pay-button";
 
 export const metadata: Metadata = {
   title: "Transactions",
@@ -44,7 +45,7 @@ export default async function TransactionsPage() {
   if (!user) redirect("/login?next=/dashboard/transactions");
 
   const rows = await getTransactions(user.id);
-  const configured = isPaymentConfigured();
+  const configured = isPaymentProviderConfigured();
 
   return (
     <div className="space-y-6">
@@ -106,7 +107,17 @@ export default async function TransactionsPage() {
                     <Money minor={row.net_minor} currency={row.currency} />
                   </TableCell>
                   <TableCell data-testid="transaction-status">
-                    <TransactionBadge status={row.status} />
+                    <div className="flex flex-wrap items-center gap-2">
+                      <TransactionBadge status={row.status} />
+                      {/* The buyer's only route to the provider, and only when
+                          one exists: an unconfigured deployment must not show
+                          a button that leads to a 503. */}
+                      {configured &&
+                        row.buyer_id === user.id &&
+                        row.status === "AWAITING_PAYMENT" && (
+                          <PayButton transactionId={row.id} />
+                        )}
+                    </div>
                   </TableCell>
                   <TableCell className="text-muted-foreground">{formatDate(row.created_at)}</TableCell>
                   <TableCell>

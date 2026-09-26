@@ -1,4 +1,4 @@
-import { isPaymentConfigured } from "@/server/payments/provider";
+import { isPaymentProviderConfigured } from "@/server/payments/config";
 import { feePercentLabel } from "@/lib/money";
 import { Money } from "@/components/auction/money";
 import { TransactionBadge } from "@/components/auction/status-badge";
@@ -25,7 +25,7 @@ export function SaleSummary({
   };
   feeBps: number | null;
 }) {
-  const configured = isPaymentConfigured();
+  const configured = isPaymentProviderConfigured();
 
   return (
     <div className="rounded-xl border bg-card p-4 text-sm shadow-sm">

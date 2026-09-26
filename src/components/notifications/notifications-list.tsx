@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Json } from "@/lib/supabase/types";
 import { Money } from "@/components/auction/money";
 import { MarkReadButton } from "@/components/notifications/mark-read-button";
-import { isPaymentConfigured } from "@/server/payments/provider";
+import { isPaymentProviderConfigured } from "@/server/payments/config";
 
 /**
  * The notification feed. Server-rendered: rows and their money copy are fixed
@@ -98,7 +98,7 @@ function describe(
             <Money minor={amountOf(p.winning_bid_minor)} currency={currency} /> · Fee{" "}
             <Money minor={amountOf(p.fee_minor)} currency={currency} /> · You keep{" "}
             <Money minor={amountOf(p.net_minor)} currency={currency} />.
-            {!isPaymentConfigured() && (
+            {!isPaymentProviderConfigured() && (
               <>
                 {" "}
                 No payment provider is configured yet, so no money has moved.

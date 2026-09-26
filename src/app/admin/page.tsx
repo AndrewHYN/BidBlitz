@@ -11,7 +11,7 @@ import {
 import { badgeVariants } from "@/components/auction/status-badge";
 import { Money } from "@/components/auction/money";
 import { ReportStatusControls } from "@/components/dashboard/report-status-controls";
-import { isPaymentConfigured } from "@/server/payments/provider";
+import { isPaymentProviderConfigured } from "@/server/payments/config";
 
 export const metadata: Metadata = {
   title: "Admin",
@@ -116,7 +116,7 @@ export default async function AdminPage() {
 
   const reports = (reportsRes.data ?? []) as ReportRow[];
   const fee = (feeRes.data ?? null) as FeeRow | null;
-  const configured = isPaymentConfigured();
+  const configured = isPaymentProviderConfigured();
 
   return (
     <div className="page-container py-10 sm:py-14 space-y-8" data-testid="admin-page">
