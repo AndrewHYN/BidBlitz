@@ -146,6 +146,8 @@ Run these against the deployed URL before calling it shipped:
 6. `GET /auction/<id>` HTML → `og:url` and the `rel=canonical` link start with
    `NEXT_PUBLIC_SITE_URL` (a stale domain means the env change predates the
    running build: environment snapshots are per deployment, so push again).
+7. `POST /api/payments/webhook` with `{}` → **503** with
+   `{"ok":false,"error":"no_payment_provider"}` (the honest Noop answer; §5).
 
 ## 5. Explicitly not configured
 
@@ -155,6 +157,24 @@ proceeds are recorded as `AWAITING_PAYMENT`, and the UI says so. **"Payment
 successful" is never rendered** without a real provider confirming a charge. To
 activate one, implement `src/server/payments/provider.ts` — no auction, fee or
 transaction code changes.
+
+**Payment webhook (dormant):** `POST /api/payments/webhook` exists so the
+provider integration has its route from day one. It is deliberately
+*unauthenticated by Bearer secret* — webhook authentication is the provider's
+signature scheme, which the handler will verify inside
+`PaymentProvider.confirm(payload, context)` using the raw body + headers it is
+forwarded (`WebhookContext`). Exact responses today (Noop provider
+configured): **503 `{"ok":false,"error":"no_payment_provider"}`** for every
+POST (checked before the body is read), **400** with `empty_body`,
+`invalid_json` or `unrecognized_payload`, **200 `{"ok":true}`** only when a
+provider reports the event handled, and **500 `webhook_failed`** (safe to
+retry) on handler failure. Before wiring a real provider, add: constant-time
+signature verification over the raw body, an event-id dedupe against
+`payment_events` (the table already exists, RLS-closed, no client surface),
+and IP allow-listing if the provider offers one. `mark_transaction_paid`
+(service_role only) is the single write path a webhook may use; it re-checks
+amount/currency against the recorded gross. Do **not** add a shared-secret
+env var until a provider is chosen — a secret with no verifier is theater.
 
 ## 6. Vercel Deployment Protection (SSO) — why every URL 302s
 
