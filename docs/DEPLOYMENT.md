@@ -22,18 +22,20 @@ name and does nothing clever.
 | `NEXT_PUBLIC_SITE_URL` | `https://<your-domain>` | Used for canonical URLs and Open Graph tags. Also derives the Paynow `resulturl` / `returnurl` (§5), so it must be the canonical origin before a provider is configured. |
 | `CRON_SECRET` | 32+ random bytes | `openssl rand -hex 32`. Authorizes `GET /api/cron/settle`. |
 
-**Deliberately not set — payment provider.** These are the only variables that
-can make BidBlitz charge anyone, which is exactly why they are absent:
+**Payment provider — Production secrets, set 2026-09-26.** These are the only
+variables that can make BidBlitz charge anyone, which is why they live in Vercel
+and never in git:
 
 | Variable | Value | Notes |
 | --- | --- | --- |
-| `PAYNOW_INTEGRATION_ID` | from the Paynow dashboard | **Server only.** Unset in Vercel until the test-mode flow is verified (ADR-011). |
-| `PAYNOW_INTEGRATION_KEY` | from "Email Key To Company Address" | **Server only.** Never `NEXT_PUBLIC_`, never logged. Only a SHA-512 hash derived from it ever leaves the server. |
+| `PAYNOW_INTEGRATION_ID` | from the Paynow dashboard | **Server only.** Production secret, set 2026-09-26; the integration is in Paynow **test mode**. |
+| `PAYNOW_INTEGRATION_KEY` | from "Email Key To Company Address" | **Server only.** Never `NEXT_PUBLIC_`, never logged. Only a SHA-512 hash derived from it ever leaves the server. Rotate it ("Generate New Key") after it has been used in testing. |
 
 Both must be present or neither: a partial configuration leaves the honest
-`NoopPaymentProvider` in place and writes the reason to the server log. Adding
-them activates checkout **and** the webhook in the same deployment, so do it in
-one deliberate push, after reading ADR-011.
+`NoopPaymentProvider` in place and writes the reason to the server log. Both are
+present in Production, so checkout **and** the webhook are live in that
+deployment — ADR-011 records what that verified and what it did not (Paynow's
+status-update push never arrived in test mode).
 
 **Not** set in Vercel, because they are development-machine only:
 
@@ -159,30 +161,36 @@ Run these against the deployed URL before calling it shipped:
 6. `GET /auction/<id>` HTML → `og:url` and the `rel=canonical` link start with
    `NEXT_PUBLIC_SITE_URL` (a stale domain means the env change predates the
    running build: environment snapshots are per deployment, so push again).
-7. `POST /api/payments/webhook` with `{}` → **503** with
-   `{"ok":false,"error":"no_payment_provider"}` (the honest Noop answer; §5).
-8. `POST /api/payments/checkout` with `{"transactionId":"<any uuid>"}` →
-   **503** `{"ok":false,"error":"no_payment_provider"}`, and the Transactions
-   page shows **no** pay button (only a configured provider renders one).
+7. `POST /api/payments/webhook` with `{}` → **400**
+   `{"ok":false,"error":"invalid_json"}` now that a provider is configured
+   (**503** `no_payment_provider` only while none is). `GET` on the same URL →
+   **200** probe response that writes nothing.
+8. `POST /api/payments/checkout` with `{"transactionId":"<any uuid>"}` and no
+   session → **401** `{"ok":false,"error":"unauthenticated"}` (**503** only
+   while no provider is configured), and the Transactions page shows a pay
+   button only while a provider is configured.
 
 ## 5. Payment provider status and webhook contract
 
-### Current state: nothing is configured, and that is the shipped state
+### Current state: Paynow configured in Production, in test mode
 
-Payments are a documented seam, not a feature. `PaymentProvider` is
-implemented by an honest `NoopPaymentProvider`: the sale, the platform fee and
-the seller proceeds are recorded as `AWAITING_PAYMENT`, and the UI says so.
-**"Payment successful" is never rendered** without a real provider confirming a
-charge, and no checkout button exists while none is configured.
+Payments are wired, not merely a seam. `PAYNOW_INTEGRATION_ID` and
+`PAYNOW_INTEGRATION_KEY` are **Production secrets** (set 2026-09-26), so
+`config.ts` boots `PaynowPaymentProvider`: checkout returns a real Paynow
+payment page and the webhook verifies Paynow's signature. The integration is
+in Paynow **test mode**. What has *not* changed: **"Payment successful" is
+never rendered** from a redirect — only a signed provider message can reach
+`AWAITING_PAYMENT → PAID`, and Paynow's status-update push was never observed
+arriving (ADR-011).
 
 Provider selection lives in exactly one module,
 `src/server/payments/config.ts`:
 
 | `PAYNOW_INTEGRATION_ID` / `PAYNOW_INTEGRATION_KEY` | Result |
 | --- | --- |
-| both absent (today) | `NoopPaymentProvider`; no boot error |
+| both absent | `NoopPaymentProvider`; no boot error |
 | exactly one present, or a value still matching the `.env.example` placeholder | stays `NoopPaymentProvider` **and** logs `paymentBootError()` — a half-set integration never looks like a working one |
-| both present **and** `SUPABASE_SECRET_KEY` present | `PaynowPaymentProvider` |
+| both present **and** `SUPABASE_SECRET_KEY` present | `PaynowPaymentProvider` — the state of Production since 2026-09-26 |
 
 Research, verified capabilities and open questions: **ADR-011** in
 `docs/ARCHITECTURE_DECISIONS.md`.
@@ -204,6 +212,7 @@ else → `unsupported_body`.
 
 | Status | Body | When |
 | --- | --- | --- |
+| **200** | `{"ok":true,"method":"GET",...}` | `GET` reachability probe (Paynow GETs `resulturl` at initiation). Reads no body, consults no provider, writes nothing. |
 | **503** | `{"ok":false,"error":"no_payment_provider"}` | No provider configured. Checked **before the body is read**. |
 | **400** | `{"ok":false,"error":"empty_body"}` | Zero-length or whitespace-only body. |
 | **400** | `{"ok":false,"error":"invalid_json"}` | Body starts like JSON and does not parse. |
@@ -221,6 +230,8 @@ Retry semantics: Paynow resends a status update up to **ten times** when the
 response is an HTTP error status, so 400 and 500 both cause a bounded retry —
 they differ in meaning (permanent rejection vs. try again), not in whether the
 handler is safe to re-enter. Every re-entry is idempotent by construction.
+In test mode no status update ever arrived to retry against; the observed
+behaviour is recorded in ADR-011.
 
 **Write paths.** A provider reaches the database only through `ledger.ts`:
 
@@ -257,15 +268,17 @@ is no write path to `transactions` at all.
 ### Before going live with a provider
 
 1. Run `npm run db:migrate` (the Phase 3 transition writers are additive).
-2. Set both `PAYNOW_*` variables in Vercel — never in git, never in
-   `.env.example` with a real value.
-3. Re-run the post-deploy checks above: 8 flips from 503 to 503 *with a server
-   log reason only if misconfigured*, and the pay button appears only on a
+2. Confirm both `PAYNOW_*` variables are set in Vercel (Production secrets —
+   they were added 2026-09-26) — never in git, never in `.env.example` with a
+   real value.
+3. Re-run the post-deploy checks above: 7 answers `400 invalid_json` with a
+   provider configured (503 only if misconfigured), 8 answers `401
+   unauthenticated` without a session, and the pay button appears only on a
    transaction the signed-in buyer owns and is still awaiting payment.
-4. Complete the test-mode proof list in ADR-011 (initiation, redirect,
-   callback, signature, success, failure, cancel, duplicate callback, wrong
-   amount, wrong currency, unknown transaction, replay) **before** requesting
-   "Set Live" in the Paynow dashboard.
+4. The test-mode proof list ran on 2026-09-26 — results are in ADR-011.
+   **Before** requesting "Set Live": establish with Paynow that status updates
+   will actually be delivered to `resulturl` (none arrived in test mode), or
+   implement `pollurl` polling first, then re-run the list.
 5. Do not add a shared-secret env var alongside the signature scheme — a
    secret with no verifier is theater.
 

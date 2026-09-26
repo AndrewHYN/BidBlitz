@@ -331,9 +331,11 @@ of identical indexes.
 
 ---
 
-## ADR-011: Payment provider — Paynow researched and built behind the seam, not activated
+## ADR-011: Payment provider — Paynow researched, built behind the seam, then verified in test mode
 
-Status: Research complete, implementation behind the seam, **not activated**
+Status: Accepted — **configured in production in Paynow test mode**, proof list
+run 2026-09-26 (results in *Test-mode verification* below). One finding stands:
+Paynow's status-update push never reached `resulturl`.
 Date: 2026-09-26
 
 Everything below was read from Paynow's *current* official documentation — the
@@ -355,7 +357,9 @@ subscription.
 
 **Keep `PaymentProvider` as the only seam, implement Paynow behind it, and
 leave it switched off until a test-mode integration has been verified end to
-end.**
+end.** *(Condition met 2026-09-26: the provider is on in Production in test
+mode and the proof list ran — see Test-mode verification. Delivery of status
+updates remains unproven and is tracked in the backlog.)*
 
 | | |
 | --- | --- |
@@ -365,7 +369,7 @@ end.**
 | Database writes | `src/server/payments/ledger.ts` → `mark_transaction_paid` / `mark_transaction_failed` / `mark_transaction_refunded` / `record_payment_event` |
 | Webhook | `POST /api/payments/webhook` |
 | Checkout | `POST /api/payments/checkout` |
-| Registration state today | `NoopPaymentProvider` — `PAYNOW_*` variables are absent, so nothing is configured |
+| Registration state today | `PaynowPaymentProvider` in Production — `PAYNOW_INTEGRATION_ID` / `PAYNOW_INTEGRATION_KEY` are Vercel **Production secrets** (set 2026-09-26). Elsewhere it is `NoopPaymentProvider`. |
 
 ### Paynow — verified capability summary
 
@@ -475,8 +479,12 @@ installed.
 - **Checkout.** `POST /api/payments/checkout` starts an intent for the
   *buyer of record* only, reads the price from the row (never from the
   request), and returns a payment page. It has **no write path** to
-  `transactions`. It answers `503 no_payment_provider` today, and the UI does
-  not render a pay button while that is true.
+  `transactions`. It answers `503 no_payment_provider` only while no provider
+  is configured; in Production it answers `401 unauthenticated` without a
+  session, `403 not_the_buyer` for anyone else, and returns a Paynow
+  `redirectUrl` for the buyer of record while the row is still
+  `AWAITING_PAYMENT`. The UI renders a pay button only while a provider is
+  configured.
 - **No payout code.** Nothing moves money to a seller.
 
 ### Verified capability list
@@ -484,46 +492,88 @@ installed.
 | Capability | Status | Evidence |
 | --- | --- | --- |
 | Hosted checkout with redirect | Documented | `initiatetransaction` + `browserurl` |
-| Server-to-server callback | Documented | `resulturl` POST, up to 10 retries |
+| Server-to-server callback | **Push not observed** | `resulturl` documented as the target; across 5 Paynow test transactions (4 hosted, 2 express) **zero POSTs** reached production — see *Test-mode verification* |
+| Status by polling `pollurl` | **Verified live** | Paynow returns the same signed message shape (`reference`, `paynowreference`, `amount`, `status`, `pollurl`, `hash`); our verifier accepted Paynow's real hash |
 | Signature verification | **Verified in tests** | both official hash vectors asserted in `paynow.test.ts` |
 | Amount + currency verification | **Verified in DB** | harness: wrong amount, wrong currency rejected, nothing written |
 | Unknown transaction rejected | **Verified in DB** | harness: `transaction_not_found` |
 | Duplicate / replayed event | **Verified in DB** | harness: `already_paid`, `already_failed`, `already_refunded`, one audit row each |
 | Failed payment handling | **Verified in DB** | harness: `AWAITING_PAYMENT → FAILED` |
 | Refund state transition | **Verified in DB** | harness: `PAID → REFUNDED` |
-| Sandbox / test mode | Documented | integration starts in test mode; **not yet exercised** |
+| Sandbox / test mode | **Exercised 2026-09-26** | merchant login, hosted `TESTING` card and express test numbers (`0771111111` success, `0773333333` cancelled); Paynow's ledger recorded every payment as Paid/Cancelled |
 | Server-initiated cancellation | **Not available** | no documented endpoint — `cancel()` refuses rather than no-ops |
 | Escrow / split payment to sellers | **Not available (Zimbabwe)** | only Paynow Poland publishes `transfers[]` |
-| End-to-end sandbox transaction | **NOT DONE** | requires a Paynow account — see below |
+| End-to-end sandbox transaction | **DONE 2026-09-26** | `AWAITING_PAYMENT → PAID` on production from a genuine Paynow-signed message; cancel path `→ FAILED`; results below |
 
 ### Open questions (unresolved, deliberately)
 
 1. **Hash concatenation on inbound messages.** The *Generating Hash* page says
    concatenate the values only; a separate page about the Custom Button
    Template says concatenate *key plus value*. Our implementation follows the
-   primary page plus its worked examples (which reproduce exactly). This must
-   be confirmed against a real test-mode callback.
+   primary page plus its worked examples. **Resolved 2026-09-26:** Paynow's
+   own signed message (fetched from `pollurl`) verified on the first attempt
+   with values-only concatenation, no key inside the message.
 2. **Whitespace in values.** Paynow's published outbound example contains a
    leading space in `returnurl= http://...` yet publishes a hash that only
-   reproduces when the value is trimmed; we trim. To be re-confirmed live.
+   reproduces when the value is trimmed; we trim. **Resolved 2026-09-26:**
+   the live Paynow message verified with trimming, as did every field we
+   re-sign and replay.
 3. **Paynow reference uniqueness per merchant reference.** Our `reference` is
-   the transaction UUID. Nothing documents what Paynow does if the same
-   reference is initiated twice (a buyer tapping *Pay now* twice). Because the
-   database allows only `AWAITING_PAYMENT → PAID` once, this cannot corrupt
-   state — but the intent record to correlate a `pollurl` is **not persisted**,
-   and is deliberately deferred until a real callback can be measured against.
+   the transaction UUID. The same reference was initiated **six times** in test
+   mode (four hosted, two express) and Paynow issued a distinct
+   `paynowreference` each time with no corruption on our side — the database
+   allows only `AWAITING_PAYMENT → PAID` once. The intent record to correlate a
+   `pollurl` is still **not persisted**; it is now justified rather than
+   speculative (see *Test-mode verification*).
 4. **Refunds.** Endpoint availability for an advanced-integration merchant is
    unconfirmed; `PAID → REFUNDED` is implemented and tested, but how Paynow
    reports a refund to *this* kind of merchant must be confirmed in test mode.
 5. **Disputes.** `Disputed` is recorded in the audit log and changes no state;
    no dispute-resolution flow exists.
 
-### The exact manual step still required
+### Test-mode verification — 2026-09-26
 
-Create a Paynow merchant account, register a settle account, create an
-Advanced Integration (test mode), and obtain the Integration ID and Key. Then
-set `PAYNOW_INTEGRATION_ID` and `PAYNOW_INTEGRATION_KEY` in Vercel and run the
-full proof list (initiation, redirect, callback, signature verification,
-success, failure, cancel, duplicate callback, wrong amount, wrong currency,
-unknown transaction, replayed event) in test mode before requesting "Set Live".
-Until that is done, **payment is not "working"** — only ready to be tested.
+Run against production (`https://bid-blitz-ten.vercel.app`) with a real Paynow
+merchant account in test mode. Credentials are Vercel **Production secrets**,
+never in git or `.env.example`.
+
+| Proof-list check | Result | Evidence |
+| --- | --- | --- |
+| Credentials wired | Pass | both `PAYNOW_*` set in Production; provider boots, `no_payment_provider` is gone |
+| Initiation | Pass | `initiatetransaction` → `browserurl`; `remotetransaction` → `paynowreference` |
+| Redirect alone does not pay | Pass | browser returned from Paynow; the transaction stayed `AWAITING_PAYMENT` for 60s+ |
+| Genuine callback accepted | Pass | Paynow-signed message → `200` → `AWAITING_PAYMENT → PAID`, `provider=paynow`, `provider_reference` recorded, one audit row |
+| Duplicate delivery | Pass | byte-identical replay → `200`, no second audit row, state unchanged |
+| Replayed / tampered message | Pass ×6 | amount, status, hash truncation, field reorder, wrong key, reference swap → all `400 invalid_signature` |
+| Wrong amount (fresh row) | Pass | `400 amount_mismatch`, nothing written |
+| Unknown / non-uuid reference | Pass | `400 unknown_transaction` |
+| Unsigned and malformed bodies | Pass | `invalid_signature`, `empty_body`, `invalid_json`, `unsupported_body`, `unrecognized_payload` |
+| Cancelled payment | Pass | Paynow `Cancelled` → `AWAITING_PAYMENT → FAILED`, never `PAID` |
+| Buyer-forged success | Pass | unsigned `Paid` claim → `400 invalid_signature`, state untouched (10/10 on both fixtures) |
+| Production UI | Pass | transactions page shows Paid and Failed rows at `$10.00 / $0.50 (5% fee) / $9.50` |
+
+Paynow's status message carries no currency field, so a *live* wrong-currency
+case cannot be produced; that check lives in `mark_transaction_paid()` and is
+covered by the engine harness.
+
+Two behaviours worth naming explicitly:
+
+- On an already-`PAID` row, `mark_transaction_paid()` returns `already_paid`
+  **before** the amount check — the documented, retry-safe order. A
+  correctly-signed message carrying the wrong amount is therefore acknowledged
+  with `200` and writes nothing; state, amounts and the audit log were all
+  verified unchanged.
+- Paynow probed `resulturl` with GET at initiation (405 until the webhook
+  gained a stateless GET probe, then 200) and **never POSTed a status update**
+  for any of the five test transactions. `pollurl` did answer, and polling it is
+  how the genuine `Paid` and `Cancelled` messages above were obtained.
+
+### The manual step still required
+
+Before requesting **"Set Live"** in the Paynow dashboard: ask Paynow why status
+updates were not delivered to this integration in test mode. If the push cannot
+be relied on, `pollurl` polling must become the authoritative confirmation path
+(tracked in `docs/POST_LAUNCH_BACKLOG.md`). Rotate the Integration Key
+("Generate New Key") after this shared key has been used in testing. Until then,
+payment is **verified as a receiver and a state machine**, not as a delivery
+path BidBlitz has observed Paynow use.

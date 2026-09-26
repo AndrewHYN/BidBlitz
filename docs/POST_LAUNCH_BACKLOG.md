@@ -26,17 +26,23 @@ When traffic requires it, move to a distributed/serverless rate limiter or anoth
 ### Payments
 MVP deliberately does not fake payment.
 
-Phase 3 moved this from "unimplemented" to "researched, built behind a seam,
-and switched off" (see **ADR-011**). Completed: provider abstraction
+Phase 3 moved this from "unimplemented" to "researched and built behind a
+seam" (see **ADR-011**); on 2026-09-26 the provider was switched **on** in
+Production (Paynow test mode) and the ADR-011 proof list ran against the live
+site. Completed: provider abstraction
 (`PaymentProvider` with Noop/Paynow implementations), webhook signature
 verification over the raw body, amount/currency/reference re-checks, event
 dedupe and replay protection, the allowlisted state machine with
-service-role-only writers, and a buyer checkout route. Not completed — and
-therefore **not claimed**:
+service-role-only writers, a buyer checkout route, and the sandbox proof list.
+Still open — and therefore **not claimed**:
 
-- **End-to-end sandbox verification.** Requires a Paynow merchant account, a
-  registered settle account, an Advanced Integration, and the emailed
-  Integration Key. This is the single manual onboarding step still outstanding.
+- **End-to-end delivery.** The proof list passed on 2026-09-26: a genuine
+  Paynow-signed callback moved `AWAITING_PAYMENT → PAID`, a cancelled payment
+  moved `→ FAILED`, duplicates and tampered replays were rejected, and
+  unsigned forgeries were rejected (evidence in **ADR-011**). What it did
+  *not* establish: Paynow never delivered a status update to `resulturl`
+  (5 test transactions, zero POSTs), so **delivery** is still open — see
+  *Paynow status-update delivery* below.
 - **Refunds as a real operation.** `PAID → REFUNDED` exists, is tested and is
   reachable only by service role, but Paynow's published reversal endpoint is
   BillPay-only and "a very limited set of billers accept reversals". The
@@ -49,7 +55,8 @@ therefore **not claimed**:
   endpoint, so `cancel()` refuses rather than pretending.
 
 Before enabling real buyer/seller money movement:
-- complete the test-mode proof list in ADR-011 before requesting "Set Live",
+- confirm Paynow will deliver status updates to `resulturl`, or implement
+  `pollurl` polling first (the test-mode proof list itself is done — ADR-011),
 - implement payout/settlement rules (none exist; see *Payouts* below),
 - add refunds/disputes once confirmed against the real API,
 - review legal/regulatory obligations.
@@ -165,10 +172,18 @@ until there is a reason:
 
 ## DEFERRED IN THE PAYMENT PASS (P3 — intentional, not blockers)
 
-- **Paynow test-mode verification** — the only step that can call payment
-  "working". Needs a merchant account, a registered settle account, an
-  Advanced Integration and the emailed Integration Key; then the full proof
-  list in ADR-011. Until then `PAYNOW_*` stays unset in Vercel.
+- **Paynow test-mode verification** — completed 2026-09-26: `PAYNOW_*` are
+  Production secrets and the ADR-011 proof list passed (callback accepted,
+  `→ PAID`, cancel `→ FAILED`, duplicate and tampered replays rejected,
+  forgeries rejected). Outstanding from that run: **Paynow's status-update push
+  never arrived** — see *Paynow status-update delivery* below.
+- **Paynow status-update delivery** — across five test transactions (four
+  hosted, two express) Paynow recorded every payment as Paid/Cancelled and
+  never POSTed to `resulturl`, even after the endpoint answered its GET probe
+  with 200. `pollurl` did answer and returned the same signed message shape,
+  and is how the verification callbacks were obtained. Before real money: ask
+  Paynow why, and if push cannot be relied on, make polling authoritative
+  (needs the intent/`pollurl` row below).
 - **Custom domain** — production is `https://bid-blitz-ten.vercel.app`.
   Registering a domain is a deliberate, paid, human decision and is recorded
   here so it is not forgotten; do not purchase one as part of engineering work.
@@ -177,8 +192,10 @@ until there is a reason:
   smoke check.
 - **Seller payout automation** — see *Payouts* above. No API exists in the
   chosen market; payouts stay manual and platform-administered.
-- **Intent (`pollurl`) persistence** — deferred until a real callback shows
-  what needs correlating.
+- **Intent (`pollurl`) persistence** — was deferred "until a real callback
+  shows what needs correlating"; that condition is now met (a real signed
+  callback was received and `pollurl` is the only fallback path if the push
+  stays silent). Still no schema change until polling is actually implemented.
 - **Dispute and refund operations** — the states and writers exist; the
   provider-side endpoints still need confirmation against a real integration.
 
