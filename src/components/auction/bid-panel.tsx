@@ -4,6 +4,7 @@ import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Gavel, Info, Timer, Trophy } from "lucide-react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -78,6 +79,8 @@ export type BidPanelProps = {
   bidIncrementMinor: number;
   myHighestBidMinor: number | null;
   transactionStatus: string | null;
+  /** Server-decided: only truthfully claims "no provider" when that is so. */
+  paymentConfigured: boolean;
   /** Called with the server's response after a committed bid. */
   onServerEcho?: (echo: ServerEcho) => void;
 };
@@ -99,10 +102,12 @@ export function BidPanel({
   bidIncrementMinor,
   myHighestBidMinor,
   transactionStatus,
+  paymentConfigured,
   onServerEcho,
 }: BidPanelProps) {
   const router = useRouter();
   const now = useNow();
+  const reduceMotion = useReducedMotion();
 
   const [value, setValue] = useState("");
   const [pending, setPending] = useState(false);
@@ -296,7 +301,12 @@ export function BidPanel({
             </p>
           </div>
         ) : winnerId ? (
-          <div className="space-y-1">
+          <motion.div
+            className="space-y-1"
+            initial={reduceMotion ? false : { opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.25, ease: "easeOut" }}
+          >
             <p className="font-medium">
               {viewerId === winnerId
                 ? "You won this auction."
@@ -311,7 +321,7 @@ export function BidPanel({
                 currency={currency}
               />
             </p>
-          </div>
+          </motion.div>
         ) : status === "CANCELLED" ? (
           <p className="text-sm text-muted-foreground">
             This auction was cancelled.
@@ -327,12 +337,30 @@ export function BidPanel({
         )}
 
         {transactionStatus && (
-          <div className="space-y-2 border-t pt-3">
+          <div
+            className="space-y-2 border-t pt-3"
+            data-testid="closed-transaction-state"
+          >
             <TransactionBadge status={transactionStatus} />
-            <p className="flex items-start gap-2 text-sm text-muted-foreground">
-              <Info className="mt-0.5 size-4 shrink-0" aria-hidden />
-              No payment provider is configured yet, so no money has moved.
+            <p className="text-sm text-muted-foreground">
+              <Link
+                href="/dashboard/transactions"
+                className="font-medium text-foreground underline underline-offset-2"
+              >
+                Dashboard → Transactions
+              </Link>{" "}
+              {viewerId === winnerId
+                ? "holds this purchase — the payment status and receipt live there."
+                : "holds this sale — the fee breakdown and proceeds live there."}
             </p>
+            {/* Truthful only while that is so: gate on the server-decided flag
+                so this line can never contradict a configured provider. */}
+            {!paymentConfigured && (
+              <p className="flex items-start gap-2 text-sm text-muted-foreground">
+                <Info className="mt-0.5 size-4 shrink-0" aria-hidden />
+                No payment provider is configured yet, so no money has moved.
+              </p>
+            )}
           </div>
         )}
       </div>
@@ -414,29 +442,43 @@ export function BidPanel({
         <h2 className="font-semibold">Place your bid</h2>
       </div>
 
-      {viewerOutbid && (
-        <div
-          data-testid="outbid-status"
-          role="status"
-          className="rounded-lg border border-ending/40 bg-ending/10 px-3 py-2 text-sm"
-        >
-          You&apos;ve been outbid — the top bid is now{" "}
-          <Money minor={currentBidMinor} currency={currency} />. Bid again to
-          take the lead.
-        </div>
-      )}
+      {/* Status banners crossfade (transform/opacity only, reduced-motion
+          guarded): being outbid vs. leading IS the core bid feedback. */}
+      <AnimatePresence mode="wait" initial={false}>
+        {viewerOutbid && (
+          <motion.div
+            key="outbid"
+            data-testid="outbid-status"
+            role="status"
+            className="rounded-lg border border-ending/40 bg-ending/10 px-3 py-2 text-sm"
+            initial={reduceMotion ? false : { opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -4 }}
+            transition={{ duration: 0.15, ease: "easeOut" }}
+          >
+            You&apos;ve been outbid — the top bid is now{" "}
+            <Money minor={currentBidMinor} currency={currency} />. Bid again to
+            take the lead.
+          </motion.div>
+        )}
 
-      {viewerLeading && (
-        <div
-          data-testid="leading-status"
-          role="status"
-          className="rounded-lg border border-live/40 bg-live/10 px-3 py-2 text-sm"
-        >
-          You&apos;re the highest bidder at{" "}
-          <Money minor={currentBidMinor} currency={currency} />. The auction is
-          still live — anyone can outbid you before the clock runs out.
-        </div>
-      )}
+        {viewerLeading && (
+          <motion.div
+            key="leading"
+            data-testid="leading-status"
+            role="status"
+            className="rounded-lg border border-live/40 bg-live/10 px-3 py-2 text-sm"
+            initial={reduceMotion ? false : { opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -4 }}
+            transition={{ duration: 0.15, ease: "easeOut" }}
+          >
+            You&apos;re the highest bidder at{" "}
+            <Money minor={currentBidMinor} currency={currency} />. The auction is
+            still live — anyone can outbid you before the clock runs out.
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <div className="space-y-1.5">
         <Label htmlFor="bid-amount">Your bid</Label>
@@ -490,14 +532,17 @@ export function BidPanel({
       )}
 
       {success && (
-        <p
+        <motion.p
           data-testid="bid-success"
           role="status"
           className="rounded-lg border border-live/40 bg-live/10 px-3 py-2 text-sm"
+          initial={reduceMotion ? false : { opacity: 0, y: -4 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.2, ease: "easeOut" }}
         >
           Bid placed. The minimum is now{" "}
           <Money minor={floor} currency={currency} />.
-        </p>
+        </motion.p>
       )}
 
       <p className="text-xs text-muted-foreground">

@@ -72,6 +72,23 @@ export async function GET(request: Request): Promise<Response> {
 
   const admin = createAdminClient();
 
+  // 0. Ending-soon notices. Independent of settlement (an auction can sit in
+  //    its final window long before anything is due to close) and fully best
+  //    effort: a notice failure must never be able to block settlement, so it
+  //    is isolated in its own try/catch. The function itself dedupes to one
+  //    notice per auction per recipient, so re-running is always safe.
+  let endingSoon = 0;
+  try {
+    const soon = await admin.rpc("notify_ending_soon", { p_limit: SWEEP_LIMIT });
+    if (soon.error) {
+      console.error("[cron/settle] ending-soon failed", soon.error.message);
+    } else {
+      endingSoon = Number(soon.data ?? 0);
+    }
+  } catch (err) {
+    console.error("[cron/settle] ending-soon threw", err);
+  }
+
   // 1. Snapshot what is due BEFORE the sweep, so this run knows exactly which
   //    auctions it is responsible for announcing afterwards.
   const { data: due, error: dueError } = await admin
@@ -94,6 +111,7 @@ export async function GET(request: Request): Promise<Response> {
       scanned: 0,
       closed: 0,
       announced: 0,
+      endingSoon,
       durationMs: Date.now() - started,
     });
   }
@@ -160,6 +178,7 @@ export async function GET(request: Request): Promise<Response> {
     sold,
     unsold: settled.length - sold,
     announced,
+    endingSoon,
     durationMs: Date.now() - started,
   });
 }

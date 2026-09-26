@@ -1,7 +1,15 @@
 import Link from "next/link";
-import { MapPin, Package, Star } from "lucide-react";
+import { BadgeCheck, Calendar, MapPin, Package, Star } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import type { ProfileRow } from "@/server/queries";
+
+/** Rendered once per request, so the row never re-formats. */
+function memberSince(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-US", {
+    month: "short",
+    year: "numeric",
+  });
+}
 
 /**
  * Seller identity + trust signals. Server-renderable: the only interaction is
@@ -59,6 +67,24 @@ export function SellerCard({ seller }: { seller: ProfileRow | null }) {
               <span className="inline-flex items-center gap-1">
                 <MapPin className="size-3.5" aria-hidden />
                 {seller.location}
+              </span>
+            )}
+            {/* Factual trust signals only: account age and the auth system's
+                own verification flag — nothing invented, nothing badge-like. */}
+            <span
+              className="inline-flex items-center gap-1"
+              data-testid="seller-member-since"
+            >
+              <Calendar className="size-3.5" aria-hidden />
+              Member since {memberSince(seller.created_at)}
+            </span>
+            {seller.email_verified && (
+              <span
+                className="inline-flex items-center gap-1"
+                data-testid="seller-email-verified"
+              >
+                <BadgeCheck className="size-3.5" aria-hidden />
+                Verified email
               </span>
             )}
           </div>

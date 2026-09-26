@@ -70,6 +70,25 @@ export async function sweepDueAuctions(
       console.error("[sweep] settle_due_auctions failed:", error.message);
       return { ran: true, settled: 0, error: error.message };
     }
+
+    // Ending-soon notices ride the same throttle and the same contract as
+    // settlement: best effort, logged, never able to fail a page render.
+    // Once per auction per recipient (the function dedupes), so the extra
+    // call costs a single indexed RPC per sweep, not a notification storm.
+    try {
+      const soon = await admin.rpc("notify_ending_soon", {
+        p_limit: SWEEP_LIMIT,
+      });
+      if (soon.error) {
+        console.error("[sweep] notify_ending_soon failed:", soon.error.message);
+      }
+    } catch (err) {
+      console.error(
+        "[sweep] notify_ending_soon threw:",
+        err instanceof Error ? err.message : String(err)
+      );
+    }
+
     return { ran: true, settled: Number(data ?? 0), error: null };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

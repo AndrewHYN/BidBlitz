@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { MapPin } from "lucide-react";
 
 import { getAuctionDetail, imageUrlFor } from "@/server/queries";
+import { isPaymentConfigured } from "@/server/payments/provider";
 import { nextMinimumBid } from "@/lib/money";
 import { conditionLabels } from "@/lib/validation";
 import { ImageGallery, type GalleryImage } from "@/components/auction/image-gallery";
@@ -12,6 +13,7 @@ import { BidHistory } from "@/components/auction/bid-history";
 import { Money } from "@/components/auction/money";
 import { ReportDialog } from "@/components/auction/report-dialog";
 import { SellerCard } from "@/components/auction/seller-card";
+import { ShareButton } from "@/components/auction/share-button";
 import { WatchButton } from "@/components/auction/watch-button";
 import { ConditionBadge } from "@/components/auction/status-badge";
 import { SectionHeading } from "@/components/auction/page-header";
@@ -42,6 +44,15 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       description,
       url: `/auction/${detail.auction.id}`,
       ...(coverUrl ? { images: [{ url: coverUrl }] } : {}),
+    },
+    // Explicit twitter fields: the card type alone would fall back to the
+    // site-wide defaults, losing the auction's own title/description/image
+    // in the one place sharing actually happens.
+    twitter: {
+      card: "summary_large_image",
+      title: detail.auction.title,
+      description,
+      ...(coverUrl ? { images: [coverUrl] } : {}),
     },
   };
 }
@@ -142,13 +153,17 @@ export default async function AuctionPage({ params }: Props) {
             bidIncrementMinor={auction.bid_increment_minor}
             myHighestBidMinor={myHighestBidMinor}
             transactionStatus={transaction?.status ?? null}
+            paymentConfigured={isPaymentConfigured()}
           />
 
-          <WatchButton
-            auctionId={auction.id}
-            initialWatched={watched}
-            viewerId={viewerId}
-          />
+          <div className="flex flex-wrap items-center gap-2">
+            <WatchButton
+              auctionId={auction.id}
+              initialWatched={watched}
+              viewerId={viewerId}
+            />
+            <ShareButton auctionId={auction.id} title={auction.title} />
+          </div>
 
           <SellerCard seller={auction.seller} />
         </div>

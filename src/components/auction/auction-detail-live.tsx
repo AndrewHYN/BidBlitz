@@ -57,6 +57,7 @@ export function AuctionDetailLive({
   bidIncrementMinor,
   myHighestBidMinor,
   transactionStatus,
+  paymentConfigured,
 }: {
   auctionId: string;
   currency: string;
@@ -78,6 +79,8 @@ export function AuctionDetailLive({
   bidIncrementMinor: number;
   myHighestBidMinor: number | null;
   transactionStatus: string | null;
+  /** Server-decided: mirrors isPaymentConfigured() into the client panel. */
+  paymentConfigured: boolean;
 }) {
   const router = useRouter();
 
@@ -270,6 +273,7 @@ export function AuctionDetailLive({
         bidIncrementMinor={bidIncrementMinor}
         myHighestBidMinor={myHighestBidMinor}
         transactionStatus={transactionStatus}
+        paymentConfigured={paymentConfigured}
         onServerEcho={handleEcho}
       />
     </div>

@@ -121,11 +121,22 @@ function describe(
           ) : null,
       };
     case "ENDING_SOON":
-      return { headline: `${headline} is ending soon`, detail: null };
+      return {
+        headline: `${headline} is ending soon`,
+        detail:
+          typeof p.ends_at === "string" ? (
+            <>Closes {formatDate(p.ends_at)}.</>
+          ) : null,
+      };
     case "REVIEW_REQUEST":
       return {
-        headline: `Review requested for ${headline}`,
-        detail: null,
+        headline: `Leave a review for ${headline}`,
+        detail: (
+          <>
+            The auction is complete — your review keeps this marketplace honest
+            for the next buyer.
+          </>
+        ),
       };
     default:
       return { headline, detail: null };
@@ -138,6 +149,12 @@ export function NotificationsList({ items }: { items: NotificationItem[] }) {
       {items.map((item) => {
         const unread = item.read_at === null;
         const { headline, detail } = describe(item.type, item.payload);
+        // WON/SOLD/REVIEW_REQUEST carry the reader to the transaction itself:
+        // payment state, fee breakdown and the review dialog all live there.
+        const transactionLinked =
+          item.type === "WON" ||
+          item.type === "SOLD" ||
+          item.type === "REVIEW_REQUEST";
 
         return (
           <li
@@ -169,13 +186,22 @@ export function NotificationsList({ items }: { items: NotificationItem[] }) {
             </div>
 
             <div className="flex shrink-0 items-center gap-2">
-              {item.auction_id && (
+              {transactionLinked ? (
                 <Link
-                  href={`/auction/${item.auction_id}`}
+                  href="/dashboard/transactions"
                   className="text-sm font-medium text-muted-foreground hover:text-foreground hover:underline"
                 >
-                  View auction
+                  {item.type === "REVIEW_REQUEST" ? "Write a review" : "View transaction"}
                 </Link>
+              ) : (
+                item.auction_id && (
+                  <Link
+                    href={`/auction/${item.auction_id}`}
+                    className="text-sm font-medium text-muted-foreground hover:text-foreground hover:underline"
+                  >
+                    View auction
+                  </Link>
+                )
               )}
               {unread && <MarkReadButton id={item.id} label={headline} />}
             </div>

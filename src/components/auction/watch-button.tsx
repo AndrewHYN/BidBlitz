@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Eye } from "lucide-react";
+import { motion, useReducedMotion } from "motion/react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { toggleWatchAction } from "@/server/actions/social";
@@ -24,6 +25,7 @@ export function WatchButton({
   const router = useRouter();
   const [watched, setWatched] = useState(initialWatched);
   const [pending, setPending] = useState(false);
+  const reduceMotion = useReducedMotion();
 
   async function toggle() {
     if (pending) return;
@@ -62,7 +64,15 @@ export function WatchButton({
       onClick={toggle}
       className="w-full sm:w-auto"
     >
-      <Eye aria-hidden />
+      {/* One pulse when the watch lands — transform only, no-op under
+          reduced motion. The toast is the textual confirmation. */}
+      <motion.span
+        aria-hidden
+        animate={watched && !reduceMotion ? { scale: [1, 1.18, 1] } : { scale: 1 }}
+        transition={{ duration: 0.28, ease: "easeOut" }}
+      >
+        <Eye />
+      </motion.span>
       {watched ? "Watching" : "Watch"}
     </Button>
   );
