@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Mail, Phone } from "lucide-react";
 import { PageHeader, SectionHeading } from "@/components/auction/page-header";
+import { isPaymentProviderConfigured } from "@/server/payments/config";
 
 export const metadata: Metadata = {
   title: "Terms of Use",
@@ -10,7 +11,7 @@ export const metadata: Metadata = {
   alternates: { canonical: "/terms" },
 };
 
-const LAST_UPDATED = "25 September 2026";
+const LAST_UPDATED = "26 September 2026";
 
 function TermsSection({
   id,
@@ -32,6 +33,10 @@ function TermsSection({
 }
 
 export default function TermsPage() {
+  // Whether payments are wired up is a deployment fact, not a fixed promise:
+  // the section below must describe the state the site is actually in.
+  const paymentConfigured = isPaymentProviderConfigured();
+
   return (
     <div data-testid="terms-page" className="page-container py-10 sm:py-14">
       <div className="mx-auto w-full max-w-3xl space-y-10">
@@ -140,21 +145,50 @@ export default function TermsPage() {
           </p>
         </TermsSection>
 
-        <TermsSection id="payments" title="7. Payments — current limitation">
-          <p>
-            <strong>
-              BidBlitz does not process payments yet. No payment provider is
-              connected to the site.
-            </strong>
-          </p>
-          <p>
-            When an auction settles, its transaction starts in a state called
-            &ldquo;Awaiting payment&rdquo; and simply waits there. Nothing is
-            charged, collected or paid out through BidBlitz today. Until a
-            payment provider is connected, do not assume that money has moved
-            through the site — and check back here before payments are enabled,
-            because these terms will be updated first.
-          </p>
+        <TermsSection
+          id="payments"
+          title={
+            paymentConfigured
+              ? "7. Payments"
+              : "7. Payments — current limitation"
+          }
+        >
+          {paymentConfigured ? (
+            <>
+              <p>
+                <strong>Payments are processed by Paynow.</strong> When an
+                auction settles, BidBlitz records the gross winning price, the
+                platform fee and the seller&apos;s proceeds, and the buyer
+                completes payment through Paynow&apos;s checkout.
+              </p>
+              <p>
+                The transaction starts as &ldquo;Awaiting payment&rdquo; and
+                becomes &ldquo;Paid&rdquo; only when Paynow&apos;s own
+                confirmation reaches BidBlitz and passes signature and amount
+                checks. A payment that fails or is cancelled leaves it
+                &ldquo;Failed&rdquo;. Being sent back to this site from Paynow
+                never marks a sale paid by itself.
+              </p>
+            </>
+          ) : (
+            <>
+              <p>
+                <strong>
+                  BidBlitz does not process payments yet. No payment provider is
+                  connected to the site.
+                </strong>
+              </p>
+              <p>
+                When an auction settles, its transaction starts in a state
+                called &ldquo;Awaiting payment&rdquo; and simply waits there.
+                Nothing is charged, collected or paid out through BidBlitz
+                today. Until a payment provider is connected, do not assume
+                that money has moved through the site — and check back here
+                before payments are enabled, because these terms will be
+                updated first.
+              </p>
+            </>
+          )}
         </TermsSection>
 
         <TermsSection id="reviews" title="8. Reviews">

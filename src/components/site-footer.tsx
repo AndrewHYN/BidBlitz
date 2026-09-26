@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Gavel, Mail, Phone } from "lucide-react";
+import { isPaymentProviderConfigured } from "@/server/payments/config";
 
 const COLUMNS = [
   {
@@ -33,6 +34,11 @@ const COLUMNS = [
 ] as const;
 
 export function SiteFooter() {
+  // Read once, server-side: the footer must never claim a state the
+  // deployment does not have. With Paynow configured the old "no provider"
+  // sentence would be false, so both branches are kept honest.
+  const paymentConfigured = isPaymentProviderConfigured();
+
   return (
     <footer className="mt-auto border-t bg-card/50">
       <div className="page-container grid gap-10 py-12 sm:grid-cols-2 lg:grid-cols-4">
@@ -95,8 +101,9 @@ export function SiteFooter() {
         <div className="page-container flex flex-col gap-2 py-6 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
           <p>© {new Date().getFullYear()} BidBlitz. All prices are in US dollars.</p>
           <p>
-            No payment provider is connected yet — no money changes hands
-            through BidBlitz.
+            {paymentConfigured
+              ? "Payments are processed by Paynow — a sale is marked paid only once Paynow confirms it."
+              : "No payment provider is connected yet — no money changes hands through BidBlitz."}
           </p>
         </div>
       </div>

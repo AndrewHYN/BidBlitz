@@ -4,6 +4,7 @@ import { ArrowRight, CreditCard, ReceiptText } from "lucide-react";
 import { PageHeader, SectionHeading } from "@/components/auction/page-header";
 import { Money } from "@/components/auction/money";
 import { previewFeeMinor } from "@/lib/money";
+import { isPaymentProviderConfigured } from "@/server/payments/config";
 
 export const metadata: Metadata = {
   title: "Fees",
@@ -55,6 +56,10 @@ function ExampleRow({
 }
 
 export default function HelpFeesPage() {
+  // The badge and the note below must track the deployment, not a fixed
+  // claim: with Paynow configured, "No provider connected" would be false.
+  const paymentConfigured = isPaymentProviderConfigured();
+
   return (
     <div data-testid="help-fees-page" className="page-container py-10 sm:py-14">
       <div className="mx-auto w-full max-w-3xl space-y-10">
@@ -126,7 +131,7 @@ export default function HelpFeesPage() {
             action={
               <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <CreditCard className="size-3.5" aria-hidden />
-                No provider connected
+                {paymentConfigured ? "Paynow connected" : "No provider connected"}
               </span>
             }
           />
@@ -134,14 +139,32 @@ export default function HelpFeesPage() {
             <p>
               When an auction settles, a transaction is created with the winning
               price, fee and net amount recorded. It starts as{" "}
-              <strong>Awaiting payment</strong> and stays in that state until a
-              payment provider is connected.
+              <strong>Awaiting payment</strong>{" "}
+              {paymentConfigured ? (
+                <>
+                  and becomes <strong>Paid</strong> only when Paynow confirms
+                  the payment.
+                </>
+              ) : (
+                <>and stays in that state until a payment provider is connected.</>
+              )}
             </p>
             <p>
-              <strong>No payment provider is configured yet</strong> — so no
-              money ever moves through BidBlitz today. Nothing is charged,
-              captured or transferred; the transaction is a record of what is
-              owed, not a completed payment.
+              {paymentConfigured ? (
+                <>
+                  <strong>The payment is handled by Paynow.</strong> The
+                  transaction records what is owed until Paynow confirms the
+                  payment; a failed or cancelled payment leaves it{" "}
+                  <strong>Failed</strong>.
+                </>
+              ) : (
+                <>
+                  <strong>No payment provider is configured yet</strong> — so no
+                  money ever moves through BidBlitz today. Nothing is charged,
+                  captured or transferred; the transaction is a record of what
+                  is owed, not a completed payment.
+                </>
+              )}
             </p>
           </div>
         </section>

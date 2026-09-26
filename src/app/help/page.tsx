@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, Coins, Handshake, Mail, Phone, Scale, ShieldAlert } from "lucide-react";
 import { PageHeader, SectionHeading } from "@/components/auction/page-header";
+import { isPaymentProviderConfigured } from "@/server/payments/config";
 
 export const metadata: Metadata = {
   title: "Help",
@@ -83,9 +84,22 @@ export default function HelpPage() {
               </li>
               <li>
                 <strong>The transaction starts as “Awaiting payment”.</strong>{" "}
-                No payment provider is connected to BidBlitz yet, so no money
-                ever moves — the transaction simply waits in that state until
-                one is.
+                {isPaymentProviderConfigured() ? (
+                  <>
+                    The buyer completes payment through Paynow, and BidBlitz
+                    marks the sale paid only when Paynow&apos;s own confirmation
+                    arrives and passes its signature and amount checks — being
+                    sent back to the site never marks a sale paid on its own. If
+                    the payment fails or is cancelled, the transaction becomes
+                    “Failed”.
+                  </>
+                ) : (
+                  <>
+                    No payment provider is connected to BidBlitz yet, so no money
+                    ever moves — the transaction simply waits in that state until
+                    one is.
+                  </>
+                )}
               </li>
               <li>
                 <strong>Both sides can leave a review.</strong> Reviews are
