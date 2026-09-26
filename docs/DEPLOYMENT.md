@@ -19,8 +19,21 @@ name and does nothing clever.
 | `NEXT_PUBLIC_SUPABASE_URL` | `https://<project-ref>.supabase.co` | Public. Baked into the bundle at build time. |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | `sb_publishable_...` | Public by design; safe to ship because RLS constrains every query it can make. |
 | `SUPABASE_SECRET_KEY` | `sb_secret_...` | **Server only.** Never `NEXT_PUBLIC_`, never logged. Read in exactly one module (`src/lib/supabase/admin.ts`, guarded by `import "server-only"`). |
-| `NEXT_PUBLIC_SITE_URL` | `https://<your-domain>` | Used for canonical URLs and Open Graph tags. |
+| `NEXT_PUBLIC_SITE_URL` | `https://<your-domain>` | Used for canonical URLs and Open Graph tags. Also derives the Paynow `resulturl` / `returnurl` (§5), so it must be the canonical origin before a provider is configured. |
 | `CRON_SECRET` | 32+ random bytes | `openssl rand -hex 32`. Authorizes `GET /api/cron/settle`. |
+
+**Deliberately not set — payment provider.** These are the only variables that
+can make BidBlitz charge anyone, which is exactly why they are absent:
+
+| Variable | Value | Notes |
+| --- | --- | --- |
+| `PAYNOW_INTEGRATION_ID` | from the Paynow dashboard | **Server only.** Unset in Vercel until the test-mode flow is verified (ADR-011). |
+| `PAYNOW_INTEGRATION_KEY` | from "Email Key To Company Address" | **Server only.** Never `NEXT_PUBLIC_`, never logged. Only a SHA-512 hash derived from it ever leaves the server. |
+
+Both must be present or neither: a partial configuration leaves the honest
+`NoopPaymentProvider` in place and writes the reason to the server log. Adding
+them activates checkout **and** the webhook in the same deployment, so do it in
+one deliberate push, after reading ADR-011.
 
 **Not** set in Vercel, because they are development-machine only:
 
@@ -148,33 +161,113 @@ Run these against the deployed URL before calling it shipped:
    running build: environment snapshots are per deployment, so push again).
 7. `POST /api/payments/webhook` with `{}` → **503** with
    `{"ok":false,"error":"no_payment_provider"}` (the honest Noop answer; §5).
+8. `POST /api/payments/checkout` with `{"transactionId":"<any uuid>"}` →
+   **503** `{"ok":false,"error":"no_payment_provider"}`, and the Transactions
+   page shows **no** pay button (only a configured provider renders one).
 
-## 5. Explicitly not configured
+## 5. Payment provider status and webhook contract
 
-Payments are a documented seam, not a feature. `PaymentProvider` is implemented
-by an honest `NoopPaymentProvider`: the sale, the platform fee and the seller
-proceeds are recorded as `AWAITING_PAYMENT`, and the UI says so. **"Payment
-successful" is never rendered** without a real provider confirming a charge. To
-activate one, implement `src/server/payments/provider.ts` — no auction, fee or
-transaction code changes.
+### Current state: nothing is configured, and that is the shipped state
 
-**Payment webhook (dormant):** `POST /api/payments/webhook` exists so the
-provider integration has its route from day one. It is deliberately
-*unauthenticated by Bearer secret* — webhook authentication is the provider's
-signature scheme, which the handler will verify inside
-`PaymentProvider.confirm(payload, context)` using the raw body + headers it is
-forwarded (`WebhookContext`). Exact responses today (Noop provider
-configured): **503 `{"ok":false,"error":"no_payment_provider"}`** for every
-POST (checked before the body is read), **400** with `empty_body`,
-`invalid_json` or `unrecognized_payload`, **200 `{"ok":true}`** only when a
-provider reports the event handled, and **500 `webhook_failed`** (safe to
-retry) on handler failure. Before wiring a real provider, add: constant-time
-signature verification over the raw body, an event-id dedupe against
-`payment_events` (the table already exists, RLS-closed, no client surface),
-and IP allow-listing if the provider offers one. `mark_transaction_paid`
-(service_role only) is the single write path a webhook may use; it re-checks
-amount/currency against the recorded gross. Do **not** add a shared-secret
-env var until a provider is chosen — a secret with no verifier is theater.
+Payments are a documented seam, not a feature. `PaymentProvider` is
+implemented by an honest `NoopPaymentProvider`: the sale, the platform fee and
+the seller proceeds are recorded as `AWAITING_PAYMENT`, and the UI says so.
+**"Payment successful" is never rendered** without a real provider confirming a
+charge, and no checkout button exists while none is configured.
+
+Provider selection lives in exactly one module,
+`src/server/payments/config.ts`:
+
+| `PAYNOW_INTEGRATION_ID` / `PAYNOW_INTEGRATION_KEY` | Result |
+| --- | --- |
+| both absent (today) | `NoopPaymentProvider`; no boot error |
+| exactly one present, or a value still matching the `.env.example` placeholder | stays `NoopPaymentProvider` **and** logs `paymentBootError()` — a half-set integration never looks like a working one |
+| both present **and** `SUPABASE_SECRET_KEY` present | `PaynowPaymentProvider` |
+
+Research, verified capabilities and open questions: **ADR-011** in
+`docs/ARCHITECTURE_DECISIONS.md`.
+
+### `POST /api/payments/webhook`
+
+Deliberately *unauthenticated by Bearer secret* — webhook authentication is the
+provider's signature scheme, verified inside
+`PaymentProvider.confirm(payload, { rawBody, headers })` **before any field of
+the message is believed**. The raw body is passed through byte-for-byte so the
+signature hashes exactly what was transmitted.
+
+**Encodings accepted.** The body is pre-checked structurally, not by
+`Content-Type`: a `{...}` body is parsed as JSON (malformed → `invalid_json`),
+a `key=value...` body is parsed as form-encoded (Paynow's encoding), anything
+else → `unsupported_body`.
+
+**Exact responses:**
+
+| Status | Body | When |
+| --- | --- | --- |
+| **503** | `{"ok":false,"error":"no_payment_provider"}` | No provider configured. Checked **before the body is read**. |
+| **400** | `{"ok":false,"error":"empty_body"}` | Zero-length or whitespace-only body. |
+| **400** | `{"ok":false,"error":"invalid_json"}` | Body starts like JSON and does not parse. |
+| **400** | `{"ok":false,"error":"unsupported_body"}` | Neither JSON object nor form message. |
+| **400** | `{"ok":false,"error":"invalid_signature"}` | Signature did not verify — nothing was believed, nothing was written. |
+| **400** | `{"ok":false,"error":"unknown_transaction"}` | Not a transaction id we have. |
+| **400** | `{"ok":false,"error":"amount_mismatch"}` | Amount **or** currency differs from the recorded sale (same guard, same message). |
+| **400** | `{"ok":false,"error":"invalid_transition"}` | The event would require a transition outside the allowlist (e.g. `PAID → FAILED`). |
+| **400** | `{"ok":false,"error":"malformed_payload"}` | Well-formed envelope, unreadable or missing required fields. |
+| **400** | `{"ok":false,"error":"unrecognized_payload"}` | Provider recognised it as "not for us" (`confirm` → `handled: false`). |
+| **200** | `{"ok":true}` | Verified and accounted for. Deliberately contains no `status`/`paid` field: **200 never means "the sale is paid"**. |
+| **500** | `{"ok":false,"error":"webhook_failed"}` | Unexpected handler failure. Logged **without** the payload (it may carry buyer details). |
+
+Retry semantics: Paynow resends a status update up to **ten times** when the
+response is an HTTP error status, so 400 and 500 both cause a bounded retry —
+they differ in meaning (permanent rejection vs. try again), not in whether the
+handler is safe to re-enter. Every re-entry is idempotent by construction.
+
+**Write paths.** A provider reaches the database only through `ledger.ts`:
+
+| Function | Transition | Guards |
+| --- | --- | --- |
+| `mark_transaction_paid` | `AWAITING_PAYMENT → PAID` | row lock, amount **and** currency equal to the recorded sale, `(provider, event_id)` dedupe, `already_paid` on replay |
+| `mark_transaction_failed` | `AWAITING_PAYMENT → FAILED` | row lock, dedupe, `already_failed` on replay; **no** amount check — no money moved |
+| `mark_transaction_refunded` | `PAID → REFUNDED` | row lock, dedupe, `already_refunded` on replay; provider reference fields untouched (written once, at `PAID`) |
+| `record_payment_event` | *(none)* | audit row only, for authentic events that change no state (in-flight status, dispute) |
+
+All four are `SECURITY DEFINER`, `search_path = ''`, `EXECUTE` restricted to
+`postgres` / `supabase_admin` / `service_role`. A browser redirect from the
+provider's page has no path to any of them.
+
+### `POST /api/payments/checkout`
+
+Starts a payment intent for the **buyer of record** only. The amount and
+currency are read from the transaction row, never from the request body; there
+is no write path to `transactions` at all.
+
+| Status | Body |
+| --- | --- |
+| **503** | `{"ok":false,"error":"no_payment_provider"}` (checked first, before any work) |
+| **429** | `{"ok":false,"error":"rate_limited"}` (8 requests/minute per client IP) |
+| **400** | `invalid_request`, `unsupported_currency`, or a provider-side rejection reason |
+| **401** | `unauthenticated` |
+| **403** | `not_the_buyer` |
+| **404** | `transaction_not_found` (RLS hides rows the caller is not a party to) |
+| **409** | `not_awaiting_payment` |
+| **502** | `provider_error` (the provider refused, errored, or returned no payment page) |
+| **500** | `checkout_failed` |
+| **200** | `{"ok":true,"provider","transactionId","redirectUrl"}` — an invitation to go and pay, nothing more |
+
+### Before going live with a provider
+
+1. Run `npm run db:migrate` (the Phase 3 transition writers are additive).
+2. Set both `PAYNOW_*` variables in Vercel — never in git, never in
+   `.env.example` with a real value.
+3. Re-run the post-deploy checks above: 8 flips from 503 to 503 *with a server
+   log reason only if misconfigured*, and the pay button appears only on a
+   transaction the signed-in buyer owns and is still awaiting payment.
+4. Complete the test-mode proof list in ADR-011 (initiation, redirect,
+   callback, signature, success, failure, cancel, duplicate callback, wrong
+   amount, wrong currency, unknown transaction, replay) **before** requesting
+   "Set Live" in the Paynow dashboard.
+5. Do not add a shared-secret env var alongside the signature scheme — a
+   secret with no verifier is theater.
 
 ## 6. Vercel Deployment Protection (SSO) — why every URL 302s
 

@@ -116,7 +116,8 @@ rendered from server timestamps plus a synchronized clock offset
 
 ## ADR-006: Payments — provider abstraction, no fake checkout
 
-Status: Accepted
+Status: Accepted (extended by **ADR-011**, which records the Paynow research
+and the code written behind this seam)
 
 `src/server/payments/*` defines a `PaymentProvider` interface. No provider is
 configured in the MVP, so the UI shows an explicit **configuration-required**
@@ -327,3 +328,202 @@ of identical indexes.
   and the harness rebuilds from all ten migrations green (57/57).
 - The `private` schema must stay out of PostgREST's exposed-schema setting;
   if it were ever added, `anon_security_definer_*` findings would return.
+
+---
+
+## ADR-011: Payment provider — Paynow researched and built behind the seam, not activated
+
+Status: Research complete, implementation behind the seam, **not activated**
+Date: 2026-09-26
+
+Everything below was read from Paynow's *current* official documentation — the
+Developer Hub (`developers.paynow.co.zw`) and the merchant site
+(`paynow.co.zw`) — on the date above. Nothing is taken from an old blog post,
+a copied integration guide, or an SDK README. Where the official documentation
+is ambiguous or silent, it is listed under **Open questions** rather than
+resolved by guessing.
+
+### Context
+
+Phase 2 left the full commercial loop *recorded* but not *paid*:
+`SELL → BID → WIN → TRANSACTION (AWAITING_PAYMENT) → FEE → PROCEEDS`. The
+remaining gap was whether a real rail could be attached without rewriting the
+auction engine, without faking a checkout, and without a paid infrastructure
+subscription.
+
+### Decision
+
+**Keep `PaymentProvider` as the only seam, implement Paynow behind it, and
+leave it switched off until a test-mode integration has been verified end to
+end.**
+
+| | |
+| --- | --- |
+| Provider abstraction | `src/server/payments/provider.ts` (interface, error vocabulary, registry) |
+| Credential selection | `src/server/payments/config.ts` — the **only** module that knows which provider is in use |
+| Paynow implementation | `src/server/payments/paynow.ts` |
+| Database writes | `src/server/payments/ledger.ts` → `mark_transaction_paid` / `mark_transaction_failed` / `mark_transaction_refunded` / `record_payment_event` |
+| Webhook | `POST /api/payments/webhook` |
+| Checkout | `POST /api/payments/checkout` |
+| Registration state today | `NoopPaymentProvider` — `PAYNOW_*` variables are absent, so nothing is configured |
+
+### Paynow — verified capability summary
+
+**Provider.** Paynow is operated in Zimbabwe by Integrated Payments Services
+(Pvt) Ltd (`paynow.co.zw`), with a separate Developer Hub at
+`developers.paynow.co.zw`.
+
+**Onboarding (merchant side).** Per the official integration documentation,
+getting credentials means:
+
+1. Register at `paynow.co.zw/Customer/Register` and complete email validation.
+2. Log in and register the **settle account** — the Zimbabwean bank account
+   funds are paid into. Paynow states no separate merchant account and no bank
+   paperwork are required.
+3. Go to *Other Ways To Get Paid* → *Create/Manage Shopping Carts* →
+   *Create Advanced Integration*: name it, choose whether the merchant absorbs
+   fees, give a notification email, pick the payment methods, save.
+4. The **Integration ID** is shown; the **Integration Key** is *not* displayed
+   and must be requested via *Email Key To Company Address*. It must be kept
+   secret.
+5. A newly created integration is usable **in test mode** immediately.
+   *Generate New Key* when moving from development to live, which also
+   invalidates any key other developers held.
+
+**KYC / "Verified Merchant"** is a separate, document-based process
+(`verify.paynow.co.zw`): company letterhead letter confirming bank details,
+director ID, proof of account in the company's name, logo; plus CR2, MAA, CR6
+and related documents for full verification. This governs settlement
+limits/behaviour, not the ability to open a test integration.
+
+**Payment methods.** The current documented set: Visa, Mastercard, Zimswitch,
+Vpayments, EcoCash, OneMoney, Telecash, and (in Express Checkout) InnBucks and
+O'mari. Express Checkout captures payment method details inside the merchant's
+own app with no redirect, at `POST /interface/remotetransaction`.
+
+**Initiation / redirect flow.** `POST
+https://www.paynow.co.zw/interface/initiatetransaction` as
+`application/x-www-form-urlencoded` with `id`, `reference`, `amount`, `returnurl`,
+`resulturl`, `status` and `hash`. The reply is a form message carrying
+`status`, `browserurl` (where the buyer is sent), `pollurl`, `paynowreference`
+and `hash`. The buyer pays on Paynow's hosted page and returns to `returnurl`.
+
+**Callback.** Paynow POSTs a form message to `resulturl` — our
+`/api/payments/webhook` — with `reference`, `amount`, `paynowreference`,
+`status`, `pollurl` and `hash`. Paynow does **not** expect a body; if the
+response is an HTTP error status it resends **up to ten times** before
+desisting. Polling `pollurl` is documented for confirming current status.
+
+**Hash / signature.** SHA-512, uppercase hex: concatenate the message values
+(URL-decoded, `hash` excluded) in message order, append the Integration Key,
+hash. Paynow publishes worked examples, and **both are asserted byte-for-byte
+in `paynow.test.ts`** using Paynow's own published example key
+(`3e9fed89-60e1-4ce5-ab6e-6b1eb2d4f977`). There is no nonce, timestamp or
+timestamp window in the scheme.
+
+**Status vocabulary.** `Paid`, `Awaiting Delivery`, `Delivered` (money good);
+`Created`, `Sent` (in flight); `Cancelled` (failed); `Disputed` (held);
+`Refunded` (returned); plus `NotFound` when polling an unknown reference.
+
+**Refunds.** The published reversal endpoint is part of **BillPay**, and its
+own documentation states "a very limited set of billers accept reversals/refunds.
+Most do not." No general-purpose refund endpoint for an advanced-integration
+merchant is documented. This is an open question (below).
+
+**Merchant charges.** Published fee table: Visa/Mastercard 3.5% + $0.50,
+Vpayments 1% + $0.50, EcoCash/OneMoney/Telecash 2.5%. No signup or usage fee —
+per-transaction commission only. The merchant chooses whether to absorb, pass
+on, or split the fee.
+
+**Settlement / payouts.** Paynow settles to the registered Zimbabwean bank
+account, less fees: locally switched payments (EcoCash, TeleCash, OneMoney,
+Vpayments) next day, local Visa/Mastercard T+2, foreign Visa/Mastercard T+3,
+20:00 cut-off; non-verified merchant accounts settle once weekly on a
+Tuesday. **There is no seller-facing payout API**: money reaches the
+*platform's* bank account, and any onward payment to a seller is a separate
+problem (see `docs/POST_LAUNCH_BACKLOG.md`).
+
+**Marketplace / split payments — NOT available.** A web search for "Paynow
+marketplace" surfaces `docs.paynow.pl`, which is **Paynow Poland (ING)**, a
+different company in a different country with a `transfers[]` split-payment
+API. Paynow Zimbabwe publishes no such API. BidBlitz therefore does **not**
+claim escrow, split payments or sub-merchant payouts.
+
+**Production activation.** Integration starts in test mode; the merchant
+requests "Set Live" in the Paynow dashboard once testing passes, and generates
+a fresh key at that point.
+
+**Stripe — country availability, stated factually.** Stripe is not a viable
+target for this launch: Stripe's supported-country list does not include
+Zimbabwe for a Zimbabwean merchant account (settlement, card acquiring and
+onboarding are unavailable there). Stripe is therefore recorded as *not
+selected*, not *deferred* — the constraint is geographic, not technical. It is
+not a hard dependency anywhere in the codebase and no Stripe package is
+installed.
+
+### What was built (and what it does not do)
+
+- **Webhook security.** Raw body is passed through untouched to `confirm()`
+  for hashing; signature is verified *before* any field is believed; amount,
+  currency and reference are re-checked in Postgres by
+  `mark_transaction_paid()`; `(provider, event_id)` dedupe makes redelivery a
+  no-op; `AWAITING_PAYMENT → PAID` is the only path in, and a redirect from
+  the provider's page can never reach it.
+- **State machine.** `AWAITING_PAYMENT → PAID | FAILED`, `PAID → SETTLED |
+  REFUNDED` — each with its own row-locked, event-deduplicated,
+  service-role-only writer, all verified by the engine harness.
+- **Checkout.** `POST /api/payments/checkout` starts an intent for the
+  *buyer of record* only, reads the price from the row (never from the
+  request), and returns a payment page. It has **no write path** to
+  `transactions`. It answers `503 no_payment_provider` today, and the UI does
+  not render a pay button while that is true.
+- **No payout code.** Nothing moves money to a seller.
+
+### Verified capability list
+
+| Capability | Status | Evidence |
+| --- | --- | --- |
+| Hosted checkout with redirect | Documented | `initiatetransaction` + `browserurl` |
+| Server-to-server callback | Documented | `resulturl` POST, up to 10 retries |
+| Signature verification | **Verified in tests** | both official hash vectors asserted in `paynow.test.ts` |
+| Amount + currency verification | **Verified in DB** | harness: wrong amount, wrong currency rejected, nothing written |
+| Unknown transaction rejected | **Verified in DB** | harness: `transaction_not_found` |
+| Duplicate / replayed event | **Verified in DB** | harness: `already_paid`, `already_failed`, `already_refunded`, one audit row each |
+| Failed payment handling | **Verified in DB** | harness: `AWAITING_PAYMENT → FAILED` |
+| Refund state transition | **Verified in DB** | harness: `PAID → REFUNDED` |
+| Sandbox / test mode | Documented | integration starts in test mode; **not yet exercised** |
+| Server-initiated cancellation | **Not available** | no documented endpoint — `cancel()` refuses rather than no-ops |
+| Escrow / split payment to sellers | **Not available (Zimbabwe)** | only Paynow Poland publishes `transfers[]` |
+| End-to-end sandbox transaction | **NOT DONE** | requires a Paynow account — see below |
+
+### Open questions (unresolved, deliberately)
+
+1. **Hash concatenation on inbound messages.** The *Generating Hash* page says
+   concatenate the values only; a separate page about the Custom Button
+   Template says concatenate *key plus value*. Our implementation follows the
+   primary page plus its worked examples (which reproduce exactly). This must
+   be confirmed against a real test-mode callback.
+2. **Whitespace in values.** Paynow's published outbound example contains a
+   leading space in `returnurl= http://...` yet publishes a hash that only
+   reproduces when the value is trimmed; we trim. To be re-confirmed live.
+3. **Paynow reference uniqueness per merchant reference.** Our `reference` is
+   the transaction UUID. Nothing documents what Paynow does if the same
+   reference is initiated twice (a buyer tapping *Pay now* twice). Because the
+   database allows only `AWAITING_PAYMENT → PAID` once, this cannot corrupt
+   state — but the intent record to correlate a `pollurl` is **not persisted**,
+   and is deliberately deferred until a real callback can be measured against.
+4. **Refunds.** Endpoint availability for an advanced-integration merchant is
+   unconfirmed; `PAID → REFUNDED` is implemented and tested, but how Paynow
+   reports a refund to *this* kind of merchant must be confirmed in test mode.
+5. **Disputes.** `Disputed` is recorded in the audit log and changes no state;
+   no dispute-resolution flow exists.
+
+### The exact manual step still required
+
+Create a Paynow merchant account, register a settle account, create an
+Advanced Integration (test mode), and obtain the Integration ID and Key. Then
+set `PAYNOW_INTEGRATION_ID` and `PAYNOW_INTEGRATION_KEY` in Vercel and run the
+full proof list (initiation, redirect, callback, signature verification,
+success, failure, cancel, duplicate callback, wrong amount, wrong currency,
+unknown transaction, replayed event) in test mode before requesting "Set Live".
+Until that is done, **payment is not "working"** — only ready to be tested.

@@ -25,13 +25,44 @@ When traffic requires it, move to a distributed/serverless rate limiter or anoth
 
 ### Payments
 MVP deliberately does not fake payment.
+
+Phase 3 moved this from "unimplemented" to "researched, built behind a seam,
+and switched off" (see **ADR-011**). Completed: provider abstraction
+(`PaymentProvider` with Noop/Paynow implementations), webhook signature
+verification over the raw body, amount/currency/reference re-checks, event
+dedupe and replay protection, the allowlisted state machine with
+service-role-only writers, and a buyer checkout route. Not completed — and
+therefore **not claimed**:
+
+- **End-to-end sandbox verification.** Requires a Paynow merchant account, a
+  registered settle account, an Advanced Integration, and the emailed
+  Integration Key. This is the single manual onboarding step still outstanding.
+- **Refunds as a real operation.** `PAID → REFUNDED` exists, is tested and is
+  reachable only by service role, but Paynow's published reversal endpoint is
+  BillPay-only and "a very limited set of billers accept reversals". The
+  endpoint for an advanced-integration merchant must be confirmed in test mode.
+- **Dispute handling.** `Disputed` is recorded in the payment audit log and
+  changes no state. No flow exists beyond that.
+- **Intent (`pollurl`) persistence.** Deliberately not added: no schema change
+  without a real callback to measure it against.
+- **Cancellation.** Paynow publishes no server-initiated cancellation
+  endpoint, so `cancel()` refuses rather than pretending.
+
 Before enabling real buyer/seller money movement:
-- choose a compliant payment provider available to the target market,
-- implement server-verified checkout/payment status,
-- implement payout/settlement rules,
-- add webhook verification,
-- add refunds/disputes as required,
+- complete the test-mode proof list in ADR-011 before requesting "Set Live",
+- implement payout/settlement rules (none exist; see *Payouts* below),
+- add refunds/disputes once confirmed against the real API,
 - review legal/regulatory obligations.
+
+### Payouts (money path, stated plainly)
+Today the money path is: **buyer → Paynow → the platform's registered
+Zimbabwean bank account**, less Paynow's transaction fee. BidBlitz records a
+5% platform fee and the seller's proceeds in integer minor units, but **nothing
+transfers to a seller**. There is no seller payout API in Paynow Zimbabwe, no
+escrow, and no split-payment support — the `transfers[]` split API belongs to
+Paynow *Poland* (ING), a different company. Any onward payment to a seller is a
+separate, manual administrative process (currently: platform-side bank
+transfer), and must not be described as an automated payout.
 
 ### Future monetization
 Potential post-launch revenue:
@@ -131,6 +162,25 @@ until there is a reason:
 - **Review policy when payments land** — today any transaction row can be
   reviewed (matching RLS). Once real payments exist, decide whether refunded or
   failed transactions should hide the review affordance.
+
+## DEFERRED IN THE PAYMENT PASS (P3 — intentional, not blockers)
+
+- **Paynow test-mode verification** — the only step that can call payment
+  "working". Needs a merchant account, a registered settle account, an
+  Advanced Integration and the emailed Integration Key; then the full proof
+  list in ADR-011. Until then `PAYNOW_*` stays unset in Vercel.
+- **Custom domain** — production is `https://bid-blitz-ten.vercel.app`.
+  Registering a domain is a deliberate, paid, human decision and is recorded
+  here so it is not forgotten; do not purchase one as part of engineering work.
+  When it happens: point the domain, update `NEXT_PUBLIC_SITE_URL` (which also
+  rewrites the Paynow `resulturl`/`returnurl`), and re-run the canonical-URL
+  smoke check.
+- **Seller payout automation** — see *Payouts* above. No API exists in the
+  chosen market; payouts stay manual and platform-administered.
+- **Intent (`pollurl`) persistence** — deferred until a real callback shows
+  what needs correlating.
+- **Dispute and refund operations** — the states and writers exist; the
+  provider-side endpoints still need confirmation against a real integration.
 
 Never add:
 - fake counters
