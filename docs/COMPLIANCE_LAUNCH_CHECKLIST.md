@@ -20,6 +20,66 @@ Status key: ☐ not started · ◐ in progress · ☑ done and evidenced
 
 ---
 
+## 0. BLOCKER — nobody can sign up until a mailer is configured
+
+**Verified 2026-09-28 against this Supabase project's own Auth configuration.**
+
+| Setting | Value |
+| --- | --- |
+| Custom SMTP provider configured | **No** — the built-in Supabase email service is in use |
+| `rate_limit_email_sent` | **2 per hour, project-wide** |
+| `mailer_autoconfirm` | `false` (email confirmation is ON, and must stay ON) |
+
+A signup on BidBlitz sends a confirmation email. With no custom SMTP, the whole
+platform shares a budget of **two confirmation emails per hour**. The moment a
+real user and the test suite together exceed two signups in an hour, GoTrue
+refuses every subsequent signup with `over_email_send_rate_limit`.
+
+**This is the cause of the real user who was told "Too many attempts. Try again
+later."** It is not a BidBlitz rate limit — BidBlitz's own limiter allows 5
+failed attempts per IP+email per minute, and a real user's first attempt never
+came close to it.
+
+**What was a BidBlitz bug, and is fixed:** the application was translating that
+provider refusal into *its own* limiter's wording, and was additionally
+charging it against BidBlitz's failure budget. So the user was told the site was
+blocking them when the site had not blocked anything, and each retry made the
+window worse. The provider throttle is now reported in its own words, in its own
+right, and no longer spends any of BidBlitz's budget.
+
+**What only the owner can fix:** configure a real SMTP provider in Supabase
+(*Project Settings → Authentication → Email*), which is what raises the send
+limit to something a marketplace can use. That needs the owner's own email
+provider account and credentials.
+
+☐ **0.1. Choose a transactional email provider** and create an account.
+
+☐ **0.2. Add its SMTP host, port, username and password to Supabase Auth.**
+Store them in Supabase — never in this repository, never in `.env.example`,
+never in a support message.
+
+☐ **0.3. Set a correct "from" sender** and verify SPF/DKIM for the sending
+domain, or mail will be filtered rather than delivered.
+
+☐ **0.4. Confirm `rate_limit_email_sent` is raised** to a level that survives a
+launch. Read the value back after configuring SMTP — do not assume it moved.
+
+☐ **0.5. Prove a signup end to end** on a real disposable mailbox: signup →
+email arrives → link works → sign in. The Playwright signup test currently
+*skips itself* with the provider-throttle message, which is honest but is not a
+passing signup.
+
+☐ **0.6. Decide what to tell users** who tried to sign up while the budget was
+exhausted. None of them were created, so there is nothing to clean up, but the
+failure was visible to them.
+
+**Until 0.2 and 0.4 are done, BidBlitz cannot onboard a real user**, and no
+amount of application code changes that.
+
+---
+
+---
+
 ## A. Data controller — who is responsible for the data
 
 BidBlitz holds personal data about real people: names, email addresses,
@@ -273,6 +333,11 @@ who can do it if they are unavailable.
 ☐ **J4. Confirm escalation contacts** exist internally for the fraud and
 incident paths in §G and in the operations SOP.
 
+☐ **J5. Note the capacity limit that a real user will hit first.** A brand-new
+visitor cannot create an account at all until §0 is closed. This is a support
+issue before it is a growth issue: the first person who tries to join a
+marketplace and is told to wait is the first person who may never come back.
+
 ---
 
 ## K. Launch decision
@@ -281,6 +346,7 @@ Launch is gated on the following being **closed**, not merely attempted:
 
 | # | Gate | Type | Closed? |
 | --- | --- | --- | --- |
+| K0 | **Transactional email provider configured and signup proven end to end** | Owner action | ☐ |
 | K1 | Legal entity facts supplied and confirmed | Owner action | ☐ |
 | K2 | Controller determined, contact published | Owner action | ☐ |
 | K3 | Privacy policy reviewed against actual behaviour | Owner action | ☐ |
@@ -292,6 +358,10 @@ Launch is gated on the following being **closed**, not merely attempted:
 | K9 | Incident runbook written and rehearsed | Owner action | ☐ |
 | K10 | Paynow moved from test mode to live | External — Paynow | ☐ |
 
-**BidBlitz is not commercially live until K1–K10 are closed.** A complete
+**K0 is the first gate chronologically.** It is also the cheapest: one SMTP
+configuration. Leaving it open means the marketplace has no way to admit a new
+participant at all.
+
+**BidBlitz is not commercially live until K0–K10 are closed.** A complete
 codebase, a passing test suite and a deployed site do not make it live; they
 make the software ready for a business that is ready to trade.

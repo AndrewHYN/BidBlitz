@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { sellerPayoutAction } from "@/components/dashboard/admin-actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Money } from "@/components/auction/money";
 import type { SellerPayoutStatus } from "@/lib/supabase/types";
 
 /**
@@ -53,10 +54,16 @@ const ACTION_LABELS: Record<SellerPayoutStatus, string> = {
 /** Only `PAID_OUT` records money leaving the platform — it is irreversible. */
 const IRREVERSIBLE: SellerPayoutStatus[] = ["PAID_OUT"];
 
-function confirmCopy(to: SellerPayoutStatus, amount: string): string {
+function confirmCopy(to: SellerPayoutStatus, amountMinor: number, currency: string) {
   switch (to) {
     case "PAID_OUT":
-      return `Record ${amount} as paid out to the seller? This only states that you have already transferred it yourself — BidBlitz does not send money. It cannot be undone.`;
+      return (
+        <>
+          Record this payout of <Money minor={amountMinor} currency={currency} /> as
+          paid to the seller? This only states that you have already transferred
+          it yourself — BidBlitz does not send money. It cannot be undone.
+        </>
+      );
     case "HELD":
       return "Hold this payout? The seller stays unpaid until it is released.";
     case "DISPUTED":
@@ -85,7 +92,6 @@ export function PayoutControls({
   const [note, setNote] = useState("");
 
   const actions = NEXT_ACTIONS[status] ?? [];
-  const amount = `${currency} ${(amountMinor / 100).toFixed(2)}`;
 
   function run(to: SellerPayoutStatus) {
     setError(null);
@@ -122,7 +128,9 @@ export function PayoutControls({
         data-testid="payout-confirm-panel"
         className="space-y-3 rounded-lg border bg-muted/40 p-3"
       >
-        <p className="text-xs leading-relaxed">{confirmCopy(confirming, amount)}</p>
+        <p className="text-xs leading-relaxed">
+          {confirmCopy(confirming, amountMinor, currency)}
+        </p>
 
         {needsReference && (
           <div className="space-y-1.5">

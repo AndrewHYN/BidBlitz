@@ -23,6 +23,37 @@ Revisit when revenue/traffic justifies them:
 Current MVP can use a documented lightweight approach.
 When traffic requires it, move to a distributed/serverless rate limiter or another durable shared mechanism.
 
+### Signup capacity — a launch blocker, not a growth problem
+Verified 2026-09-28 against this Supabase project's Auth configuration:
+
+| Setting | Value |
+| --- | --- |
+| Custom SMTP provider | **not configured** (built-in Supabase email service) |
+| `rate_limit_email_sent` | **2 per hour, project-wide** |
+| `mailer_autoconfirm` | `false` — confirmation is ON and stays ON |
+
+A signup sends a confirmation email, so the whole marketplace shares two
+confirmation emails an hour. Once that is spent, GoTrue refuses **every**
+subsequent signup with `over_email_send_rate_limit`. This is what a real user
+hit as "Too many attempts. Try again later."
+
+Two distinct things are true here, and conflating them is what made the original
+report misleading:
+
+- **Fixed in BidBlitz (`7624540`):** the provider refusal was being rendered in
+  BidBlitz's *own* limiter's wording and was also spending BidBlitz's failure
+  budget, so retries compounded it. The two throttles are now distinct in the
+  UI and a provider throttle costs nothing of ours.
+- **Not fixable in BidBlitz:** the two-per-hour budget. Configuring a real SMTP
+  provider in Supabase (*Project Settings → Authentication → Email*) is what
+  raises it, and that needs the owner's own provider account and credentials.
+  Tracked as gate K0 in `docs/COMPLIANCE_LAUNCH_CHECKLIST.md` §0.
+
+Consequence: **a new visitor cannot create an account at all until the mailer is
+configured.** The Playwright signup test skips itself with the provider-throttle
+message rather than reporting a false pass, so this must not be mistaken for a
+green suite proving signups work.
+
 ### Payments
 MVP deliberately does not fake payment.
 

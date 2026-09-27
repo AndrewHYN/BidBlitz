@@ -7,6 +7,17 @@ build settings. What needs a human is the environment and the Supabase side.
 > `.env.example` is tracked. Nothing with a real value is ever written into
 > source, the README, or a screenshot.
 
+> **Signup blocker (verified 2026-09-28):** this Supabase project has **no custom
+> SMTP provider** configured and `rate_limit_email_sent` is **2 per hour,
+> project-wide**. Every signup needs a confirmation email, so once two signups
+> happen in an hour, GoTrue refuses every subsequent one with
+> `over_email_send_rate_limit` and the visitor sees *"Our account service is
+> temporarily rate-limiting requests."* This is an environment fact, not an
+> application defect, and no Vercel variable changes it. Configure a real
+> transactional email provider in **Supabase → Project Settings → Authentication
+> → Email** and confirm the send limit is raised. Tracked as gate K0 / §0 in
+> `docs/COMPLIANCE_LAUNCH_CHECKLIST.md`.
+
 ## 1. Environment variables
 
 Create the project in Vercel, then add these under
