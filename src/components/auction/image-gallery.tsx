@@ -30,7 +30,7 @@ export function ImageGallery({
     return (
       <div
         data-testid="auction-gallery"
-        className="grid aspect-[4/3] place-items-center rounded-xl border border-dashed bg-muted/40 text-center"
+        className="grid aspect-[4/3] max-h-[min(58vh,560px)] w-full place-items-center rounded-xl border border-dashed bg-muted/40 text-center"
       >
         <div className="space-y-2 px-6 py-8">
           <ImageIcon className="mx-auto size-8 text-muted-foreground/60" aria-hidden />
@@ -48,25 +48,35 @@ export function ImageGallery({
 
   return (
     <div data-testid="auction-gallery" className="space-y-3">
-      <div className="relative aspect-[4/3] overflow-hidden rounded-xl border bg-muted">
-        {/* key by photo: a failed load must reset when the user switches. */}
-        <ImageWithFallback
-          key={active.id}
-          src={active.url}
-          alt={`${title} — photo ${activeIndex + 1} of ${images.length}`}
-          className="size-full object-cover"
-          fallback={
-            <div className="grid size-full place-items-center bg-muted/40 text-center">
-              <div className="space-y-2 px-6 py-8">
-                <ImageIcon className="mx-auto size-8 text-muted-foreground/60" aria-hidden />
-                <p className="text-sm font-medium">Photo unavailable</p>
-                <p className="text-xs text-muted-foreground">
-                  This listing&apos;s image could not be loaded.
-                </p>
+      {/*
+        Media frame: bordered, rounded, and inset. The photo is CONTAINED
+        inside visible padding rather than cropped to fill, so a seller's whole
+        image is always readable — and the frame's height is capped so a large
+        photo can never take over the viewport, while the width stays full on
+        every screen. The box, not the image, owns the height: switching photos
+        or hitting a broken one changes nothing about the layout.
+      */}
+      <div className="relative overflow-hidden rounded-xl border bg-muted/40 shadow-xs">
+        <div className="flex aspect-[4/3] max-h-[min(58vh,560px)] w-full items-center justify-center p-3 sm:p-4 md:p-5">
+          {/* key by photo: a failed load must reset when the user switches. */}
+          <ImageWithFallback
+            key={active.id}
+            src={active.url}
+            alt={`${title} — photo ${activeIndex + 1} of ${images.length}`}
+            className="size-full object-contain"
+            fallback={
+              <div className="grid size-full place-items-center rounded-lg border border-dashed bg-background/60 text-center">
+                <div className="space-y-2 px-6 py-8">
+                  <ImageIcon className="mx-auto size-8 text-muted-foreground/60" aria-hidden />
+                  <p className="text-sm font-medium">Photo unavailable</p>
+                  <p className="text-xs text-muted-foreground">
+                    This listing&apos;s image could not be loaded.
+                  </p>
+                </div>
               </div>
-            </div>
-          }
-        />
+            }
+          />
+        </div>
         <span className="absolute right-2 bottom-2 rounded-md bg-background/90 px-2 py-0.5 text-xs tabular-nums backdrop-blur-sm">
           {activeIndex + 1} / {images.length}
         </span>
