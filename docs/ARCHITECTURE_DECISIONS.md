@@ -416,7 +416,11 @@ and `hash`. The buyer pays on Paynow's hosted page and returns to `returnurl`.
 `/api/payments/webhook` — with `reference`, `amount`, `paynowreference`,
 `status`, `pollurl` and `hash`. Paynow does **not** expect a body; if the
 response is an HTTP error status it resends **up to ten times** before
-desisting. Polling `pollurl` is documented for confirming current status.
+desisting. Polling `pollurl` is documented for confirming current status, and
+it answers with the *same* signed message shape; BidBlitz stores that URL at
+initiation and uses it as the **fallback** (`POST /api/payments/reconcile`,
+server-side only, explicit request) when no status update is delivered.
+`resulturl` remains the primary signal.
 
 **Hash / signature.** SHA-512, uppercase hex: concatenate the message values
 (URL-decoded, `hash` excluded) in message order, append the Integration Key,
@@ -486,6 +490,23 @@ installed.
   `AWAITING_PAYMENT`. The UI renders a pay button only while a provider is
   configured.
 - **No payout code.** Nothing moves money to a seller.
+- **Reconciliation fallback (added 2026-09-27).** `resulturl` remains the
+  **primary** settlement signal. What test mode proved is that a push can
+  simply never arrive, so initiation now persists Paynow's `pollurl` in a new
+  `payment_intents` table (RLS on, **no policies**, no PostgREST surface — the
+  URL is a capability token) and `POST /api/payments/reconcile` lets a party to
+  the transaction ask the server to check *that one* transaction. Server-side
+  only and HTTPS to `*.paynow.co.zw` only: the reply is hash-verified before
+  any field is believed, the `reference` must be this transaction, the `amount`
+  must equal the sale re-read from Postgres, and the currency must be one
+  Paynow settles. The result then passes through the same `ledger.ts` writers,
+  so row locks, `(provider, event_id)` dedupe, idempotent transitions and
+  "never downgrade `PAID`" hold unchanged — a replayed check writes nothing and
+  `Cancelled` still lands on `FAILED`. The request body's only meaningful field
+  is `transactionId`; a browser-supplied `status` is ignored outright. There is
+  **no timer, cron or queue**: only explicit, rate-limited requests (per caller
+  and per transaction), so it can never become an uncontrolled polling loop,
+  and the answer it returns is re-read from Postgres after the provider ran.
 
 ### Verified capability list
 
@@ -494,6 +515,7 @@ installed.
 | Hosted checkout with redirect | Documented | `initiatetransaction` + `browserurl` |
 | Server-to-server callback | **Push not observed** | `resulturl` documented as the target; across 5 Paynow test transactions (4 hosted, 2 express) **zero POSTs** reached production — see *Test-mode verification* |
 | Status by polling `pollurl` | **Verified live** | Paynow returns the same signed message shape (`reference`, `paynowreference`, `amount`, `status`, `pollurl`, `hash`); our verifier accepted Paynow's real hash |
+| Server-side reconciliation | **Built 2026-09-27** | `payment_intents` persists `pollurl` at initiation; `POST /api/payments/reconcile` re-authenticates the poll reply and re-checks reference/amount/currency against Postgres before passing it to the same ledger. Covered by unit + route tests: valid `Paid`, valid `Cancelled`, invalid signature, tampered field, wrong amount, wrong reference, unknown status, duplicate check, already-paid, in-flight stays pending, provider unreachable, no session stored, non-Paynow address, wrong currency, and a browser-supplied `status` being ignored |
 | Signature verification | **Verified in tests** | both official hash vectors asserted in `paynow.test.ts` |
 | Amount + currency verification | **Verified in DB** | harness: wrong amount, wrong currency rejected, nothing written |
 | Unknown transaction rejected | **Verified in DB** | harness: `transaction_not_found` |
@@ -523,8 +545,9 @@ installed.
    mode (four hosted, two express) and Paynow issued a distinct
    `paynowreference` each time with no corruption on our side — the database
    allows only `AWAITING_PAYMENT → PAID` once. The intent record to correlate a
-   `pollurl` is still **not persisted**; it is now justified rather than
-   speculative (see *Test-mode verification*).
+   `pollurl` **is now persisted** (`payment_intents`, one row per transaction,
+   latest initiation wins) — that is what makes server-side reconciliation
+   possible at all, and it was built on 2026-09-27.
 4. **Refunds.** Endpoint availability for an advanced-integration merchant is
    unconfirmed; `PAID → REFUNDED` is implemented and tested, but how Paynow
    reports a refund to *this* kind of merchant must be confirmed in test mode.
@@ -571,9 +594,11 @@ Two behaviours worth naming explicitly:
 ### The manual step still required
 
 Before requesting **"Set Live"** in the Paynow dashboard: ask Paynow why status
-updates were not delivered to this integration in test mode. If the push cannot
-be relied on, `pollurl` polling must become the authoritative confirmation path
-(tracked in `docs/POST_LAUNCH_BACKLOG.md`). Rotate the Integration Key
-("Generate New Key") after this shared key has been used in testing. Until then,
-payment is **verified as a receiver and a state machine**, not as a delivery
-path BidBlitz has observed Paynow use.
+updates were not delivered to this integration in test mode. The `pollurl`
+fallback is now built (2026-09-27), so a silent push degrades to an explicit
+server-side reconciliation instead of a stranded sale — but a fallback is not a
+fix, and the push itself must not be described as working until a real Paynow
+POST reaches `/api/payments/webhook`. Rotate the Integration Key ("Generate New
+Key") after this shared key has been used in testing. Until a push is observed,
+payment is **verified as a receiver, a state machine and a reconciler**, not as
+a delivery path BidBlitz has observed Paynow use.

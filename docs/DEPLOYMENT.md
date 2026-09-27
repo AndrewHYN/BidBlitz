@@ -241,10 +241,17 @@ behaviour is recorded in ADR-011.
 | `mark_transaction_failed` | `AWAITING_PAYMENT → FAILED` | row lock, dedupe, `already_failed` on replay; **no** amount check — no money moved |
 | `mark_transaction_refunded` | `PAID → REFUNDED` | row lock, dedupe, `already_refunded` on replay; provider reference fields untouched (written once, at `PAID`) |
 | `record_payment_event` | *(none)* | audit row only, for authentic events that change no state (in-flight status, dispute) |
+| `record_payment_intent` | *(none)* | writes the provider's **session** URL (`payment_intents`) only — never a status. Re-initiation replaces the row; an unknown transaction id is refused |
 
-All four are `SECURITY DEFINER`, `search_path = ''`, `EXECUTE` restricted to
+All five are `SECURITY DEFINER`, `search_path = ''`, `EXECUTE` restricted to
 `postgres` / `supabase_admin` / `service_role`. A browser redirect from the
 provider's page has no path to any of them.
+
+`payment_intents` mirrors `payment_events`: RLS enabled, **no policies**, and
+`anon` / `authenticated` have no table grant at all. It holds Paynow's `pollurl`
+(a capability token for reading payment status), so nothing outside the server
+can read it — and it is never a source of payment truth, only an address the
+server may ask.
 
 ### `POST /api/payments/checkout`
 
@@ -265,9 +272,46 @@ is no write path to `transactions` at all.
 | **500** | `checkout_failed` |
 | **200** | `{"ok":true,"provider","transactionId","redirectUrl"}` — an invitation to go and pay, nothing more |
 
+### `POST /api/payments/reconcile`
+
+The **fallback**, not a second settlement path. `resulturl` (the webhook)
+remains the primary signal; this endpoint exists because a status update that
+never arrives must not leave a paid-for sale stuck in `AWAITING_PAYMENT`.
+
+- The server fetches the `pollurl` stored at initiation (`payment_intents`) —
+  only server-side code ever calls it, over HTTPS to `*.paynow.co.zw` only.
+- The reply is authenticated with Paynow's own hash **before** any field is
+  believed, then checked against the row: reference must be this transaction,
+  amount must equal the recorded sale, currency must be one Paynow settles.
+- The result goes through the same row-locked, idempotent `ledger.ts` path the
+  webhook uses, so `(provider, event_id)` dedupe still applies and `PAID` is
+  never downgraded.
+- The response reports the status **re-read from Postgres after** the provider
+  ran, so the UI converges on the database rather than on Paynow's opinion.
+- Only an explicit request triggers it: no timer, no cron, no queue. Rate
+  limited to 6 requests/minute per client IP **and** per transaction.
+
+| Status | Body |
+| --- | --- |
+| **503** | `no_payment_provider` (checked first) |
+| **501** | `reconciliation_unsupported` (the configured provider publishes no status endpoint) |
+| **429** | `rate_limited` |
+| **400** | `invalid_request`, `invalid_signature`, `amount_mismatch`, `reference_mismatch`, `currency_mismatch`, `no_poll_url`, `invalid_poll_url`, `malformed_payload`, `unrecognized_payload` |
+| **401** | `unauthenticated` |
+| **403** | `not_a_party` |
+| **404** | `transaction_not_found` (RLS) |
+| **502** | `provider_unreachable`, `provider_error` — nothing was read, so nothing changed |
+| **500** | `reconcile_failed` |
+| **200** | `{"ok":true,"status","reconciled","outcome","providerStatus","changed"}` where `status` is the Postgres row. A row that is no longer `AWAITING_PAYMENT` answers `{"ok":true,"status","reconciled":false,"reason":"already_final"}` **without contacting Paynow** |
+
+The request body carries only `transactionId`. Any `status` / `amount` /
+`paid` field in it is ignored outright — the browser is the party with the
+most to gain from inventing one.
+
 ### Before going live with a provider
 
-1. Run `npm run db:migrate` (the Phase 3 transition writers are additive).
+1. Run `npm run db:migrate` (every migration is additive: transition writers,
+   then the `payment_intents` poll-address table).
 2. Confirm both `PAYNOW_*` variables are set in Vercel (Production secrets —
    they were added 2026-09-26) — never in git, never in `.env.example` with a
    real value.

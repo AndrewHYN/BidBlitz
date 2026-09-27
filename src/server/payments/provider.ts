@@ -82,6 +82,35 @@ export type WebhookContext = {
  */
 export type ConfirmResult = { handled: boolean };
 
+/**
+ * Server-side reconciliation against the provider's OWN status endpoint.
+ *
+ * Why it exists: `resulturl` push is the primary settlement signal, but a push
+ * that never arrives must not leave a paid-for sale stuck in AWAITING_PAYMENT.
+ * So the server may ask the provider directly - never the browser, which is
+ * the party with the most to gain from lying.
+ *
+ * The caller re-reads amount, currency and reference from Postgres and hands
+ * them in; the provider must authenticate its response and reject any mismatch
+ * before it is allowed to reach the ledger.
+ */
+export type ReconcileInput = {
+  transactionId: string;
+  /** The recorded sale amount, re-read from the database. */
+  amountMinor: bigint;
+  /** The recorded sale currency, re-read from the database. */
+  currency: string;
+};
+
+export type ReconcileResult = {
+  /** The provider's authenticated status, or null if it would not say. */
+  providerStatus: string | null;
+  /** What that status means in the provider's published vocabulary. */
+  outcome: "paid" | "failed" | "refunded" | "noted";
+  /** True only when THIS call is what moved the transaction. */
+  applied: boolean;
+};
+
 export type ProviderCapabilities = {
   id: string;
   displayName: string;
@@ -102,6 +131,18 @@ export interface PaymentProvider {
    * dedupe, amount check and transition guard live there, not here.
    */
   confirm(payload: unknown, context?: WebhookContext): Promise<ConfirmResult>;
+  /**
+   * Optional, server-side only: fetch the CURRENT status of one transaction
+   * from the provider's own status endpoint and apply it through exactly the
+   * same signature-verified ledger path `confirm()` uses.
+   *
+   * Providers that publish no such endpoint do not implement it, and the
+   * caller must report that honestly rather than inventing an outcome. It is
+   * never a substitute for `confirm()` - it is the fallback for the push that
+   * did not arrive - and it is only ever invoked on an explicit request for a
+   * specific transaction, never on a timer.
+   */
+  reconcile?(input: ReconcileInput): Promise<ReconcileResult>;
   cancel(transactionId: string): Promise<void>;
 }
 

@@ -59,11 +59,37 @@ export type RecordEventInput = {
   payload?: Record<string, unknown>;
 };
 
+/**
+ * The provider's own payment session for a transaction, stored at initiation.
+ *
+ * It is NOT a payment status and it is never treated as one: `pollUrl` is only
+ * an address the server may ask for the status, and whatever comes back still
+ * has to authenticate like any other provider message before anything moves.
+ */
+export type RecordIntentInput = {
+  transactionId: string;
+  provider: string;
+  /** Where the server polls for status (Paynow `pollurl`). */
+  pollUrl: string;
+  browserUrl?: string | null;
+  providerReference?: string | null;
+};
+
+export type PaymentIntentRecord = {
+  transactionId: string;
+  provider: string;
+  pollUrl: string;
+};
+
 export type PaymentLedger = {
   markPaid(input: MarkPaidInput): Promise<{ alreadyPaid: boolean }>;
   markFailed(input: MarkFailedInput): Promise<{ alreadyFailed: boolean }>;
   markRefunded(input: MarkRefundedInput): Promise<{ alreadyRefunded: boolean }>;
   recordEvent(input: RecordEventInput): Promise<void>;
+  /** Store/replace the payment session. Writes payment_intents, never status. */
+  recordIntent(input: RecordIntentInput): Promise<void>;
+  /** Read the stored session for a transaction, or null when none was stored. */
+  readIntent(transactionId: string): Promise<PaymentIntentRecord | null>;
 };
 
 /**
@@ -185,6 +211,34 @@ export function supabasePaymentLedger(): PaymentLedger {
       if (error) {
         throw toError(error, "record_payment_event");
       }
+    },
+
+    async recordIntent(input: RecordIntentInput) {
+      requireCredentials();
+      const { error } = await createAdminClient().rpc("record_payment_intent", {
+        p_transaction_id: input.transactionId,
+        p_provider: input.provider,
+        p_poll_url: input.pollUrl,
+        p_browser_url: input.browserUrl ?? null,
+        p_provider_reference: input.providerReference ?? null,
+      });
+      if (error) throw toError(error, "record_payment_intent");
+    },
+
+    async readIntent(transactionId: string) {
+      requireCredentials();
+      const { data, error } = await createAdminClient()
+        .from("payment_intents")
+        .select("transaction_id, provider, poll_url")
+        .eq("transaction_id", transactionId)
+        .maybeSingle();
+      if (error) throw toError(error, "read_payment_intent");
+      if (!data) return null;
+      return {
+        transactionId: data.transaction_id as string,
+        provider: data.provider as string,
+        pollUrl: data.poll_url as string,
+      };
     },
   };
 }

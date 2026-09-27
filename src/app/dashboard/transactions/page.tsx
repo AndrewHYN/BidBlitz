@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/table";
 import { isPaymentProviderConfigured } from "@/server/payments/config";
 import { PayButton } from "@/components/dashboard/pay-button";
+import { CheckStatusButton } from "@/components/dashboard/check-status-button";
 
 export const metadata: Metadata = {
   title: "Transactions",
@@ -117,6 +118,12 @@ export default async function TransactionsPage() {
                         row.status === "AWAITING_PAYMENT" && (
                           <PayButton transactionId={row.id} />
                         )}
+                      {/* Both sides may ask the server to reconcile a payment
+                          that is still waiting — the answer always comes back
+                          from Postgres, never from this page. */}
+                      {configured && row.status === "AWAITING_PAYMENT" && (
+                        <CheckStatusButton transactionId={row.id} />
+                      )}
                     </div>
                   </TableCell>
                   <TableCell className="text-muted-foreground">{formatDate(row.created_at)}</TableCell>

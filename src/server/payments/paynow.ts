@@ -11,6 +11,8 @@ import {
   type PaymentIntent,
   type PaymentProvider,
   type ProviderCapabilities,
+  type ReconcileInput,
+  type ReconcileResult,
   type WebhookContext,
 } from "./provider";
 import type { PaymentLedger } from "./ledger";
@@ -34,6 +36,12 @@ import type { PaymentLedger } from "./ledger";
  *   CALLBACK   Paynow POSTs a form string to `resulturl`
  *              (our POST /api/payments/webhook): reference, amount,
  *              paynowreference, status, pollurl, hash. Verify the hash FIRST.
+ *   POLL       When no status update arrives (observed in test mode: pushes
+ *              never came), GET the `pollurl` stored at initiation from the
+ *              SERVER only. It answers with the same signed message shape, so
+ *              the hash, the reference and the amount are checked exactly as
+ *              they are for a push, and the result goes through the same
+ *              row-locked, idempotent ledger functions.
  *   HASH       concatenate the message values (URL-decoded, HASH excluded) in
  *              message order, append the Integration Key, SHA-512, uppercase
  *              hex. Confirmed against both published vectors.
@@ -72,6 +80,27 @@ const NOTED_STATUSES = new Set(["created", "sent", "disputed"]);
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** How long a server-side status request may take before it gives up. */
+const POLL_TIMEOUT_MS = 10_000;
+
+/**
+ * A stored poll address may only ever be sent to Paynow itself.
+ *
+ * The value comes from a hash-verified Paynow reply, so it is already
+ * trustworthy — this is belt-and-braces against a poisoned row, because the
+ * cost of being wrong is the server making a request on someone else's
+ * behalf. Staging (`staging.paynow.co.zw`) satisfies the same rule.
+ */
+export function isPaynowPollUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "https:" && url.protocol !== "http:") return false;
+    return /(^|\.)paynow\.co\.zw$/i.test(url.hostname);
+  } catch {
+    return false;
+  }
+}
 
 export type PaynowOutcome = "paid" | "failed" | "refunded" | "noted";
 
@@ -351,6 +380,25 @@ export class PaynowPaymentProvider implements PaymentProvider {
       throw new PaymentProviderRequestError("Paynow did not return a payment page.");
     }
 
+    const providerReference = paynowField(fields, "paynowreference") ?? null;
+
+    // Store the session BEFORE the buyer leaves for Paynow: this row is the
+    // only record that makes a server-side status check possible if no status
+    // update ever arrives. It is written from a reply whose hash has just
+    // verified, it changes no transaction status, and a repeat initiation
+    // replaces it rather than accumulating abandoned sessions. Failing to
+    // store it fails the checkout on purpose — a payment we could never
+    // reconcile is worse than one the buyer starts again a second later.
+    if (pollUrl) {
+      await this.config.ledger.recordIntent({
+        transactionId: input.transactionId,
+        provider: PAYNOW_PROVIDER_ID,
+        pollUrl,
+        browserUrl,
+        providerReference,
+      });
+    }
+
     return {
       id: pollUrl ?? browserUrl,
       transactionId: input.transactionId,
@@ -358,7 +406,7 @@ export class PaynowPaymentProvider implements PaymentProvider {
       currency: input.currency,
       status: "requires_action",
       redirectUrl: browserUrl,
-      providerReference: paynowField(fields, "paynowreference") ?? undefined,
+      providerReference: providerReference ?? undefined,
     };
   }
 
@@ -433,6 +481,164 @@ export class PaynowPaymentProvider implements PaymentProvider {
     }
 
     return { handled: true };
+  }
+
+  /**
+   * Server-side fallback: ask Paynow for the CURRENT status of one
+   * transaction, because `resulturl` may simply never be delivered.
+   *
+   * The rules of `confirm()` apply without relaxation:
+   *   1. only this server calls it, and only for a transaction whose amount,
+   *      currency and reference were just re-read from Postgres;
+   *   2. the reply must authenticate (Paynow's own hash over Paynow's own
+   *      field order) before a single field of it is believed;
+   *   3. the reply must be about THIS transaction, and for a paid outcome the
+   *      amount must equal the recorded sale — a signed message about another
+   *      sale, or for another amount, is refused rather than "close enough";
+   *   4. only then does it reach the ledger, which takes the row lock, checks
+   *      the amount again, dedupes on (provider, event_id) and performs the
+   *      same explicit transition it would for a pushed update. PAID is never
+   *      downgraded, Cancelled becomes FAILED, and a replay writes nothing.
+   */
+  async reconcile(input: ReconcileInput): Promise<ReconcileResult> {
+    // Paynow's status messages carry no currency, so the currency has to come
+    // from the sale — and a sale recorded in anything but the currency Paynow
+    // settles could never be matched, however well the amount lines up.
+    if (input.currency.trim().toUpperCase() !== USD) {
+      throw new PaymentPayloadError(
+        "currency_mismatch",
+        `This sale is recorded in ${input.currency}, which Paynow does not settle.`
+      );
+    }
+
+    const intent = await this.config.ledger.readIntent(input.transactionId);
+    if (!intent?.pollUrl) {
+      throw new PaymentPayloadError(
+        "no_poll_url",
+        "No Paynow payment session was recorded for this transaction."
+      );
+    }
+    if (!isPaynowPollUrl(intent.pollUrl)) {
+      throw new PaymentPayloadError(
+        "invalid_poll_url",
+        "The recorded Paynow status address is not a Paynow address."
+      );
+    }
+
+    const raw = await this.poll(intent.pollUrl);
+    const fields = parsePaynowForm(raw);
+    if (!isPlausibleMessage(fields)) {
+      throw new PaymentPayloadError(
+        "malformed_payload",
+        "Paynow returned a status message we cannot read."
+      );
+    }
+
+    // Authenticate BEFORE parsing anything we might act on.
+    verifyPaynowHash(fields, this.config.integrationKey);
+
+    const status = paynowField(fields, "status");
+    const outcome = paynowOutcome(status);
+    if (!outcome || !status) {
+      throw new PaymentPayloadError(
+        "unrecognized_payload",
+        "Paynow reported a status outside its published vocabulary."
+      );
+    }
+
+    // It must be an answer about THIS transaction. A genuine message about a
+    // different sale is not a wrong signature — it is the wrong subject, and
+    // acting on it would move someone else's money record.
+    const reference = paynowField(fields, "reference");
+    if (reference !== input.transactionId) {
+      throw new PaymentPayloadError(
+        "reference_mismatch",
+        "Paynow answered about a different transaction."
+      );
+    }
+
+    const paynowReference = paynowField(fields, "paynowreference");
+    const eventId = paynowEventId(input.transactionId, paynowReference, status);
+    const common = {
+      transactionId: input.transactionId,
+      provider: PAYNOW_PROVIDER_ID,
+      eventId,
+      // `source` is audit metadata: it says which half of the contract
+      // delivered this status. It is not part of the signature or the key.
+      payload: { ...toPayload(fields), source: "pollurl" },
+    };
+
+    if (outcome === "paid") {
+      const amount = paynowField(fields, "amount");
+      if (amount === null) {
+        throw new PaymentPayloadError(
+          "malformed_payload",
+          "The status carried no amount."
+        );
+      }
+      const amountMinor = paynowAmountToMinor(amount);
+      // Checked here as well as inside mark_transaction_paid(): a mismatch is
+      // refused before the database is even asked to consider the transition.
+      if (amountMinor !== input.amountMinor) {
+        throw new PaymentPayloadError(
+          "amount_mismatch",
+          "Paynow's amount does not match the recorded sale."
+        );
+      }
+      const { alreadyPaid } = await this.config.ledger.markPaid({
+        ...common,
+        providerReference: paynowReference,
+        amountMinor,
+        currency: USD,
+      });
+      return { providerStatus: status, outcome, applied: !alreadyPaid };
+    }
+
+    if (outcome === "failed") {
+      const { alreadyFailed } = await this.config.ledger.markFailed({
+        ...common,
+        providerReference: paynowReference,
+      });
+      return { providerStatus: status, outcome, applied: !alreadyFailed };
+    }
+
+    if (outcome === "refunded") {
+      const { alreadyRefunded } = await this.config.ledger.markRefunded({ ...common });
+      return { providerStatus: status, outcome, applied: !alreadyRefunded };
+    }
+
+    // Created / Sent / Disputed: authentic, recognised, and deliberately NOT
+    // a state change — a transaction that has not been paid stays exactly
+    // where it is. Recorded so the audit log is complete, deduped so a
+    // repeated check does not fill it.
+    await this.config.ledger.recordEvent(common);
+    return { providerStatus: status, outcome, applied: false };
+  }
+
+  /** GET the stored status address. Server-side, bounded, uncached. */
+  private async poll(pollUrl: string): Promise<string> {
+    let response: Response;
+    try {
+      response = await (this.config.fetchImpl ?? fetch)(pollUrl, {
+        method: "GET",
+        cache: "no-store",
+        headers: { accept: "text/plain, */*" },
+        signal: AbortSignal.timeout(POLL_TIMEOUT_MS),
+      });
+    } catch (err) {
+      // The transaction is NOT touched: an unreachable provider means we
+      // still do not know, and "we do not know" must never read as "paid"
+      // or as "failed".
+      throw new PaymentProviderRequestError(
+        `Could not reach Paynow's status endpoint: ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
+    if (!response.ok) {
+      throw new PaymentProviderRequestError(
+        `Paynow answered HTTP ${response.status} for the status request.`
+      );
+    }
+    return response.text();
   }
 
   async cancel(transactionId: string): Promise<void> {

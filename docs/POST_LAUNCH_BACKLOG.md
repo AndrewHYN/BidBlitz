@@ -42,21 +42,25 @@ Still open — and therefore **not claimed**:
   unsigned forgeries were rejected (evidence in **ADR-011**). What it did
   *not* establish: Paynow never delivered a status update to `resulturl`
   (5 test transactions, zero POSTs), so **delivery** is still open — see
-  *Paynow status-update delivery* below.
+  *Paynow status-update delivery* below. A server-side fallback now exists so
+  a silent push cannot strand a sale (`payment_intents` stores `pollurl` at
+  initiation; `POST /api/payments/reconcile` asks Paynow directly on an
+  explicit request — see **DEPLOYMENT.md**), but the fallback is a fallback:
+  it does not make the push work and must not be described as if it did.
 - **Refunds as a real operation.** `PAID → REFUNDED` exists, is tested and is
   reachable only by service role, but Paynow's published reversal endpoint is
   BillPay-only and "a very limited set of billers accept reversals". The
   endpoint for an advanced-integration merchant must be confirmed in test mode.
 - **Dispute handling.** `Disputed` is recorded in the payment audit log and
   changes no state. No flow exists beyond that.
-- **Intent (`pollurl`) persistence.** Deliberately not added: no schema change
-  without a real callback to measure it against.
 - **Cancellation.** Paynow publishes no server-initiated cancellation
   endpoint, so `cancel()` refuses rather than pretending.
 
 Before enabling real buyer/seller money movement:
-- confirm Paynow will deliver status updates to `resulturl`, or implement
-  `pollurl` polling first (the test-mode proof list itself is done — ADR-011),
+- confirm Paynow will deliver status updates to `resulturl`. The `pollurl`
+  fallback is now built, so a silent push degrades to an explicit server-side
+  reconciliation instead of a stranded sale — but delivery itself is still
+  unproven (ADR-011, DEPLOYMENT.md),
 - implement payout/settlement rules (none exist; see *Payouts* below),
 - add refunds/disputes once confirmed against the real API,
 - review legal/regulatory obligations.
@@ -172,6 +176,12 @@ until there is a reason:
 
 ## DEFERRED IN THE PAYMENT PASS (P3 — intentional, not blockers)
 
+Delivered since: **intent (`pollurl`) persistence** — deferred in P3 "until a
+real callback shows what needs correlating", and the condition was met the same
+day (a genuine signed callback arrived). The schema change it was avoiding is
+now `20260927000001_payment_intent_poll_url.sql`, and the fallback it enables is
+`POST /api/payments/reconcile` (2026-09-27).
+
 - **Paynow test-mode verification** — completed 2026-09-26: `PAYNOW_*` are
   Production secrets and the ADR-011 proof list passed (callback accepted,
   `→ PAID`, cancel `→ FAILED`, duplicate and tampered replays rejected,
@@ -182,8 +192,10 @@ until there is a reason:
   never POSTed to `resulturl`, even after the endpoint answered its GET probe
   with 200. `pollurl` did answer and returned the same signed message shape,
   and is how the verification callbacks were obtained. Before real money: ask
-  Paynow why, and if push cannot be relied on, make polling authoritative
-  (needs the intent/`pollurl` row below).
+  Paynow why. The `pollurl` fallback is now implemented (2026-09-27 —
+  `payment_intents` + `POST /api/payments/reconcile`), so a silent push no
+  longer strands a transaction; the push itself remains the primary signal and
+  is still undelivered.
 - **Custom domain** — production is `https://bid-blitz-ten.vercel.app`.
   Registering a domain is a deliberate, paid, human decision and is recorded
   here so it is not forgotten; do not purchase one as part of engineering work.
@@ -192,10 +204,6 @@ until there is a reason:
   smoke check.
 - **Seller payout automation** — see *Payouts* above. No API exists in the
   chosen market; payouts stay manual and platform-administered.
-- **Intent (`pollurl`) persistence** — was deferred "until a real callback
-  shows what needs correlating"; that condition is now met (a real signed
-  callback was received and `pollurl` is the only fallback path if the push
-  stays silent). Still no schema change until polling is actually implemented.
 - **Dispute and refund operations** — the states and writers exist; the
   provider-side endpoints still need confirmation against a real integration.
 

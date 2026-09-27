@@ -24,8 +24,10 @@ import type {
   MarkFailedInput,
   MarkPaidInput,
   MarkRefundedInput,
+  PaymentIntentRecord,
   PaymentLedger,
   RecordEventInput,
+  RecordIntentInput,
 } from "./ledger";
 
 /**
@@ -46,12 +48,19 @@ import type {
 // Paynow's own published example integration key (developers.paynow.co.zw).
 const INTEGRATION_KEY = "3e9fed89-60e1-4ce5-ab6e-6b1eb2d4f977";
 const TX = "3f1d2a4c-9b8e-4f6a-8c2d-1e5b7a9c0f34";
+const OTHER_TX = "9c8b7a6d-5e4f-4a3b-9c2d-1f0e9d8c7b6a";
+const POLL_URL = "https://www.paynow.co.zw/Interface/CheckPayment/?guid=abc";
 
 type StubLedger = PaymentLedger & {
   paid: MarkPaidInput[];
   failed: MarkFailedInput[];
   refunded: MarkRefundedInput[];
   events: RecordEventInput[];
+  intents: RecordIntentInput[];
+  /** What readIntent() answers — `null` means no session was ever stored. */
+  intent: PaymentIntentRecord | null;
+  /** Transitions the database has already applied, to model a re-check. */
+  applied: { paid: boolean; failed: boolean; refunded: boolean };
 };
 
 function stubLedger(): StubLedger {
@@ -59,27 +68,52 @@ function stubLedger(): StubLedger {
   const failed: MarkFailedInput[] = [];
   const refunded: MarkRefundedInput[] = [];
   const events: RecordEventInput[] = [];
-  return {
+  const intents: RecordIntentInput[] = [];
+  const applied = { paid: false, failed: false, refunded: false };
+  const ledger: StubLedger = {
     paid,
     failed,
     refunded,
     events,
+    intents,
+    intent: { transactionId: TX, provider: "paynow", pollUrl: POLL_URL },
+    applied,
     async markPaid(input) {
+      // Faithful to mark_transaction_paid(): the answer says whether the row
+      // was ALREADY paid before this call, then records the transition.
+      const alreadyPaid = applied.paid;
       paid.push(input);
-      return { alreadyPaid: false };
+      applied.paid = true;
+      return { alreadyPaid };
     },
     async markFailed(input) {
+      const alreadyFailed = applied.failed;
       failed.push(input);
-      return { alreadyFailed: false };
+      applied.failed = true;
+      return { alreadyFailed };
     },
     async markRefunded(input) {
+      const alreadyRefunded = applied.refunded;
       refunded.push(input);
-      return { alreadyRefunded: false };
+      applied.refunded = true;
+      return { alreadyRefunded };
     },
     async recordEvent(input) {
       events.push(input);
     },
+    async recordIntent(input) {
+      intents.push(input);
+      ledger.intent = {
+        transactionId: input.transactionId,
+        provider: input.provider,
+        pollUrl: input.pollUrl,
+      };
+    },
+    async readIntent(transactionId) {
+      return ledger.intent?.transactionId === transactionId ? ledger.intent : null;
+    },
   };
+  return ledger;
 }
 
 /** Build a message exactly as Paynow would receive it: fields + hash. */
@@ -526,6 +560,65 @@ describe("PaynowPaymentProvider.createIntent", () => {
     expect(intent.id).toContain("CheckPayment");
   });
 
+  it("stores the poll address before the buyer leaves for Paynow", async () => {
+    const ledger = stubLedger();
+    const replyFields: Array<[string, string]> = [
+      ["Status", "Ok"],
+      ["BrowserUrl", "https://www.paynow.co.zw/Payment/ConfirmPayment/9510"],
+      ["PollUrl", "https://www.paynow.co.zw/Interface/CheckPayment/?guid=abc"],
+      ["PaynowReference", "9510"],
+    ];
+    const reply = new URLSearchParams([
+      ...replyFields,
+      ["Hash", paynowHash(replyFields, INTEGRATION_KEY)],
+    ]).toString();
+
+    await providerWith(ledger, async () => new Response(reply, { status: 200 })).createIntent({
+      transactionId: TX,
+      amountMinor: 1000n,
+      currency: "USD",
+      idempotencyKey: `checkout:${TX}`,
+    });
+
+    expect(ledger.intents).toHaveLength(1);
+    expect(ledger.intents[0]).toMatchObject({
+      transactionId: TX,
+      provider: "paynow",
+      pollUrl: "https://www.paynow.co.zw/Interface/CheckPayment/?guid=abc",
+      browserUrl: "https://www.paynow.co.zw/Payment/ConfirmPayment/9510",
+      providerReference: "9510",
+    });
+    // ...and it is readable again, which is the whole point of storing it.
+    expect(ledger.intent?.pollUrl).toContain("CheckPayment");
+  });
+
+  it("refuses to start a payment whose session cannot be stored", async () => {
+    // A payment we could never reconcile must not be handed to the buyer as
+    // if it were fine: the fallback path is part of the checkout contract.
+    const ledger = stubLedger();
+    ledger.recordIntent = async () => {
+      throw new PaymentProviderError("PAYMENT_LEDGER_FAILED", "insert failed");
+    };
+    const replyFields: Array<[string, string]> = [
+      ["Status", "Ok"],
+      ["BrowserUrl", "https://www.paynow.co.zw/Payment/ConfirmPayment/9510"],
+      ["PollUrl", "https://www.paynow.co.zw/Interface/CheckPayment/?guid=abc"],
+    ];
+    const reply = new URLSearchParams([
+      ...replyFields,
+      ["Hash", paynowHash(replyFields, INTEGRATION_KEY)],
+    ]).toString();
+
+    await expect(
+      providerWith(ledger, async () => new Response(reply, { status: 200 })).createIntent({
+        transactionId: TX,
+        amountMinor: 1000n,
+        currency: "USD",
+        idempotencyKey: "k",
+      })
+    ).rejects.toBeInstanceOf(PaymentProviderError);
+  });
+
   it("refuses to start a payment whose reply does not verify", async () => {
     const replyFields: Array<[string, string]> = [
       ["Status", "Ok"],
@@ -643,5 +736,273 @@ describe("PaynowPaymentProvider.capabilities", () => {
       // UI must never offer one.
       supportsCancellation: false,
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// reconcile() — the server-side fallback for the status update that never
+// arrives (ADR-011: six initiations, zero POSTs to resulturl).
+//
+// Same signature rules as confirm(), same ledger, and no browser anywhere in
+// the loop: the caller re-reads amount/currency/reference from Postgres and
+// the reply still has to be Paynow's own signed message about that exact sale.
+// ---------------------------------------------------------------------------
+
+describe("PaynowPaymentProvider.reconcile", () => {
+  const SALE = { transactionId: TX, amountMinor: 1000n, currency: "USD" };
+
+  /** Paynow's CheckPayment endpoint answering with a signed status message. */
+  function pollFetch(raw: string): typeof fetch {
+    return async () => new Response(raw, { status: 200 });
+  }
+
+  function providerForReply(
+    ledger: PaymentLedger,
+    fields: Array<[string, string]>,
+    key = INTEGRATION_KEY
+  ) {
+    return providerWith(ledger, pollFetch(signed(fields, key)));
+  }
+
+  it("confirms a genuine signed Paid status and applies it once", async () => {
+    const ledger = stubLedger();
+    const provider = providerForReply(
+      ledger,
+      statusFields({ status: "Paid", amount: "10.00" })
+    );
+
+    const result = await provider.reconcile(SALE);
+
+    expect(result).toEqual({
+      providerStatus: "Paid",
+      outcome: "paid",
+      applied: true,
+    });
+    expect(ledger.paid).toHaveLength(1);
+    expect(ledger.paid[0]).toMatchObject({
+      transactionId: TX,
+      provider: "paynow",
+      amountMinor: 1000n,
+      currency: "USD",
+      eventId: `paynow:${TX}:9510:paid`,
+    });
+    expect(ledger.failed).toHaveLength(0);
+    // The audit payload says WHICH half of the contract delivered it.
+    expect(ledger.paid[0].payload?.source).toBe("pollurl");
+  });
+
+  it("records a genuine signed Cancelled as FAILED, never as PAID", async () => {
+    const ledger = stubLedger();
+    const provider = providerForReply(
+      ledger,
+      statusFields({ status: "Cancelled" })
+    );
+
+    const result = await provider.reconcile(SALE);
+
+    expect(result).toMatchObject({ outcome: "failed", applied: true });
+    expect(ledger.paid).toHaveLength(0);
+    expect(ledger.failed).toHaveLength(1);
+    expect(ledger.failed[0].eventId).toBe(`paynow:${TX}:9510:cancelled`);
+  });
+
+  it("refuses a reply whose hash was made with another key", async () => {
+    const ledger = stubLedger();
+    const provider = providerForReply(
+      ledger,
+      statusFields({ status: "Paid", amount: "10.00" }),
+      "00000000-0000-0000-0000-000000000000"
+    );
+
+    await expect(provider.reconcile(SALE)).rejects.toBeInstanceOf(
+      PaymentSignatureError
+    );
+    expect(ledger.paid).toHaveLength(0);
+    expect(ledger.events).toHaveLength(0);
+  });
+
+  it("refuses a reply whose value was tampered with after signing", async () => {
+    const ledger = stubLedger();
+    const authentic = signed(statusFields({ status: "Paid", amount: "10.00" }));
+    const provider = providerWith(ledger, pollFetch(authentic.replace("amount=10.00", "amount=99.00")));
+
+    await expect(provider.reconcile(SALE)).rejects.toBeInstanceOf(
+      PaymentSignatureError
+    );
+    expect(ledger.paid).toHaveLength(0);
+  });
+
+  it("refuses a reply whose amount does not match the recorded sale", async () => {
+    const ledger = stubLedger();
+    const provider = providerForReply(
+      ledger,
+      statusFields({ status: "Paid", amount: "99.00" })
+    );
+
+    await expect(provider.reconcile(SALE)).rejects.toMatchObject({
+      reason: "amount_mismatch",
+    });
+    expect(ledger.paid).toHaveLength(0);
+    expect(ledger.events).toHaveLength(0);
+  });
+
+  it("refuses a genuine reply about a different transaction", async () => {
+    const ledger = stubLedger();
+    const provider = providerForReply(
+      ledger,
+      statusFields({ status: "Paid", amount: "10.00", reference: OTHER_TX })
+    );
+
+    await expect(provider.reconcile(SALE)).rejects.toMatchObject({
+      reason: "reference_mismatch",
+    });
+    expect(ledger.paid).toHaveLength(0);
+  });
+
+  it("refuses a status outside the published vocabulary", async () => {
+    const ledger = stubLedger();
+    const provider = providerForReply(
+      ledger,
+      statusFields({ status: "Paid (guaranteed)" })
+    );
+
+    await expect(provider.reconcile(SALE)).rejects.toMatchObject({
+      reason: "unrecognized_payload",
+    });
+    expect(ledger.paid).toHaveLength(0);
+  });
+
+  it("re-checks the same status without producing a second audit key", async () => {
+    const ledger = stubLedger();
+    const provider = providerForReply(
+      ledger,
+      statusFields({ status: "Paid", amount: "10.00" })
+    );
+
+    const first = await provider.reconcile(SALE);
+    const second = await provider.reconcile(SALE);
+
+    expect(first).toMatchObject({ applied: true });
+    // Same provider message => same (provider, event_id) => the dedupe in
+    // payment_events records it exactly once, and the row is already PAID so
+    // the second answer writes nothing.
+    expect(second).toMatchObject({ outcome: "paid", applied: false });
+    expect(ledger.paid).toHaveLength(2);
+    expect(ledger.paid[0].eventId).toBe(ledger.paid[1].eventId);
+  });
+
+  it("reports an already-paid transaction without re-applying anything", async () => {
+    const ledger = stubLedger();
+    ledger.applied.paid = true; // the webhook (or an earlier check) got there first
+    const provider = providerForReply(
+      ledger,
+      statusFields({ status: "Paid", amount: "10.00" })
+    );
+
+    const result = await provider.reconcile(SALE);
+
+    expect(result).toMatchObject({ outcome: "paid", applied: false });
+    expect(ledger.paid).toHaveLength(1);
+  });
+
+  it("leaves an in-flight status exactly where it was", async () => {
+    const ledger = stubLedger();
+    const provider = providerForReply(
+      ledger,
+      statusFields({ status: "Created", amount: "10.00" })
+    );
+
+    const result = await provider.reconcile(SALE);
+
+    expect(result).toEqual({
+      providerStatus: "Created",
+      outcome: "noted",
+      applied: false,
+    });
+    // Audited, deduped, and — crucially — no transition of any kind.
+    expect(ledger.events).toHaveLength(1);
+    expect(ledger.paid).toHaveLength(0);
+    expect(ledger.failed).toHaveLength(0);
+    expect(ledger.refunded).toHaveLength(0);
+  });
+
+  it("reports a provider/network failure without touching the transaction", async () => {
+    const ledger = stubLedger();
+    const down: typeof fetch = async () => {
+      throw new Error("ECONNREFUSED");
+    };
+    const provider = providerWith(ledger, down);
+
+    await expect(provider.reconcile(SALE)).rejects.toBeInstanceOf(
+      PaymentProviderRequestError
+    );
+    expect(ledger.paid).toHaveLength(0);
+    expect(ledger.failed).toHaveLength(0);
+    expect(ledger.events).toHaveLength(0);
+
+    const refused: typeof fetch = async () => new Response("nope", { status: 503 });
+    await expect(
+      providerWith(ledger, refused).reconcile(SALE)
+    ).rejects.toBeInstanceOf(PaymentProviderRequestError);
+    expect(ledger.paid).toHaveLength(0);
+  });
+
+  it("refuses to poll when no payment session was recorded", async () => {
+    const ledger = stubLedger();
+    ledger.intent = null;
+    // Any network call here would be a bug: there is nothing to ask.
+    const exploding: typeof fetch = async () => {
+      throw new Error("the provider must not be contacted");
+    };
+
+    await expect(
+      providerWith(ledger, exploding).reconcile(SALE)
+    ).rejects.toMatchObject({ reason: "no_poll_url" });
+  });
+
+  it("refuses a stored status address that is not Paynow's", async () => {
+    const ledger = stubLedger();
+    ledger.intent = {
+      transactionId: TX,
+      provider: "paynow",
+      pollUrl: "https://evil.example.com/CheckPayment/?guid=abc",
+    };
+    const exploding: typeof fetch = async () => {
+      throw new Error("the provider must not be contacted");
+    };
+
+    await expect(
+      providerWith(ledger, exploding).reconcile(SALE)
+    ).rejects.toMatchObject({ reason: "invalid_poll_url" });
+  });
+
+  it("refuses a sale recorded in a currency Paynow does not settle", async () => {
+    const ledger = stubLedger();
+    const exploding: typeof fetch = async () => {
+      throw new Error("the provider must not be contacted");
+    };
+
+    await expect(
+      providerWith(ledger, exploding).reconcile({
+        transactionId: TX,
+        amountMinor: 1000n,
+        currency: "EUR",
+      })
+    ).rejects.toMatchObject({ reason: "currency_mismatch" });
+  });
+
+  it("polls the exact address Paynow handed us at initiation", async () => {
+    const ledger = stubLedger();
+    const asked: string[] = [];
+    const provider = providerWith(ledger, async (input) => {
+      asked.push(String(input));
+      return new Response(signed(statusFields({ status: "Created" })), {
+        status: 200,
+      });
+    });
+
+    await provider.reconcile(SALE);
+
+    expect(asked).toEqual([POLL_URL]);
   });
 });
