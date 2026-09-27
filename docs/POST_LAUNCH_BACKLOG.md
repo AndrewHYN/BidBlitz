@@ -86,6 +86,28 @@ Potential post-launch revenue:
 
 Do not build these prematurely if they slow down proving the marketplace.
 
+#### Support BidBlitz / "coffee" tip (pre-launch audit Phase 8 — deferred, not built)
+
+Considered for launch: a subtle "Support BidBlitz" link that lets happy users
+send a small thank-you payment. Deferred, not built, because:
+
+- the Paynow integration is still in test mode and has never completed a live
+  payment end-to-end — adding a second payment flow would multiply unproven
+  surface right before launch;
+- a tip is not an auction payment: it needs its own reference namespace and
+  intent/ledger rows (so fee and revenue reporting stay honest), its own
+  amount-entry UI, cancel/refund rules, and copy that clearly separates it
+  from bidder money — real scope, not a footer button;
+- the rule for this pass was to ship it only with a real, clearly-labelled,
+  separate payment flow; otherwise record the deferral. That rule is
+  recorded here.
+
+Placement rules when it is eventually built: footer / Help / account area
+only — never beside bid buttons, auction cards, checkout, pop-ups or
+banners; a real icon (no emoji); honest copy; zero fabricated counts (no
+"X coffees bought"). The 5% sale fee remains the business model; a tip
+stream is optional generosity, not revenue to plan around.
+
 ## DEFERRED IN THE COMMERCIAL PASS (PHASE 2 — P2/P3, intentional)
 
 Carried out of the "Phase 2: Revenue + Marketplace Growth + Premium UX" pass.
