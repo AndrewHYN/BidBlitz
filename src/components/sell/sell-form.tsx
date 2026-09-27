@@ -303,10 +303,12 @@ export function SellForm({
         </div>
 
         <p className="rounded-lg border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-          When this auction sells, BidBlitz takes{" "}
+          If this auction sells, BidBlitz takes{" "}
           {feeBps !== null ? <strong>{feePercentLabel(feeBps)}</strong> : "a platform fee"}{" "}
-          of the winning price out of your proceeds — buyers pay exactly their winning bid,
-          nothing extra. You keep the rest.
+          of the winning price out of your proceeds — the buyer pays your winning
+          bid plus Paynow&apos;s own payment charge, which is not money you
+          receive. You keep the rest, and it is paid to you after the sale is
+          fulfilled and the buyer&apos;s window to dispute has passed.
         </p>
       </section>
 

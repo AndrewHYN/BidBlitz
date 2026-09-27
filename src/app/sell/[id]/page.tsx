@@ -222,15 +222,33 @@ export default async function SellDraftPage({
                 endsAt={auction.ends_at}
               />
             </div>
-            <p className="mt-4 text-xs text-muted-foreground">
-              If it sells, BidBlitz takes{" "}
-              {feeBps !== null ? (
-                <strong className="font-semibold">{feePercentLabel(feeBps)}</strong>
-              ) : (
-                "a platform fee"
-              )}{" "}
-              of the winning price from your proceeds. Buyers pay their winning bid.
-            </p>
+            <div className="space-y-3 rounded-xl border bg-muted/30 p-4">
+              <p className="text-sm font-medium">Your obligations on this listing</p>
+              <ul className="list-disc space-y-1.5 pl-5 text-xs text-muted-foreground">
+                <li>
+                  Your title, description and photos must describe the actual
+                  item. Buyers are held to what you wrote, so a materially wrong
+                  listing can cost you the sale.
+                </li>
+                <li>
+                  If it sells, you must deliver or hand over what you listed to
+                  the winning bidder.
+                </li>
+              </ul>
+              <p className="text-xs text-muted-foreground">
+                If it sells, BidBlitz takes{" "}
+                {feeBps !== null ? (
+                  <strong className="font-semibold">{feePercentLabel(feeBps)}</strong>
+                ) : (
+                  "a platform fee"
+                )}{" "}
+                of the winning price from your proceeds. The buyer pays your
+                winning bid plus Paynow&apos;s own payment charge, which is not
+                money you receive. Your proceeds are paid after the sale is
+                fulfilled and the buyer&apos;s window to dispute has passed, and
+                they are held while any dispute is open.
+              </p>
+            </div>
           </section>
 
           {(canCancel || canDelete) && (

@@ -94,6 +94,16 @@ export default function TermsPage() {
             afterwards. If your auction ends with a winning bid, you agree to
             complete the sale with the winning bidder.
           </p>
+          <p>
+            <strong>
+              If you win a sale you must deliver the item you listed.
+            </strong>{" "}
+            Your description and photos are the promise you are being held to: a
+            materially wrong description, a damaged item, or an item that was
+            never available can leave your payout held and can lead to a refund
+            to the buyer. If you genuinely cannot fulfil, tell the buyer and us
+            as soon as you know rather than going quiet.
+          </p>
         </TermsSection>
 
         <TermsSection id="bidding" title="4. Bidding">
@@ -134,10 +144,16 @@ export default function TermsPage() {
         <TermsSection id="fees" title="6. Fees">
           <p>
             BidBlitz charges sellers a platform fee of{" "}
-            <strong>5% of the winning price</strong> on sold auctions. Buyers
-            pay exactly their winning bid — the fee comes out of the
-            seller&apos;s proceeds. The current rate and a worked example are
-            on the{" "}
+            <strong>5% of the winning price</strong> on sold auctions. The fee
+            is taken out of the seller&apos;s proceeds, so the seller receives
+            the winning price minus 5%.
+          </p>
+          <p>
+            Buyers pay the winning price <strong>plus</strong> the applicable
+            Paynow payment charge. That charge is Paynow&apos;s own cost for the
+            payment method, is calculated and displayed by Paynow before the
+            buyer authorises the payment, and is not revenue received by
+            BidBlitz. The current rate and a worked example are on the{" "}
             <Link href="/help/fees" className="font-medium text-primary hover:underline">
               fees page
             </Link>
@@ -191,7 +207,50 @@ export default function TermsPage() {
           )}
         </TermsSection>
 
-        <TermsSection id="reviews" title="8. Reviews">
+        <TermsSection
+          id="settlement-payout"
+          title={
+            paymentConfigured
+              ? "8. Paying the seller"
+              : "8. Paying the seller — current limitation"
+          }
+        >
+          {paymentConfigured ? (
+            <>
+              <p>
+                A sale being <strong>Paid</strong> means Paynow confirmed the
+                buyer&apos;s payment. It does not mean the seller has been paid.
+                The two are recorded separately, and they are separate steps.
+              </p>
+              <p>
+                BidBlitz pays the seller&apos;s proceeds — the winning price less
+                the 5% platform fee — after the seller has fulfilled the sale
+                and the buyer&apos;s window to raise a dispute has passed. That
+                payment is made outside the site and its reference is recorded
+                against the sale. BidBlitz does not split a buyer&apos;s payment
+                between sellers automatically.
+              </p>
+              <p>
+                A payout is held while a dispute about the sale is open, and is
+                held if the buyer&apos;s payment is refunded. Sellers can see the
+                current payout status for their own sales on their dashboard.
+              </p>
+              <p>
+                If you are a seller, you are responsible for delivering what you
+                listed and for describing it accurately. Failing to fulfil a won
+                sale can hold your payout and, if it is not put right, can lead
+                to a refund to the buyer and action on your account.
+              </p>
+            </>
+          ) : (
+            <p>
+              No money moves through BidBlitz yet, so there is no seller payout
+              to describe. A transaction is a record of what is owed.
+            </p>
+          )}
+        </TermsSection>
+
+        <TermsSection id="reviews" title="9. Reviews">
           <p>
             Reviews are tied to a real transaction, so only the actual buyer and
             seller of a settled sale can write one — and each transaction gets
@@ -200,7 +259,7 @@ export default function TermsPage() {
           </p>
         </TermsSection>
 
-        <TermsSection id="moderation" title="9. Reporting and moderation">
+        <TermsSection id="moderation" title="10. Reporting and moderation">
           <p>
             Every auction and profile can be reported. Reports are reviewed by
             the BidBlitz team, and content that breaks these rules can be
@@ -210,7 +269,7 @@ export default function TermsPage() {
           </p>
         </TermsSection>
 
-        <TermsSection id="content" title="10. What you list is yours">
+        <TermsSection id="content" title="11. What you list is yours">
           <p>
             You keep ownership of the items, photos and text you upload. You
             give BidBlitz permission to display them on the site for as long as
@@ -219,7 +278,7 @@ export default function TermsPage() {
           </p>
         </TermsSection>
 
-        <TermsSection id="disclaimer" title="11. How the site is provided">
+        <TermsSection id="disclaimer" title="12. How the site is provided">
           <p>
             BidBlitz is provided as-is. Listings are written by other users, so
             use your judgement before bidding — we do not guarantee that every
