@@ -96,55 +96,57 @@ export default async function BuyingPage() {
             {items.map((item) => {
               const tx = item.won ? txByAuction.get(item.id) : undefined;
               return (
-                <li key={item.id}>
-                  <AuctionCard
-                    auction={item}
-                    badge={badgeFor(item)}
-                    meta={
-                      <div className="space-y-2">
-                        <div
-                          data-testid="my-bid"
-                          className="flex items-center justify-between gap-2"
-                        >
-                          <span className="text-muted-foreground">Your bid</span>
-                          {/* `getBuying` doesn't project currency; the sell schema
-                              pins every auction to USD, which is `<Money>`'s default. */}
-                          <span className="font-medium" data-numeric>
-                            <Money minor={item.myBidMinor} />
-                          </span>
-                        </div>
-                        {/* Won rows carry their financial state: the badge, the
-                            route to the full record, and — truthfully gated —
-                            the fact that nothing can be charged yet. */}
-                        {tx && (
-                          <div
-                            className="space-y-1 border-t pt-2"
-                            data-testid="buying-payment-state"
-                          >
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span className="text-xs text-muted-foreground">
-                                Payment
-                              </span>
-                              <TransactionBadge status={tx.status} />
-                              <Link
-                                href="/dashboard/transactions"
-                                className="text-xs font-medium text-primary hover:underline"
-                              >
-                                View transaction
-                              </Link>
-                            </div>
-                            {!configured && (
-                              <p className="text-xs text-muted-foreground">
-                                No payment provider is configured yet, so
-                                nothing has been charged.
-                              </p>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    }
-                  />
-                </li>
+              <li key={item.id} className="space-y-2">
+                <AuctionCard
+                  auction={item}
+                  badge={badgeFor(item)}
+                  meta={
+                    <div
+                      data-testid="my-bid"
+                      className="flex items-center justify-between gap-2"
+                    >
+                      <span className="text-muted-foreground">Your bid</span>
+                      {/* `getBuying` doesn't project currency; the sell schema
+                          pins every auction to USD, which is `<Money>`'s default. */}
+                      <span className="font-medium" data-numeric>
+                        <Money minor={item.myBidMinor} />
+                      </span>
+                    </div>
+                  }
+                />
+                {/* Won rows carry their financial state: the badge, the route
+                    to the full record, and — truthfully gated — the fact that
+                    nothing can be charged yet. It lives BELOW the card, not in
+                    the card's `meta`, because `AuctionCard`'s root is a <Link>:
+                    nesting the "View transaction" link inside it would put an
+                    <a> in an <a> — invalid HTML that fails hydration (React
+                    #418) and regenerates the page tree on every visit. The
+                    selling dashboard already places its transaction summary
+                    outside the card for the same structural reason. */}
+                {tx && (
+                  <div
+                    className="space-y-1 rounded-xl border bg-card px-3.5 py-2.5 text-[11px]"
+                    data-testid="buying-payment-state"
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-muted-foreground">Payment</span>
+                      <TransactionBadge status={tx.status} />
+                      <Link
+                        href="/dashboard/transactions"
+                        className="text-xs font-medium text-primary hover:underline"
+                      >
+                        View transaction
+                      </Link>
+                    </div>
+                    {!configured && (
+                      <p className="text-xs text-muted-foreground">
+                        No payment provider is configured yet, so nothing has
+                        been charged.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </li>
               );
             })}
           </ul>
