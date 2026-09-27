@@ -20,6 +20,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createServerRealtime } from "@/lib/realtime/supabase";
 import { placeBidSchema } from "@/lib/validation";
 import { normalizeEngineError, type BidRejection } from "@/server/errors";
+import { BID_LIMIT, rateLimit } from "@/server/rate-limit";
 
 export type PlaceBidResult =
   | {
@@ -68,6 +69,21 @@ export async function placeBidAction(input: {
     return {
       ok: false,
       rejection: { code: "not_authenticated", message: "Sign in to bid." },
+    };
+  }
+
+  // Per-account submission budget (in-memory, see rate-limit.ts): every attempt
+  // counts, because even rejected ones are work. 30 bids in 10s is far beyond
+  // what a person does and far below what a hot auction legitimately needs from
+  // one bidder; the idempotent retry path stays inside it.
+  const budget = rateLimit(`bid:${user.id}`, BID_LIMIT.limit, BID_LIMIT.windowMs);
+  if (!budget.allowed) {
+    return {
+      ok: false,
+      rejection: {
+        code: "rate_limited",
+        message: "You're bidding very quickly — wait a few seconds and try again.",
+      },
     };
   }
 

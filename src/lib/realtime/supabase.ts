@@ -5,10 +5,20 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  * Supabase Realtime Broadcast implementation.
  *
  * Chosen over Postgres Changes for the hot path because Broadcast is a
- * low-latency fan-out that does not wake the database, and private channels
- * are authorised by RLS. Postgres Changes stays available as the
- * reconnect/reconciliation fallback (the tables are in the
+ * low-latency fan-out that does not wake the database. Postgres Changes stays
+ * available as the reconnect/reconciliation fallback (the tables are in the
  * `supabase_realtime` publication) but is not the primary signal.
+ *
+ * SECURITY NOTE — these channels are PUBLIC, not private. They are created
+ * without `private: true` and no `realtime.messages` RLS policies exist, so
+ * anyone holding the publishable key can subscribe to `auction:{id}` /
+ * `user:{id}` and post to them. Realtime is therefore treated as a
+ * best-effort NOTIFICATION only: consumers just refresh or mirror server-provided
+ * facts (see `use-auction-realtime.ts`) and no price, state, authorization or
+ * payment decision is ever derived from a payload received here. Closing the
+ * gap means Supabase private channels + `realtime.messages` policies, which
+ * must be verified against live bidding before it ships — tracked in
+ * docs/POST_LAUNCH_BACKLOG.md.
  */
 
 const auctionChannel = (id: string) => `auction:${id}`;

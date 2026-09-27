@@ -4,6 +4,7 @@ import {
   AUTH_LIMIT,
   BID_LIMIT,
   REPORT_LIMIT,
+  peekRateLimit,
   rateLimit,
   resetRateLimits,
 } from "./rate-limit";
@@ -85,5 +86,43 @@ describe("rateLimit()", () => {
     expect(AUCTION_CREATE_LIMIT).toEqual({ limit: 10, windowMs: 60_000 });
     expect(REPORT_LIMIT).toEqual({ limit: 5, windowMs: 60_000 });
     expect(AUTH_LIMIT).toEqual({ limit: 5, windowMs: 60_000 });
+  });
+});
+
+describe("peekRateLimit()", () => {
+  it("reports the remaining budget without recording a hit", () => {
+    expect(peekRateLimit("peek", 2, 1_000)).toEqual({
+      allowed: true,
+      remaining: 2,
+      retryAfterMs: 0,
+    });
+    expect(peekRateLimit("peek", 2, 1_000)).toEqual({
+      allowed: true,
+      remaining: 2,
+      retryAfterMs: 0,
+    });
+
+    // recording happens through rateLimit() only
+    rateLimit("peek", 2, 1_000);
+    expect(peekRateLimit("peek", 2, 1_000).remaining).toBe(1);
+  });
+
+  it("blocks once recorded failures fill the budget, then recovers", () => {
+    rateLimit("peek-block", 2, 1_000);
+    rateLimit("peek-block", 2, 1_000);
+
+    const blocked = peekRateLimit("peek-block", 2, 1_000);
+    expect(blocked.allowed).toBe(false);
+    expect(blocked.remaining).toBe(0);
+    expect(blocked.retryAfterMs).toBeGreaterThan(0);
+
+    vi.advanceTimersByTime(1_100);
+    expect(peekRateLimit("peek-block", 2, 1_000).allowed).toBe(true);
+  });
+
+  it("keeps keys independent", () => {
+    rateLimit("peek-a", 1, 1_000);
+    expect(peekRateLimit("peek-a", 1, 1_000).allowed).toBe(false);
+    expect(peekRateLimit("peek-b", 1, 1_000).allowed).toBe(true);
   });
 });

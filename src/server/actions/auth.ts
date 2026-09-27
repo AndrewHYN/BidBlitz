@@ -8,11 +8,33 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { absoluteUrl } from "@/lib/site-url";
+import { safeNext } from "@/lib/safe-next";
+import { AUTH_LIMIT, peekRateLimit, rateLimit } from "@/server/rate-limit";
 import type { BidRejection } from "@/server/errors";
 
 export type AuthResult = { ok: true } | { ok: false; rejection: BidRejection };
+
+const AUTH_RATE_MESSAGE = "Too many attempts. Wait a moment and try again.";
+
+/**
+ * Budget key for FAILED sign-in/sign-up attempts: client IP + email.
+ *
+ * A Server Action payload is directly invocable, so the scope comes from the
+ * request's forwarded hop and the submitted email — nothing else the caller
+ * controls. Only failures consume budget (`peekRateLimit` before the attempt,
+ * `rateLimit` after it fails), so routine sign-ins are never throttled while
+ * password guessing against one account is capped at AUTH_LIMIT per window, on
+ * top of GoTrue's own rate limiting. In-memory by design — see rate-limit.ts.
+ */
+async function authFailureKey(email: string): Promise<string> {
+  const forwarded = (await headers()).get("x-forwarded-for");
+  const ip = forwarded?.split(",")[0]?.trim();
+  const scope = ip && ip.length > 0 ? ip : "unknown";
+  return `auth:${scope}:${email.trim().toLowerCase()}`;
+}
 
 function friendlyAuthError(message: string): BidRejection {
   const m = message.toLowerCase();
@@ -45,6 +67,11 @@ export async function signInAction(input: {
   password: string;
   redirectTo?: string;
 }): Promise<AuthResult> {
+  const budgetKey = await authFailureKey(input.email);
+  if (!peekRateLimit(budgetKey, AUTH_LIMIT.limit, AUTH_LIMIT.windowMs).allowed) {
+    return { ok: false, rejection: { code: "rate_limited", message: AUTH_RATE_MESSAGE } };
+  }
+
   const supabase = await createClient();
 
   const { error } = await supabase.auth.signInWithPassword({
@@ -52,10 +79,13 @@ export async function signInAction(input: {
     password: input.password,
   });
 
-  if (error) return { ok: false, rejection: friendlyAuthError(error.message) };
+  if (error) {
+    rateLimit(budgetKey, AUTH_LIMIT.limit, AUTH_LIMIT.windowMs); // record the failure
+    return { ok: false, rejection: friendlyAuthError(error.message) };
+  }
 
   revalidatePath("/", "layout");
-  redirect(input.redirectTo ?? "/dashboard");
+  redirect(safeNext(input.redirectTo));
 }
 
 export async function signUpAction(input: {
@@ -64,6 +94,11 @@ export async function signUpAction(input: {
   displayName: string;
   redirectTo?: string;
 }): Promise<AuthResult> {
+  const budgetKey = await authFailureKey(input.email);
+  if (!peekRateLimit(budgetKey, AUTH_LIMIT.limit, AUTH_LIMIT.windowMs).allowed) {
+    return { ok: false, rejection: { code: "rate_limited", message: AUTH_RATE_MESSAGE } };
+  }
+
   const supabase = await createClient();
 
   const { data, error } = await supabase.auth.signUp({
@@ -77,7 +112,10 @@ export async function signUpAction(input: {
     },
   });
 
-  if (error) return { ok: false, rejection: friendlyAuthError(error.message) };
+  if (error) {
+    rateLimit(budgetKey, AUTH_LIMIT.limit, AUTH_LIMIT.windowMs); // record the failure
+    return { ok: false, rejection: friendlyAuthError(error.message) };
+  }
 
   // auto-confirm is off: tell the truth instead of pretending they are in
   if (data.session === null && data.user !== null) {
@@ -85,7 +123,7 @@ export async function signUpAction(input: {
   }
 
   revalidatePath("/", "layout");
-  redirect(input.redirectTo ?? "/dashboard");
+  redirect(safeNext(input.redirectTo));
 }
 
 export async function signOutAction(): Promise<void> {

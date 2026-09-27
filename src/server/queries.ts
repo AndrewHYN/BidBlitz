@@ -65,7 +65,20 @@ type CardJoin = {
 
 export function imageUrlFor(path: string | null | undefined): string | null {
   if (!path) return null;
-  if (/^https?:\/\//.test(path)) return path;
+  // Only a plain storage key survives. `auction_images.storage_path` is
+  // written through PostgREST by sellers directly as well as by our server
+  // action, so a row could carry `https://attacker.tld/x.jpg` — rendering it
+  // would load an arbitrary external image in browse/detail (and the URL
+  // could change after the listing was published). Anything that is not a
+  // bare relative key (absolute, protocol-relative, backslash, `.`/`..`
+  // traversal) falls through to `null` and the UI shows its own placeholder.
+  const segments = path.split("/");
+  const plain =
+    !path.includes("://") &&
+    !path.startsWith("/") &&
+    !path.includes("\\") &&
+    segments.every((seg) => seg !== "." && seg !== "..");
+  if (!plain) return null;
   const base = process.env.NEXT_PUBLIC_SUPABASE_URL;
   // public bucket => unauthenticated delivery, which keeps browse pages cacheable
   return `${base}/storage/v1/object/public/auction-images/${path}`;

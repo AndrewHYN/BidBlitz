@@ -207,6 +207,58 @@ now `20260927000001_payment_intent_poll_url.sql`, and the fallback it enables is
 - **Dispute and refund operations** — the states and writers exist; the
   provider-side endpoints still need confirmation against a real integration.
 
+## DEFERRED IN THE PRE-LAUNCH SECURITY SWEEP (2026-09-27 — reviewed, consciously not changed)
+
+A full security sweep ran before launch. What shipped in the sweep itself:
+failure-only rate limiting on sign-in/sign-up (`peekRateLimit` + `AUTH_LIMIT`,
+keyed by IP + email so routine sign-ins are never throttled), per-user budgets
+on bid/list/report actions (`BID_LIMIT`, `AUCTION_CREATE_LIMIT`,
+`REPORT_LIMIT`), open-redirect validation of `redirectTo` inside the auth
+server actions via the shared `src/lib/safe-next.ts`, `imageUrlFor()` refusing
+anything that is not a bare storage key, and the realtime header comment
+corrected (channels are public; consumption is notification-only — see below).
+The following were reviewed and deliberately left alone; each needs care the
+pre-launch window did not have, and none is a known path to money or data loss:
+
+- **Realtime channel authorization.** `auction:{id}` / `user:{id}` Broadcast
+  channels are created without `private: true` and no `realtime.messages` RLS
+  policies exist, so anyone holding the publishable key can subscribe to or
+  post on them. Safe today only because every consumer treats events as a
+  hint to re-read server state — no price, state, authorization or payment
+  decision is derived from a payload (documented at the top of
+  `src/lib/realtime/supabase.ts`). Closing it means Supabase private channels
+  + `realtime.messages` policies; it must be verified against live bidding
+  before it ships, so it was not risked pre-launch.
+- **`is_banned` enforcement.** The column and RLS references exist, but no
+  code path sets it (no admin surface does) and no action reads it. Wiring
+  enforcement before an admin tool can set it would be theatre; build the
+  admin operation first.
+- **`profiles_insert_self` INSERT policy** has no `is_admin = false` guard, so
+  a self-inserted row could claim admin. Profiles are actually created by the
+  `handle_new_user` trigger on signup and the app never INSERTs `profiles` from
+  the client, so the only way in is a manually inserted row for a missing
+  profile id. One-line `with check` tightening when migrations are next open.
+- **`auction_images.storage_path` has no DB format CHECK.** The server action
+  validates uploads and `imageUrlFor()` now refuses non-key values, but a
+  direct PostgREST write can still store an odd string. A CHECK constraint is
+  a follow-up migration.
+- **Bid idempotency scope** is `(bidder_id, request_id)` — a request id reused
+  across two different auctions would resolve to the earlier bid. Clients
+  generate a fresh UUID per submit, so the collision is theoretical; scope the
+  key by auction id when the engine next changes.
+- **Anti-snipe `extension_count` is unbounded** — a determined bidder could
+  extend an auction repeatedly. A cap (e.g. max extensions per auction) is a
+  product rule that needs its own test; not added in the sweep.
+- **Admin raw error text** — the admin-only surface returns the provider's raw
+  `error.message` for operator diagnostics. Deliberate for now; genericize if
+  an admin UI ever becomes multi-user.
+- **`scripts/db/verify-engine.mjs` test credentials** — a local database
+  verification script carries its own test login. It is never deployed and
+  never touches production data; keep it out of any hosted context.
+- **Distributed rate limiting** — see *Infrastructure limits* above; the new
+  budgets are in-memory per instance (sufficient on Hobby's single isolate,
+  not a DDoS control).
+
 Never add:
 - fake counters
 - fake reviews

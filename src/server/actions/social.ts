@@ -9,6 +9,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { watchlistSchema, markNotificationsReadSchema } from "@/lib/validation";
 import { normalizeEngineError, type BidRejection } from "@/server/errors";
+import { REPORT_LIMIT, rateLimit } from "@/server/rate-limit";
 
 export type SimpleResult =
   | { ok: true; [k: string]: unknown }
@@ -109,6 +110,19 @@ export async function reportAction(input: unknown): Promise<SimpleResult> {
   } = await supabase.auth.getUser();
   if (!user) {
     return { ok: false, rejection: { code: "not_authenticated", message: "Sign in to report." } };
+  }
+
+  // Per-account report budget (in-memory, see rate-limit.ts): reporting is a
+  // deliberate moderation signal, not a repeated interaction.
+  const budget = rateLimit(`report:${user.id}`, REPORT_LIMIT.limit, REPORT_LIMIT.windowMs);
+  if (!budget.allowed) {
+    return {
+      ok: false,
+      rejection: {
+        code: "rate_limited",
+        message: "Too many reports in a row — wait a minute and try again.",
+      },
+    };
   }
 
   const { reportSchema } = await import("@/lib/validation");

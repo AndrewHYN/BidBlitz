@@ -13,6 +13,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createServerRealtime } from "@/lib/realtime/supabase";
 import { createAuctionSchema, publishAuctionSchema } from "@/lib/validation";
 import { normalizeEngineError, type BidRejection } from "@/server/errors";
+import { AUCTION_CREATE_LIMIT, rateLimit } from "@/server/rate-limit";
 
 export type ActionResult<T = unknown> =
   | ({ ok: true } & T)
@@ -48,6 +49,23 @@ export async function createAuctionAction(input: unknown): Promise<
     return {
       ok: false,
       rejection: { code: "not_authenticated", message: "Sign in to sell." },
+    };
+  }
+
+  // Per-account listing budget (in-memory, see rate-limit.ts): draft creation
+  // is a write a human does a handful of times, never ten times a minute.
+  const budget = rateLimit(
+    `auction:${user.id}`,
+    AUCTION_CREATE_LIMIT.limit,
+    AUCTION_CREATE_LIMIT.windowMs
+  );
+  if (!budget.allowed) {
+    return {
+      ok: false,
+      rejection: {
+        code: "rate_limited",
+        message: "You're creating listings very quickly — wait a minute and try again.",
+      },
     };
   }
 

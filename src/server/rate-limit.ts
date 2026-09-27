@@ -24,11 +24,7 @@ export function rateLimit(
 ): RateLimitResult {
   const now = Date.now();
   const bucket = buckets.get(key) ?? { hits: [] };
-
-  // drop everything outside the window
-  while (bucket.hits.length && now - bucket.hits[0] > windowMs) {
-    bucket.hits.shift();
-  }
+  prune(bucket, now, windowMs);
 
   if (bucket.hits.length >= limit) {
     const oldest = bucket.hits[0];
@@ -43,6 +39,43 @@ export function rateLimit(
   bucket.hits.push(now);
   buckets.set(key, bucket);
   return { allowed: true, remaining: limit - bucket.hits.length, retryAfterMs: 0 };
+}
+
+/**
+ * Read-only view of a budget: how much is left for `key`? Never records a hit.
+ *
+ * Used where the attempt itself must stay free but PREVIOUS failures must not:
+ * sign-in/sign-up check this before contacting the identity provider and record
+ * through `rateLimit()` only when an attempt actually fails. A user who simply
+ * signs in (or a test suite that signs in repeatedly) is never throttled;
+ * password guessing against one account still hits the AUTH_LIMIT wall.
+ */
+export function peekRateLimit(
+  key: string,
+  limit: number,
+  windowMs: number
+): RateLimitResult {
+  const now = Date.now();
+  const bucket = buckets.get(key);
+  if (!bucket) return { allowed: true, remaining: limit, retryAfterMs: 0 };
+
+  prune(bucket, now, windowMs);
+  if (bucket.hits.length >= limit) {
+    const oldest = bucket.hits[0];
+    return {
+      allowed: false,
+      remaining: 0,
+      retryAfterMs: Math.max(0, oldest + windowMs - now),
+    };
+  }
+  return { allowed: true, remaining: limit - bucket.hits.length, retryAfterMs: 0 };
+}
+
+function prune(bucket: Bucket, now: number, windowMs: number): void {
+  // drop everything outside the window
+  while (bucket.hits.length && now - bucket.hits[0] > windowMs) {
+    bucket.hits.shift();
+  }
 }
 
 /** Opportunistic sweep so an idle server does not retain stale buckets. */

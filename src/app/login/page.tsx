@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { safeNext } from "@/lib/safe-next";
 import { LoginForm } from "@/components/auth/login-form";
 
 export const metadata: Metadata = {
@@ -8,20 +9,8 @@ export const metadata: Metadata = {
   description: "Sign in to BidBlitz to bid, sell and track your auctions.",
 };
 
-/**
- * Open-redirect guard, shared with /auth/callback: only a single-slash,
- * same-origin path survives. `//evil.com`, `\`, and absolute URLs all fall
- * back to the default.
- */
-function safeNext(value: string | undefined): string {
-  if (typeof value !== "string") return "/dashboard";
-  const v = value.trim();
-  if (!v.startsWith("/")) return "/dashboard";
-  if (v.startsWith("//")) return "/dashboard";
-  if (v.includes("\\")) return "/dashboard";
-  if (/^[a-z][a-z0-9+.-]*:/i.test(v)) return "/dashboard"; // http:, javascript:, …
-  return v;
-}
+/** Open-redirect guard lives in `@/lib/safe-next` (shared with /auth/callback
+ *  and the auth server actions). */
 
 export default async function LoginPage({
   searchParams,
