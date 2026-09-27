@@ -209,13 +209,16 @@ now `20260927000001_payment_intent_poll_url.sql`, and the fallback it enables is
   `→ PAID`, cancel `→ FAILED`, duplicate and tampered replays rejected,
   forgeries rejected). Outstanding from that run: **Paynow's status-update push
   never arrived** — see *Paynow status-update delivery* below.
-- **Paynow status-update delivery** — across five test transactions (four
-  hosted, two express) Paynow recorded every payment as Paid/Cancelled and
-  never POSTed to `resulturl`, even after the endpoint answered its GET probe
-  with 200. `pollurl` did answer and returned the same signed message shape,
-  and is how the verification callbacks were obtained. Before real money: ask
-  Paynow why. The `pollurl` fallback is now implemented (2026-09-27 —
-  `payment_intents` + `POST /api/payments/reconcile`), so a silent push no
+- **Paynow status-update delivery** — across seven test transactions (eight
+  initiations: six on 2026-09-26, two on 2026-09-27) Paynow recorded every
+  payment as Paid/Cancelled/Created and never POSTed to `resulturl`, even after
+  the endpoint answered its GET probe with 200. `pollurl` did answer and
+  returned the same signed message shape, and is how the verification callbacks
+  were obtained. Before real money: ask Paynow why (the support packet is
+  drafted in ADR-011, *Information prepared for Paynow support*). The `pollurl`
+  fallback is implemented **and proven live** (2026-09-27 — `payment_intents` +
+  `POST /api/payments/reconcile` moved a genuinely completed hosted payment to
+  `PAID` on production with exactly one audit event), so a silent push no
   longer strands a transaction; the push itself remains the primary signal and
   is still undelivered.
 - **Custom domain** — production is `https://bid-blitz-ten.vercel.app`.

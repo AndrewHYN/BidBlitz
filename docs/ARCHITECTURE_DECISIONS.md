@@ -513,9 +513,9 @@ installed.
 | Capability | Status | Evidence |
 | --- | --- | --- |
 | Hosted checkout with redirect | Documented | `initiatetransaction` + `browserurl` |
-| Server-to-server callback | **Push not observed** | `resulturl` documented as the target; across 5 Paynow test transactions (4 hosted, 2 express) **zero POSTs** reached production — see *Test-mode verification* |
+| Server-to-server callback | **Push not observed** | `resulturl` documented as the target; across seven test transactions (eight initiations through 2026-09-27) **zero POSTs** reached production — see *Test-mode verification* and *Reconciliation proof* |
 | Status by polling `pollurl` | **Verified live** | Paynow returns the same signed message shape (`reference`, `paynowreference`, `amount`, `status`, `pollurl`, `hash`); our verifier accepted Paynow's real hash |
-| Server-side reconciliation | **Built 2026-09-27** | `payment_intents` persists `pollurl` at initiation; `POST /api/payments/reconcile` re-authenticates the poll reply and re-checks reference/amount/currency against Postgres before passing it to the same ledger. Covered by unit + route tests: valid `Paid`, valid `Cancelled`, invalid signature, tampered field, wrong amount, wrong reference, unknown status, duplicate check, already-paid, in-flight stays pending, provider unreachable, no session stored, non-Paynow address, wrong currency, and a browser-supplied `status` being ignored |
+| Server-side reconciliation | **Proven live 2026-09-27** | `payment_intents` persists `pollurl` at initiation; `POST /api/payments/reconcile` re-authenticates the poll reply and re-checks reference/amount/currency against Postgres before passing it to the same ledger. Unit + route tests cover valid `Paid`, valid `Cancelled`, invalid signature, tampered field, wrong amount, wrong reference, unknown status, duplicate check, already-paid, in-flight stays pending, provider unreachable, no session stored, non-Paynow address, wrong currency, and a browser-supplied `status` being ignored. **Live proof (production, 2026-09-27):** a completed hosted payment moved `AWAITING_PAYMENT → PAID` through this route with exactly one audit event (`source: pollurl`); a hostile body (`status: Failed`, `amount: 0.01`) and a duplicate check wrote nothing — see *Reconciliation proof* below |
 | Signature verification | **Verified in tests** | both official hash vectors asserted in `paynow.test.ts` |
 | Amount + currency verification | **Verified in DB** | harness: wrong amount, wrong currency rejected, nothing written |
 | Unknown transaction rejected | **Verified in DB** | harness: `transaction_not_found` |
@@ -590,6 +590,58 @@ Two behaviours worth naming explicitly:
   gained a stateless GET probe, then 200) and **never POSTed a status update**
   for any of the five test transactions. `pollurl` did answer, and polling it is
   how the genuine `Paid` and `Cancelled` messages above were obtained.
+
+### Reconciliation proof — 2026-09-27
+
+A second production run closed the loop the 2026-09-26 run left open: the
+fallback built that same day was exercised against a genuinely completed hosted
+payment, end to end, on `https://bid-blitz-ten.vercel.app`.
+
+| Proof-list check | Result | Evidence |
+| --- | --- | --- |
+| End-to-end hosted payment → `PAID` | Pass | transaction `9eed5892-8da5-4303-b707-8b71f4a87b18`: `AWAITING_PAYMENT` at the hosted page, still `AWAITING_PAYMENT` after the browser returned (redirect alone did not settle, zero `resulturl` POSTs), then `POST /api/payments/reconcile` fetched Paynow's signed `pollurl` message and the ledger wrote `PAID` — `provider=paynow`, `provider_reference=63046856`, amount `1000` minor `USD` |
+| Exactly one audit event | Pass | single `payment_events` row `paynow:9eed5892-…:63046856:paid`, `source: pollurl`, received `2026-09-27T10:12:24Z`, payload carries Paynow's genuine SHA-512 `hash` |
+| Duplicate reconcile is a no-op | Pass | second check on the `PAID` row answered `already_final` without contacting Paynow; `eventCount` stayed `1` |
+| Browser cannot fake the outcome | Pass | hostile reconcile body `{status:"Failed", amount:"0.01"}` ignored — the row stayed `PAID`, `reconciled:false` |
+| Second checkout refused | Pass | `409 not_awaiting_payment` |
+| `Created` never settles | Pass | second initiation (transaction `600e4ac8-…`, `paynowreference=63048942`) abandoned at Paynow's merchant-login gate; `pollurl` answered a signed `Created` message → one `:created` audit event, status stayed `AWAITING_PAYMENT` |
+| `resulturl` push | **Still not observed** | two further initiations on 2026-09-27 (one completed, one abandoned) — Paynow GET-probed nothing new and POSTed nothing; the transition arrived only via `pollurl` |
+
+The PAID transition above was therefore delivered **solely** by server-side
+reconciliation of Paynow's signed `pollurl` message. The `pollurl` fallback is a
+proven mitigation, not a fix: `resulturl` remains the primary signal and remains
+undelivered — do not describe the push as working until a genuine Paynow POST
+reaches `/api/payments/webhook`.
+
+Cancelled → FAILED was proven on 2026-09-26 (express test number `0773333333`,
+table above). A repeat attempt through the hosted flow on 2026-09-27 could not
+reach a cancel control: the hosted page gates every action behind the merchant
+login screen, which stops automation by design.
+
+### Information prepared for Paynow support (2026-09-27 — not yet sent)
+
+- **Integration ID:** `27042` (test mode; the integration key is a secret and
+  is never included in any message, ticket or repository).
+- **Production result URL:** `https://bid-blitz-ten.vercel.app/api/payments/webhook`
+  — answers `200` to the GET reachability probe (observed: Paynow GETs it at
+  initiation) and is ready to accept signed POSTs.
+- **Test initiations:** eight in total across seven test transactions —
+  2026-09-26: six initiations (four hosted, two express); 2026-09-27: two
+  hosted (one completed at ~10:11 UTC, one abandoned at the merchant-login
+  gate at ~10:30 UTC).
+- **What Paynow accepted:** at least one payment completed in test mode and was
+  recorded as Paid on Paynow's side; its signed status message was fetched from
+  `pollurl` and verified by this integration (hash accepted on first check).
+- **What was not delivered:** for every one of those initiations, Paynow
+  recorded the final status (Paid/Cancelled) and **never POSTed a status update
+  to `resulturl`**, even after the endpoint began answering the GET probe with
+  `200`. `pollurl` answered every signed request.
+- **The ask:** why status updates are not being delivered to this integration's
+  `resulturl`, and what (if anything) must change for POST delivery to work —
+  required before requesting "Set Live".
+
+No response from Paynow has been received; nothing above is paraphrased from
+one.
 
 ### The manual step still required
 

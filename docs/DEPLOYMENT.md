@@ -319,10 +319,12 @@ most to gain from inventing one.
    provider configured (503 only if misconfigured), 8 answers `401
    unauthenticated` without a session, and the pay button appears only on a
    transaction the signed-in buyer owns and is still awaiting payment.
-4. The test-mode proof list ran on 2026-09-26 — results are in ADR-011.
-   **Before** requesting "Set Live": establish with Paynow that status updates
-   will actually be delivered to `resulturl` (none arrived in test mode), or
-   implement `pollurl` polling first, then re-run the list.
+4. The test-mode proof list ran on 2026-09-26 and the reconciliation proof ran
+   on 2026-09-27 — results are in ADR-011. **Before** requesting "Set Live":
+   establish with Paynow that status updates will actually be delivered to
+   `resulturl` (none arrived across eight initiations; the `pollurl`
+   reconciliation fallback is implemented and proven live as the mitigation),
+   then re-run the list.
 5. Do not add a shared-secret env var alongside the signature scheme — a
    secret with no verifier is theater.
 
