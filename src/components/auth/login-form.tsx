@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { Gavel } from "lucide-react";
 import { signInAction } from "@/server/actions/auth";
 import { Button } from "@/components/ui/button";
@@ -27,15 +27,24 @@ export function LoginForm({
   initialError?: string;
 }) {
   const [error, setError] = useState<string | null>(initialError ?? null);
-  const [pending, startTransition] = useTransition();
+  // See signup-form.tsx: `isPending` from `useTransition` is not synchronous,
+  // so it cannot be what disables the button. `submitting` + `busyRef` make a
+  // double-click a single sign-in request — repeated duplicate submissions are
+  // exactly what turns an ordinary sign-in into a self-inflicted rate limit.
+  const [, startTransition] = useTransition();
+  const [submitting, setSubmitting] = useState(false);
+  const busyRef = useRef(false);
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = event.currentTarget;
-    const data = new FormData(form);
+    if (busyRef.current) return; // duplicate submit while the first is in flight
+
+    const data = new FormData(event.currentTarget);
     const email = String(data.get("email") ?? "");
     const password = String(data.get("password") ?? "");
 
+    busyRef.current = true;
+    setSubmitting(true);
     setError(null);
     startTransition(async () => {
       try {
@@ -44,6 +53,9 @@ export function LoginForm({
       } catch (err) {
         if (isNextRedirect(err)) throw err; // signed in — let the router navigate
         setError("Sign in failed. Please try again.");
+      } finally {
+        busyRef.current = false;
+        setSubmitting(false);
       }
     });
   }
@@ -101,8 +113,14 @@ export function LoginForm({
         />
       </div>
 
-      <Button type="submit" className="w-full" disabled={pending} data-testid="sign-in-button">
-        {pending ? "Signing in…" : "Sign in"}
+      <Button
+        type="submit"
+        className="w-full"
+        disabled={submitting}
+        aria-busy={submitting}
+        data-testid="sign-in-button"
+      >
+        {submitting ? "Signing in…" : "Sign in"}
       </Button>
 
       <p className="text-center text-sm text-muted-foreground">

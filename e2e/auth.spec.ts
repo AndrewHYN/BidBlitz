@@ -14,6 +14,28 @@ test.describe("authentication", () => {
     await expect(page).toHaveURL(/\/login/, { timeout: 5_000 });
   });
 
+  test("a double-click on sign-in sends exactly one request", async ({ page }) => {
+    await page.goto("/login");
+    await expect(page.getByTestId("login-form")).toBeVisible({ timeout: 30_000 });
+
+    let loginPosts = 0;
+    page.on("request", (request) => {
+      if (request.method() === "POST" && new URL(request.url()).pathname === "/login") {
+        loginPosts += 1;
+      }
+    });
+
+    await page.getByTestId("email-field").fill(ACCOUNTS.seller.email);
+    await page.getByTestId("password-field").fill("DefinitelyWrong!2026");
+    await page.getByTestId("sign-in-button").dblclick();
+
+    // One failure, one request: the button disables synchronously and the
+    // submit handler carries its own guard, so the second click is dropped
+    // instead of spending a second unit of the auth failure budget.
+    await expect(page.getByTestId("auth-error")).toBeVisible({ timeout: 45_000 });
+    expect(loginPosts, "the sign-in form submitted exactly once").toBe(1);
+  });
+
   test("signing out from settings returns to a signed-out state", async ({ page }) => {
     test.setTimeout(240_000);
 
@@ -80,7 +102,17 @@ test.describe("authentication", () => {
       .or(page.locator('input[type="password"]'))
       .first()
       .fill(TEST_PASSWORD);
-    await page.getByTestId("sign-up-button").click();
+
+    // One click must mean one request. The button is double-clicked on purpose:
+    // duplicate sign-ups are the cheapest possible way to burn GoTrue's
+    // confirmation-email quota and then blame the site for "too many attempts".
+    let signupPosts = 0;
+    page.on("request", (request) => {
+      if (request.method() === "POST" && new URL(request.url()).pathname === "/signup") {
+        signupPosts += 1;
+      }
+    });
+    await page.getByTestId("sign-up-button").dblclick();
 
     // Wait for one of exactly two honest outcomes: the check-email panel, or
     // an error surfaced on the form. Never a dashboard — auto-confirm is off.
@@ -91,16 +123,20 @@ test.describe("authentication", () => {
         .first()
     ).toBeVisible({ timeout: 60_000 });
 
+    expect(signupPosts, "the sign-up form submitted exactly once").toBe(1);
+
     const authError = page.getByTestId("auth-error");
     if (await authError.isVisible()) {
       const detail = (await authError.innerText()).trim();
-      // Supabase Auth rate-limits confirmation emails
-      // (over_email_send_rate_limit -> our "Too many attempts" copy). That is
-      // a provider quota state, not a defect in this flow, so record it as an
-      // explicit skip instead of a false red. Any other rejection fails with
-      // the real message so it cannot hide.
-      if (/too many attempts/i.test(detail)) {
-        test.skip(true, `provider email quota exhausted: ${detail}`);
+      // Two throttles are legitimate outcomes here, and they are deliberately
+      // worded differently now: Supabase Auth rate-limits confirmation emails
+      // (over_email_send_rate_limit / 429 -> our provider-throttle copy), and
+      // BidBlitz's own 5-per-minute failure budget ("... from this device").
+      // Neither is a defect in this flow, so both are an explicit skip rather
+      // than a false red. Any other rejection fails with the real message so
+      // it cannot hide.
+      if (/too many attempts|rate-limiting requests/i.test(detail)) {
+        test.skip(true, `auth throttled: ${detail}`);
       }
       throw new Error(`signup was rejected: ${detail}`);
     }

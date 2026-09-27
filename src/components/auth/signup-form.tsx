@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { MailCheck } from "lucide-react";
 import { signUpAction } from "@/server/actions/auth";
 import { Button } from "@/components/ui/button";
@@ -21,12 +21,24 @@ function isNextRedirect(err: unknown): boolean {
 
 export function SignupForm() {
   const [error, setError] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
+  // `isPending` from `useTransition` deliberately does NOT gate the button: a
+  // transition update is not flushed synchronously, so a fast double-click can
+  // land a second submit before the first re-render disables the control. Two
+  // parallel sign-ups waste provider quota, can create a duplicate profile
+  // race, and are the easiest way to manufacture our own "too many attempts".
+  // `submitting` is an ordinary state update — flushed before the browser
+  // processes the next discrete event — and `busyRef` closes the same-tick
+  // window outright. One click, one request.
+  const [, startTransition] = useTransition();
+  const [submitting, setSubmitting] = useState(false);
+  const busyRef = useRef(false);
   // Set only when the account was created AND email confirmation is pending.
   const [sentTo, setSentTo] = useState<string | null>(null);
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (busyRef.current) return; // duplicate submit while the first is in flight
+
     const data = new FormData(event.currentTarget);
     const displayName = String(data.get("name") ?? "").trim();
     const email = String(data.get("email") ?? "").trim();
@@ -41,6 +53,8 @@ export function SignupForm() {
       return;
     }
 
+    busyRef.current = true;
+    setSubmitting(true);
     setError(null);
     startTransition(async () => {
       try {
@@ -55,6 +69,9 @@ export function SignupForm() {
       } catch (err) {
         if (isNextRedirect(err)) throw err; // session created + confirmed: navigate
         setError("Account creation failed. Please try again.");
+      } finally {
+        busyRef.current = false;
+        setSubmitting(false);
       }
     });
   }
@@ -153,8 +170,14 @@ export function SignupForm() {
         </p>
       </div>
 
-      <Button type="submit" className="w-full" disabled={pending} data-testid="sign-up-button">
-        {pending ? "Creating account…" : "Create account"}
+      <Button
+        type="submit"
+        className="w-full"
+        disabled={submitting}
+        aria-busy={submitting}
+        data-testid="sign-up-button"
+      >
+        {submitting ? "Creating account…" : "Create account"}
       </Button>
 
       <p className="text-center text-sm text-muted-foreground">
