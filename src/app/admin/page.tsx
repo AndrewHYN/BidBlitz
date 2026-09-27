@@ -1,21 +1,24 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Flag, ReceiptText, ShieldAlert } from "lucide-react";
+import { Banknote, Flag, ReceiptText, ShieldAlert } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import {
   EmptyState,
   PageHeader,
   SectionHeading,
 } from "@/components/auction/page-header";
-import { badgeVariants } from "@/components/auction/status-badge";
+import { badgeVariants, SellerPayoutBadge, TransactionBadge } from "@/components/auction/status-badge";
 import { Money } from "@/components/auction/money";
+import { feePercentLabel } from "@/lib/money";
 import { ReportStatusControls } from "@/components/dashboard/report-status-controls";
+import { PayoutControls } from "@/components/dashboard/payout-controls";
+import { getAdminPayouts, type AdminPayoutRow } from "@/server/queries";
 import { isPaymentProviderConfigured } from "@/server/payments/config";
 
 export const metadata: Metadata = {
   title: "Admin",
-  description: "Open reports and platform fee settings on BidBlitz.",
+  description: "Payout operations, open reports and platform fee settings on BidBlitz.",
   robots: { index: false, follow: false },
 };
 
@@ -54,6 +57,104 @@ const STATUS_LABELS: Record<ReportRow["status"], string> = {
   RESOLVED: "Resolved",
   DISMISSED: "Dismissed",
 };
+
+function PayoutField({
+  label,
+  children,
+  emphasis = false,
+}: {
+  label: string;
+  children: React.ReactNode;
+  emphasis?: boolean;
+}) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</dt>
+      <dd
+        className={
+          emphasis
+            ? "text-sm font-semibold text-foreground"
+            : "text-sm font-medium text-foreground"
+        }
+      >
+        {children}
+      </dd>
+    </div>
+  );
+}
+
+/**
+ * One payout, read-only above the controls: the numbers come straight from
+ * the frozen row, so what an operator acts on is what the database will pay.
+ */
+function PayoutRow({ row }: { row: AdminPayoutRow }) {
+  const delivery = row.deliveryConfirmedAt
+    ? `Confirmed ${formatDate(row.deliveryConfirmedAt)}`
+    : "Not confirmed";
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <Link
+          href={`/auction/${row.auctionId}`}
+          className="font-medium hover:text-primary hover:underline"
+        >
+          {row.auctionTitle}
+        </Link>
+        <span className="text-xs text-muted-foreground">
+          recorded {formatDate(row.recordedAt)}
+        </span>
+      </div>
+
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3 lg:grid-cols-4">
+        <PayoutField label="Seller">{row.sellerName}</PayoutField>
+        <PayoutField label="Buyer">{row.buyerName}</PayoutField>
+        <PayoutField label="Winning price">
+          <Money minor={row.grossMinor} currency={row.currency} />
+        </PayoutField>
+        <PayoutField label={`BidBlitz fee (${feePercentLabel(row.feeBps)})`}>
+          <Money minor={row.feeMinor} currency={row.currency} />
+        </PayoutField>
+        <PayoutField label="Seller proceeds" emphasis>
+          <Money minor={row.amountMinor} currency={row.currency} />
+        </PayoutField>
+        <PayoutField label="Payment status">
+          <TransactionBadge status={row.transactionStatus} />
+        </PayoutField>
+        <PayoutField label="Payout status">
+          <SellerPayoutBadge status={row.status} />
+        </PayoutField>
+        <PayoutField label="Delivery">{delivery}</PayoutField>
+        <PayoutField label="Payout record opened">{formatDate(row.payoutCreatedAt)}</PayoutField>
+        <PayoutField label="Payout reference">
+          {row.payoutReference ?? <span className="text-muted-foreground">Not recorded</span>}
+        </PayoutField>
+        <PayoutField label="Paid out">
+          {row.paidAt ? (
+            formatDate(row.paidAt)
+          ) : (
+            <span className="text-muted-foreground">Not paid out</span>
+          )}
+        </PayoutField>
+        <PayoutField label="Last updated">{formatDate(row.payoutUpdatedAt)}</PayoutField>
+      </dl>
+
+      {row.internalNote && (
+        <p className="rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+          <span className="font-medium text-foreground">Internal note:</span>{" "}
+          {row.internalNote}
+        </p>
+      )}
+
+      <PayoutControls
+        payoutId={row.payoutId}
+        status={row.status}
+        amountMinor={row.amountMinor}
+        currency={row.currency}
+      />
+    </div>
+  );
+}
 
 export default async function AdminPage() {
   const supabase = await createClient();
@@ -97,9 +198,10 @@ export default async function AdminPage() {
     );
   }
 
-  // No shared query helper exists for moderation data, so these two reads are
-  // caller-scoped here (RLS: reports are admin-visible, fee_settings is public).
-  const [reportsRes, feeRes] = await Promise.all([
+  // No shared query helper exists for moderation data, so these reads are
+  // caller-scoped here (RLS: reports are admin-visible, fee_settings is
+  // public, seller_payouts is admin-only).
+  const [reportsRes, feeRes, payouts] = await Promise.all([
     supabase
       .from("reports")
       .select(
@@ -112,6 +214,7 @@ export default async function AdminPage() {
       .from("fee_settings")
       .select("id, fee_bps, min_fee_minor, currency, updated_at")
       .maybeSingle(),
+    getAdminPayouts(),
   ]);
 
   const reports = (reportsRes.data ?? []) as ReportRow[];
@@ -122,8 +225,53 @@ export default async function AdminPage() {
     <div className="page-container py-10 sm:py-14 space-y-8" data-testid="admin-page">
       <PageHeader
         title="Admin"
-        description="Open moderation reports and the platform fee currently in force."
+        description="Payout operations, open moderation reports and the platform fee currently in force."
       />
+
+      <section aria-labelledby="admin-payouts-heading" className="space-y-4">
+        <SectionHeading
+          title={
+            <span id="admin-payouts-heading" className="inline-flex items-center gap-2">
+              <Banknote className="size-4 text-muted-foreground" aria-hidden />
+              Payout operations
+            </span>
+          }
+        />
+
+        <div className="space-y-3 rounded-xl border bg-card p-4 text-sm leading-relaxed shadow-sm sm:p-5">
+          <p className="text-xs text-muted-foreground">
+            A payout record appears here the moment Paynow confirms a buyer&apos;s
+            payment. It freezes the seller&apos;s proceeds and then follows its own
+            workflow — it is <strong className="text-foreground">not</strong> the payment
+            status. Nothing on this page sends money: <em>Record seller payout</em> means
+            the transfer has already been made outside BidBlitz and you are recording its
+            reference.
+          </p>
+
+          <div data-testid="admin-payouts">
+            {payouts.length === 0 ? (
+              <EmptyState
+                compact
+                icon={Banknote}
+                title="No payouts yet"
+                description="A row appears once a buyer's payment has been confirmed by Paynow."
+              />
+            ) : (
+              <ul className="space-y-4">
+                {payouts.map((row) => (
+                  <li
+                    key={row.payoutId}
+                    data-testid="admin-payout-row"
+                    className="space-y-4 rounded-xl border bg-background p-4 shadow-sm"
+                  >
+                    <PayoutRow row={row} />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      </section>
 
       <section aria-labelledby="admin-reports-heading" className="space-y-4">
         <SectionHeading

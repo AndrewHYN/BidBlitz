@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Tag } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { getSelling, getTransactions } from "@/server/queries";
+import { getMySellerPayouts, getSelling, getTransactions } from "@/server/queries";
 import { AuctionCard } from "@/components/auction/auction-card";
 import { EmptyState, PageHeader } from "@/components/auction/page-header";
 import { Button } from "@/components/ui/button";
@@ -24,14 +24,18 @@ export default async function SellingPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login?next=/dashboard/selling");
 
-  const [items, transactions] = await Promise.all([
+  const [items, transactions, payouts] = await Promise.all([
     getSelling(user.id),
     getTransactions(user.id),
+    getMySellerPayouts(),
   ]);
 
   // `fee_bps` lives on the transaction row (getSelling projects only amounts),
   // so join it here rather than recomputing a fee the engine already recorded.
   const feeBpsById = new Map(transactions.map((row) => [row.id, row.fee_bps]));
+  // The payout is a SEPARATE record from the sale: "Paid" says Paynow collected
+  // from the buyer, the payout says whether this seller has been paid yet.
+  const payoutByTx = new Map(payouts.map((p) => [p.transaction_id, p]));
 
   // eslint-disable-next-line react-hooks/purity -- server component: one render per request
   const now = Date.now();
@@ -109,6 +113,7 @@ export default async function SellingPage() {
                             currency: tx.currency,
                           }}
                           feeBps={feeBpsById.get(tx.id) ?? null}
+                          payout={payoutByTx.get(tx.id) ?? null}
                         />
                       )}
 

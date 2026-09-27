@@ -123,6 +123,51 @@ export function TransactionBadge({
   );
 }
 
+/**
+ * The SELLER's money, not the buyer's payment.
+ *
+ * Kept on a different component from `TransactionBadge` so nobody can reuse
+ * one for the other: `PAID` says Paynow collected from the buyer, this says
+ * what the platform still owes (or has recorded paying out to) the seller.
+ */
+const SELLER_PAYOUT_LABELS: Record<string, string> = {
+  WAITING_FOR_FULFILMENT: "Waiting for fulfilment",
+  DELIVERY_CONFIRMED: "Delivery confirmed",
+  PAYOUT_PENDING: "Payout pending",
+  PAYOUT_DUE: "Payout due",
+  PAID_OUT: "Paid out",
+  HELD: "On hold",
+  DISPUTED: "Disputed",
+};
+
+export function SellerPayoutBadge({
+  status,
+  className,
+}: {
+  status: string;
+  className?: string;
+}) {
+  const tone: BadgeTone =
+    status === "PAID_OUT"
+      ? "sold"
+      : status === "DISPUTED" || status === "HELD"
+        ? "cancelled"
+        : status === "PAYOUT_DUE"
+          ? "ending"
+          : status === "DELIVERY_CONFIRMED"
+            ? "live"
+            : "neutral";
+
+  return (
+    <span
+      data-payout-status={status}
+      className={cn(badgeVariants({ tone }), className)}
+    >
+      {SELLER_PAYOUT_LABELS[status] ?? status}
+    </span>
+  );
+}
+
 export function ConditionBadge({ condition, className }: { condition: string; className?: string }) {
   return (
     <span className={cn(badgeVariants({ tone: "neutral" }), className)}>

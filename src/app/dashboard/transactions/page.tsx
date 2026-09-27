@@ -3,11 +3,11 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Check, ReceiptText } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { getTransactions } from "@/server/queries";
+import { getMySellerPayouts, getTransactions } from "@/server/queries";
 import { EmptyState, PageHeader } from "@/components/auction/page-header";
 import { Money } from "@/components/auction/money";
 import { feePercentLabel } from "@/lib/money";
-import { TransactionBadge } from "@/components/auction/status-badge";
+import { SellerPayoutBadge, TransactionBadge } from "@/components/auction/status-badge";
 import { ReviewDialog } from "@/components/dashboard/review-dialog";
 import { Button } from "@/components/ui/button";
 import {
@@ -45,14 +45,21 @@ export default async function TransactionsPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login?next=/dashboard/transactions");
 
-  const rows = await getTransactions(user.id);
+  const [rows, payouts] = await Promise.all([
+    getTransactions(user.id),
+    getMySellerPayouts(),
+  ]);
   const configured = isPaymentProviderConfigured();
+  // Payment status and payout status are two different records on purpose:
+  // "Paid" is Paynow's word about the buyer, the payout is our word about the
+  // seller. Collapsing them is how a marketplace talks itself into a lie.
+  const payoutByTx = new Map(payouts.map((p) => [p.transaction_id, p]));
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Transactions"
-        description="Every settled sale you were part of, with the exact fee breakdown."
+        description="Every sale you were part of: the winning price, the BidBlitz fee, what the seller receives, and where the payment stands."
       />
 
       <div>
@@ -76,13 +83,15 @@ export default async function TransactionsPage() {
                 <TableHead>Winning price</TableHead>
                 <TableHead>Fee</TableHead>
                 <TableHead>Proceeds</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead>Payment status</TableHead>
                 <TableHead>Recorded</TableHead>
                 <TableHead>Review</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {rows.map((row) => (
+              {rows.map((row) => {
+                const payout = payoutByTx.get(row.id);
+                return (
                 <TableRow key={row.id} data-testid="transaction-row">
                   <TableCell className="max-w-[16rem] truncate whitespace-normal">
                     <Link
@@ -106,6 +115,18 @@ export default async function TransactionsPage() {
                   </TableCell>
                   <TableCell className="font-medium" data-numeric>
                     <Money minor={row.net_minor} currency={row.currency} />
+                    {/* The payout is a separate record from the payment, and it
+                        is what actually answers "have I been paid?". Showing it
+                        only for the selling side avoids implying a buyer has a
+                        payout at all. */}
+                    {row.seller_id === user.id && payout && (
+                      <span
+                        className="mt-1 block"
+                        data-testid="transaction-payout-status"
+                      >
+                        <SellerPayoutBadge status={payout.status} />
+                      </span>
+                    )}
                   </TableCell>
                   <TableCell data-testid="transaction-status">
                     <div className="flex flex-wrap items-center gap-2">
@@ -147,7 +168,8 @@ export default async function TransactionsPage() {
                     )}
                   </TableCell>
                 </TableRow>
-              ))}
+                );
+              })}
             </TableBody>
           </Table>
         )}
@@ -157,6 +179,16 @@ export default async function TransactionsPage() {
         <p className="text-xs text-muted-foreground">
           No payment provider is configured yet, so no money has moved. These rows record what is
           owed, not what has been paid.
+        </p>
+      )}
+
+      {configured && rows.length > 0 && (
+        <p className="text-xs text-muted-foreground">
+          <strong className="text-foreground">Payment status</strong> is the
+          buyer&apos;s payment, as Paynow reports it. <strong className="text-foreground">Payout status</strong>{" "}
+          is the seller&apos;s proceeds, tracked separately: it appears only on
+          sales you sold, and reaching &ldquo;Paid out&rdquo; means an
+          administrator has recorded a payment made outside BidBlitz.
         </p>
       )}
     </div>

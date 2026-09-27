@@ -22,6 +22,15 @@ export type AuctionStatus =
 export type TransactionStatus =
   | "AWAITING_PAYMENT" | "PAID" | "SETTLED" | "REFUNDED" | "FAILED";
 
+/**
+ * The seller fulfilment / payout operation. Deliberately NOT part of
+ * `TransactionStatus`: PAID only ever means "Paynow confirmed the buyer's
+ * payment", never "the seller has been paid".
+ */
+export type SellerPayoutStatus =
+  | "WAITING_FOR_FULFILMENT" | "DELIVERY_CONFIRMED" | "PAYOUT_PENDING"
+  | "PAYOUT_DUE" | "PAID_OUT" | "HELD" | "DISPUTED";
+
 export type NotificationType =
   | "AUCTION_PUBLISHED" | "NEW_BID" | "OUTBID" | "ENDING_SOON"
   | "WON" | "SOLD" | "ENDED_UNSOLD" | "REVIEW_REQUEST";
@@ -167,6 +176,41 @@ export interface Database {
         Insert: { id?: string; reporter_id: string; target_type: "auction" | "user"; target_id: string; reason: string };
         Update: { status?: string; resolution?: string | null };
       };
+      seller_payouts: {
+        Row: {
+          id: string;
+          transaction_id: string;
+          seller_id: string;
+          amount_minor: number;
+          currency: string;
+          status: SellerPayoutStatus;
+          payout_reference: string | null;
+          paid_at: string | null;
+          delivery_confirmed_at: string | null;
+          internal_note: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        // No client write path exists: INSERT/UPDATE/DELETE are revoked from
+        // anon and authenticated, and RLS grants SELECT to admins only. The
+        // sole writer is admin_transition_seller_payout().
+        Insert: never;
+        Update: never;
+      };
+      seller_payout_events: {
+        Row: {
+          id: string;
+          payout_id: string;
+          from_status: SellerPayoutStatus | null;
+          to_status: SellerPayoutStatus;
+          payout_reference: string | null;
+          note: string | null;
+          actor_id: string | null;
+          created_at: string;
+        };
+        Insert: never;
+        Update: never;
+      };
       schema_migrations: {
         Row: { filename: string; applied_at: string };
         Insert: { filename: string; applied_at?: string };
@@ -185,6 +229,27 @@ export interface Database {
       cancel_auction: { Args: { p_auction_id: string }; Returns: Json };
       settle_auction: { Args: { p_auction_id: string }; Returns: Json };
       settle_due_auctions: { Args: { p_limit?: number }; Returns: number };
+      admin_transition_seller_payout: {
+        Args: {
+          p_payout_id: string;
+          p_to_status: SellerPayoutStatus;
+          p_payout_reference?: string | null;
+          p_internal_note?: string | null;
+        };
+        Returns: Json;
+      };
+      my_seller_payouts: {
+        Args: Record<string, never>;
+        Returns: {
+          transaction_id: string;
+          status: SellerPayoutStatus;
+          amount_minor: number;
+          currency: string;
+          delivery_confirmed_at: string | null;
+          paid_at: string | null;
+          updated_at: string;
+        }[];
+      };
       server_now: { Args: Record<string, never>; Returns: string };
       // is_admin intentionally absent: the function lives in the `private`
       // schema (migration 000010) and has no PostgREST route. Admin UI reads

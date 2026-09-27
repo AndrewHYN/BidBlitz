@@ -144,6 +144,19 @@ export default async function BuyingPage() {
                         been charged.
                       </p>
                     )}
+                    {configured && tx.status === "AWAITING_PAYMENT" && (
+                      <p className="text-xs text-muted-foreground">
+                        Not paid yet. Your total is your winning bid plus
+                        Paynow&apos;s payment charge, which Paynow shows you
+                        before you confirm.
+                      </p>
+                    )}
+                    {configured && tx.status === "PAID" && (
+                      <p className="text-xs text-muted-foreground">
+                        Paynow has confirmed your payment. That is separate from
+                        when the seller is paid.
+                      </p>
+                    )}
                   </div>
                 )}
               </li>

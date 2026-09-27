@@ -3,7 +3,7 @@ import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sweepDueAuctions } from "@/server/sweep";
-import type { Database } from "@/lib/supabase/types";
+import type { Database, SellerPayoutStatus, TransactionStatus } from "@/lib/supabase/types";
 
 /**
  * Read model. Server Components call these so the first paint already has
@@ -539,4 +539,158 @@ export const getProfileByUsername = cache(async (username: string) => {
   };
 });
 
+// ---------------------------------------------------------------------------
+// Seller - own payout status
+// ---------------------------------------------------------------------------
+
+export type SellerPayoutView = {
+  transaction_id: string;
+  status: SellerPayoutStatus;
+  amount_minor: number;
+  currency: string;
+  delivery_confirmed_at: string | null;
+  paid_at: string | null;
+  updated_at: string;
+};
+
+/**
+ * The caller's own seller payouts, and nothing else.
+ *
+ * This goes through the `my_seller_payouts()` function rather than a table
+ * select on purpose: the table has no seller-facing RLS policy precisely so a
+ * seller can never read another payout, an internal note, or the payout
+ * reference of their own record through a direct PostgREST call.
+ */
+export const getMySellerPayouts = cache(async (): Promise<SellerPayoutView[]> => {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("my_seller_payouts");
+  if (error || !Array.isArray(data)) return [];
+  return data as unknown as SellerPayoutView[];
+});
+
 export { toCard };
+
+// ---------------------------------------------------------------------------
+// Admin - payout operations
+// ---------------------------------------------------------------------------
+
+export type AdminPayoutRow = {
+  payoutId: string;
+  status: SellerPayoutStatus;
+  amountMinor: number;
+  currency: string;
+  payoutReference: string | null;
+  paidAt: string | null;
+  deliveryConfirmedAt: string | null;
+  internalNote: string | null;
+  payoutCreatedAt: string;
+  payoutUpdatedAt: string;
+  transactionId: string;
+  transactionStatus: TransactionStatus;
+  grossMinor: number;
+  feeBps: number;
+  feeMinor: number;
+  netMinor: number;
+  recordedAt: string;
+  auctionId: string;
+  auctionTitle: string;
+  sellerId: string;
+  sellerName: string;
+  buyerId: string;
+  buyerName: string;
+};
+
+/**
+ * The payout queue, for administrators only.
+ *
+ * Runs on the caller's session, so RLS decides who sees anything: transactions
+ * are readable by their parties plus admins, `seller_payouts` has an
+ * admin-only SELECT policy, and there is no write path here at all. Auction
+ * and profile names are read separately rather than nested, because the
+ * answer is a flat row for a table and a second round trip keeps the shape
+ * obvious.
+ */
+export const getAdminPayouts = cache(async (): Promise<AdminPayoutRow[]> => {
+  const supabase = await createClient();
+
+  const { data: payouts, error } = await supabase
+    .from("seller_payouts")
+    .select(
+      `id, transaction_id, seller_id, amount_minor, currency, status,
+       payout_reference, paid_at, delivery_confirmed_at, internal_note,
+       created_at, updated_at,
+       transactions:transaction_id(id, auction_id, buyer_id, gross_minor,
+         fee_bps, fee_minor, net_minor, currency, status, created_at)`
+    )
+    .order("created_at", { ascending: false })
+    .limit(100);
+
+  if (error || !payouts?.length) return [];
+
+  type PayoutWithTx = (typeof payouts)[number];
+  const tx = (p: PayoutWithTx) =>
+    p.transactions as unknown as {
+      id: string;
+      auction_id: string;
+      buyer_id: string;
+      gross_minor: number;
+      fee_bps: number;
+      fee_minor: number;
+      net_minor: number;
+      currency: string;
+      status: TransactionStatus;
+      created_at: string;
+    };
+
+  const auctionIds = [...new Set(payouts.map((p) => tx(p).auction_id))];
+  const profileIds = [
+    ...new Set(payouts.flatMap((p) => [p.seller_id, tx(p).buyer_id])),
+  ];
+
+  const [auctionsRes, profilesRes] = await Promise.all([
+    supabase.from("auctions").select("id, title").in("id", auctionIds),
+    supabase
+      .from("profiles")
+      .select("id, username, display_name")
+      .in("id", profileIds),
+  ]);
+
+  const titleById = new Map(
+    (auctionsRes.data ?? []).map((a) => [a.id as string, a.title as string])
+  );
+  const nameById = new Map(
+    (profilesRes.data ?? []).map((p) => [
+      p.id as string,
+      (p.display_name as string) || (p.username as string),
+    ])
+  );
+
+  return payouts.map((p) => {
+    const t = tx(p);
+    return {
+      payoutId: p.id,
+      status: p.status as SellerPayoutStatus,
+      amountMinor: Number(p.amount_minor),
+      currency: p.currency,
+      payoutReference: p.payout_reference,
+      paidAt: p.paid_at,
+      deliveryConfirmedAt: p.delivery_confirmed_at,
+      internalNote: p.internal_note,
+      payoutCreatedAt: p.created_at,
+      payoutUpdatedAt: p.updated_at,
+      transactionId: p.transaction_id,
+      transactionStatus: t.status,
+      grossMinor: Number(t.gross_minor),
+      feeBps: t.fee_bps,
+      feeMinor: Number(t.fee_minor),
+      netMinor: Number(t.net_minor),
+      recordedAt: t.created_at,
+      auctionId: t.auction_id,
+      auctionTitle: titleById.get(t.auction_id) ?? "Auction",
+      sellerId: p.seller_id,
+      sellerName: nameById.get(p.seller_id) ?? "Seller",
+      buyerId: t.buyer_id,
+      buyerName: nameById.get(t.buyer_id) ?? "Buyer",
+    };
+  });
+});

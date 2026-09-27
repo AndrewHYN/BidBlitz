@@ -245,6 +245,12 @@ const testIds = rows(await sql(
 if (testIds.length) {
   const list = testIds.map((i) => `'${i}'`).join(",");
   await sql(`delete from public.reviews where reviewer_id in (${list}) or reviewee_id in (${list})`);
+  // Payouts are a child of transactions (FK is RESTRICT, by design: the audit
+  // trail must not vanish with the sale). They have to go first.
+  await sql(`delete from public.seller_payout_events
+              where payout_id in (select id from public.seller_payouts
+                                   where seller_id in (${list}))`);
+  await sql(`delete from public.seller_payouts where seller_id in (${list})`);
   await sql(`delete from public.transactions where seller_id in (${list}) or buyer_id in (${list})`);
   await sql(`delete from public.bids where bidder_id in (${list})`);
   // Image rows first: explicit even if the FK cascades — a row whose object
@@ -1239,11 +1245,239 @@ check("payments: replaying a refund is idempotent (already_refunded, no extra au
     Number(refundEvents2) === 2,
   `body=${JSON.stringify(refundReplay.data)?.slice(0, 140)} events=${refundEvents2}`);
 
+// ---- 14e. seller payouts: fulfilment / payout operation ---------------------
+// Two facts are proved here that nothing else can prove, because neither has a
+// UI: (1) `PAID` only ever meant the buyer's money — the seller's proceeds are
+// a separate row with their own workflow; (2) every write path other than the
+// admin RPC is closed, and the one write path that exists cannot touch money.
+console.log("\n--- seller payouts ---");
+
+const payPayout = rows(await sql(
+  `select id, status, amount_minor, currency, payout_reference, paid_at,
+          delivery_confirmed_at
+     from public.seller_payouts where transaction_id='${payTx.id}'`))[0];
+check("payout: reaching PAID mints one payout row frozen at net_minor + currency",
+  payPayout && Number(payPayout.amount_minor) === 2375 &&
+    payPayout.currency === "USD" && payPayout.status === "WAITING_FOR_FULFILMENT" &&
+    payPayout.paid_at === null,
+  JSON.stringify(payPayout));
+
+const refundPayout = rows(await sql(
+  `select status, amount_minor from public.seller_payouts
+    where transaction_id='${refundTx.id}'`))[0];
+check("payout: refunding the sale HOLDS the payout instead of paying it out",
+  refundPayout?.status === "HELD" && Number(refundPayout?.amount_minor) === 2375,
+  JSON.stringify(refundPayout));
+
+const failedPayout = rows(await sql(
+  `select id from public.seller_payouts where transaction_id='${failTx.id}'`));
+check("payout: a FAILED transaction never gets a payout row",
+  failedPayout.length === 0, `${failedPayout.length} rows`);
+
+// --- hostile request surface ------------------------------------------------
+const payoutId = payPayout?.id ?? "00000000-0000-0000-0000-000000000000";
+
+const anonPayoutRead = await rest(`/rest/v1/seller_payouts?select=id`);
+check("security: anon cannot read seller payouts",
+  !anonPayoutRead.ok || (anonPayoutRead.data?.length ?? 0) === 0,
+  `status=${anonPayoutRead.status} n=${anonPayoutRead.data?.length}`);
+
+const anonPayoutWrite = await rest(`/rest/v1/seller_payouts`, {
+  method: "POST",
+  body: {
+    transaction_id: refundTx.id, seller_id: sellerId, amount_minor: 999999,
+    currency: "USD",
+  },
+});
+check("security: anon cannot insert a payout with a forged amount",
+  !anonPayoutWrite.ok, `status=${anonPayoutWrite.status}`);
+
+const memberPayoutRead = await rest(`/rest/v1/seller_payouts?select=id,amount_minor,internal_note`,
+  { bearer: tok.buyer1 });
+check("security: a signed-in non-admin cannot read payout rows or notes",
+  memberPayoutRead.ok && (memberPayoutRead.data?.length ?? 0) === 0,
+  `n=${memberPayoutRead.data?.length}`);
+
+const memberPayoutEdit = await rest(`/rest/v1/seller_payouts?id=eq.${payoutId}`,
+  { method: "PATCH", bearer: tok.buyer1, body: { amount_minor: 999999 } });
+check("security: a signed-in non-admin cannot change a payout amount",
+  !memberPayoutEdit.ok, `status=${memberPayoutEdit.status}`);
+
+const memberPayoutDelete = await rest(`/rest/v1/seller_payouts?id=eq.${payoutId}`,
+  { method: "DELETE", bearer: tok.buyer1 });
+check("security: a signed-in non-admin cannot delete a payout",
+  !memberPayoutDelete.ok, `status=${memberPayoutDelete.status}`);
+
+const memberPayoutState = rows(await sql(
+  `select amount_minor from public.seller_payouts where id='${payoutId}'`))[0];
+check("security: the hostile writes above changed nothing",
+  Number(memberPayoutState?.amount_minor) === 2375,
+  `amount_minor=${memberPayoutState?.amount_minor}`);
+
+const anonPayoutRpc = await rest(`/rest/v1/rpc/admin_transition_seller_payout`, {
+  method: "POST",
+  body: { p_payout_id: payoutId, p_to_status: "PAID_OUT", p_payout_reference: "x" },
+});
+check("security: anon cannot call the payout writer",
+  !anonPayoutRpc.ok, `status=${anonPayoutRpc.status}`);
+
+const memberPayoutRpc = await rest(`/rest/v1/rpc/admin_transition_seller_payout`, {
+  method: "POST", bearer: tok.buyer1,
+  body: { p_payout_id: payoutId, p_to_status: "PAID_OUT", p_payout_reference: "x" },
+});
+check("security: a non-admin cannot move a payout (payout_admin_only)",
+  !memberPayoutRpc.ok &&
+    String(memberPayoutRpc.data?.message ?? "").includes("payout_admin_only"),
+  JSON.stringify(memberPayoutRpc.data)?.slice(0, 140));
+
+const anonAuditWrite = await rest(`/rest/v1/seller_payout_events`, {
+  method: "POST",
+  body: { payout_id: payoutId, to_status: "PAID_OUT", payout_reference: "forged" },
+});
+check("security: the payout audit log has no write surface for clients",
+  !anonAuditWrite.ok, `status=${anonAuditWrite.status}`);
+
+// Money is frozen for EVERY role, the engine included — same rule as
+// transactions, enforced by the BEFORE UPDATE trigger rather than by RLS.
+let payoutMoneyErr = "";
+try {
+  await sql(`update public.seller_payouts set amount_minor = 1 where id='${payoutId}'`);
+} catch (e) {
+  payoutMoneyErr = `${e?.message ?? e}`;
+}
+check("payout: amount_minor / currency are immutable for EVERY role",
+  payoutMoneyErr.includes("payout_money_immutable"),
+  payoutMoneyErr.slice(0, 160) || "update succeeded — NOT immutable");
+
+// --- the fulfilment ladder, driven by a real admin session ------------------
+await sql(`update public.profiles set is_admin = true where id='${buyer2Id}'`);
+const asAdmin = (body) =>
+  rest(`/rest/v1/rpc/admin_transition_seller_payout`, {
+    method: "POST", bearer: tok.buyer2, body,
+  });
+
+const noRef = await asAdmin({
+  p_payout_id: payoutId, p_to_status: "PAID_OUT", p_payout_reference: null,
+});
+check("payout: PAID_OUT is refused without a payout reference",
+  !noRef.ok && String(noRef.data?.message ?? "").includes("payout_reference_required"),
+  JSON.stringify(noRef.data)?.slice(0, 140));
+
+const step1 = await asAdmin({ p_payout_id: payoutId, p_to_status: "DELIVERY_CONFIRMED" });
+const afterStep1 = rows(await sql(
+  `select status, delivery_confirmed_at, paid_at from public.seller_payouts
+    where id='${payoutId}'`))[0];
+check("payout: WAITING_FOR_FULFILMENT -> DELIVERY_CONFIRMED stamps delivery",
+  step1.ok && afterStep1?.status === "DELIVERY_CONFIRMED" &&
+    afterStep1?.delivery_confirmed_at !== null && afterStep1?.paid_at === null,
+  JSON.stringify(afterStep1));
+
+const step2 = await asAdmin({
+  p_payout_id: payoutId, p_to_status: "PAYOUT_DUE",
+  p_internal_note: "Item collected in person.",
+});
+const afterStep2 = rows(await sql(
+  `select status, internal_note from public.seller_payouts where id='${payoutId}'`))[0];
+check("payout: -> PAYOUT_DUE records the operator note",
+  step2.ok && afterStep2?.status === "PAYOUT_DUE" &&
+    String(afterStep2?.internal_note ?? "").includes("collected in person"),
+  JSON.stringify(afterStep2));
+
+const step3 = await asAdmin({
+  p_payout_id: payoutId, p_to_status: "PAID_OUT", p_payout_reference: "BANK-REF-1",
+});
+const afterStep3 = rows(await sql(
+  `select status, payout_reference, paid_at from public.seller_payouts
+    where id='${payoutId}'`))[0];
+check("payout: PAYOUT_DUE -> PAID_OUT records the reference and the moment",
+  step3.ok && afterStep3?.status === "PAID_OUT" &&
+    afterStep3?.payout_reference === "BANK-REF-1" && afterStep3?.paid_at !== null,
+  JSON.stringify(afterStep3));
+
+const revert = await asAdmin({
+  p_payout_id: payoutId, p_to_status: "DELIVERY_CONFIRMED",
+});
+check("payout: PAID_OUT is terminal — it cannot be reverted",
+  !revert.ok && String(revert.data?.message ?? "").includes("payout_paid_out_immutable"),
+  JSON.stringify(revert.data)?.slice(0, 140));
+
+const illegal = await asAdmin({
+  p_payout_id: payoutId, p_to_status: "PAYOUT_DUE",
+});
+check("payout: PAID_OUT -> anything else is refused by the transition map",
+  !illegal.ok, JSON.stringify(illegal.data)?.slice(0, 140));
+
+await sql(`update public.profiles set is_admin = false where id='${buyer2Id}'`);
+
+const refundPayoutId = rows(await sql(
+  `select id from public.seller_payouts where transaction_id='${refundTx.id}'`))[0]?.id;
+
+const postDemotion = await asAdmin({
+  p_payout_id: refundPayoutId ?? payoutId,
+  p_to_status: "PAYOUT_DUE",
+});
+check("payout: revoking admin immediately revokes the payout writer",
+  !postDemotion.ok && String(postDemotion.data?.message ?? "").includes("payout_admin_only"),
+  JSON.stringify(postDemotion.data)?.slice(0, 140));
+
+// --- audit trail ------------------------------------------------------------
+const auditRows = rows(await sql(
+  `select from_status, to_status, payout_reference, actor_id
+     from public.seller_payout_events
+    where payout_id='${payoutId}' order by created_at`));
+const auditOk = auditRows.length >= 4 &&
+  auditRows[0]?.from_status === null &&
+  auditRows[0]?.to_status === "WAITING_FOR_FULFILMENT" &&
+  auditRows.some((r) => r.from_status === "WAITING_FOR_FULFILMENT" &&
+    r.to_status === "DELIVERY_CONFIRMED") &&
+  auditRows.some((r) => r.to_status === "PAID_OUT" &&
+    r.payout_reference === "BANK-REF-1");
+check("payout: every payout state change is audited (creation -> PAID_OUT)",
+  auditOk, `${auditRows.length} events: ${JSON.stringify(auditRows).slice(0, 220)}`);
+
+const actorsAreNonSystem = auditRows.slice(1).every((r) => r.actor_id === buyer2Id);
+check("payout: transition audit rows are attributed to the acting admin",
+  actorsAreNonSystem, JSON.stringify(auditRows.slice(1).map((r) => r.actor_id)));
+
+// --- the seller's own read path --------------------------------------------
+const anonMine = await rest(`/rest/v1/rpc/my_seller_payouts`, { method: "POST", body: {} });
+check("security: anon cannot read my_seller_payouts",
+  !anonMine.ok, `status=${anonMine.status}`);
+
+const buyer1Mine = await rest(`/rest/v1/rpc/my_seller_payouts`, {
+  method: "POST", bearer: tok.buyer1, body: {},
+});
+check("payout: my_seller_payouts returns nothing for someone else's sales",
+  buyer1Mine.ok && (buyer1Mine.data?.length ?? 0) === 0,
+  `n=${buyer1Mine.data?.length}`);
+
+const sellerMine = await rest(`/rest/v1/rpc/my_seller_payouts`, {
+  method: "POST", bearer: tok.seller, body: {},
+});
+const safeFields = ["transaction_id", "status", "amount_minor", "currency",
+  "delivery_confirmed_at", "paid_at", "updated_at"];
+const sellerRows = Array.isArray(sellerMine.data) ? sellerMine.data : [];
+const leaksInternal = sellerRows.some(
+  (r) => !safeFields.every((f) => Object.hasOwn(r, f)) ||
+    Object.hasOwn(r, "internal_note") || Object.hasOwn(r, "payout_reference") ||
+    Object.hasOwn(r, "seller_id") || Object.hasOwn(r, "id"),
+);
+check("payout: my_seller_payouts exposes only the caller's own safe fields",
+  sellerMine.ok && sellerRows.length > 0 && !leaksInternal &&
+    sellerRows.every((r) => Number.isInteger(r.amount_minor)),
+  `n=${sellerRows.length} keys=${Object.keys(sellerRows[0] ?? {}).join(",")}`);
+
 // Remove every synthetic artifact: fixtures never survive into production
 // data (no fabricated payment, no fabricated notifications, no fake listing).
 await sql(`delete from public.payment_events where transaction_id='${payTx.id}'`);
 await sql(`delete from public.payment_events where transaction_id='${failTx.id}'`);
 await sql(`delete from public.payment_events where transaction_id='${refundTx.id}'`);
+await sql(`delete from public.seller_payout_events
+            where payout_id in (select id from public.seller_payouts
+                                 where transaction_id in
+                                   ('${payTx.id}','${failTx.id}','${refundTx.id}'))`);
+await sql(`delete from public.seller_payouts
+            where transaction_id in ('${payTx.id}','${failTx.id}','${refundTx.id}')`);
 await sql(`delete from public.notifications where auction_id='${soonAuction}'`);
 await sql(`delete from public.notifications where auction_id='${failFixture.auction}'`);
 await sql(`delete from public.notifications where auction_id='${refundFixture.auction}'`);
@@ -1268,6 +1502,9 @@ await sql(`delete from public.auctions where id='${refundFixture.auction}'`);
 // refuses to ship. Fixtures are removed here, and then asserted gone.
 const fixtureTxIds = `(select id from public.transactions where auction_id='${auctionId}')`;
 await sql(`delete from public.payment_events where transaction_id in ${fixtureTxIds}`);
+await sql(`delete from public.seller_payout_events where payout_id in
+            (select id from public.seller_payouts where transaction_id in ${fixtureTxIds})`);
+await sql(`delete from public.seller_payouts where transaction_id in ${fixtureTxIds}`);
 await sql(`delete from public.reviews where transaction_id in ${fixtureTxIds}`);
 await sql(`delete from public.notifications where auction_id='${auctionId}'`);
 await sql(`delete from public.watchlist where auction_id='${auctionId}'`);
@@ -1293,12 +1530,19 @@ const residue = rows(await sql(
        left join public.transactions t on t.id = pe.transaction_id
       where t.id is null
          or t.seller_id in ${testUserSubquery}
-         or t.buyer_id in ${testUserSubquery}) as payment_events`))[0];
+         or t.buyer_id in ${testUserSubquery}) as payment_events,
+     (select count(*)::int from public.seller_payouts sp
+        left join public.transactions t on t.id = sp.transaction_id
+       where t.id is null
+          or t.seller_id in ${testUserSubquery}
+          or t.buyer_id in ${testUserSubquery}) as seller_payouts`))[0];
 check("cleanup: no synthetic fixture survives in production data",
   Number(residue?.auctions) === 0 && Number(residue?.transactions) === 0 &&
-    Number(residue?.payment_events) === 0,
+    Number(residue?.payment_events) === 0 &&
+    Number(residue?.seller_payouts) === 0,
   `auctions=${residue?.auctions} transactions=${residue?.transactions} ` +
-    `payment_events=${residue?.payment_events}`);
+    `payment_events=${residue?.payment_events} ` +
+    `seller_payouts=${residue?.seller_payouts}`);
 
 // ---------------------------------------------------------------------------
 console.log("\n" + "=".repeat(64));
