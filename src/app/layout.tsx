@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/providers";
@@ -18,7 +19,7 @@ const geistMono = Geist_Mono({
 
 const siteUrl = SITE_URL;
 
-export const metadata: Metadata = {
+const baseMetadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
     default: "BidBlitz — live auctions, honest settlement",
@@ -35,12 +36,39 @@ export const metadata: Metadata = {
     url: siteUrl,
   },
   twitter: { card: "summary_large_image", title: "BidBlitz", description: "Live competitive auctions." },
-  // Deliberately NO `robots: { index: true, follow: true }`: "index, follow" is
-  // already the crawler default, and on a streamed 404 (e.g. an unknown
-  // auction, where the page emits its own `noindex`) Next emits this layout
-  // block separately from the page's — leaving both tags on one document, a
-  // conflicting directive crawlers are told to resolve unpredictably.
+  // Deliberately NO `robots: { index: true, follow: true }` here: "index,
+  // follow" is already the crawler default, and emitting it from the root
+  // layout once meant a streamed 404 carried BOTH that tag and the page-level
+  // `noindex` — a conflicting directive crawlers are told to resolve
+  // unpredictably. Missing resources get their explicit `noindex` below.
 };
+
+/**
+ * Root metadata resolves per request for exactly one reason: `src/proxy.ts`
+ * sets `x-bidblitz-missing` when it rewrites a missing auction/profile URL
+ * onto the router-level not-found path, and that response needs a
+ * resource-specific title plus an explicit `noindex`. `not-found.tsx` cannot
+ * export metadata (verified against the live build), so the root layout is the
+ * only place both can come from — and the proxy strips any inbound copy of the
+ * header, so a client cannot spoof the directive onto a real page.
+ *
+ * With no header set, this returns the same object the previous static export
+ * was, so no normal page's head changes.
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  const missing = (await headers()).get("x-bidblitz-missing");
+  if (missing === "auction" || missing === "profile") {
+    return {
+      ...baseMetadata,
+      title: {
+        default: missing === "auction" ? "Auction not found" : "Profile not found",
+        template: "%s · BidBlitz",
+      },
+      robots: { index: false, follow: false },
+    };
+  }
+  return baseMetadata;
+}
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   // Seed the client clock from request time. This is a Server Component, which

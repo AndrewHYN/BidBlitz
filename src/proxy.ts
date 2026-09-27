@@ -22,10 +22,17 @@ import { NextResponse, type NextRequest } from "next/server";
  *     `/profile/[username]` stream a `loading.tsx` shell before their page can
  *     throw `notFound()`, and once streaming has started the status can no
  *     longer be changed — it is pinned at 200 (Next docs, `loading.md` →
- *     "Status codes"). Checking existence HERE, before any response body is
- *     written, is what lets a genuinely missing resource answer 404 while the
- *     page still renders the same not-found UI, with the same `noindex`, that
- *     it renders today.
+ *     "Status codes"). No page-level trick escapes that: a dedicated route
+ *     throwing `notFound()` synchronously still answered 200 under the root
+ *     loading boundary (measured, not assumed). The status therefore has to be
+ *     decided HERE, before the app renders: a confirmed-missing id is rewritten
+ *     to a path that matches NO route, which is Next's router-level not-found
+ *     path — a real 404 with the root not-found UI and the site chrome, the
+ *     same on self-hosted Node and Vercel. Two things the rewrite carries with
+ *     it: an `x-bidblitz-missing` request header (root `generateMetadata` reads
+ *     it to emit the resource-specific title + `noindex` for this response
+ *     only) and an `X-Robots-Tag: noindex` response header (belt and braces —
+ *     works even if nothing parses the document head).
  *
  * Why it is needed at all: `src/lib/supabase/server.ts` cannot write cookies
  * during a Server Component render (the write is caught and ignored). Without
@@ -45,25 +52,25 @@ const UUID_RE =
 type ProxyClient = ReturnType<typeof createServerClient>;
 
 /**
- * True when the URL names a public resource this viewer cannot see — i.e. the
- * page below is about to call `notFound()`.
+ * The kind of resource the URL names but cannot see — `"auction"`,
+ * `"profile"`, or `null` when the URL names nothing missing.
  *
  * Each lookup mirrors the page's own query exactly (same table, same filter,
  * same publishable key and cookies, therefore the same RLS visibility), so the
- * guard cannot disagree with the page about what exists. It only decides the
- * HTTP status; it never renders, reads, or caches content.
+ * guard cannot disagree with the page about what exists. It only decides where
+ * the request is routed; it never renders, reads, or caches content.
  *
- * An infrastructure error fails OPEN: the page runs its own lookup and still
- * renders the not-found UI, at worst with the status quo of 200.
+ * An infrastructure error fails OPEN (`null`): the page runs its own lookup
+ * and still renders the not-found UI, at worst with the status quo of 200.
  */
-async function resourceIsMissing(
+async function missingResourceKind(
   request: NextRequest,
   supabase: ProxyClient
-): Promise<boolean> {
+): Promise<"auction" | "profile" | null> {
   const auction = AUCTION_PATH_RE.exec(request.nextUrl.pathname);
   if (auction) {
-    // A malformed id can never match a uuid column: reject without a round trip.
-    if (!UUID_RE.test(auction[1])) return true;
+    // A malformed id can never match a uuid column: rewrite without a round trip.
+    if (!UUID_RE.test(auction[1])) return "auction";
 
     const { data, error } = await supabase
       .from("auctions")
@@ -72,9 +79,9 @@ async function resourceIsMissing(
       .maybeSingle();
     if (error) {
       console.error("[proxy/auction]", error.message);
-      return false;
+      return null;
     }
-    return data === null;
+    return data === null ? "auction" : null;
   }
 
   const profile = PROFILE_PATH_RE.exec(request.nextUrl.pathname);
@@ -86,22 +93,28 @@ async function resourceIsMissing(
       .maybeSingle();
     if (error) {
       console.error("[proxy/profile]", error.message);
-      return false;
+      return null;
     }
-    return data === null;
+    return data === null ? "profile" : null;
   }
 
-  return false;
+  return null;
 }
 
 export async function proxy(request: NextRequest) {
   // Unconfigured deployment (e.g. a build with no env yet): pass through
   // untouched rather than failing every request in the app.
+  // `x-bidblitz-missing` is OUR signal to root `generateMetadata`; a client
+  // must never be able to spoof it (it would noindex a real page), so any
+  // inbound copy is stripped before anything continues to the app.
+  const forwardHeaders = new Headers(request.headers);
+  forwardHeaders.delete("x-bidblitz-missing");
+
   if (!url || !publishableKey) {
-    return NextResponse.next({ request: { headers: request.headers } });
+    return NextResponse.next({ request: { headers: forwardHeaders } });
   }
 
-  const response = NextResponse.next({ request: { headers: request.headers } });
+  const response = NextResponse.next({ request: { headers: forwardHeaders } });
 
   const supabase = createServerClient(url, publishableKey, {
     cookies: {
@@ -128,20 +141,35 @@ export async function proxy(request: NextRequest) {
   // when the session is inside its expiry margin, which is the whole point.
   await supabase.auth.getSession();
 
-  if (!(await resourceIsMissing(request, supabase))) {
+  const missing = await missingResourceKind(request, supabase);
+  if (missing === null) {
     return response;
   }
 
-  // Missing resource: same pass-through render (the page shows its own
-  // not-found UI and generateMetadata marks it noindex), but committed with a
-  // real 404 status before the loading shell is streamed. Session cookies that
-  // were rotated above ride along on the new response.
-  const notFound = NextResponse.next({
-    request: { headers: request.headers },
-    status: 404,
-  });
-  response.cookies.getAll().forEach((cookie) => notFound.cookies.set(cookie));
-  return notFound;
+  // Confirmed missing: rewrite to a path that matches NO route, so routing —
+  // not rendering — produces the 404 with the root not-found UI and this
+  // site's own chrome. This is the only mechanism that behaves identically on
+  // self-hosted Node and Vercel (measured on both):
+  //   - `next({ status: 404 })`   → Node renders the real route, Vercel
+  //                                  short-circuits to /_not-found;
+  //   - a page-level `notFound()` → always pinned at 200 by the root
+  //                                  loading.tsx boundary;
+  //   - rewrite to unmatched      → router-level not-found on both.
+  //
+  // The original URL stays in the address bar (internal rewrite, not a
+  // redirect). `x-bidblitz-missing` tells root `generateMetadata` to emit the
+  // resource-specific title and an explicit `noindex` for this response only;
+  // `X-Robots-Tag` repeats the directive as a header for clients that never
+  // parse the head. Session cookies rotated above ride along.
+  const downstream = new Headers(forwardHeaders);
+  downstream.set("x-bidblitz-missing", missing);
+  const rewritten = NextResponse.rewrite(
+    new URL("/resource-not-found", request.url),
+    { request: { headers: downstream }, status: 404 }
+  );
+  rewritten.headers.set("X-Robots-Tag", "noindex");
+  response.cookies.getAll().forEach((cookie) => rewritten.cookies.set(cookie));
+  return rewritten;
 }
 
 export const config = {
