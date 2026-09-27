@@ -169,6 +169,14 @@ Run these against the deployed URL before calling it shipped:
    session → **401** `{"ok":false,"error":"unauthenticated"}` (**503** only
    while no provider is configured), and the Transactions page shows a pay
    button only while a provider is configured.
+9. Payout surface (added 2026-09-28, see ADR-012). With a **non-admin**
+   session, `GET /admin` must redirect (403/redirect) — the payout queue is
+   admin-only. With an admin session, `/admin` shows *Payout operations* with an
+   empty-state message when no sale has been paid. `POST
+   /rest/v1/seller_payouts` (anon) and the same call with any signed-in
+   non-admin token must both be refused, and `my_seller_payouts()` must return
+   `[]` for a user who has never sold. These four checks are also automated in
+   `scripts/db/verify-engine.mjs`, section *seller payouts*.
 
 ## 5. Payment provider status and webhook contract
 

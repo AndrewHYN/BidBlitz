@@ -489,7 +489,10 @@ installed.
   `redirectUrl` for the buyer of record while the row is still
   `AWAITING_PAYMENT`. The UI renders a pay button only while a provider is
   configured.
-- **No payout code.** Nothing moves money to a seller.
+- **No automatic payout code.** Nothing moves money to a seller. What exists is
+  the *record* of a manual payout — see **ADR-012**, which deliberately keeps
+  payment status and payout status in separate tables so that a manual,
+  human-executed transfer can never be mistaken for an automated split.
 - **Reconciliation fallback (added 2026-09-27).** `resulturl` remains the
   **primary** settlement signal. What test mode proved is that a push can
   simply never arrive, so initiation now persists Paynow's `pollurl` in a new
@@ -654,3 +657,154 @@ POST reaches `/api/payments/webhook`. Rotate the Integration Key ("Generate New
 Key") after this shared key has been used in testing. Until a push is observed,
 payment is **verified as a receiver, a state machine and a reconciler**, not as
 a delivery path BidBlitz has observed Paynow use.
+
+### The marketplace question this integration has not been asked
+
+API success is not business-model approval. A working `initiatetransaction` and
+a verifiable signed callback prove that Paynow *can* collect a payment. They say
+nothing about whether Paynow *permits* a merchant to collect money **for
+third-party sellers** and then pay those sellers onward — which is what an
+auction marketplace is, and what BidBlitz is.
+
+**No such confirmation exists, and none is assumed.** The question is drafted
+as point 5 of `docs/PAYNOW_MARKETPLACE_SUPPORT_REQUEST.md`, together with
+points 6–11 (required seller documents, BuySafe's applicability when the payee
+is the operator, the refund endpoint for an Advanced Integration merchant,
+whether any split-settlement mechanism exists in Zimbabwe, the `resulturl`
+non-delivery, and "Set Live" requirements). **That message has not been sent and
+no response has been received. Nothing in this ADR, or anywhere else in this
+repository, should be read as Paynow having approved the marketplace model.**
+
+The consequence is concrete, and it is why **ADR-012** was built the way it
+was: because there may be no automated split settlement available to us at all,
+the payout path has to be modelled as an explicit, recorded, human operation
+rather than an assumed side-effect of checkout. The design does not depend on
+Paynow approving anything, and does not pretend it has.
+
+## ADR-012: Seller payouts — a separate, admin-driven operation, never a payment status
+
+Status: Accepted — implemented 2026-09-28 (migrations
+`20260928000001_seller_payouts.sql`, `20260928000002_seller_payout_delivery.sql`)
+Date: 2026-09-28
+
+### Context
+
+ADR-011 established the payment side and stopped exactly where it had to: the
+buyer's money is collected by Paynow and settles into the **platform's** bank
+account. There is no seller-facing payout API in Paynow Zimbabwe, no escrow and
+no split settlement, so every onward payment to a seller is a **manual bank
+transfer made by a person**.
+
+That left BidBlitz with a real and specific lie available to it. `transactions.status`
+carries `PAID`, and a seller's dashboard showed that badge. A seller reading it
+had every reason to conclude they had been paid. Nothing in the product recorded
+whether a seller *had* been paid, whether delivery happened, or whether a payout
+was stuck behind a dispute — so an operator doing it manually had nowhere to put
+it, and the audit trail did not exist.
+
+The tempting fix is to add `SELLER_PAID` to `transactions.status`. That is
+exactly the wrong fix, and this ADR exists to record why.
+
+### Decision
+
+**Keep the payment status exactly as Paynow reports it, and add a separate
+`seller_payouts` operation for the seller's money. The browser never writes to
+it; one admin-only, `SECURITY DEFINER` function is the only writer; the amount
+is frozen from the transaction at creation and is immutable for every role.**
+
+#### Why not extend `transactions.status`
+
+`transactions.status` means one thing and only one thing: *what Paynow told us
+about the buyer's payment*. Extending it to describe the seller's fulfilment
+would:
+
+- make a single column mean two unrelated things, so every reader — the buyer
+  dashboard, the seller dashboard, the admin queue, a future report — would have
+  to know which of the two it is looking at;
+- put seller-side states into a table whose `status` is protected by
+  `private.transactions_protect_state()` and whose money columns are immutable
+  for every role. A seller payout legitimately changes over days; a payment
+  confirmation is a fact that arrives once and never changes;
+- make it possible for the application to imply automatic settlement. A
+  `SELLER_PAID` state on the payment row reads as "the platform split the money",
+  which is precisely the claim ADR-011 says cannot be made. Keeping them apart
+  makes the manual step visible in the data model instead of hidden in a word.
+
+#### The model
+
+```
+AWAITING_PAYMENT ──Paynow──> PAID
+                                 │  (AFTER UPDATE trigger on `transactions`)
+                                 ▼
+seller_payouts.status:
+  WAITING_FOR_FULFILMENT ──> DELIVERY_CONFIRMED ──> PAYOUT_PENDING ──> PAYOUT_DUE ──> PAID_OUT
+          │                        │                     │              │             (terminal)
+          └────────────────────────┴─────────────────────┴──────────────┴──> HELD
+          └────────────────────────┴─────────────────────┴──────────────┴──> DISPUTED
+                     HELD / DISPUTED release back into the flow
+```
+
+- `amount_minor` and `currency` are copied from `transactions.net_minor` /
+  `transactions.currency` when the row is created, and are immutable for
+  **every** role — engine, `service_role`, admin, browser. A fee recalculation
+  can never rewrite what a seller was owed for a sale that already happened.
+- The row is created by a **trigger**, not by an application call, so it cannot
+  be forgotten, skipped, duplicated or back-dated. A migration backfill gives
+  already-`PAID` transactions the same row with the same frozen money.
+- `PAYOUT_PENDING` is "waiting for the provider to settle"; `PAYOUT_DUE` is
+  "payable now". They are different questions and the money must be in the bank
+  before the second one is answered.
+- `PAID_OUT` requires a `payout_reference` and a `paid_at` (enforced by a CHECK
+  constraint *and* by the writer), and is refused against a transaction that is
+  not `PAID`/`SETTLED`. It is terminal: no transition out of it exists, so a
+  recorded external transfer cannot be quietly un-recorded through the UI.
+- `delivery_confirmed_at` is stamped by the transition itself rather than
+  derived from the current status, so the delivery fact survives a later hold or
+  dispute instead of becoming unknowable.
+- A `REFUNDED` transaction holds its payout automatically, unless it was already
+  recorded as paid out — in which case the administrator deals with it out of
+  band, because their own record must not be silently rewritten.
+
+#### Why the browser cannot touch it
+
+| Control | Where |
+| --- | --- |
+| `INSERT`/`UPDATE`/`DELETE` revoked from `anon` and `authenticated` | migration 0001 |
+| RLS `SELECT` for admins only; no write policy at all | migration 0001 |
+| Money/identity columns frozen for every role in a `BEFORE UPDATE` trigger | `private.seller_payouts_protect_state()` |
+| Only privileged roles may update at all (`current_user` check) | same |
+| Explicit transition map; `PAID_OUT` terminal | same |
+| One writer: `public.admin_transition_seller_payout()` | migration 0001 |
+| That function re-reads `profiles.is_admin` on the **caller's own session** | same |
+| `search_path = ''`, objects schema-qualified, `EXECUTE` revoked from `PUBLIC`/`anon` | same |
+| Every state and reference change appended to `seller_payout_events` with `auth.uid()` | `private.seller_payouts_audit()` |
+
+Sellers cannot read the table at all: there is deliberately no seller-facing
+RLS policy, because one would also expose `internal_note` and the payout
+reference. `public.my_seller_payouts()` returns six safe fields and nothing
+else. The engine harness asserts exactly that field set.
+
+#### What `PAID_OUT` means, precisely
+
+**An administrator has already transferred the proceeds, outside BidBlitz, and is
+recording the reference.** The application holds no banking credentials, calls
+no transfer API, and fakes nothing. The confirmation dialog in the admin queue
+says this in those words, because a button labelled "record seller payout" is
+otherwise indistinguishable from a button that pays people.
+
+#### Consequences
+
+- A marketplace on this architecture needs a **human** in the loop for every
+  seller payment. That is the honest cost of Paynow Zimbabwe having no split
+  settlement, and it is an operational fact, not a defect to be papered over.
+- Nothing in this design assumes Paynow approves the marketplace model. If it
+  does not, the payments need a different provider — but the fulfilment and
+  payout record, the audit trail and the admin workflow all remain correct,
+  because they never claimed to be an automated split.
+- The support query asking whether that model is permitted at all is
+  `docs/PAYNOW_MARKETPLACE_SUPPORT_REQUEST.md` (point 5). It has not been sent.
+  See **ADR-011**, *The marketplace question this integration has not been
+  asked*.
+- Seller bank details are **not** collected — no field, no column, no upload.
+  Storing them is a separate decision with its own security and legal weight,
+  and it should wait until Paynow has said what a seller must provide.

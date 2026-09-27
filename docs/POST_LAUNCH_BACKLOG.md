@@ -61,19 +61,59 @@ Before enabling real buyer/seller money movement:
   fallback is now built, so a silent push degrades to an explicit server-side
   reconciliation instead of a stranded sale — but delivery itself is still
   unproven (ADR-011, DEPLOYMENT.md),
-- implement payout/settlement rules (none exist; see *Payouts* below),
+- **confirm in writing that Paynow permits the multi-seller / manual-payout
+  model at all** (`docs/PAYNOW_MARKETPLACE_SUPPORT_REQUEST.md`, point 5). Until
+  it does, the platform has a payment integration but no confirmed right to
+  operate as a marketplace on it,
+- the payout/settlement *record* now exists (ADR-012); the settlement
+  *permission* and the refund *mechanism* do not,
 - add refunds/disputes once confirmed against the real API,
-- review legal/regulatory obligations.
+- review legal/regulatory obligations (`docs/COMPLIANCE_LAUNCH_CHECKLIST.md`).
 
 ### Payouts (money path, stated plainly)
 Today the money path is: **buyer → Paynow → the platform's registered
 Zimbabwean bank account**, less Paynow's transaction fee. BidBlitz records a
 5% platform fee and the seller's proceeds in integer minor units, but **nothing
-transfers to a seller**. There is no seller payout API in Paynow Zimbabwe, no
-escrow, and no split-payment support — the `transfers[]` split API belongs to
-Paynow *Poland* (ING), a different company. Any onward payment to a seller is a
-separate, manual administrative process (currently: platform-side bank
-transfer), and must not be described as an automated payout.
+transfers to a seller automatically**. There is no seller payout API in Paynow
+Zimbabwe, no escrow, and no split-payment support — the `transfers[]` split API
+belongs to Paynow *Poland* (ING), a different company. Any onward payment to a
+seller is a separate, manual administrative process (currently: platform-side
+bank transfer), and must not be described as an automated payout.
+
+**Built 2026-09-28 (see ADR-012):** the *record* of that manual process now
+exists and is enforced by the database — `seller_payouts`, created automatically
+when a transaction reaches `PAID`, with the seller's proceeds frozen from
+`net_minor`, its own fulfilment/payout status, an append-only audit trail, and
+an admin-only operations queue at `/admin`. Nothing in this moves money and
+nothing in it is automated settlement; it records what a human did.
+
+Still open for payouts:
+- **Paynow marketplace approval.** Nothing in writing says Paynow permits a
+  merchant to collect buyer funds for third-party sellers and make onward
+  payments to them in a manual model. Query drafted in
+  `docs/PAYNOW_MARKETPLACE_SUPPORT_REQUEST.md` (point 5); **not sent, no
+  response.** This is a launch blocker, not a backlog nicety.
+- **Seller payment details are not collected at all.** No product field, no
+  database column, no upload. Payouts are made out of band. Storing seller bank
+  details raises real security and legal obligations and must be a deliberate
+  decision, not a feature — and it should wait until Paynow has confirmed what
+  documentation a seller must provide (same document, point 6).
+- **Payout reconciliation has no tooling.** The comparison described in
+  `docs/MARKETPLACE_OPERATIONS.md` §9 is a manual weekly routine today.
+- **No fee ledger export.** Platform fee revenue is frozen per transaction in
+  Postgres and exported to nothing.
+
+### External checklist — Paynow (BLOCKERS, not engineering)
+Tracked in full in `docs/COMPLIANCE_LAUNCH_CHECKLIST.md` §I. None of these can
+be closed by writing code, and none may be described as closed:
+- **Marketplace model approval in writing** (collect for third-party sellers,
+  onward manual payouts) — no response.
+- **`resulturl` status delivery** — eight test-mode initiations, zero POSTs.
+  `pollurl` reconciliation works and is the proven path; `resulturl` remains
+  the primary signal and remains unproven.
+- **Refund mechanism for an Advanced Integration merchant** — none confirmed.
+- **Merchant verification status and settlement timing** — unknown.
+- **"Set Live" requirements** — unknown; do not request before the two above.
 
 ### Future monetization
 Potential post-launch revenue:
@@ -86,7 +126,27 @@ Potential post-launch revenue:
 
 Do not build these prematurely if they slow down proving the marketplace.
 
-#### Support BidBlitz / "coffee" tip (pre-launch audit Phase 8 — deferred, not built)
+### Support BidBlitz / "coffee" tip (pre-launch audit Phase 8 — deferred, not built)
+
+**Still deferred. Re-confirmed 2026-09-28, and the reason is now sharper.** The
+5% sale fee remains the business model and is the only thing being planned
+around. A tip is not built, and will not be, until all of the following are
+true:
+
+- the primary auction money flow is live — i.e. a real buyer has paid a real
+  winning bid on a real sale, in live mode, and the seller has been paid from
+  it,
+- seller payouts are operational — i.e. an operator has actually run the
+  fulfilment → payout due → manual transfer → record reference cycle, not just
+  exercised it in a test harness,
+- the marketplace is stable: Paynow's marketplace model and `resulturl`
+  delivery are both settled in writing (`docs/COMPLIANCE_LAUNCH_CHECKLIST.md`
+  §I).
+
+Adding a second money flow to a marketplace whose primary money flow is still
+in test mode multiplies unproven surface for no revenue, and a "support" payment
+that is not audited with its own references can contaminate the fee and payout
+records the real business depends on.
 
 Considered for launch: a subtle "Support BidBlitz" link that lets happy users
 send a small thank-you payment. Deferred, not built, because:
