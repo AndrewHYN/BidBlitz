@@ -338,6 +338,32 @@ visitor cannot create an account at all until §0 is closed. This is a support
 issue before it is a growth issue: the first person who tries to join a
 marketplace and is told to wait is the first person who may never come back.
 
+☐ **J6. There is currently NO administrator.** Verified 2026-09-28: **zero** rows
+in `public.profiles` have `is_admin = true`. `/admin` — and with it the entire
+payout operations queue — is unreachable by any real person, and has always
+been. This must be set deliberately, by the owner, on their own account:
+
+```sql
+-- owner runs this in the Supabase SQL editor, for their own account only
+update public.profiles set is_admin = true where id = '<your own user id>';
+```
+
+Find the id under *Authentication → Users*, or by joining `auth.users` to
+`profiles`. Then prove it: sign in, open `/admin`, confirm **Payout operations**
+is present. Do not grant admin to a shared or test account, and do not guess —
+`is_admin` is the single flag that authorises moving seller money, and it should
+belong to a named person who has read `docs/MARKETPLACE_OPERATIONS.md`.
+
+☐ **J7. The payout queue's populated view has not been seen in a browser.**
+Verified 2026-09-28: `public.transactions` is **empty** in production, so there
+is no paid sale for the queue to render — it shows its empty state. The
+mechanics underneath it *are* proven: 24 database checks drive the real
+`admin_transition_seller_payout` function over the real PostgREST API with a
+real admin session, including the whole fulfilment ladder and the refusals. But
+the rendered rows, the confirmation dialog and the reference input should be
+looked at on the **first real paid sale**, before an operator is trusted with a
+live payout. Do not fabricate a paid transaction to rehearse it.
+
 ---
 
 ## K. Launch decision
@@ -357,11 +383,15 @@ Launch is gated on the following being **closed**, not merely attempted:
 | K8 | Payout operator and reconciliation owner named | Owner action | ☐ |
 | K9 | Incident runbook written and rehearsed | Owner action | ☐ |
 | K10 | Paynow moved from test mode to live | External — Paynow | ☐ |
+| K11 | **An account actually has `is_admin` — today none does** | Owner action | ☐ |
 
 **K0 is the first gate chronologically.** It is also the cheapest: one SMTP
 configuration. Leaving it open means the marketplace has no way to admit a new
 participant at all.
 
-**BidBlitz is not commercially live until K0–K10 are closed.** A complete
+**K11 is the gate that surprises people.** The payout machinery is built,
+audited and proven, and not one account can reach it.
+
+**BidBlitz is not commercially live until K0–K11 are closed.** A complete
 codebase, a passing test suite and a deployed site do not make it live; they
 make the software ready for a business that is ready to trade.

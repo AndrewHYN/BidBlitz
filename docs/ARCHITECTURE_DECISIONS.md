@@ -616,6 +616,17 @@ proven mitigation, not a fix: `resulturl` remains the primary signal and remains
 undelivered — do not describe the push as working until a genuine Paynow POST
 reaches `/api/payments/webhook`.
 
+**Status of the proof row (checked 2026-09-28):** `public.transactions` in
+production is now **empty**. The proof transaction
+`9eed5892-8da5-4303-b707-8b71f4a87b18` belonged to a disposable QA profile and
+was removed by the engine harness's own fixture cleanup, as designed. The
+evidence recorded above is a record of an observed event and is not retracted by
+the row's absence — but there is no longer a live `PAID` row in the database to
+re-inspect, and anyone wanting to see one must create a real paid sale rather
+than resurrect a test record. For the same reason, the seller-payout backfill in
+**ADR-012** had nothing to backfill; it ran clean and the `seller_payouts`
+table is correctly empty.
+
 Cancelled → FAILED was proven on 2026-09-26 (express test number `0773333333`,
 table above). A repeat attempt through the hosted flow on 2026-09-27 could not
 reach a cancel control: the hosted page gates every action behind the merchant

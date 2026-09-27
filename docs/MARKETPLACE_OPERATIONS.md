@@ -345,6 +345,12 @@ it does.
 
 ## 13. What an administrator does, and what nobody does
 
+**As shipped, no account has this role.** Verified 2026-09-28: zero rows in
+`public.profiles` have `is_admin = true`, so `/admin` and everything in it is
+currently unreachable. The owner must set that flag on their own account
+first — see `docs/COMPLIANCE_LAUNCH_CHECKLIST.md` J6 — and should be someone
+who has read this document end to end.
+
 An administrator may:
 
 - read every payout, its audit trail and the seller's details
