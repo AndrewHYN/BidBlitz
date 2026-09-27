@@ -35,7 +35,11 @@ export const metadata: Metadata = {
     url: siteUrl,
   },
   twitter: { card: "summary_large_image", title: "BidBlitz", description: "Live competitive auctions." },
-  robots: { index: true, follow: true },
+  // Deliberately NO `robots: { index: true, follow: true }`: "index, follow" is
+  // already the crawler default, and on a streamed 404 (e.g. an unknown
+  // auction, where the page emits its own `noindex`) Next emits this layout
+  // block separately from the page's — leaving both tags on one document, a
+  // conflicting directive crawlers are told to resolve unpredictably.
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

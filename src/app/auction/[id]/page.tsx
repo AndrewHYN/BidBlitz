@@ -24,6 +24,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
   const detail = await getAuctionDetail(id);
   if (!detail) {
+    // The real 404 status is produced in `src/proxy.ts` (this segment's
+    // loading boundary would otherwise stream a 200 shell first — see
+    // docs/loading.md "Status codes"). This is the fail-open path: correct
+    // title + noindex if the proxy check could not run.
     return { title: "Auction not found", robots: { index: false } };
   }
 
