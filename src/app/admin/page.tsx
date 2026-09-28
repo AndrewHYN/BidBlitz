@@ -249,6 +249,22 @@ export default async function AdminPage() {
           </p>
 
           <div data-testid="admin-payouts">
+            {/*
+              A queue, not a set of cards.
+
+              Each payout was a shadowed card with 16px of space around it, so
+              an operator working a backlog of twenty payouts was scrolling past
+              twenty floating islands rather than reading a list. The frame
+              stays — a queue row still needs an edge you can scan down — but the
+              drop shadow goes, and the rows sit closer together so the eye can
+              compare them. Density is what an operations console is for; a
+              consumer-style card per row is the opposite.
+
+              NOT VISUALLY VERIFIED: /admin needs the owner's own credentials,
+              which are never handled here, so this is reviewed from source and
+              from the non-admin refusal path. It should be looked at on the
+              first real payout before it is trusted.
+            */}
             {payouts.length === 0 ? (
               <EmptyState
                 compact
@@ -257,22 +273,6 @@ export default async function AdminPage() {
                 description="A row appears once a buyer's payment has been confirmed by Paynow."
               />
             ) : (
-              {/*
-                A queue, not a set of cards.
-
-                Each payout was a shadowed card with 16px of space around it, so
-                an operator working a backlog of twenty payouts was scrolling
-                past twenty floating islands rather than reading a list. The
-                frame stays — a queue row still needs an edge you can scan down
-                — but the drop shadow goes, and the rows sit closer together so
-                the eye can compare them. Density is what an operations console
-                is for; a consumer-style card per row is the opposite.
-
-                NOT VISUALLY VERIFIED: /admin needs the owner's own credentials,
-                which are never handled here, so this is reviewed from source
-                and by the non-admin refusal path. It should be looked at on the
-                first real payout before it is trusted.
-              */}
               <ul className="space-y-2">
                 {payouts.map((row) => (
                   <li
