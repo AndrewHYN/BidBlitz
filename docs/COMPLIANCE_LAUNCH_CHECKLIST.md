@@ -375,9 +375,16 @@ homepage empty state reads as "nothing listed yet" rather than broken.
 ☐ **J9. Decide where the test suite runs.** The e2e suite publishes real
 auctions, uploads real files and places real bids through the real app. It now
 cleans up after itself automatically, but cleanup is a safety net, not a
-boundary. The correct answer is a separate Supabase project for tests. That
-needs an owner action (provision it, set `.env` for the test run) and it is the
-only way a test run can never touch production.
+boundary — and it cleans up *after* a run, not during one, so the live homepage
+serves test listings while a suite is in progress (observed 2026-09-28). The
+correct answer is a separate Supabase project for tests. That needs an owner
+action (provision it, set `.env` for the test run) and it is the only way a test
+run can never touch production.
+
+☐ **J9a. Do not run the e2e suite against production while real visitors are on
+the site.** Until J9 is done, a suite run publishes disposable listings
+(electronics at $10.00, test-seller profiles) on the public homepage for the
+duration of the run.
 
 ☐ **J10. Confirm no QA account is an administrator before launch.** The QA
 account password is in the public repository because the suites need it. That

@@ -436,12 +436,19 @@ commercial product, which must never ship.
   address **and** the suite's exact title pattern, printing every candidate and
   refusing to delete without `--yes`. It also deletes storage objects that no
   `auction_images` row references. `npm run db:cleanup-e2e`.
-- `e2e/global-teardown.ts` runs it after every suite, wired through
-  `playwright.config.ts`. It is best-effort by design: it warns loudly rather
-  than failing a green run, and never hides a skipped cleanup.
-- **The real fix is not a cleanup script.** The suite should run against a
-  separate Supabase project so a test run can never touch production. That needs
-  an owner action (provision a project) and is the correct long-term answer.
+- `e2e/global-teardown.mjs` runs it after every suite, wired through
+  `playwright.config.ts`. Best-effort by design: it warns loudly rather than
+  failing a green run, and never hides a skipped cleanup. It is `.mjs` on
+  purpose — a `.ts` teardown loaded as CommonJS here and failed silently, which
+  is how ten listings got back onto the homepage once already.
+- **Known limit of the safety net: it cleans up AFTER a run, not during one.**
+  Observed on 2026-09-28: with the suite running, the live homepage was serving
+  `Loop mukihthf-…`, `Race mukiktnf-…` in Electronics at $10.00. Nothing can
+  prevent that while tests write to the production database.
+- **Therefore: do not run the e2e suite against production while real visitors
+  are on the site.** The correct fix is a separate Supabase project for tests.
+  That needs an owner action (provision it, point the test run at it) and it is
+  the only answer that removes the window entirely.
 
 Never add:
 - fake counters
