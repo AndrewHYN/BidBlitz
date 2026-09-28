@@ -449,6 +449,37 @@ instant deletion.
 
 ---
 
+## L. Test-suite honesty (read before trusting a green run)
+
+**The e2e suite runs with `retries: 1`, and that is a deliberate, pre-existing
+decision — not a default.** `playwright.config.ts` justifies it: this machine
+has ~3.9 GB of RAM and the observed non-product failures were ambient
+(`net::ERR_NETWORK_IO_SUSPENDED` mid-navigation, "timeout while setting up
+page"). A genuine defect fails both attempts and still reports red.
+
+It still means **a test that fails once may finish the run reported as green**,
+so a single clean run is weaker evidence than it looks. Two consequences for
+whoever acts on this:
+
+- Treat one green full run as necessary, not sufficient. The 2026-09-28 pass
+  confirmed the run by executing the affected spec four additional times, all
+  clean, after a single failure it could not reproduce.
+- An **unreproduced** failure must be reported as unreproduced, not quietly
+  dropped because the next run was green. One such case occurred on 2026-09-28
+  and is called out in the pass report.
+
+**The suite cannot run safely against production while real visitors are on the
+site** (§J9a), and it leaves real rows behind whenever it is interrupted — the
+teardown runs at the end of a run, not during one. Always finish with:
+
+```
+npm run db:cleanup-e2e -- --yes
+```
+
+and confirm zero auctions and zero storage objects before walking away.
+
+---
+
 ## K. Launch decision
 
 Launch is gated on the following being **closed**, not merely attempted:
