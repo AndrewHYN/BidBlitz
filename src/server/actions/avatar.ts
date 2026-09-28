@@ -79,7 +79,14 @@ export async function uploadAvatarAction(
       // deterministic key, so changing your picture cannot accumulate objects
       // and cannot leave an orphan the moment a user tries to change it again.
       upsert: true,
-      contentType: file.type || mimeFor(validated.ext),
+      // The type we DETECTED, never the type the browser claimed. The bytes
+      // already passed `validateAvatarBytes`, so this is the truth about the
+      // file - whereas `file.type` is whatever the uploader felt like sending.
+      // Passing that through would let a real JPEG be stored, and served, as
+      // whatever the request claimed.
+      contentType: mimeFor(validated.ext),
+      // A year, because the key changes when the picture changes, so a cached
+      // response can never be stale for its own URL.
       cacheControl: "31536000",
     });
 
@@ -113,8 +120,13 @@ export async function uploadAvatarAction(
     };
   }
 
-  revalidatePath("/settings");
-  revalidatePath("/dashboard");
+  // The avatar appears in the site header, which is in the ROOT LAYOUT, so it
+  // is on every page. Revalidating only /settings would leave the header
+  // showing the old picture everywhere else until something else happened to
+  // revalidate. This is a rare, deliberate, user-initiated action, so
+  // invalidating the layout is the correct cost - and a stale avatar on every
+  // page is the visible alternative.
+  revalidatePath("/", "layout");
   if (updated?.username) revalidatePath(`/profile/${updated.username}`);
 
   return { ok: true, avatarUrl: avatarUrlFor(key), ext: validated.ext };
@@ -157,9 +169,8 @@ export async function removeAvatarAction(): Promise<AvatarResult> {
     };
   }
 
-  revalidatePath("/settings");
-  revalidatePath(`/profile/${profile?.username ?? ""}`);
-  revalidatePath("/dashboard");
+  revalidatePath("/", "layout");
+  if (profile?.username) revalidatePath(`/profile/${profile.username}`);
   return { ok: true, avatarUrl: null, ext: null };
 }
 

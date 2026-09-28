@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import Image from "next/image";
 import { Camera, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -35,12 +35,35 @@ export function AvatarUploader({
   const [pending, startTransition] = useTransition();
   const [removing, startRemoving] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  // A local preview so the new picture appears immediately; `router.refresh()`
-  // then brings back the server truth.
-  const [preview, setPreview] = useState<string | null>(null);
+  // An optimistic preview, so the new picture appears the instant it is chosen
+  // rather than after a round trip. `replaces` is the stored URL this preview
+  // is standing in for, which is how we know when the server has caught up and
+  // the blob can be discarded.
+  const [preview, setPreview] = useState<{
+    url: string;
+    replaces: string | null;
+  } | null>(null);
 
+  const serverUrl = avatarUrlFor(avatarPath);
   const busy = pending || removing;
-  const shown = preview ?? avatarUrlFor(avatarPath);
+
+  // Show the optimistic blob only while the server has not yet caught up. Once
+  // `avatarPath` resolves to the very URL the preview was standing in for, the
+  // real image is displayed and the blob is out of the picture. Deriving this
+  // during render rather than clearing it in an effect keeps it correct even if
+  // the refreshed props arrive before the action's promise settles.
+  const shown =
+    preview && serverUrl !== preview.replaces ? preview.url : serverUrl;
+
+  // Revoke the blob when a new one takes its place, and on unmount. React runs
+  // the cleanup before the next effect, so the URL being released is always one
+  // that is no longer on screen. A blob is therefore held for at most the life
+  // of the current selection - one per pick, not one per render.
+  useEffect(() => {
+    if (!preview) return;
+    const current = preview.url;
+    return () => URL.revokeObjectURL(current);
+  }, [preview]);
 
   function onPick(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -57,11 +80,7 @@ export function AvatarUploader({
       return;
     }
 
-    const localUrl = URL.createObjectURL(file);
-    // Revoke the previous object URL so a long settings session does not leak
-    // blobs; the <img> has already been told about the replacement by React.
-    if (preview) URL.revokeObjectURL(preview);
-    setPreview(localUrl);
+    setPreview({ url: URL.createObjectURL(file), replaces: null });
 
     const form = new FormData();
     form.set("avatar", file);
@@ -76,6 +95,9 @@ export function AvatarUploader({
           toast.error(result.message);
           return;
         }
+        // Record what the server will report back, so the effect above knows
+        // when the real image has arrived to replace this blob.
+        setPreview((p) => (p ? { ...p, replaces: result.avatarUrl } : p));
         toast.success("Picture updated.");
       } catch {
         setError("We couldn't upload that picture. Please try again.");
@@ -95,7 +117,6 @@ export function AvatarUploader({
           toast.error(result.message);
           return;
         }
-        if (preview) URL.revokeObjectURL(preview);
         setPreview(null);
         toast.success("Picture removed.");
       } catch {
