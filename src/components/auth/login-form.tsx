@@ -63,6 +63,20 @@ export function LoginForm({
   return (
     <form
       onSubmit={handleSubmit}
+      /*
+       * Declared POST on purpose. This form is driven by a server action
+       * through onSubmit, so it is not designed to work without JavaScript —
+       * but "not designed to" is not "impossible": a user on a slow connection
+       * who submits before hydration gets the browser's NATIVE submit, and a
+       * form with no method defaults to GET, which puts the email AND the
+       * password into the URL — into browser history, into proxy and access
+       * logs, and into the Referer of the next navigation.
+       *
+       * POST means an un-hydrated submit fails visibly instead of leaking. Once
+       * hydrated, onSubmit calls preventDefault and this attribute is never
+       * consulted.
+       */
+      method="post"
       data-testid="login-form"
       className="space-y-5 rounded-xl border bg-card p-6 shadow-sm sm:p-8"
     >

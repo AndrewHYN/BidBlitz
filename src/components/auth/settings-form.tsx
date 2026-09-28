@@ -84,6 +84,9 @@ export function SettingsForm({
     <div className="space-y-6">
       <form
         onSubmit={handleSubmit}
+        /* POST: a pre-hydration native GET would put the display name, location
+           and bio into the URL and into the access log. See login-form.tsx. */
+        method="post"
         data-testid="settings-form"
         className="space-y-5 rounded-xl border bg-card p-5 sm:p-6"
       >

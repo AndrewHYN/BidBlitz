@@ -434,6 +434,9 @@ export function BidPanel({
   return (
     <form
       onSubmit={submit}
+      /* POST: a pre-hydration native GET would put the bid amount into the URL.
+         See login-form.tsx for the full reasoning. */
+      method="post"
       className="space-y-3 rounded-xl border bg-card p-5"
       noValidate
     >

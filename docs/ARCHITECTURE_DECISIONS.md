@@ -956,3 +956,71 @@ caps size and refuses SVG. `src/lib/avatar.test.ts` — 14 unit tests pinning th
 key shape, the magic-byte sniffing, the size and type messages, and the
 deterministic fallback. `e2e/avatar.spec.ts` — the UI contract, including that
 an oversized file and a text file are both refused with copy that names the fix.
+## ADR-014: A form is not a link - every form declares its method
+
+Date: 2026-09-28
+
+Status: Accepted
+
+### Context
+
+Every `<form>` in BidBlitz is driven by `onSubmit` plus a server action. That
+works only once React has hydrated. Before hydration the element is an ordinary
+HTML form, and **an HTML form with no `method` attribute defaults to GET**.
+
+This was not a theoretical concern. A Playwright run against production
+navigated to:
+
+```
+/login?email=buyer1%40bidblitz.test&password=Bl1tzVerify%212026&password=...
+```
+
+because a submit landed before the bundle had executed. The password was in
+the URL, which means it was in the address bar, in browser history, in proxy
+and CDN access logs, and available to be sent in the `Referer` of whatever the
+page loaded next.
+
+Nothing in the toolchain can see this. TypeScript is satisfied, ESLint has no
+rule for it, `next build` succeeds, and the code reads correctly — a form with
+an `onSubmit` handler looks safe. It is only visible if you either reason about
+the un-hydrated state or watch a real browser lose a race.
+
+The same shape applied to seven forms: the two credential forms, the profile
+settings form, the bid form, the sell form, the review form and the report form.
+Each would have put its own fields into a URL.
+
+### Decision
+
+**Action-driven forms declare `method="post"`.** An un-hydrated submit then
+fails visibly — a 405 on a page route — instead of leaking. This is strictly
+better than a broken no-JS login, and it is not a feature being given up: a
+form that calls a server action from an `onSubmit` handler was never going to
+work without JavaScript anyway, so the fallback behaviour was never "working",
+only "quiet".
+
+**Genuine navigation forms declare `method="get"` explicitly.** The three search
+boxes really are navigation forms, a query string really is the correct result,
+and they carry no secrets — so they are stated rather than defaulted, to make
+the distinction from the action forms deliberate and reviewable instead of
+accidental.
+
+**A test now holds the line.** `src/components/form-method.test.ts` scans every
+form in `src/` and fails if one omits `method`/`action`, if one declares a
+method that is not `post`/`get`/`dialog`, if either credential form is not POST,
+or if a form combines an `onSubmit` with the default GET. The scan asserts its
+own coverage first, because a scan that silently finds nothing would pass
+forever.
+
+The test was verified to have teeth: reverting the one-word fix on the login
+form fails three of the five assertions, and restoring it passes them.
+
+### Consequences
+
+- No behaviour changes after hydration — `onSubmit` calls `preventDefault()`
+  and `method` is never consulted.
+- The no-JavaScript path for these forms is a visible error rather than a
+  credential leak. That is the intended trade.
+- Progressive enhancement for the action forms (a real `action={serverAction}`
+  so they work pre-hydration) is a possible later improvement. It was not done
+  here because it is a rewrite of each form's submit handling, and the security
+  defect is fully closed without it.

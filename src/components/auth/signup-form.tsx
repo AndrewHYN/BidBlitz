@@ -104,6 +104,14 @@ export function SignupForm() {
   return (
     <form
       onSubmit={handleSubmit}
+      /*
+       * POST on purpose, for the same reason as the login form: without a
+       * declared method a submit that happens before hydration is a native GET,
+       * which would put the email, the password and the confirm-password into
+       * the URL. Declared POST makes an un-hydrated submit fail visibly rather
+       * than leak three credentials into history, logs and the next Referer.
+       */
+      method="post"
       data-testid="signup-form"
       className="space-y-5 rounded-xl border bg-card p-6 shadow-sm sm:p-8"
     >

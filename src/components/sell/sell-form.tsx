@@ -142,6 +142,9 @@ export function SellForm({
   return (
     <form
       onSubmit={handleSubmit}
+      /* POST: a pre-hydration native GET would put the whole listing into the
+         URL. See login-form.tsx for the full reasoning. */
+      method="post"
       data-testid="sell-form"
       className="space-y-8 rounded-xl border bg-card p-6 shadow-sm"
     >

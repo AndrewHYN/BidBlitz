@@ -89,7 +89,13 @@ export function ReportDialog({ auctionId }: { auctionId: string }) {
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={submit} className="space-y-4">
+        <form
+          onSubmit={submit}
+          /* POST: a pre-hydration native GET would put the report text into the
+             URL. See login-form.tsx for the full reasoning. */
+          method="post"
+          className="space-y-4"
+        >
           <div className="space-y-1.5">
             <Label htmlFor="report-reason">What&apos;s wrong?</Label>
             <Textarea

@@ -165,7 +165,15 @@ export function BrowseFilters({
       aria-label="Filter auctions"
       className="space-y-4 rounded-xl border bg-card p-4"
     >
-      <form onSubmit={submitSearch} className="space-y-4">
+      <form
+      onSubmit={submitSearch}
+      /* GET, stated rather than defaulted. This is a genuine navigation form —
+         a query string IS the correct result — and it carries no secrets, so
+         unlike the action-driven forms it is safe to put in the URL. See
+         login-form.tsx for why those must not default to GET. */
+      method="get"
+      className="space-y-4"
+    >
         <div className="flex flex-wrap items-end gap-3">
           <div className="min-w-56 flex-1 space-y-1.5">
             <Label htmlFor="browse-q">Search</Label>

@@ -8,7 +8,6 @@ import { removeAvatarAction, uploadAvatarAction } from "@/server/actions/avatar"
 import { AVATAR_ACCEPT, AVATAR_MAX_BYTES, avatarUrlFor } from "@/lib/avatar";
 import { UserAvatar } from "@/components/profile/user-avatar";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 /**
@@ -203,14 +202,24 @@ export function AvatarUploader({
             )}
           </div>
 
-          {/* The input is visually hidden but still in the accessibility tree
-              and still focusable, so keyboard and screen-reader users get the
-              native file dialog rather than an inaccessible custom control. */}
+          {/* Visually hidden but still in the accessibility tree and still
+              focusable, so keyboard and screen-reader users get the native file
+              dialog rather than an inaccessible custom control.
+
+              A PLAIN <input>, deliberately not the shared `Input`. `Input`
+              carries `w-full`, and `sr-only` only wins on `width` if it is
+              emitted later in the stylesheet — which is not something a
+              component should depend on. When `w-full` won, the absolutely
+              positioned input was as wide as its container while sitting at its
+              static position, and pushed the mobile page 132px sideways. That is
+              a real horizontal-overflow bug on a real phone, measured in
+              production, and it came from reusing a styled input for something
+              that must have no styling. */}
           <div className="space-y-1.5">
             <Label htmlFor="avatar-input" className="sr-only">
               Profile picture file
             </Label>
-            <Input
+            <input
               ref={inputRef}
               id="avatar-input"
               type="file"

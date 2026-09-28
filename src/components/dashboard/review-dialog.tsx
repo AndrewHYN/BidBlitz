@@ -109,7 +109,13 @@ export function ReviewDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={submit} className="space-y-4">
+        <form
+          onSubmit={submit}
+          /* POST: a pre-hydration native GET would put the review text into the
+             URL. See login-form.tsx for the full reasoning. */
+          method="post"
+          className="space-y-4"
+        >
           <fieldset className="space-y-1.5">
             <legend className="text-sm font-medium leading-none">
               Your rating

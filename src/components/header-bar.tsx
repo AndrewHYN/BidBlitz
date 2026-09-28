@@ -133,7 +133,13 @@ export function HeaderBar({
 
   const drawerContent = (
     <div className="page-container space-y-3 py-4">
-      <form onSubmit={submitSearch} className="md:hidden">
+      <form
+        onSubmit={submitSearch}
+        /* GET, stated rather than defaulted: this is a navigation form and the
+           query string is the correct result. Carries no secrets. */
+        method="get"
+        className="md:hidden"
+      >
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -218,7 +224,11 @@ export function HeaderBar({
           ))}
         </nav>
 
-        <form onSubmit={submitSearch} className="ml-auto hidden min-w-0 flex-1 max-w-md md:flex">
+        <form
+          onSubmit={submitSearch}
+          method="get"
+          className="ml-auto hidden min-w-0 flex-1 max-w-md md:flex"
+        >
           <div className="relative w-full">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
