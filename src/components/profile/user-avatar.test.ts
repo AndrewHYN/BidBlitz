@@ -113,8 +113,9 @@ describe("UserAvatar rendering states", () => {
     const markers = src.match(/useState<string \| null>\(null\)/g) ?? [];
     expect(markers.length).toBeGreaterThanOrEqual(2);
 
-    // Both transitions must record the URL that produced them.
-    expect(src).toMatch(/onLoad=\{\(\)\s*=>\s*setLoadedUrl\(url\)\}/);
+    // Both transitions must record the URL that produced them. `onLoad` takes
+    // the element so it can reject a zero-size image; `onError` needs nothing.
+    expect(src).toMatch(/onLoad=\{\(event\)\s*=>/);
     expect(src).toMatch(/onError=\{\(\)\s*=>\s*setFailedUrl\(url\)\}/);
   });
 
@@ -125,6 +126,21 @@ describe("UserAvatar rendering states", () => {
     expect(src).toMatch(/data-avatar-state=\{isLoaded \? "image" : "initials"\}/);
     // "both" is deliberately absent from that expression.
     expect(src).not.toMatch(/data-avatar-state=\{[^}]*both/);
+  });
+
+  it("treats a zero-size loaded image as a failure, not a success", () => {
+    const src = code();
+    /*
+     * `onError` does not fire for an undecodable image. The browser reports
+     * `complete === true` with `naturalWidth === 0` and considers the fetch
+     * successful, so a corrupt or truncated object produces an empty circle
+     * with no fallback and no error. Measured in production against a stored
+     * object the decoder rejected.
+     */
+    expect(src).toMatch(/naturalWidth === 0/);
+    expect(src).toMatch(/naturalWidth === 0[\s\S]{0,200}setFailedUrl\(url\)/);
+    // And the ordinary success path must still mark it loaded.
+    expect(src).toMatch(/setLoadedUrl\(url\)/);
   });
 
   it("keeps the image decorative, and the initials hidden from assistive tech", () => {

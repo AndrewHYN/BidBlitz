@@ -154,7 +154,28 @@ export function UserAvatar({
             isLoaded ? "opacity-100" : "invisible opacity-0"
           )}
           data-testid="user-avatar-image"
-          onLoad={() => setLoadedUrl(url)}
+          onLoad={(event) => {
+            /*
+             * A load event is not proof of an image.
+             *
+             * A stored object can be present, served 200, and carry bytes the
+             * browser cannot decode — a truncated upload, a corrupt object. The
+             * browser then reports `complete === true` with
+             * `naturalWidth === 0` and **never fires `error`**, because from its
+             * point of view the fetch succeeded. Without this check the avatar
+             * sits there as an empty circle forever: the fallback never engages,
+             * and the user has no way to tell a broken picture from a face.
+             *
+             * Zero intrinsic size is never a real avatar, so treat it as the
+             * failure it is.
+             */
+            const img = event.currentTarget;
+            if (img.naturalWidth === 0) {
+              setFailedUrl(url);
+              return;
+            }
+            setLoadedUrl(url);
+          }}
           onError={() => setFailedUrl(url)}
         />
       ) : null}
