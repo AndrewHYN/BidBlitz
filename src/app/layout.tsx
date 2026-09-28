@@ -81,6 +81,21 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html
       lang="en"
       suppressHydrationWarning
+      /*
+       * Next.js reads this to decide whether it may keep `scroll-behavior:
+       * smooth` during a route transition. globals.css sets `scroll-smooth` on
+       * the html element, so without this attribute the app scrolls smoothly to
+       * the top on every client-side navigation - which fights the transition
+       * and made Next log a warning on every route change:
+       *
+       *   Detected `scroll-behavior: smooth` on the `<html>` element. To disable
+       *   smooth scrolling during route transitions, add
+       *   `data-scroll-behavior="smooth"` to your <html> element.
+       *
+       * This is the fix Next asks for, and it keeps smooth scrolling for
+       * in-page anchors, which is where it is wanted.
+       */
+      data-scroll-behavior="smooth"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col">
