@@ -451,22 +451,36 @@ instant deletion.
 
 ## L. Test-suite honesty (read before trusting a green run)
 
-**The e2e suite runs with `retries: 1`, and that is a deliberate, pre-existing
-decision — not a default.** `playwright.config.ts` justifies it: this machine
-has ~3.9 GB of RAM and the observed non-product failures were ambient
-(`net::ERR_NETWORK_IO_SUSPENDED` mid-navigation, "timeout while setting up
-page"). A genuine defect fails both attempts and still reports red.
+**`retries: 0`.** It was `retries: 1` from an earlier pass, justified by ambient
+environment failures on this low-memory machine. That justification was never
+tested, and it turned out to be covering a real problem that was being reported
+as environment noise (see below). A retry is the one thing that makes a green
+run worthless: a test that fails once still reports green, and an intermittent
+real defect is exactly the one you would most want to see. If a test is
+environment-sensitive, that is a finding about the test, and it gets fixed at
+its cause — a deterministic wait for a real state, never a sleep and never a
+retry.
 
-It still means **a test that fails once may finish the run reported as green**,
-so a single clean run is weaker evidence than it looks. Two consequences for
-whoever acts on this:
+**The suite now runs against the real deployment by default.** This was the
+more serious defect. `PLAYWRIGHT_BASE_URL` defaulted to `localhost:3000` with
+`reuseExistingServer: true`, so on 2026-09-28 the suite adopted a node process
+that had been listening since 03:39 — about six hours, predating the entire
+avatar feature. That server answered `has avatar uploader: false` and
+`has data-hydrated: false`. Every new avatar test failed against code that no
+longer existed, and the remaining tests "passed" against a stale build.
 
-- Treat one green full run as necessary, not sufficient. The 2026-09-28 pass
-  confirmed the run by executing the affected spec four additional times, all
-  clean, after a single failure it could not reproduce.
-- An **unreproduced** failure must be reported as unreproduced, not quietly
-  dropped because the next run was green. One such case occurred on 2026-09-28
-  and is called out in the pass report.
+The rules now are:
+
+- `baseURL` defaults to `https://bid-blitz-ten.vercel.app`.
+- A local server is booted **only** when `PLAYWRIGHT_BASE_URL` points at
+  localhost, and when it is booted it is **never reused** — a reused server may
+  predate the code under test, which is the entire bug.
+- If you are unsure what a run actually tested, check the target first. A green
+  run against the wrong code is worse than a red one, because it is believed.
+
+**An unreproduced failure must be reported as unreproduced**, not dropped
+because the next run was green. Two occurred on 2026-09-28 and are described in
+the pass report.
 
 **The suite cannot run safely against production while real visitors are on the
 site** (§J9a), and it leaves real rows behind whenever it is interrupted — the
@@ -476,7 +490,9 @@ teardown runs at the end of a run, not during one. Always finish with:
 npm run db:cleanup-e2e -- --yes
 ```
 
-and confirm zero auctions and zero storage objects before walking away.
+and confirm zero auctions and zero storage objects before walking away. A run
+killed part-way leaves everything the interrupted tests had created, because the
+teardown never runs.
 
 ---
 

@@ -225,6 +225,19 @@ trust facts, buying-page payment state). What follows was judged safe to wait:
   typed, but no buyer-facing payment sheet exists while the provider is
   the Noop one (showing one would fake payment progress).
 
+### Test-suite hygiene (fixed 2026-09-28 — do not reintroduce)
+
+- **`retries: 0` in `playwright.config.ts`, permanently.** It was `retries: 1`.
+  A retry makes a green run meaningless: a test that fails once still reports
+  green. Environment-sensitivity is fixed at its cause, not absorbed.
+- **The e2e suite targets the real deployment by default.** It defaulted to
+  `localhost:3000` with `reuseExistingServer: true` and therefore adopted a
+  six-hour-old dev server, against which every newly added test failed while
+  the rest of the suite passed. A local server is now booted only when
+  `PLAYWRIGHT_BASE_URL` points at localhost, and is never reused.
+- **A killed run leaves its fixtures behind**, because `globalTeardown` runs at
+  the end. `npm run db:cleanup-e2e -- --yes` after any interrupted run.
+
 ### Product/UX deferrals
 - **Avatar resizing, cropping and re-encoding** — the avatar path is
   server-validated (magic bytes, 2 MB, raster only, no SVG) and stored at
