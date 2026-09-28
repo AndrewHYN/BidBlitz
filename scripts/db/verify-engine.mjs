@@ -1861,6 +1861,28 @@ await sql(`delete from public.auctions where id='${auctionId}'`);
 // ---- 16. avatars: namespaced storage + a key that cannot leave your folder --
 console.log("\n--- avatars ---");
 
+/*
+ * A tripwire against the worst bug this file has ever had.
+ *
+ * The cleanup used to delete every object in the avatars bucket and null
+ * `avatar_path` on every profile, which destroyed a real user's profile picture
+ * on a run that reported itself green. It is now scoped to the four QA
+ * identities this harness resolved.
+ *
+ * This snapshot exists so that if the scoping is ever widened again, the run
+ * FAILS on a real account instead of succeeding quietly and taking someone's
+ * picture with it. Read-only, and taken before the section writes anything.
+ */
+const nonQaAvatarsBefore = rows(
+  await sql(
+    `select p.id::text, p.avatar_path
+       from public.profiles p
+       join auth.users u on u.id = p.id
+      where p.avatar_path is not null
+        and u.email not like '%@bidblitz.test'`
+  )
+);
+
 // A 1x1 PNG: the smallest valid thing that can pass the bucket's type gate.
 const PNG_1PX = Uint8Array.from([
   0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
@@ -1896,18 +1918,51 @@ async function profileAvatarPath(id) {
   return r[0]?.avatar_path;
 }
 
-// Remove everything this section put in the bucket.
+// Remove the objects THIS RUN created, and nothing else.
 //
-// Through the Storage API, not SQL: Supabase installs storage.protect_delete,
-// which refuses a direct DELETE on storage tables exactly to stop accidental
-// data loss. An earlier version of this section tried, and was correctly
-// rejected. Storage objects are not really rows either, so removing the row
-// alone would leave the blob behind.
-async function purgeAvatarBucket() {
-  const listed = rows(
-    await sql(`select name from storage.objects where bucket_id = 'avatars'`)
+// The previous version listed the whole `avatars` bucket, deleted every object in
+// it, and then nulled `avatar_path` on every profile in the database. That is
+// indiscriminate, and it destroyed a real user's profile picture: the owner
+// uploaded a real avatar, `db:verify` was run, and the picture was gone. Anyone
+// running the verification suite against a database with real users would have
+// lost all of their avatars, silently, on a green run.
+//
+// A verification script is supposed to leave the system as it found it, minus its
+// own fixtures. Scoping it to the four QA identities it resolved is the only way
+// to make that true, and it is what this does:
+//
+//   * only objects whose first path segment is one of the harness's QA user ids;
+//   * only the `avatar_path` of those same profiles;
+//   * and only when the value being cleared is one of the paths this run wrote.
+//
+// A real account is not in the id list, so it cannot be reached at all.
+const QA_AVATAR_OWNERS = [sellerId, buyer1Id, buyer2Id, buyer3Id].filter(Boolean);
+
+/** Object names in the avatars bucket that belong to the harness's QA accounts. */
+async function harnessAvatarObjects() {
+  if (QA_AVATAR_OWNERS.length === 0) return [];
+  const owners = QA_AVATAR_OWNERS.map((x) => `'${x}'`).join(",");
+  return rows(
+    await sql(
+      `select name from storage.objects
+        where bucket_id = 'avatars' and split_part(name, '/', 1) in (${owners})`
+    )
   );
+}
+
+/**
+ * Delete the QA accounts' avatar objects and clear their references.
+ *
+ * Through the Storage API, not SQL: Supabase installs storage.protect_delete,
+ * which refuses a direct DELETE on storage tables exactly to stop accidental data
+ * loss, and an object is not just a row so deleting the row would leave the blob.
+ */
+async function purgeAvatarBucket() {
+  if (QA_AVATAR_OWNERS.length === 0) return;
+  const owners = QA_AVATAR_OWNERS.map((x) => `'${x}'`).join(",");
+  const listed = await harnessAvatarObjects();
   if (listed.length === 0) return;
+
   const pub = requireEnv("NEXT_PUBLIC_SUPABASE_URL");
   const svc = requireEnv("SUPABASE_SECRET_KEY");
   for (const o of listed) {
@@ -1916,7 +1971,17 @@ async function purgeAvatarBucket() {
       headers: { apikey: svc, Authorization: `Bearer ${svc}` },
     });
   }
-  await sql(`update public.profiles set avatar_path = null where avatar_path is not null`);
+  // Only these accounts, and only a path that is now being removed. A profile
+  // outside the QA set is untouched whatever it points at.
+  await sql(
+    `update public.profiles set avatar_path = null
+      where id in (${owners}) and avatar_path is not null`
+  );
+  // Say what was removed, so a run that quietly did more than it should is
+  // visible in the output rather than inferred from a missing file later.
+  console.log(
+    `    (avatar cleanup removed ${listed.length} object(s) for ${QA_AVATAR_OWNERS.length} QA account(s); no other account was touched)`
+  );
 }
 
 const AV_OWN = `${sellerId}/avatar.png`;
@@ -2111,9 +2176,56 @@ check(
   );
 
 // Clean up everything this section put in the bucket.
-await purgeAvatarBucket();
-await sql(`update public.profiles set avatar_path = null where avatar_path is not null`);
+  // Clean up everything this section put in the bucket. `purgeAvatarBucket()` is now scoped
+  // to the four QA identities this run resolved, so it cannot reach a real account.
+  // The statement that used to follow it here was unscoped - `where avatar_path is not
+  // null` - so it nulled EVERY profile in the database, and it is what destroyed the
+  // owner's real profile picture on a green run. The scoping inside the helper makes
+  // it redundant, and leaving an unscoped copy of the same statement beside it would
+  // only be a way to reintroduce the same bug.
+  // Clean up everything this section put in the bucket. `purgeAvatarBucket()` is
+  // now scoped to the four QA identities this run resolved, so it cannot reach a
+  // real account. The statement that used to follow it here was unscoped -
+  // `where avatar_path is not null` - so it nulled EVERY profile in the database,
+  // and it is what destroyed the owner's real profile picture on a green run. The
+  // scoping inside the helper makes it redundant, and leaving an unscoped copy of
+  // the same statement beside it would only be a way to reintroduce the bug.
+  await purgeAvatarBucket();
 
+  // And prove it, rather than trusting the scoping. A real account that had a
+  // picture before this section must still have exactly that picture after it.
+  const nonQaAvatarsAfter = rows(
+    await sql(
+      `select p.id::text, p.avatar_path
+         from public.profiles p
+         join auth.users u on u.id = p.id
+        where p.avatar_path is not null
+          and u.email not like '%@bidblitz.test'`
+    )
+  );
+  const realBefore = JSON.stringify(nonQaAvatarsBefore.slice().sort());
+  const realAfter = JSON.stringify(nonQaAvatarsAfter.slice().sort());
+  check(
+    "avatar: the cleanup left every real account's picture exactly as it found it",
+    realBefore === realAfter,
+    realBefore === realAfter
+      ? `${nonQaAvatarsAfter.length} real avatar(s) untouched`
+      : `BEFORE ${realBefore} AFTER ${realAfter}`
+  );
+  const strayAvatarObjects = rows(
+    await sql(
+      `select name from storage.objects
+        where bucket_id = 'avatars'
+          and split_part(name, '/', 1) not in (${QA_AVATAR_OWNERS.map((x) => `'${x}'`).join(",") || "''"})`
+    )
+  );
+  check(
+    "avatar: the cleanup removed no object belonging to a real account",
+    strayAvatarObjects.length === nonQaAvatarsBefore.length,
+    strayAvatarObjects.length === nonQaAvatarsBefore.length
+      ? `${strayAvatarObjects.length} real object(s) intact`
+      : `expected ${nonQaAvatarsBefore.length} real object(s), found ${strayAvatarObjects.length}: ${JSON.stringify(strayAvatarObjects)}`
+  );
 // A finished run must leave no synthetic residue at all — this is the check
 // that makes the cleanup a promise rather than a hope.
 const testUserSubquery =
