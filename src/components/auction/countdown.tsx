@@ -75,55 +75,44 @@ export function Countdown({
   const urgent = Boolean(parts?.endingSoon);
 
   if (variant === "boxes" || variant === "large") {
-    const cells: Array<[number, string]> = parts
-      ? [
-          [parts.days, "d"],
-          [parts.hours, "h"],
-          [parts.minutes, "m"],
-          [parts.seconds, "s"],
-        ]
-      : [];
-
-    const visible = cells.filter(([v], i) => v > 0 || i >= 2);
-
+    /*
+     * One reading, not one box per unit.
+     *
+     * This rendered minutes and seconds as separate bordered cards, each with a
+     * 10px uppercase unit letter underneath, so the most time-sensitive number
+     * on the page read as "59 M" in one box and "13 S" in another. The eye had
+     * to cross a gap and infer the order; the boxes added two more frames to a
+     * panel that already had three; and `min-w-12` on a digit that changes
+     * every second made the whole group twitch as the numbers grew and shrank.
+     *
+     * A clock should read like a clock. "2d 4h" or "58m 13s" in one run of
+     * tabular numerals is legible in a single glance, has nothing to jitter,
+     * and leaves the panel quieter. Urgency is carried by colour and weight -
+     * the same information the old boxes carried, without the furniture.
+     */
+    const label = formatRemaining(endsAt, now);
     return (
-      <div
+      <span
         data-countdown="boxes"
         data-urgent={urgent ? "true" : undefined}
-        className={cn("flex items-center gap-1.5", className)}
         role="timer"
-        aria-label={`Time remaining: ${formatRemaining(endsAt, now)}`}
-        // Hydration guard: the label and digits are computed from `now`, so a
-        // second boundary crossing between SSR and hydration makes the two
-        // renders differ (observed: 59m 34s vs 59m 33s -> React hydration
-        // error). The server snapshot is stale by definition; React is told
-        // to trust the client for these nodes instead of discarding the tree.
+        aria-label={`Time remaining: ${label}`}
+        // Hydration guard: the digits are computed from `now`, so a second
+        // boundary crossing between SSR and hydration makes the two renders
+        // differ (observed: 59m 34s vs 59m 33s -> React hydration error). The
+        // server snapshot is stale by definition; React is told to trust the
+        // client for these nodes instead of discarding the tree.
         suppressHydrationWarning
+        className={cn(
+          "inline-flex items-baseline tabular-nums",
+          variant === "large" ? "text-2xl" : "text-base",
+          "font-semibold",
+          urgent ? "text-ending" : "text-foreground",
+          className
+        )}
       >
-        {visible.map(([value, unit]) => (
-          <div
-            key={unit}
-            className={cn(
-              "grid min-w-12 place-items-center rounded-lg border bg-card px-2 py-1.5",
-              urgent
-                ? "border-ending/60 bg-ending/10 text-ending-foreground"
-                : "text-foreground"
-            )}
-          >
-            <span data-numeric suppressHydrationWarning
-              className={cn(
-                "font-semibold tabular-nums",
-                variant === "large" ? "text-2xl" : "text-lg"
-              )}
-            >
-              {String(value).padStart(2, "0")}
-            </span>
-            <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
-              {unit}
-            </span>
-          </div>
-        ))}
-      </div>
+        {label}
+      </span>
     );
   }
 

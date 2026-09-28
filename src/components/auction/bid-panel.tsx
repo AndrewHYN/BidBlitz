@@ -3,13 +3,12 @@
 import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Gavel, Info, Timer, Trophy } from "lucide-react";
+import { Info, Timer, Trophy } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Countdown } from "@/components/auction/countdown";
 import { Money } from "@/components/auction/money";
 import { TransactionBadge } from "@/components/auction/status-badge";
@@ -437,12 +436,19 @@ export function BidPanel({
       /* POST: a pre-hydration native GET would put the bid amount into the URL.
          See login-form.tsx for the full reasoning. */
       method="post"
-      className="space-y-3 rounded-xl border bg-card p-5"
+      className="space-y-3 border-t border-border/70 pt-5"
       noValidate
     >
-      <div className="flex items-center gap-2">
-        <Gavel className="size-4 text-primary" aria-hidden />
-        <h2 className="font-semibold">Place your bid</h2>
+      {/* The bid control is the point of this page, so its heading states the
+          amount that will win the auction rather than repeating "Place your
+          bid" above a button that already says it. The minimum moves up here,
+          where a bidder checks it before typing, rather than below the field
+          where it is read after. */}
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 className="text-sm font-semibold tracking-tight">Your bid</h2>
+        <span className="text-xs text-muted-foreground">
+          Minimum <Money minor={floor} currency={currency} />
+        </span>
       </div>
 
       {/* Status banners crossfade (transform/opacity only, reduced-motion
@@ -483,41 +489,61 @@ export function BidPanel({
         )}
       </AnimatePresence>
 
-      <div className="space-y-1.5">
-        <Label htmlFor="bid-amount">Your bid</Label>
-        <div className="flex gap-2">
+      {/*
+        The amount and the action are stacked, full width, and both are tall.
+
+        They used to sit side by side with the button sized to its own label,
+        which made the primary action of the entire product the smallest thing
+        in the panel - a pale chip next to a wide empty input. A bid is one
+        number and one decision, so it gets the full width of the surface, a
+        larger field for the amount, and a button of equal weight directly
+        beneath it. Nothing else on the page can now be mistaken for the action.
+      */}
+      <div className="space-y-2.5">
+        <div className="flex flex-col gap-2.5">
           <Input
             id="bid-amount"
             data-testid="bid-amount-input"
             type="text"
             inputMode="decimal"
             autoComplete="off"
+            aria-label="Your bid amount"
             value={value}
             onChange={handleChange}
             placeholder={formatMoney(money(floor, currency))}
             disabled={pending}
             aria-invalid={errorText ? true : undefined}
             aria-describedby={errorText ? "bid-error-text" : undefined}
-            className="flex-1"
+            className="h-12 text-base font-semibold tabular-nums"
           />
           <Button
             type="submit"
             data-testid="place-bid-button"
             size="lg"
+            className="h-12 w-full text-base"
             disabled={pending || parsedAmount === null}
           >
-            {pending ? "Bidding…" : "Place bid"}
+            {pending ? "Placing bid…" : "Place bid"}
           </Button>
         </div>
 
         <p className="text-xs text-muted-foreground">
-          Minimum bid:{" "}
-          <Money minor={floor} currency={currency} />
-          {myHighestBidMinor !== null && (
+          {myHighestBidMinor !== null ? (
             <>
-              {" · "}
               Your highest bid:{" "}
-              <Money minor={myHighestBidMinor} currency={currency} />
+              <Money minor={myHighestBidMinor} currency={currency} /> · bids are
+              final.
+            </>
+          ) : (
+            <>
+              Bids are final.{" "}
+              <a
+                href="/help/rules"
+                className="font-medium text-primary underline-offset-2 hover:underline"
+              >
+                Read the bidding rules
+              </a>
+              .
             </>
           )}
         </p>
