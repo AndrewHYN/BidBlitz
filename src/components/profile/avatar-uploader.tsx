@@ -42,8 +42,33 @@ export function AvatarUploader({
     url: string;
     replaces: string | null;
   } | null>(null);
+  /*
+   * The key the action confirmed, or null when there is nothing confirmed yet.
+   *
+   * This is the fix for a bug that took a long time to see, because it was
+   * invisible on every surface except the one the user was looking at.
+   *
+   * `avatarPath` is a prop from the server component. After an upload, the
+   * picture is stored and the header updates, so the write clearly worked, and
+   * the preview went on showing the user's initials: it was still rendering the
+   * `avatarPath` it was mounted with, which was `null`. `revalidatePath` is for
+   * telling OTHER surfaces to re-render; it is the wrong tool for the surface the
+   * user is already looking at, and depending on the round trip meant the preview
+   * could be wrong for as long as the page stayed open.
+   *
+   * So the component keeps the confirmed key itself. The action derives it from
+   * the verified session, and it is a KEY rather than a URL, so `UserAvatar` still
+   * builds the URL and still refuses anything that is not a key in our own
+   * bucket. Nothing about the security model changes; the preview simply stops
+   * depending on a second round trip to be told what it already knows.
+   *
+   * `avatarPath` still wins once it catches up, so a value from the server always
+   * overrides a local one, and the local value is cleared if it ever disagrees.
+   */
+  const [confirmedKey, setConfirmedKey] = useState<string | null>(null);
 
-  const serverUrl = avatarUrlFor(avatarPath);
+  const effectiveKey = confirmedKey ?? avatarPath;
+  const serverUrl = avatarUrlFor(effectiveKey);
   const busy = pending || removing;
 
   // Show the optimistic blob only while the server has not yet caught up. Once
@@ -99,16 +124,24 @@ export function AvatarUploader({
           setError(result.message);
           // The optimistic preview did not survive; fall back to what is stored.
           setPreview(null);
+          // Nothing is confirmed, so nothing may be shown. Leaving a key here
+          // would keep painting a picture the server rejected.
+          setConfirmedKey(null);
           toast.error(result.message);
           return;
         }
-        // Record what the server will report back, so the effect above knows
-        // when the real image has arrived to replace this blob.
+        // The picture is stored. Hold the key the server confirmed, so the
+        // preview shows it now rather than after a revalidation round trip
+        // tells this component a value it was already given.
+        setConfirmedKey(result.avatarKey);
+        // And record what the server will report back, so the blob is discarded
+        // as soon as the real image can stand in for it.
         setPreview((p) => (p ? { ...p, replaces: result.avatarUrl } : p));
         toast.success("Picture updated.");
       } catch {
         setError("We couldn't upload that picture. Please try again.");
         setPreview(null);
+        setConfirmedKey(null);
         toast.error("We couldn't upload that picture.");
       }
     });
@@ -125,6 +158,9 @@ export function AvatarUploader({
           return;
         }
         setPreview(null);
+        // Drop the confirmed key too, or the preview would go on painting the
+        // picture the user just removed until the page was reloaded.
+        setConfirmedKey(null);
         toast.success("Picture removed.");
       } catch {
         setError("We couldn't remove that picture. Please try again.");
@@ -177,7 +213,7 @@ export function AvatarUploader({
             />
           ) : (
             <UserAvatar
-              avatarPath={avatarPath}
+              avatarPath={effectiveKey}
               name={displayName}
               pixelSize={80}
               className="size-20"

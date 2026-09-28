@@ -229,18 +229,42 @@ export async function updateProfileAction(input: {
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, rejection: { code: "not_authenticated", message: "Sign in." } };
 
-  const { error } = await supabase
+  /*
+   * `select("username")` is not cosmetic. The public profile route is
+   * `/profile/[username]`, so revalidating a path built from `user.id` throws
+   * away a cache entry for a URL that does not exist while leaving the real one
+   * stale - which is what this did. Editing your display name, bio or location
+   * and finding the old text still on your public profile is the visible result.
+   *
+   * Returning the row also keeps RLS honest: the update is still filtered to
+   * `user.id`, so a row the caller may not write is never returned, and an empty
+   * result is reported as a failure rather than silently succeeding.
+   */
+  const { data: updated, error } = await supabase
     .from("profiles")
     .update({
       display_name: input.displayName.trim(),
       bio: input.bio?.trim() || null,
       location: input.location?.trim() || null,
     })
-    .eq("id", user.id);
+    .eq("id", user.id)
+    .select("username")
+    .single();
 
   if (error) return { ok: false, rejection: friendlyAuthError(error.message) };
+  if (!updated?.username) {
+    return {
+      ok: false,
+      rejection: { code: "unknown", message: "We couldn't save those details. Please try again." },
+    };
+  }
 
-  revalidatePath(`/profile/${user.id}`);
+  // The two surfaces that can show these values: the page being edited, and the
+  // public profile. The header also carries the display name, and it lives in the
+  // root layout, so it is refreshed with the layout rather than path by path.
+  revalidatePath("/settings");
+  revalidatePath(`/profile/${updated.username}`);
+  revalidatePath("/", "layout");
   return { ok: true };
 }
 

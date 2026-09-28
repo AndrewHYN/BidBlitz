@@ -28,7 +28,27 @@ import {
 } from "@/lib/avatar";
 
 export type AvatarResult =
-  | { ok: true; avatarUrl: string | null; ext: AvatarExt | null }
+  | {
+      ok: true;
+      avatarUrl: string | null;
+      ext: AvatarExt | null;
+      /**
+       * The storage key that is now stored, or null when the picture was removed.
+       *
+       * Returned so the client can render the confirmed picture immediately
+       * instead of waiting for a revalidation round trip to hand it back. This is
+       * a KEY, not a URL, which is the point: `UserAvatar` builds the URL itself
+       * and refuses anything that is not a key in our own bucket, so handing it
+       * a key changes nothing about the security model. Returning a URL would
+       * mean a caller-supplied origin could reach the component, which is exactly
+       * the escape hatch the component is built to prevent.
+       *
+       * The key is derived server-side from the verified session, so it is not
+       * caller-controlled, and the database independently refuses any value
+       * outside the caller's own folder.
+       */
+      avatarKey: string | null;
+    }
   | { ok: false; message: string };
 
 /**
@@ -131,16 +151,25 @@ export async function uploadAvatarAction(
     };
   }
 
-  // The avatar appears in the site header, which is in the ROOT LAYOUT, so it
-  // is on every page. Revalidating only /settings would leave the header
-  // showing the old picture everywhere else until something else happened to
-  // revalidate. This is a rare, deliberate, user-initiated action, so
-  // invalidating the layout is the correct cost - and a stale avatar on every
-  // page is the visible alternative.
+  /*
+   * Revalidate every surface that can show the picture, not just the obvious one.
+   *
+   * `revalidatePath("/", "layout")` refreshes the header, which lives in the root
+   * layout and is on every page. It does NOT re-render the `/settings` page
+   * segment, which is where the user is standing and where the preview sits. That
+   * omission was a real bug, found by looking at the rendered page: uploading a
+   * picture updated the header avatar immediately while the preview kept showing
+   * initials, and the state sat at "initials" for as long as the page was open.
+   *
+   * The three paths below are the complete set of places a stored avatar is
+   * rendered. A new one needs adding here, or it will show the previous picture
+   * until an unrelated navigation happens to revalidate it.
+   */
   revalidatePath("/", "layout");
+  revalidatePath("/settings");
   if (updated?.username) revalidatePath(`/profile/${updated.username}`);
 
-  return { ok: true, avatarUrl: avatarUrlFor(key), ext: validated.ext };
+  return { ok: true, avatarUrl: avatarUrlFor(key), ext: validated.ext, avatarKey: key };
 }
 
 export async function removeAvatarAction(): Promise<AvatarResult> {
@@ -180,9 +209,12 @@ export async function removeAvatarAction(): Promise<AvatarResult> {
     };
   }
 
+  // Same three surfaces as the upload, for the same reason. Removing a picture
+  // left the /settings preview showing the old image for the rest of the visit.
   revalidatePath("/", "layout");
+  revalidatePath("/settings");
   if (profile?.username) revalidatePath(`/profile/${profile.username}`);
-  return { ok: true, avatarUrl: null, ext: null };
+  return { ok: true, avatarUrl: null, ext: null, avatarKey: null };
 }
 
 /**
