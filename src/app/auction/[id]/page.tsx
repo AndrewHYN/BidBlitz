@@ -6,7 +6,6 @@ import { MapPin } from "lucide-react";
 import { getAuctionDetail, imageUrlFor } from "@/server/queries";
 import { isPaymentProviderConfigured } from "@/server/payments/config";
 import { nextMinimumBid } from "@/lib/money";
-import { conditionLabels } from "@/lib/validation";
 import { ImageGallery, type GalleryImage } from "@/components/auction/image-gallery";
 import { AuctionDetailLive } from "@/components/auction/auction-detail-live";
 import { BidHistory } from "@/components/auction/bid-history";
@@ -16,7 +15,6 @@ import { SellerCard } from "@/components/auction/seller-card";
 import { ShareButton } from "@/components/auction/share-button";
 import { WatchButton } from "@/components/auction/watch-button";
 import { ConditionBadge } from "@/components/auction/status-badge";
-import { SectionHeading } from "@/components/auction/page-header";
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -174,10 +172,20 @@ export default async function AuctionPage({ params }: Props) {
       </div>
 
       <div className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-        <div className="space-y-6">
-          <section className="space-y-3 rounded-xl border bg-card p-5">
-            <SectionHeading title="About this item" />
-            <p className="text-sm leading-relaxed break-words whitespace-pre-line text-muted-foreground">
+        <div className="space-y-8">
+          {/* The seller's description is content, not an object, so it does not
+              get a card. It was a bordered box holding one paragraph, which is
+              the "unrelated paragraph, own box" failure — and on a page whose
+              right-hand column is the bid panel, an extra frame here competed
+              with the thing a bidder came for. */}
+          <section aria-labelledby="about-item">
+            <h2
+              id="about-item"
+              className="mb-3 text-base font-semibold tracking-tight"
+            >
+              About this item
+            </h2>
+            <p className="text-[0.9375rem] leading-[1.7] break-words whitespace-pre-line text-muted-foreground text-pretty">
               {auction.description}
             </p>
           </section>
@@ -185,34 +193,33 @@ export default async function AuctionPage({ params }: Props) {
           <BidHistory bids={bids} currency={auction.currency} />
         </div>
 
-        <aside className="space-y-4 self-start rounded-xl border bg-card p-5 lg:sticky lg:top-24">
-          <SectionHeading title="Item details" />
-          <dl className="divide-y">
-            <FactRow label="Category">
-              {auction.categories?.name ?? "Uncategorized"}
-            </FactRow>
-            <FactRow label="Condition">
-              {conditionLabels[auction.condition] ?? auction.condition}
-            </FactRow>
-            <FactRow label="Location">{auction.location}</FactRow>
-            <FactRow label="Starting bid">
-              <Money
-                minor={auction.starting_bid_minor}
-                currency={auction.currency}
-              />
-            </FactRow>
-            <FactRow label="Bid increment">
-              <Money
-                minor={auction.bid_increment_minor}
-                currency={auction.currency}
-              />
-            </FactRow>
-            <FactRow label="Listed">{listedOn}</FactRow>
-          </dl>
+        {/*
+          Only the terms that are not already on screen.
 
-          <div className="border-t pt-3">
-            <ReportDialog auctionId={auction.id} />
+          Category, condition and location were shown twice — as chips under the
+          title where they belong, and again as rows here — and the starting bid
+          was shown twice too, once in the bid panel. Repeating a fact in two
+          places on one page makes a reader check which is current. What is left
+          is what a bidder needs and cannot see anywhere else: what each extra
+          bid costs, and when the listing was published.
+        */}
+        <aside className="space-y-4 self-start lg:sticky lg:top-24">
+          <div className="rounded-xl border bg-card p-5">
+            <h2 className="mb-2 text-base font-semibold tracking-tight">
+              Bidding terms
+            </h2>
+            <dl className="divide-y">
+              <FactRow label="Bid increment">
+                <Money
+                  minor={auction.bid_increment_minor}
+                  currency={auction.currency}
+                />
+              </FactRow>
+              <FactRow label="Listed">{listedOn}</FactRow>
+            </dl>
           </div>
+
+          <ReportDialog auctionId={auction.id} />
         </aside>
       </div>
     </div>
