@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Search, X } from "lucide-react";
+import { ChevronDown, Search, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -159,6 +159,13 @@ export function BrowseFilters({
     apply({ ...values, q: values.q });
   }
 
+  // Which of the secondary filters are actually set, so the collapsed panel
+  // can say so instead of hiding the fact that results are narrowed.
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const activeFilterCount = [values.category, values.condition, values.min, values.max].filter(
+    Boolean
+  ).length;
+
   return (
     <section
       data-testid="browse-filters"
@@ -193,6 +200,37 @@ export function BrowseFilters({
           </Button>
         </div>
 
+        {/* Progressive disclosure: see the file-level note in the commit. */}
+        <div className="sm:hidden">
+          <button
+            type="button"
+            onClick={() => setFiltersOpen((o) => !o)}
+            aria-expanded={filtersOpen}
+            aria-controls="browse-advanced-filters"
+            data-testid="browse-filters-toggle"
+            className="flex w-full items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors hover:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+          >
+            <span>
+              Filters
+              {activeFilterCount > 0 && (
+                <span className="ml-1.5 text-primary">({activeFilterCount})</span>
+              )}
+            </span>
+            <span
+              aria-hidden
+              className={`text-muted-foreground transition-transform duration-200 ${filtersOpen ? "rotate-180" : ""}`}
+            >
+              <ChevronDown className="size-4" />
+            </span>
+          </button>
+        </div>
+
+        <div
+          id="browse-advanced-filters"
+          data-testid="browse-advanced-filters"
+          hidden={!filtersOpen}
+          className="sm:block"
+        >
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <div className="space-y-1.5">
             <Label htmlFor="browse-category">Category</Label>
@@ -314,6 +352,7 @@ export function BrowseFilters({
               }
             />
           </div>
+        </div>
         </div>
       </form>
 
