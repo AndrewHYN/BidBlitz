@@ -28,6 +28,40 @@ const NET_MINOR = GROSS_MINOR - FEE_MINOR; // $23.75
  */
 const PAYNOW_CHARGE_MINOR = 150n; // illustrative only
 
+/**
+ * A prose block on an explanation page.
+ *
+ * This page mixes two different kinds of content and the old layout treated them
+ * identically: paragraphs, and the worked examples. Only the examples are
+ * objects — a receipt you read line by line — so only they keep a frame. Every
+ * paragraph having its own border broke the reading rhythm on the one page
+ * whose entire job is making a money model legible, and boxed it the same way a
+ * legal section had been boxed, which is what made the whole help area feel
+ * generated.
+ *
+ * A hairline between sections does the separating. The bolded amounts in the
+ * prose are the real emphasis on this page, so they carry the weight the border
+ * used to.
+ */
+function Explain({
+  title,
+  action,
+  children,
+}: {
+  title: string;
+  action?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="space-y-4 border-t border-border/70 pt-8 first:border-t-0 first:pt-0">
+      <SectionHeading title={title} action={action} />
+      <div className="space-y-3 text-[0.9375rem] leading-[1.75] text-muted-foreground [&_em]:not-italic [&_em]:font-medium [&_em]:text-foreground [&_strong]:font-semibold [&_strong]:text-foreground">
+        {children}
+      </div>
+    </section>
+  );
+}
+
 function ExampleRow({
   label,
   note,
@@ -69,54 +103,48 @@ export default function HelpFeesPage() {
 
   return (
     <div data-testid="help-fees-page" className="page-container py-10 sm:py-14">
-      <div className="mx-auto w-full max-w-3xl space-y-10">
+      <div className="mx-auto w-full max-w-[68ch] space-y-10">
         <PageHeader
           title="Fees"
           description="What the seller pays BidBlitz, and what the buyer pays Paynow. Two separate amounts."
         />
 
-        <section className="space-y-4">
-          <SectionHeading title="The BidBlitz platform fee" />
-          <div className="space-y-3 rounded-xl border bg-card p-5 text-sm leading-relaxed sm:p-6">
-            <p>
-              BidBlitz charges <strong>one</strong> fee: a platform fee of{" "}
-              <strong>5% on the winning price</strong> of a sold auction. It is
-              deducted from the seller&apos;s proceeds, never added on top.
-            </p>
-            <p>
-              The fee is worked out once, when the auction closes, and saved on
-              the transaction itself. That way the record always matches the
-              maths, and both buyer and seller see the same numbers afterwards.
-            </p>
-          </div>
-        </section>
+        <Explain title="The BidBlitz platform fee">
+          <p>
+            BidBlitz charges <strong>one</strong> fee: a platform fee of{" "}
+            <strong>5% on the winning price</strong> of a sold auction. It is
+            deducted from the seller&apos;s proceeds, never added on top.
+          </p>
+          <p>
+            The fee is worked out once, when the auction closes, and saved on
+            the transaction itself. That way the record always matches the
+            maths, and both buyer and seller see the same numbers afterwards.
+          </p>
+        </Explain>
 
-        <section className="space-y-4">
-          <SectionHeading
-            title="What the buyer pays"
-            action={
-              <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <CreditCard className="size-3.5" aria-hidden />
-                Processed by Paynow
-              </span>
-            }
-          />
-          <div className="space-y-3 rounded-xl border bg-card p-5 text-sm leading-relaxed sm:p-6">
-            <p>
-              The buyer is charged the <strong>winning bid</strong> plus the{" "}
-              <strong>applicable Paynow payment charge</strong>. That charge is
-              Paynow&apos;s own cost for the payment method: it is calculated
-              and displayed by Paynow on its own payment page before the buyer
-              authorises anything, and it is <strong>not</strong> money BidBlitz
-              receives.
-            </p>
-            <p>
-              The two amounts therefore move in opposite directions: the buyer
-              pays the winning bid <em>plus</em> Paynow&apos;s charge, and the
-              seller receives the winning bid <em>minus</em> BidBlitz&apos;s 5%.
-            </p>
-          </div>
-        </section>
+        <Explain
+          title="What the buyer pays"
+          action={
+            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <CreditCard className="size-3.5" aria-hidden />
+              Processed by Paynow
+            </span>
+          }
+        >
+          <p>
+            The buyer is charged the <strong>winning bid</strong> plus the{" "}
+            <strong>applicable Paynow payment charge</strong>. That charge is
+            Paynow&apos;s own cost for the payment method: it is calculated
+            and displayed by Paynow on its own payment page before the buyer
+            authorises anything, and it is <strong>not</strong> money BidBlitz
+            receives.
+          </p>
+          <p>
+            The two amounts therefore move in opposite directions: the buyer
+            pays the winning bid <em>plus</em> Paynow&apos;s charge, and the
+            seller receives the winning bid <em>minus</em> BidBlitz&apos;s 5%.
+          </p>
+        </Explain>
 
         <section className="space-y-4">
           <SectionHeading
@@ -190,17 +218,15 @@ export default function HelpFeesPage() {
           </div>
         </section>
 
-        <section className="space-y-4">
-          <SectionHeading
-            title="Payments"
-            action={
-              <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <CreditCard className="size-3.5" aria-hidden />
-                {paymentConfigured ? "Paynow connected" : "No provider connected"}
-              </span>
-            }
-          />
-          <div className="space-y-3 rounded-xl border bg-card p-5 text-sm leading-relaxed sm:p-6">
+        <Explain
+          title="Payments"
+          action={
+            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <CreditCard className="size-3.5" aria-hidden />
+              {paymentConfigured ? "Paynow connected" : "No provider connected"}
+            </span>
+          }
+        >
             <p>
               When an auction settles, a transaction is created with the winning
               price, fee and net amount recorded. It starts as{" "}
@@ -246,8 +272,7 @@ export default function HelpFeesPage() {
               If a dispute is opened, a seller payout is held while it is looked
               into. A refund to the buyer also holds the payout.
             </p>
-          </div>
-        </section>
+        </Explain>
 
         <p className="text-sm">
           <Link href="/help/rules" className="font-medium text-primary hover:underline">

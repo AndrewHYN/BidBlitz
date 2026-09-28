@@ -41,23 +41,42 @@ export default function HelpPage() {
           description="Only what BidBlitz actually does today — no promises we haven't built."
         />
 
-        <ul className="grid gap-4 sm:grid-cols-3">
+        {/*
+          This is a contents list, and it used to be dressed as a feature grid:
+          three identical cards, each with an icon in a tinted square, a title, a
+          description and a "Read more" arrow. Nothing here is a feature — they
+          are three articles, and a reader comparing them wants to see all three
+          titles at once, not three equal-weight objects competing for attention.
+          Equal cards also force the descriptions to wrap to the same height,
+          which is what made the block feel padded.
+
+          As an index it reads faster: strong left-aligned title, one line of
+          plain explanation, the arrow on the right, and a hairline between
+          rows. Same content, less furniture, and it scans in one pass.
+        */}
+        <ul className="border-t border-border/70">
           {TOPICS.map((topic) => (
-            <li key={topic.href}>
+            <li key={topic.href} className="border-b border-border/70">
               <Link
                 href={topic.href}
-                className="group flex h-full flex-col gap-2 rounded-xl border bg-card p-5 transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md"
+                className="group flex items-start justify-between gap-6 py-4 transition-colors hover:bg-muted/40 focus-visible:bg-muted/40 focus-visible:outline-none sm:-mx-3 sm:px-3 sm:rounded-md"
               >
-                <span className="grid size-9 place-items-center rounded-lg bg-accent text-accent-foreground">
-                  <topic.icon className="size-4" aria-hidden />
+                <span className="min-w-0">
+                  <span className="flex items-center gap-2 font-medium">
+                    <topic.icon
+                      className="size-4 shrink-0 text-muted-foreground"
+                      aria-hidden
+                    />
+                    {topic.title}
+                  </span>
+                  <span className="mt-1 block text-sm leading-relaxed text-muted-foreground text-pretty">
+                    {topic.description}
+                  </span>
                 </span>
-                <span className="font-medium group-hover:text-primary">
-                  {topic.title}
-                </span>
-                <span className="text-sm text-muted-foreground">{topic.description}</span>
-                <span className="mt-auto flex items-center gap-1 pt-2 text-xs font-medium text-primary">
-                  Read more <ArrowRight className="size-3" aria-hidden />
-                </span>
+                <ArrowRight
+                  className="mt-1 size-4 shrink-0 text-muted-foreground/50 transition-[color,transform] duration-200 ease-out group-hover:translate-x-0.5 group-hover:text-primary"
+                  aria-hidden
+                />
               </Link>
             </li>
           ))}

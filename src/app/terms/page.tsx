@@ -1,7 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Mail, Phone } from "lucide-react";
-import { PageHeader, SectionHeading } from "@/components/auction/page-header";
+import {
+  LegalContactCard,
+  LegalCrossLinks,
+  LegalDocument,
+  LegalSection,
+} from "@/components/legal/legal-document";
+import { PageHeader } from "@/components/auction/page-header";
 import { isPaymentProviderConfigured } from "@/server/payments/config";
 
 export const metadata: Metadata = {
@@ -13,6 +19,29 @@ export const metadata: Metadata = {
 
 const LAST_UPDATED = "26 September 2026";
 
+/**
+ * The page index.
+ *
+ * Twelve sections with anchor targets and no visible index is a navigation
+ * problem the page was already half-solving with `scroll-mt-24`. The titles
+ * are declared once here and used for both the headings and the table of
+ * contents, so the two cannot drift apart.
+ */
+const SECTIONS = [
+  { id: "agreement", title: "1. Agreeing to these terms" },
+  { id: "account", title: "2. Your account" },
+  { id: "selling", title: "3. Selling" },
+  { id: "bidding", title: "4. Bidding" },
+  { id: "settlement", title: "5. Winning and settlement" },
+  { id: "fees", title: "6. Fees" },
+  { id: "payments", title: "7. Payments" },
+  { id: "payouts", title: "8. Paying the seller" },
+  { id: "reviews", title: "9. Reviews" },
+  { id: "moderation", title: "10. Reporting and moderation" },
+  { id: "ownership", title: "11. What you list is yours" },
+  { id: "provision", title: "12. How the site is provided" },
+] as const;
+
 function TermsSection({
   id,
   title,
@@ -23,12 +52,9 @@ function TermsSection({
   children: React.ReactNode;
 }) {
   return (
-    <section id={id} className="scroll-mt-24 space-y-4">
-      <SectionHeading title={title} />
-      <div className="space-y-3 rounded-xl border bg-card p-5 text-sm leading-relaxed sm:p-6">
-        {children}
-      </div>
-    </section>
+    <LegalSection id={id} title={title}>
+      {children}
+    </LegalSection>
   );
 }
 
@@ -38,14 +64,15 @@ export default function TermsPage() {
   const paymentConfigured = isPaymentProviderConfigured();
 
   return (
-    <div data-testid="terms-page" className="page-container py-10 sm:py-14">
-      <div className="mx-auto w-full max-w-3xl space-y-10">
-        <PageHeader
-          title="Terms of Use"
-          description="Plain language, based on what BidBlitz actually does today."
-        />
-
-        <p className="text-xs text-muted-foreground">Last updated: {LAST_UPDATED}</p>
+    <div data-testid="terms-page">
+      <LegalDocument toc={SECTIONS}>
+        <header className="space-y-4">
+          <PageHeader
+            title="Terms of Use"
+            description="Plain language, based on what BidBlitz actually does today."
+          />
+          <p className="text-xs text-muted-foreground">Last updated: {LAST_UPDATED}</p>
+        </header>
 
         <TermsSection id="agreement" title="1. Agreeing to these terms">
           <p>
@@ -292,48 +319,35 @@ export default function TermsPage() {
           </p>
         </TermsSection>
 
-        <section id="contact" className="scroll-mt-24 space-y-4">
-          <SectionHeading title="Questions" />
-          <div className="space-y-3 rounded-xl border bg-card p-5 text-sm leading-relaxed sm:p-6">
-            <p>If anything here is unclear, ask us before you bid or list:</p>
-            <ul className="space-y-2">
-              <li className="flex items-center gap-2">
-                <Phone className="size-4 shrink-0 text-primary" aria-hidden />
-                <a
-                  href="tel:0789335669"
-                  className="font-medium text-primary hover:underline"
-                >
-                  0789335669
-                </a>
-              </li>
-              <li className="flex items-center gap-2">
-                <Mail className="size-4 shrink-0 text-primary" aria-hidden />
-                <a
-                  href="mailto:hyndrrx0@gmail.com"
-                  className="font-medium text-primary hover:underline"
-                >
-                  hyndrrx0@gmail.com
-                </a>
-              </li>
-            </ul>
-            <p className="text-xs text-muted-foreground">
-              See also:{" "}
-              <Link href="/privacy" className="font-medium text-primary hover:underline">
-                Privacy Policy
-              </Link>
-              ,{" "}
-              <Link href="/help/rules" className="font-medium text-primary hover:underline">
-                Bidding rules
-              </Link>{" "}
-              and{" "}
-              <Link href="/help/fees" className="font-medium text-primary hover:underline">
-                Fees
-              </Link>
-              .
-            </p>
-          </div>
-        </section>
-      </div>
+        <LegalContactCard>
+          <p className="mb-3 text-[0.9375rem] leading-[1.75] text-muted-foreground">
+            If anything here is unclear, ask us before you bid or list.
+          </p>
+          <ul className="space-y-2 text-[0.9375rem]">
+            <li className="flex items-center gap-2">
+              <Phone className="size-4 shrink-0 text-primary" aria-hidden />
+              <a
+                href="tel:0789335669"
+                className="font-medium text-primary hover:underline"
+              >
+                0789335669
+              </a>
+            </li>
+            <li className="flex items-center gap-2">
+              <Mail className="size-4 shrink-0 text-primary" aria-hidden />
+              <a
+                href="mailto:hyndrrx0@gmail.com"
+                className="font-medium text-primary hover:underline"
+              >
+                hyndrrx0@gmail.com
+              </a>
+            </li>
+          </ul>
+          <p className="mt-4 text-sm text-muted-foreground">
+            <LegalCrossLinks />
+          </p>
+        </LegalContactCard>
+      </LegalDocument>
     </div>
   );
 }

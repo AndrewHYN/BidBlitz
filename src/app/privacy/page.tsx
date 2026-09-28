@@ -1,7 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Mail, Phone } from "lucide-react";
-import { PageHeader, SectionHeading } from "@/components/auction/page-header";
+import {
+  LegalContactCard,
+  LegalCrossLinks,
+  LegalDocument,
+  LegalSection,
+} from "@/components/legal/legal-document";
+import { PageHeader } from "@/components/auction/page-header";
 
 export const metadata: Metadata = {
   title: "Privacy Policy",
@@ -11,6 +17,19 @@ export const metadata: Metadata = {
 };
 
 const LAST_UPDATED = "25 September 2026";
+
+/** Declared once, used for both the headings and the table of contents. */
+const SECTIONS = [
+  { id: "overview", title: "1. The short version" },
+  { id: "collect", title: "2. What we collect" },
+  { id: "public", title: "3. What other people can see" },
+  { id: "use", title: "4. How we use it" },
+  { id: "cookies", title: "5. Cookies and local storage" },
+  { id: "sharing", title: "6. Who else receives it" },
+  { id: "retention", title: "7. How long we keep it" },
+  { id: "choices", title: "8. Your choices" },
+  { id: "changes", title: "9. Changes to this policy" },
+] as const;
 
 function PrivacySection({
   id,
@@ -22,25 +41,23 @@ function PrivacySection({
   children: React.ReactNode;
 }) {
   return (
-    <section id={id} className="scroll-mt-24 space-y-4">
-      <SectionHeading title={title} />
-      <div className="space-y-3 rounded-xl border bg-card p-5 text-sm leading-relaxed sm:p-6">
-        {children}
-      </div>
-    </section>
+    <LegalSection id={id} title={title}>
+      {children}
+    </LegalSection>
   );
 }
 
 export default function PrivacyPage() {
   return (
-    <div data-testid="privacy-page" className="page-container py-10 sm:py-14">
-      <div className="mx-auto w-full max-w-3xl space-y-10">
-        <PageHeader
-          title="Privacy Policy"
-          description="What BidBlitz actually stores and shows — no more than the product needs."
-        />
-
-        <p className="text-xs text-muted-foreground">Last updated: {LAST_UPDATED}</p>
+    <div data-testid="privacy-page">
+      <LegalDocument toc={SECTIONS}>
+        <header className="space-y-4">
+          <PageHeader
+            title="Privacy Policy"
+            description="What BidBlitz actually stores and shows — no more than the product needs."
+          />
+          <p className="text-xs text-muted-foreground">Last updated: {LAST_UPDATED}</p>
+        </header>
 
         <PrivacySection id="overview" title="1. The short version">
           <p>
@@ -184,9 +201,7 @@ export default function PrivacyPage() {
           </p>
         </PrivacySection>
 
-        <section id="contact" className="scroll-mt-24 space-y-4">
-          <SectionHeading title="Contact" />
-          <div className="space-y-3 rounded-xl border bg-card p-5 text-sm leading-relaxed sm:p-6">
+        <LegalContactCard>
             <p>
               Questions about your data? Reach us directly — we answer as
               individuals, not a faceless support queue:
@@ -211,16 +226,11 @@ export default function PrivacyPage() {
                 </a>
               </li>
             </ul>
-            <p className="text-xs text-muted-foreground">
-              See also:{" "}
-              <Link href="/terms" className="font-medium text-primary hover:underline">
-                Terms of Use
-              </Link>
-              .
+            <p className="mt-4 text-sm text-muted-foreground">
+              <LegalCrossLinks />
             </p>
-          </div>
-        </section>
-      </div>
+          </LegalContactCard>
+      </LegalDocument>
     </div>
   );
 }
