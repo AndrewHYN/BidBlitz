@@ -271,3 +271,103 @@ lift and button press already carry the state changes, and they are unchanged.
   page with a real photograph has not been seen, because production correctly has
   no listings. One temporary QA listing was published to review the auction page
   and removed; with a real photo, the gallery still needs a look.
+
+---
+
+# What the later 2026-09-28 work decided
+
+Continued after the structural pass above. Same rule: record the call so a later
+change argues with it rather than rediscovers the problem.
+
+## Password reset
+
+Built, because the brief requires it and it did not exist. `/forgot-password`,
+the emailed link, `/reset-password`, and an explained state for a link that was
+never issued, has expired, or was already used.
+
+**The decision that matters is what it does not say.** The first implementation
+forwarded provider errors, on the reasonable-sounding grounds that a user must
+never be told to check an inbox when no email was sent. Measured against the
+live provider:
+
+```
+unknown address  -> HTTP 200, {}
+real account     -> HTTP 429, over_email_send_rate_limit
+```
+
+The provider answers a known address differently, and the difference is an
+error. Forwarding it turns the form into an account-enumeration oracle. Since
+`rate_limit_email_sent` is 2/hour, that quota is exhausted in ordinary use, so
+the oracle was open **in production**. Every provider response is now
+normalised to the same outcome. The one failure still reported is BidBlitz's
+own budget, which is scoped to the request IP and the submitted address and
+therefore gives the same answer either way.
+
+`MIN_PASSWORD_LENGTH` lives in `@/lib/validation`, not the action file: a
+`"use server"` module may only export async functions, and exporting a number
+from one passes TypeScript, ESLint and `next build` and then fails at request
+time.
+
+## Browse filters are disclosed on a phone
+
+Search, sort and a Filters button stay visible; category, condition and price
+collapse below `sm`. The button counts active filters, so a collapsed panel is
+never a hidden state. `sm:` and above shows everything — a viewport with room
+for the whole panel would treat that as a downgrade.
+
+## The dashboard leads with what needs you
+
+Four equal KPI counters became: the counters only when something is in them, and
+being outbid lifted to the top in the ending colour. Settling is deliberately
+*not* repeated up there, because the page already has a section with a real
+`SettleButton` beside each auction. Each section does one job.
+
+## A card's heading level is the caller's decision
+
+`AuctionCard` hardcoded `h3`, correct on the home page (cards sit under an
+`h2` `SectionHeading`) and wrong on Browse (the only heading above a card is the
+page `h1`). The defect was invisible while Browse had no inventory. It became
+visible the moment the owner's own listing appeared. Card and grid now take the
+level from the caller; the nested case is the default.
+
+## Admin queues are queues
+
+Payout and report rows lost their drop shadow and tightened spacing, so a
+backlog reads as a list rather than as floating islands. **Reviewed from source
+and from the non-admin refusal path only** — `/admin` needs the owner's
+credentials, which are never handled here.
+
+## Two defects the suite was structurally blind to
+
+Both are worth more than their fixes, because each shows a gap in how the
+project verifies itself.
+
+**A `<p>` inside a `<p>` on /terms and /privacy.** Invalid HTML, so the parser
+closes the outer element, the client tree stops matching the server, and React
+discards and re-renders the subtree on every load. 263 unit tests, 136 database
+checks and 60 e2e tests were all green throughout. The e2e assertions check
+what the page *shows*, and the page showed correctly — React had repaired it in
+the browser. Only the error showed the defect, and in production it is a
+minified `#418`.
+
+`e2e/hydration.spec.ts` now asserts on uncaught errors rather than content, for
+all thirteen public pages. It was verified to have teeth: the bug was
+reintroduced locally and the guard failed, then the fix was restored and it
+passed.
+
+**Contact links 23px tall** and a **`h1` → `h3` skip on every page** — both
+found by measuring all twelve public pages in a browser, not by reading markup.
+
+## Measurement artifacts, recorded so they are not "fixed"
+
+An accessibility sweep reported three things that are correct as they stand, and
+chasing them would have made the interface worse:
+
+- the skip link measures 1×1 — visually hidden until focused, which is the
+  intent;
+- inline text links measure 18–20px — WCAG 2.5.8 exempts a target rendered
+  inline in a block of text;
+- three native `<select>` elements are unlabelled — Radix renders them
+  `aria-hidden`, `tabindex="-1"` and clipped to 0×0 for form participation. The
+  controls a user operates are `role="combobox"` and each is labelled by its
+  `<label for>`.
