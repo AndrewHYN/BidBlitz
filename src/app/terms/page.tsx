@@ -343,9 +343,14 @@ export default function TermsPage() {
               </a>
             </li>
           </ul>
-          <p className="mt-4 text-sm text-muted-foreground">
+          {/* A div, not a p: DocumentCrossLinks renders its own <p>, and a <p>
+              inside a <p> is invalid HTML. The parser auto-closes the outer
+              element, so the client tree no longer matches the server and React
+              discards and re-renders the subtree — a hydration error that only
+              showed up as a minified #418 in production. */}
+          <div className="mt-4 text-sm text-muted-foreground">
             <DocumentCrossLinks />
-          </p>
+          </div>
         </DocumentContactCard>
       </DocumentPage>
     </div>

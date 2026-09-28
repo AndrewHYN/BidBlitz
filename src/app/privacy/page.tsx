@@ -226,9 +226,13 @@ export default function PrivacyPage() {
                 </a>
               </li>
             </ul>
-            <p className="mt-4 text-sm text-muted-foreground">
+            {/* A div, not a p — DocumentCrossLinks renders its own <p>, and a
+                <p> inside a <p> is invalid HTML that the parser repairs by
+                closing the outer element, which desynchronises the client tree
+                from the server HTML. */}
+            <div className="mt-4 text-sm text-muted-foreground">
               <DocumentCrossLinks />
-            </p>
+            </div>
           </DocumentContactCard>
       </DocumentPage>
     </div>
