@@ -152,10 +152,12 @@ export function AuctionDetailLive({
     lastEvent && "serverTime" in lastEvent
       ? Date.parse(lastEvent.serverTime)
       : Number.NaN;
-  // An event that reached the mirror already passed the hook's plausibility
-  // bound (see MAX_EVENT_FUTURE_SKEW_MS), so its timestamp can be believed.
-  // One that did not is still `lastEvent` but has no usable time, and then the
-  // server-rendered snapshot wins rather than a fabricated value.
+  // `lastEvent` is only ever a event the hook already accepted: an implausible
+  // one is dropped before it becomes state, so it never reaches this render at
+  // all. So `eventTime` is either NaN (no accepted event yet, or one that
+  // changes no mirrored value) or a timestamp inside the hook's bound. Either
+  // way it is safe to compare against the server-rendered snapshot, and when
+  // there is nothing usable the server's own values win.
   const stateTime = Number.isNaN(eventTime) ? propsTime : eventTime;
 
   const propsSnapshot: Snapshot = {
