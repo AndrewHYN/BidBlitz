@@ -26,6 +26,20 @@ export const DURATIONS = [
   { label: "3 days", seconds: 259200 },
 ] as const;
 
+/**
+ * Minimum password length.
+ *
+ * One constant for the sign-up form, the password-reset form and the server
+ * action, so the three can never disagree about what a valid password is. It
+ * lived only as an `if` inside the sign-up form before this, which is how a
+ * reset form ends up accepting something the sign-up form would have rejected.
+ *
+ * It has to live here rather than in the action file: a `"use server"` module
+ * may only export async functions, and exporting a number from one breaks the
+ * module at request time while every static gate stays green.
+ */
+export const MIN_PASSWORD_LENGTH = 8;
+
 export const MAX_IMAGES = 8;
 export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 export const ALLOWED_IMAGE_TYPES = [

@@ -155,9 +155,21 @@ export function LoginForm({
         {submitting ? "Signing in…" : "Sign in"}
       </Button>
 
+      <p className="text-center text-sm">
+        <Link
+          href="/forgot-password"
+          className="font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+        >
+          Forgot your password?
+        </Link>
+      </p>
+
       <p className="text-center text-sm text-muted-foreground">
         New to BidBlitz?{" "}
-        <Link href="/signup" className="font-medium text-primary hover:underline">
+        <Link
+          href="/signup"
+          className="font-medium text-primary underline-offset-2 hover:underline"
+        >
           Create an account
         </Link>
       </p>

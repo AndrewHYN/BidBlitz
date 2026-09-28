@@ -22,6 +22,8 @@ export type BidErrorCode =
   | "has_bids"
   | "rate_limited"
   | "account_banned"
+  | "invalid_input"
+  | "reset_link_invalid"
   | "unknown";
 
 export type BidRejection = {
@@ -56,6 +58,12 @@ const MESSAGES: Record<BidErrorCode, string> = {
   // contact route is the one the site already publishes.
   account_banned:
     "Your account can't bid or list right now. If you think that's a mistake, get in touch.",
+  // Password-reset defaults. The reset actions pass their own specific copy
+  // for most failures; these are the fallbacks used when a provider message has
+  // to be mapped to a code.
+  invalid_input: "Check what you've entered and try again.",
+  reset_link_invalid:
+    "This reset link has expired or was already used. Request a new one.",
   unknown: "Something went wrong. Please try again.",
 };
 

@@ -5,6 +5,7 @@ import { useRef, useState, useTransition } from "react";
 import { MailCheck } from "lucide-react";
 import { signUpAction } from "@/server/actions/auth";
 import { useMounted } from "@/hooks/use-mounted";
+import { MIN_PASSWORD_LENGTH } from "@/lib/validation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -53,8 +54,8 @@ export function SignupForm() {
       setError("Enter your name.");
       return;
     }
-    if (password.length < 8) {
-      setError("Password must be at least 8 characters.");
+    if (password.length < MIN_PASSWORD_LENGTH) {
+      setError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters.`);
       return;
     }
 
@@ -174,13 +175,13 @@ export function SignupForm() {
           name="password"
           type="password"
           autoComplete="new-password"
-          minLength={8}
+          minLength={MIN_PASSWORD_LENGTH}
           required
           aria-describedby="signup-password-hint"
           data-testid="password-field"
         />
         <p id="signup-password-hint" className="text-xs text-muted-foreground">
-          At least 8 characters.
+          At least {MIN_PASSWORD_LENGTH} characters.
         </p>
       </div>
 

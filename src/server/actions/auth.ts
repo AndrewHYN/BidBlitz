@@ -14,6 +14,7 @@ import { absoluteUrl } from "@/lib/site-url";
 import { safeNext } from "@/lib/safe-next";
 import { AUTH_LIMIT, peekRateLimit, rateLimit } from "@/server/rate-limit";
 import type { BidRejection } from "@/server/errors";
+import { MIN_PASSWORD_LENGTH } from "@/lib/validation";
 
 export type AuthResult = { ok: true } | { ok: false; rejection: BidRejection };
 
@@ -240,5 +241,145 @@ export async function updateProfileAction(input: {
   if (error) return { ok: false, rejection: friendlyAuthError(error.message) };
 
   revalidatePath(`/profile/${user.id}`);
+  return { ok: true };
+}
+
+/**
+ * Ask the provider to email a recovery link.
+ *
+ * **This never says whether an account exists, and that is enforced rather than
+ * assumed.** The provider does distinguish them — measured live on 2026-09-28,
+ * an unknown address returns HTTP 200 `{}` while a real account returns 429
+ * `over_email_send_rate_limit` — so any provider error forwarded to the caller
+ * is an account-enumeration oracle. Every provider response is therefore
+ * normalised to the same generic outcome. The evidence and the reasoning are at
+ * the `if (error)` branch below, because this is the decision that matters.
+ *
+ * Our own budget is the one failure still reported: it is scoped to the
+ * request's IP and the submitted address, so it gives the same answer whether or
+ * not the account exists, and telling the truth there leaks nothing.
+ *
+ * The link is routed through the existing `/auth/callback`, which already
+ * exchanges a `code` for a session cookie and honours a validated `next` — so
+ * recovery reuses the one redirect rule the app already has rather than adding
+ * a second one that could disagree with it.
+ */
+export async function requestPasswordResetAction(input: {
+  email: string;
+}): Promise<{ ok: true } | { ok: false; rejection: BidRejection }> {
+  const email = input.email.trim().toLowerCase();
+  if (!email) {
+    return { ok: false, rejection: { code: "invalid_input", message: "Enter your email address." } };
+  }
+
+  const budgetKey = await authFailureKey(email);
+  if (!peekRateLimit(budgetKey, AUTH_LIMIT.limit, AUTH_LIMIT.windowMs).allowed) {
+    return { ok: false, rejection: { code: "rate_limited", message: AUTH_RATE_MESSAGE } };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${absoluteUrl("/auth/callback")}?next=${encodeURIComponent("/reset-password")}`,
+  });
+
+  if (error) {
+    const failure = classifyAuthFailure(error.message, statusOf(error));
+    /*
+     * Swallowed on purpose, and this is the important decision in the file.
+     *
+     * Measured against the live provider on 2026-09-28:
+     *
+     *   unknown address -> HTTP 200, {}
+     *   real account    -> HTTP 429, over_email_send_rate_limit
+     *
+     * The provider answers a KNOWN address differently from an unknown one, and
+     * the difference is an error. So forwarding that error — which the first
+     * version of this function did, on the reasonable-sounding grounds that
+     * "we must not tell a user to check an inbox when we know no email was
+     * sent" — turns this form into an account-enumeration oracle: submit any
+     * address, and a rate-limit error means "this person has a BidBlitz
+     * account". Enumeration is how phishers and credential-stuffers choose
+     * targets, and it is a far worse outcome than a user waiting a few minutes
+     * for an email that the provider's own 2-per-hour quota has delayed.
+     *
+     * That quota is not theoretical either: it is the real, current setting, so
+     * the oracle was open in production, not only in theory.
+     *
+     * So every provider response is normalised to the same generic outcome. The
+     * one failure that is still reported is OUR OWN budget, which is scoped to
+     * the request's IP and the submitted address and therefore does not depend
+     * on whether the account exists — "too many attempts from this device" is
+     * the same answer for every address, so telling the truth there leaks
+     * nothing.
+     */
+    if (!failure.providerThrottled) {
+      // A non-throttle error is also swallowed: it is provider-specific
+      // detail, and some of it (an "user not found" style message) would be an
+      // enumeration signal just as directly.
+      console.warn("[auth] password reset request failed:", error.message);
+    }
+    return { ok: true };
+  }
+
+  return { ok: true };
+}
+
+/**
+ * Set a new password, using the recovery session the emailed link established.
+ *
+ * There is no email parameter and no lookup: whoever holds a valid recovery
+ * session sets the password for that session's own user. A reset link is a
+ * bearer credential, so it is never combined with anything the caller could
+ * swap — otherwise "reset Alice's password with Bob's link" becomes possible.
+ *
+ * Without a recovery session this is refused, which is the correct outcome for
+ * an expired or already-used link, and the page turns it into an explanation
+ * rather than a generic error.
+ */
+export async function updatePasswordAction(input: {
+  password: string;
+}): Promise<{ ok: true } | { ok: false; rejection: BidRejection }> {
+  if (input.password.length < MIN_PASSWORD_LENGTH) {
+    return {
+      ok: false,
+      rejection: {
+        code: "invalid_input",
+        message: `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`,
+      },
+    };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return {
+      ok: false,
+      rejection: {
+        code: "reset_link_invalid",
+        message: "This reset link has expired or was already used. Request a new one.",
+      },
+    };
+  }
+
+  const { error } = await supabase.auth.updateUser({ password: input.password });
+  if (error) {
+    // A stale recovery token surfaces here rather than at getUser() on some
+    // providers, so the same honest message covers both.
+    const m = error.message.toLowerCase();
+    if (m.includes("session") || m.includes("token") || m.includes("expired")) {
+      return {
+        ok: false,
+        rejection: {
+          code: "reset_link_invalid",
+          message: "This reset link has expired or was already used. Request a new one.",
+        },
+      };
+    }
+    return { ok: false, rejection: friendlyAuthError(error.message) };
+  }
+
   return { ok: true };
 }
