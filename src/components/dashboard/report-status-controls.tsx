@@ -46,7 +46,7 @@ export function ReportStatusControls({
   if (closed) {
     return (
       <p className="text-xs text-muted-foreground">
-        {status === "RESOLVED" ? "Resolved" : "Dismissed"} — no further action.
+        {status === "RESOLVED" ? "Resolved" : "Dismissed"}. No further action.
       </p>
     );
   }

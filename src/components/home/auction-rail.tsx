@@ -58,7 +58,7 @@ export function AuctionRail({
           title={emptyTitle}
           description={
             emptyDescription ??
-            "Nothing to show in this rail right now — check back soon."
+            "Nothing to show in this rail right now. Check back soon."
           }
           action={emptyAction}
         />

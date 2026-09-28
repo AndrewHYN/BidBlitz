@@ -224,7 +224,7 @@ export default async function DashboardOverviewPage() {
                     {item.title}
                   </Link>
                   <p className="text-xs text-muted-foreground">
-                    The clock has run out — settle to record the winner, the fee and the proceeds.
+                    The clock has run out. Settle to record the winner, the fee and the proceeds.
                   </p>
                 </div>
                 <SettleButton auctionId={item.id} />

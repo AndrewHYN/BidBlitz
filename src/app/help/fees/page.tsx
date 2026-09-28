@@ -190,7 +190,7 @@ export default function HelpFeesPage() {
           </p>
 
           <p className="text-sm text-muted-foreground">
-            For the buyer — <em>illustration only</em>: the Paynow charge below
+            For the buyer, <em>illustration only</em>: the Paynow charge below
             is an example amount, not a published Paynow rate. Paynow calculates
             the real charge and shows it on its own payment page before the
             buyer authorises anything.
@@ -251,7 +251,7 @@ export default function HelpFeesPage() {
                 </>
               ) : (
                 <>
-                  <strong>No payment provider is configured yet</strong> — so no
+                  <strong>No payment provider is configured yet</strong>, so no
                   money ever moves through BidBlitz today. Nothing is charged,
                   captured or transferred; the transaction is a record of what
                   is owed, not a completed payment.

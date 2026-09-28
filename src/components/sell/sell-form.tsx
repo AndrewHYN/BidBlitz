@@ -287,7 +287,7 @@ export function SellForm({
               data-testid="sell-starting-bid"
             />
             <p id="sell-starting-bid-hint" className="text-xs text-muted-foreground">
-              Any amount above zero — bidding starts here.
+              Any amount above zero. Bidding starts here.
             </p>
             <FieldError id="sell-starting-bid-error" messages={errors.startingBidMinor} />
           </div>
@@ -319,7 +319,7 @@ export function SellForm({
         <p className="rounded-lg border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
           If this auction sells, BidBlitz takes{" "}
           {feeBps !== null ? <strong>{feePercentLabel(feeBps)}</strong> : "a platform fee"}{" "}
-          of the winning price out of your proceeds — the buyer pays your winning
+          of the winning price out of your proceeds. The buyer pays your winning
           bid plus Paynow&apos;s own payment charge, which is not money you
           receive. You keep the rest, and it is paid to you after the sale is
           fulfilled and the buyer&apos;s window to dispute has passed.
@@ -372,7 +372,7 @@ export function SellForm({
               data-testid="sell-anti-snipe-window"
             />
             <p id="sell-anti-snipe-window-hint" className="text-xs text-muted-foreground">
-              Seconds before the close that get protection — a bid in here
+              Seconds before the close that get protection. A bid in here
               pushes the end time back.
             </p>
             <FieldError
@@ -422,7 +422,7 @@ export function SellForm({
 
       <div className="flex flex-col gap-3 border-t pt-5 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-muted-foreground">
-          Saved as a draft — you&apos;ll add photos next, then publish.
+          Saved as a draft. You&apos;ll add photos next, then publish.
         </p>
         <Button type="submit" disabled={pending} data-testid="sell-submit">
           {pending ? "Saving draft…" : "Create draft"}

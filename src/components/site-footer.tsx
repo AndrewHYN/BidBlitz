@@ -121,8 +121,8 @@ export function SiteFooter() {
           <p>© {new Date().getFullYear()} BidBlitz. All prices are in US dollars.</p>
           <p>
             {paymentConfigured
-              ? "Payments are processed by Paynow — a sale is marked paid only once Paynow confirms it."
-              : "No payment provider is connected yet — no money changes hands through BidBlitz."}
+              ? "Payments are processed by Paynow. A sale is marked paid only once Paynow confirms it."
+              : "No payment provider is connected yet, so no money changes hands through BidBlitz."}
           </p>
         </div>
       </div>

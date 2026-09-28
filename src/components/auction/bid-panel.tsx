@@ -259,7 +259,7 @@ export function BidPanel({
       setRejection({
         code: "unknown",
         message:
-          "We couldn't reach the server — your bid was NOT submitted. Try again.",
+          "We couldn't reach the server, so your bid was NOT submitted. Try again.",
       });
     } finally {
       setPending(false);
@@ -295,7 +295,7 @@ export function BidPanel({
                   winner is confirmed on the server in a moment.
                 </>
               ) : (
-                <>The clock ran out with no bids — the auction is closed.</>
+                <>The clock ran out with no bids, so the auction is closed.</>
               )}
             </p>
           </div>
@@ -327,7 +327,7 @@ export function BidPanel({
           </p>
         ) : currentBidMinor === null || currentBidMinor === undefined ? (
           <p className="text-sm text-muted-foreground">
-            No bids were placed — this auction closed unsold.
+            No bids were placed. This auction closed unsold.
           </p>
         ) : (
           <p className="text-sm text-muted-foreground">
@@ -349,8 +349,8 @@ export function BidPanel({
                 Dashboard → Transactions
               </Link>{" "}
               {viewerId === winnerId
-                ? "holds this purchase — the payment status and receipt live there."
-                : "holds this sale — the fee breakdown and proceeds live there."}
+                ? "holds this purchase. The payment status and receipt live there."
+                : "holds this sale. The fee breakdown and proceeds live there."}
             </p>
             {/* Truthful only while that is so: gate on the server-decided flag
                 so this line can never contradict a configured provider. */}
@@ -378,7 +378,7 @@ export function BidPanel({
           <h2 className="font-semibold">Bidding hasn&apos;t opened yet</h2>
         </div>
         <p className="text-sm text-muted-foreground">
-          This auction goes live when the countdown reaches zero — then you can
+          This auction goes live when the countdown reaches zero. Then you can
           place your first bid.
         </p>
         <Countdown endsAt={endsAt ?? startsAt} status="SCHEDULED" variant="boxes" />
@@ -393,7 +393,7 @@ export function BidPanel({
         data-testid="seller-cannot-bid"
         className="rounded-xl border bg-muted/40 p-5 text-sm text-muted-foreground"
       >
-        This is your auction — you can&apos;t bid on it.
+        This is your auction, so you can&apos;t bid on it.
       </div>
     );
   }
@@ -465,7 +465,7 @@ export function BidPanel({
             exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -4 }}
             transition={{ duration: 0.15, ease: "easeOut" }}
           >
-            You&apos;ve been outbid — the top bid is now{" "}
+            You&apos;ve been outbid. The top bid is now{" "}
             <Money minor={currentBidMinor} currency={currency} />. Bid again to
             take the lead.
           </motion.div>
@@ -484,7 +484,7 @@ export function BidPanel({
           >
             You&apos;re the highest bidder at{" "}
             <Money minor={currentBidMinor} currency={currency} />. The auction is
-            still live — anyone can outbid you before the clock runs out.
+            still live, so anyone can outbid you before the clock runs out.
           </motion.div>
         )}
       </AnimatePresence>

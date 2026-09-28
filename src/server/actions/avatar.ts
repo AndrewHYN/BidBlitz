@@ -62,7 +62,7 @@ export async function uploadAvatarAction(
     return {
       ok: false,
       message:
-        "That image is larger than 2 MB. Try a smaller picture — a phone photo resized to fit works well.",
+        "That image is larger than 2 MB. Try a smaller picture. A phone photo resized to fit works well.",
     };
   }
 
@@ -127,7 +127,7 @@ export async function uploadAvatarAction(
     console.error("[avatar] profile update failed", profileError.message);
     return {
       ok: false,
-      message: "We couldn't save that picture. Nothing was changed — please try again.",
+      message: "We couldn't save that picture. Nothing was changed, so please try again.",
     };
   }
 

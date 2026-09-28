@@ -66,7 +66,7 @@ export function GET(): Response {
     {
       ok: true,
       method: "GET",
-      note: "reachability check only — status updates are accepted by POST",
+      note: "reachability check only; status updates are accepted by POST",
     },
     200
   );

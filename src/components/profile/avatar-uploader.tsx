@@ -82,7 +82,7 @@ export function AvatarUploader({
 
     if (file.size > AVATAR_MAX_BYTES) {
       setError(
-        "That image is larger than 2 MB. Try a smaller picture — a phone photo resized to fit works well."
+        "That image is larger than 2 MB. Try a smaller picture. A phone photo resized to fit works well."
       );
       return;
     }

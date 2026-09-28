@@ -15,12 +15,12 @@ const RULES = [
   {
     icon: Lock,
     title: "Bids are final and binding",
-    body: "Placing a bid is a commitment to buy at that price if you win. There are no retracts — bid only what you're willing to pay.",
+    body: "Placing a bid is a commitment to buy at that price if you win. There are no retracts. Bid only what you're willing to pay.",
   },
   {
     icon: Scale,
     title: "The servers have the final say",
-    body: "Price, winner and end time are decided on BidBlitz's servers, not in your browser. The countdown on your screen is a visual guide — the official clock is the referee.",
+    body: "Price, winner and end time are decided on BidBlitz's servers, not in your browser. The countdown on your screen is a visual guide. The official clock is the referee.",
   },
   {
     icon: Coins,
@@ -45,7 +45,7 @@ const RULES = [
   {
     icon: Lock,
     title: "Deal terms are locked at publish",
-    body: "Once an auction is published, its starting price, bid increment, duration and closing time are frozen — nobody, not even the seller, can quietly change them. Bids and the anti-snipe extension are the only things that can move the price or the clock.",
+    body: "Once an auction is published, its starting price, bid increment, duration and closing time are frozen. Nobody, not even the seller, can quietly change them. Bids and the anti-snipe extension are the only things that can move the price or the clock.",
   },
 ] as const;
 

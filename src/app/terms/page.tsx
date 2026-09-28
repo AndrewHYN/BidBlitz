@@ -82,7 +82,7 @@ export default function TermsPage() {
           </p>
           <p>
             BidBlitz is a live auction marketplace. Every listing is a
-            competitive auction with a real closing time — these terms, together
+            competitive auction with a real closing time. these terms, together
             with the{" "}
             <Link href="/help/rules" className="inline-flex min-h-6 items-center font-medium text-primary underline-offset-2 hover:underline">
               bidding rules
@@ -93,8 +93,7 @@ export default function TermsPage() {
 
         <TermsSection id="accounts" title="2. Your account">
           <p>
-            You need an account to bid or sell. Keep your password to yourself —
-            you are responsible for what happens on your account. Tell us
+            You need an account to bid or sell. Keep your password to yourself. you are responsible for what happens on your account. Tell us
             straight away if you think someone else has access to it.
           </p>
           <p>
@@ -117,7 +116,7 @@ export default function TermsPage() {
           </p>
           <p>
             Once you publish an auction, its starting price, bid increment,
-            duration and closing time are locked — they cannot be edited
+            duration and closing time are locked. they cannot be edited
             afterwards. If your auction ends with a winning bid, you agree to
             complete the sale with the winning bidder.
           </p>
@@ -142,7 +141,7 @@ export default function TermsPage() {
           <p>
             Every bid must be at least the current bid plus the auction&apos;s
             bid increment. If someone bids in the final protected window, the
-            auction is extended to give other bidders a fair chance — this
+            auction is extended to give other bidders a fair chance. This
             happens automatically, on BidBlitz&apos;s side, not in your browser.
           </p>
           <p>
@@ -163,8 +162,7 @@ export default function TermsPage() {
           </p>
           <p>
             For every sold auction a transaction is created recording the
-            winning price, the platform fee and the seller&apos;s net amount —
-            so both sides see exactly the same numbers.
+            winning price, the platform fee and the seller&apos;s net amount, so both sides see exactly the same numbers.
           </p>
         </TermsSection>
 
@@ -193,7 +191,7 @@ export default function TermsPage() {
           title={
             paymentConfigured
               ? "7. Payments"
-              : "7. Payments — current limitation"
+              : "7. Payments (current limitation)"
           }
         >
           {paymentConfigured ? (
@@ -226,7 +224,7 @@ export default function TermsPage() {
                 called &ldquo;Awaiting payment&rdquo; and simply waits there.
                 Nothing is charged, collected or paid out through BidBlitz
                 today. Until a payment provider is connected, do not assume
-                that money has moved through the site — and check back here
+                that money has moved through the site, and and check back here
                 before payments are enabled, because these terms will be
                 updated first.
               </p>
@@ -239,7 +237,7 @@ export default function TermsPage() {
           title={
             paymentConfigured
               ? "8. Paying the seller"
-              : "8. Paying the seller — current limitation"
+              : "8. Paying the seller (current limitation)"
           }
         >
           {paymentConfigured ? (
@@ -250,8 +248,8 @@ export default function TermsPage() {
                 The two are recorded separately, and they are separate steps.
               </p>
               <p>
-                BidBlitz pays the seller&apos;s proceeds — the winning price less
-                the 5% platform fee — after the seller has fulfilled the sale
+                BidBlitz pays the seller&apos;s proceeds (the winning price less
+                the 5% platform fee) after the seller has fulfilled the sale
                 and the buyer&apos;s window to raise a dispute has passed. That
                 payment is made outside the site and its reference is recorded
                 against the sale. BidBlitz does not split a buyer&apos;s payment
@@ -280,7 +278,7 @@ export default function TermsPage() {
         <TermsSection id="reviews" title="9. Reviews">
           <p>
             Reviews are tied to a real transaction, so only the actual buyer and
-            seller of a settled sale can write one — and each transaction gets
+            seller of a settled sale can write one, and each transaction gets
             one review per side. Write honest reviews of your own experience.
             Fake or incentivised reviews are not allowed.
           </p>
@@ -291,7 +289,7 @@ export default function TermsPage() {
             Every auction and profile can be reported. Reports are reviewed by
             the BidBlitz team, and content that breaks these rules can be
             removed or an account suspended. When you file a report, we see your
-            account so we can follow up if needed — reports are not anonymous
+            account so we can follow up if needed. reports are not anonymous
             to the team.
           </p>
         </TermsSection>
@@ -300,7 +298,7 @@ export default function TermsPage() {
           <p>
             You keep ownership of the items, photos and text you upload. You
             give BidBlitz permission to display them on the site for as long as
-            needed to run the marketplace — for example, showing your listing to
+            needed to run the marketplace, for example, showing your listing to
             buyers while the auction is open.
           </p>
         </TermsSection>
@@ -308,7 +306,7 @@ export default function TermsPage() {
         <TermsSection id="disclaimer" title="12. How the site is provided">
           <p>
             BidBlitz is provided as-is. Listings are written by other users, so
-            use your judgement before bidding — we do not guarantee that every
+            use your judgement before bidding. We do not guarantee that every
             description is accurate, and we do not guarantee uninterrupted or
             error-free operation of the site.
           </p>

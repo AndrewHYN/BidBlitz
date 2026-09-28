@@ -370,7 +370,7 @@ export function BrowseFilters({
       <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-3">
         <div className="space-y-1">
           <p id="browse-price-hint" className="text-xs text-muted-foreground">
-            Prices in dollars — e.g. 25 or 12.50. Filters by each
+            Prices in dollars, such as 25 or 12.50. Filters by each
             auction&apos;s current price.
           </p>
           {priceError && (

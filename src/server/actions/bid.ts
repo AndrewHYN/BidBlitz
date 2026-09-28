@@ -82,7 +82,7 @@ export async function placeBidAction(input: {
       ok: false,
       rejection: {
         code: "rate_limited",
-        message: "You're bidding very quickly — wait a few seconds and try again.",
+        message: "You're bidding very quickly. Wait a few seconds and try again.",
       },
     };
   }

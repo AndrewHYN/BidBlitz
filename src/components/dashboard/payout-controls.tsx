@@ -61,7 +61,7 @@ function confirmCopy(to: SellerPayoutStatus, amountMinor: number, currency: stri
         <>
           Record this payout of <Money minor={amountMinor} currency={currency} /> as
           paid to the seller? This only states that you have already transferred
-          it yourself — BidBlitz does not send money. It cannot be undone.
+          it yourself. BidBlitz does not send money. It cannot be undone.
         </>
       );
     case "HELD":
@@ -209,7 +209,7 @@ export function PayoutControls({
   if (actions.length === 0) {
     return (
       <p className="text-xs text-muted-foreground" data-testid="payout-final">
-        Paid out — closed. This record can no longer be changed.
+        Paid out and closed. This record can no longer be changed.
       </p>
     );
   }

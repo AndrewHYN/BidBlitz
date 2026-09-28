@@ -43,7 +43,7 @@ export function ShareButton({
       });
       window.setTimeout(() => setCopied(false), 2500);
     } catch {
-      toast.error("Couldn’t copy the link — you can copy it from the address bar.");
+      toast.error("Couldn’t copy the link. You can copy it from the address bar.");
     }
   }
 

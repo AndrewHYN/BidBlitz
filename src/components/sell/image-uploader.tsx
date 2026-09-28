@@ -104,7 +104,7 @@ export function ImageUploader({
       return;
     }
     if (usable.length < accepted.length) {
-      setNotice(`Only ${usable.length} of ${accepted.length} were added — the limit is ${MAX_IMAGES} photos.`);
+      setNotice(`Only ${usable.length} of ${accepted.length} were added. The limit is ${MAX_IMAGES} photos.`);
     }
 
     startTransition(async () => {
@@ -126,7 +126,7 @@ export function ImageUploader({
             console.error("[image-uploader] upload failed:", error.message);
             setNotice(
               `Couldn’t upload “${file.name}”.` +
-                (added.length > 0 ? " The photos already added are kept —" : "") +
+                (added.length > 0 ? " The photos already added are kept." : "") +
                 " pick that photo again to retry."
             );
             break;

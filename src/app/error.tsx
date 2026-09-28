@@ -39,7 +39,7 @@ export default function ErrorBoundary({
         Something went wrong
       </h1>
       <p className="mt-2 max-w-md text-sm text-muted-foreground text-balance">
-        This didn&apos;t load as expected. Try again — if it keeps happening,
+        This didn&apos;t load as expected. Try again. If it keeps happening,
         come back a little later.
       </p>
       <Button className="mt-6" onClick={() => recover()}>

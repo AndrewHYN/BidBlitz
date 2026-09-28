@@ -24,7 +24,7 @@ export async function generateMetadata({
     // renders no meta description at all, which the pre-launch UX audit flags.
     description:
       data.profile.bio ??
-      `Public profile for ${data.profile.display_name} (@${data.profile.username}) on BidBlitz — reviews, listings and member details.`,
+      `Public profile for ${data.profile.display_name} (@${data.profile.username}) on BidBlitz: reviews, listings and member details.`,
     alternates: { canonical: `/profile/${data.profile.username}` },
   };
 }

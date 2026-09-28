@@ -242,7 +242,7 @@ export default async function AdminPage() {
           <p className="text-xs text-muted-foreground">
             A payout record appears here the moment Paynow confirms a buyer&apos;s
             payment. It freezes the seller&apos;s proceeds and then follows its own
-            workflow — it is <strong className="text-foreground">not</strong> the payment
+            workflow. it is <strong className="text-foreground">not</strong> the payment
             status. Nothing on this page sends money: <em>Record seller payout</em> means
             the transfer has already been made outside BidBlitz and you are recording its
             reference.

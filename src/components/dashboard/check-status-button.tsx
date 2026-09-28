@@ -133,7 +133,7 @@ const CHECK_ERRORS: Record<string, string> = {
   reference_mismatch: "Paynow answered about a different sale, so nothing changed.",
   currency_mismatch: "This sale isn't in a currency Paynow settles, so nothing changed.",
   no_poll_url:
-    "No payment session was recorded for this sale — start the payment again.",
+    "No payment session was recorded for this sale. Start the payment again.",
   invalid_poll_url: "This sale has no usable Paynow session. Start the payment again.",
   provider_unreachable:
     "Paynow couldn't be reached, so nothing changed. Try again shortly.",

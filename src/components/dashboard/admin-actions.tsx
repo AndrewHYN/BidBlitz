@@ -83,7 +83,7 @@ const payoutActionSchema = z.object({
 function payoutErrorMessage(raw: string): string {
   const m = raw.toLowerCase();
   if (m.includes("payout_reference_required")) {
-    return "Add the payout reference first — a payout can only be recorded with it.";
+    return "Add the payout reference first. A payout can only be recorded with it.";
   }
   if (m.includes("payout_admin_only")) return "Admins only.";
   if (m.includes("payout_not_found")) return "That payout no longer exists.";

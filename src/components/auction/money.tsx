@@ -19,14 +19,14 @@ export function Money({
   signed?: boolean;
 }) {
   if (minor === null || minor === undefined) {
-    return <span className={className}>—</span>;
+    return <span className={className}>\u2212</span>;
   }
 
   let value: bigint;
   try {
     value = typeof minor === "bigint" ? minor : BigInt(minor);
   } catch {
-    return <span className={className}>—</span>;
+    return <span className={className}>\u2212</span>;
   }
 
   const m: MoneyValue = { minor: value, currency: currency.toUpperCase() };

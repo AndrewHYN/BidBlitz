@@ -33,7 +33,7 @@ const TOPICS = [
     href: "#settlement",
     icon: Handshake,
     title: "How settlement works",
-    description: "What happens after the clock runs out — winner, transaction and reviews.",
+    description: "What happens after the clock runs out: winner, transaction and reviews.",
   },
 ] as const;
 
@@ -43,7 +43,7 @@ export default function HelpPage() {
       <DocumentPage>
         <PageHeader
           title="Help"
-          description="Only what BidBlitz actually does today — no promises we haven't built."
+          description="Only what BidBlitz actually does today. No promises we haven't built."
         />
 
         {/*
@@ -110,7 +110,7 @@ export default function HelpPage() {
                   <>
                     The buyer completes payment through Paynow, and BidBlitz
                     marks the sale paid only when Paynow&apos;s own confirmation
-                    arrives and passes its signature and amount checks — being
+                    arrives and passes its signature and amount checks. Being
                     sent back to the site never marks a sale paid on its own. If
                     the payment fails or is cancelled, the transaction becomes
                     “Failed”.
@@ -118,7 +118,7 @@ export default function HelpPage() {
                 ) : (
                   <>
                     No payment provider is connected to BidBlitz yet, so no money
-                    ever moves — the transaction simply waits in that state until
+                    ever moves. the transaction simply waits in that state until
                     one is.
                   </>
                 )}
@@ -160,8 +160,7 @@ export default function HelpPage() {
               <ShieldAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
               <span>
                 See a suspicious listing? Open the auction and use the{" "}
-                <strong className="text-foreground">Report</strong> button —
-                reports go straight to the BidBlitz team for review.
+                <strong className="text-foreground">Report</strong> button. reports go straight to the BidBlitz team for review.
               </span>
             </p>
             <p className="mt-4 text-sm text-muted-foreground">

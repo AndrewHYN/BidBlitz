@@ -120,7 +120,7 @@ export default async function BrowsePage({
     <div className="page-container py-10 sm:py-14">
       <PageHeader
         title="Browse auctions"
-        description="Filter live and upcoming listings — every change lands in the URL, so results are shareable."
+        description="Filter live and upcoming listings. Every change lands in the URL, so results are shareable."
       />
 
       <div className="mt-6">
@@ -162,7 +162,7 @@ export default async function BrowsePage({
             title={hasFilters ? "No auctions match those filters" : "No auctions are listed yet"}
             description={
               hasFilters
-                ? "Try a wider price range or a different category — or clear everything and start over."
+                ? "Try a wider price range or a different category, or clear everything and start over."
                 : "BidBlitz is open, but no one has listed an item yet. Auctions appear here the moment a seller publishes one, and you can list the first one yourself."
             }
             action={

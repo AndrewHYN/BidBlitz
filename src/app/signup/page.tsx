@@ -3,7 +3,7 @@ import { SignupForm } from "@/components/auth/signup-form";
 
 export const metadata: Metadata = {
   title: "Create account",
-  description: "Join BidBlitz — create an account with your email and a password.",
+  description: "Join BidBlitz. Create an account with your email and a password.",
 };
 
 export default function SignupPage() {

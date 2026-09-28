@@ -64,7 +64,7 @@ export async function createAuctionAction(input: unknown): Promise<
       ok: false,
       rejection: {
         code: "rate_limited",
-        message: "You're creating listings very quickly — wait a minute and try again.",
+        message: "You're creating listings very quickly. Wait a minute and try again.",
       },
     };
   }

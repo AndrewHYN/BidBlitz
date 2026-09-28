@@ -62,7 +62,7 @@ export function ImageGallery({
           <ImageWithFallback
             key={active.id}
             src={active.url}
-            alt={`${title} — photo ${activeIndex + 1} of ${images.length}`}
+            alt={`${title}, photo ${activeIndex + 1} of ${images.length}`}
             className="size-full object-contain"
             fallback={
               <div className="grid size-full place-items-center rounded-lg border border-dashed bg-background/60 text-center">

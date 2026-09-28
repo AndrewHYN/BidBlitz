@@ -240,7 +240,7 @@ export function AuctionDetailLive({
           <WifiOff className="mt-0.5 size-4 shrink-0" aria-hidden />
           <span>
             {connectionWarning === "offline"
-              ? "Live updates dropped — reconnecting. This page may be a few seconds behind until it recovers."
+              ? "Live updates dropped. Reconnecting. This page may be a few seconds behind until it recovers."
               : "Still connecting to live updates…"}
           </span>
         </p>

@@ -70,7 +70,7 @@ export function PublishButton({
         ? "This auction was cancelled"
         : "This auction is closed"
       : status === "SCHEDULED"
-        ? "Scheduled — waiting for the clock to start"
+        ? "Scheduled: waiting for the clock to start"
         : "Live now";
 
     const shareable = status === "LIVE" || status === "SCHEDULED";
@@ -119,7 +119,7 @@ export function PublishButton({
         open={confirmOpen}
         onOpenChange={setConfirmOpen}
         title="Publish this auction?"
-        description="Bidding starts immediately. Your terms are locked from that moment — price, bid increment, duration and the closing time can't be changed afterwards."
+        description="Bidding starts immediately. Your terms are locked from that moment: price, bid increment, duration and the closing time can't be changed afterwards."
         confirmLabel="Publish auction"
         cancelLabel="Not yet"
         confirmVariant="default"

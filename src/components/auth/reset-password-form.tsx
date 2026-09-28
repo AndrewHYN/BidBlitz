@@ -68,7 +68,7 @@ export function ResetPasswordForm({
         <div className="space-y-2">
           <h1 className="text-xl font-semibold tracking-tight">Password updated</h1>
           <p className="text-sm leading-relaxed text-muted-foreground text-pretty">
-            Your new password is live. Sign in with it — the link you used is no
+            Your new password is live. Sign in with it. The link you used is no
             longer valid.
           </p>
         </div>

@@ -73,7 +73,7 @@ export default async function HomePage() {
         <div className="space-y-10">
           <AuctionRail
             title="Ending soon"
-            description="The clock is running — these close first."
+            description="The clock is running. These close first."
             auctions={feed.endingSoon}
             testid="home-ending-soon"
             emptyTitle="Nothing is ending right now"
@@ -85,7 +85,7 @@ export default async function HomePage() {
             auctions={feed.live}
             testid="home-live"
             emptyTitle="No live auctions right now"
-            emptyDescription="Nothing is open for bidding at this moment — new auctions show up here as soon as they go live."
+            emptyDescription="Nothing is open for bidding at this moment. New auctions appear here as soon as they go live."
             emptyAction={
               <Button asChild variant="outline">
                 <Link href="/browse">Browse everything</Link>
@@ -98,7 +98,7 @@ export default async function HomePage() {
             auctions={feed.recent}
             testid="home-recent"
             emptyTitle="No listings yet"
-            emptyDescription="Be the first — list an item and it will appear here."
+            emptyDescription="Be the first to list something. It will appear here."
             emptyAction={
               <Button asChild>
                 <Link href="/sell">List an item</Link>

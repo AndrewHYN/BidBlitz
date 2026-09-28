@@ -74,7 +74,7 @@ function describe(
         detail: (
           <>
             Your last bid was <Money minor={amountOf(p.your_last_bid_minor)} currency={currency} />. The new high is{" "}
-            <Money minor={amountOf(p.current_bid_minor)} currency={currency} /> — the next minimum is{" "}
+            <Money minor={amountOf(p.current_bid_minor)} currency={currency} />. The next minimum is{" "}
             <Money minor={amountOf(p.next_min_minor)} currency={currency} />.
           </>
         ),
@@ -133,7 +133,7 @@ function describe(
         headline: `Leave a review for ${headline}`,
         detail: (
           <>
-            The auction is complete — your review keeps this marketplace honest
+            The auction is complete. Your review keeps this marketplace honest
             for the next buyer.
           </>
         ),

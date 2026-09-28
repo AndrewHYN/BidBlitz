@@ -55,7 +55,7 @@ export function BidHistory({
           compact
           icon={Gavel}
           title="No bids yet"
-          description="Be the first to bid — every bid will be listed here the moment it's accepted."
+          description="Be the first to bid. Every bid is listed here the moment it is accepted."
         />
       ) : (
         <ul className="divide-y overflow-hidden rounded-xl border bg-card">

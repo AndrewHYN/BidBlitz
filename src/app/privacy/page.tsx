@@ -54,7 +54,7 @@ export default function PrivacyPage() {
         <header className="space-y-4">
           <PageHeader
             title="Privacy Policy"
-            description="What BidBlitz actually stores and shows — no more than the product needs."
+            description="What BidBlitz actually stores and shows. No more than the product needs."
           />
           <p className="text-xs text-muted-foreground">Last updated: {LAST_UPDATED}</p>
         </header>
@@ -63,7 +63,7 @@ export default function PrivacyPage() {
           <p>
             BidBlitz stores the information you provide so the marketplace can
             work: your account details, your listings, your bids and your
-            reviews. Some of that is deliberately public — bidding is a public,
+            reviews. Some of that is deliberately public: bidding is a public,
             competitive activity. The rest stays private to you and to the
             people directly involved in a sale.
           </p>
@@ -80,7 +80,7 @@ export default function PrivacyPage() {
             <li>
               <strong>Account data:</strong> your email address, display name
               and username. Your password is stored by our authentication
-              service in a protected form — it can never be read back, by us or
+              service in a protected form. It can never be read back, by us or
               anyone else.
             </li>
             <li>
@@ -133,7 +133,7 @@ export default function PrivacyPage() {
         <PrivacySection id="use" title="4. How we use it">
           <ul className="list-disc space-y-2 pl-5">
             <li>
-              to run auctions — identify who placed which bid, enforce the
+              to run auctions: identify who placed which bid, enforce the
               bidding rules and settle sales correctly;
             </li>
             <li>to show listings, profiles and bid history to visitors;</li>
@@ -156,8 +156,8 @@ export default function PrivacyPage() {
         <PrivacySection id="sharing" title="6. Who else receives it">
           <p>
             We do not sell or rent personal data. Data is processed only by the
-            services that run BidBlitz — hosting and delivery (Vercel), database,
-            authentication and file storage (Supabase) — and, where the product
+            services that run BidBlitz: hosting and delivery (Vercel), database,
+            authentication and file storage (Supabase), and, where the product
             makes it public, by the other users described above.
           </p>
         </PrivacySection>
@@ -167,7 +167,7 @@ export default function PrivacyPage() {
             We keep your data while your account is active. You can ask us to
             delete your account and its data at any time using the contact
             details below. Records of settled sales may need to be kept so the
-            buyer and seller transactions stay consistent — if that applies, we
+            buyer and seller transactions stay consistent. if that applies, we
             will tell you.
           </p>
         </PrivacySection>
@@ -188,7 +188,7 @@ export default function PrivacyPage() {
               Ask for a copy of your data, or its deletion, by contacting us.
             </li>
             <li>
-              Clear cookies in your browser at any time — you will simply be
+              Clear cookies in your browser at any time and you will simply be
               signed out.
             </li>
           </ul>
@@ -203,7 +203,7 @@ export default function PrivacyPage() {
 
         <DocumentContactCard>
             <p>
-              Questions about your data? Reach us directly — we answer as
+              Questions about your data? Reach us directly.we answer as
               individuals, not a faceless support queue:
             </p>
             <ul className="space-y-2">

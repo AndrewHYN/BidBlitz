@@ -73,7 +73,7 @@ export function ForgotPasswordForm() {
             soon.
           </p>
           <p className="text-sm leading-relaxed text-muted-foreground">
-            Nothing there? Check spam, then try again — a second request is safe.
+            Nothing there? Check spam, then try again. A second request is safe.
           </p>
         </div>
         <div className="space-y-2">

@@ -30,7 +30,7 @@ const siteUrl = SITE_URL;
 const baseMetadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: "BidBlitz — live auctions, honest settlement",
+    default: "BidBlitz: live auctions, honest settlement",
     template: "%s · BidBlitz",
   },
   description:
@@ -38,7 +38,7 @@ const baseMetadata: Metadata = {
   openGraph: {
     type: "website",
     siteName: "BidBlitz",
-    title: "BidBlitz — live auctions, honest settlement",
+    title: "BidBlitz: live auctions, honest settlement",
     description:
       "Live auctions with real closing times: list an item, bid against other buyers in real time, and win when the clock runs out.",
     url: siteUrl,

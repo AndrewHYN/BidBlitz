@@ -111,7 +111,7 @@ export function validateAvatarBytes(bytes: Uint8Array): AvatarValidation {
   if (bytes.length > AVATAR_MAX_BYTES) {
     return {
       ok: false,
-      reason: `That image is ${formatBytes(bytes.length)}. The limit is 2 MB — try a smaller picture.`,
+      reason: `That image is ${formatBytes(bytes.length)}. The limit is 2 MB, so try a smaller picture.`,
     };
   }
   const ext = sniffImageExt(bytes);

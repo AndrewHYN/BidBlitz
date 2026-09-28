@@ -120,7 +120,7 @@ export async function reportAction(input: unknown): Promise<SimpleResult> {
       ok: false,
       rejection: {
         code: "rate_limited",
-        message: "Too many reports in a row — wait a minute and try again.",
+        message: "Too many reports in a row. Wait a minute and try again.",
       },
     };
   }
