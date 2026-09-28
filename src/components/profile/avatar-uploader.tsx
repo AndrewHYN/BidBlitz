@@ -54,15 +54,23 @@ export function AvatarUploader({
   const shown =
     preview && serverUrl !== preview.replaces ? preview.url : serverUrl;
 
-  // Revoke the blob when a new one takes its place, and on unmount. React runs
-  // the cleanup before the next effect, so the URL being released is always one
-  // that is no longer on screen. A blob is therefore held for at most the life
-  // of the current selection - one per pick, not one per render.
+  // Revoke the blob when a new one takes its place, and on unmount.
+  //
+  // The dependency is the URL, NOT the `preview` object. The object is replaced
+  // with a new identity when `replaces` is filled in after a successful upload,
+  // and depending on the object made React run that cleanup at exactly the wrong
+  // moment: the blob being revoked was the one still rendered in the preview.
+  // The result was `net::ERR_FILE_NOT_FOUND` and a broken image in the one place
+  // a user goes to check that their picture uploaded — measured in production,
+  // with the console error captured, not inferred.
+  //
+  // Depending on the URL string means the cleanup fires only when the rendered
+  // URL genuinely changes, so the release always matches what left the screen.
+  const previewUrl = preview?.url ?? null;
   useEffect(() => {
-    if (!preview) return;
-    const current = preview.url;
-    return () => URL.revokeObjectURL(current);
-  }, [preview]);
+    if (!previewUrl) return;
+    return () => URL.revokeObjectURL(previewUrl);
+  }, [previewUrl]);
 
   function onPick(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];

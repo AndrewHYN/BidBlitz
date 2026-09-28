@@ -9,8 +9,8 @@ import { ACCOUNTS, signIn, TINY_PNG } from "./fixtures";
  * that the same person gets the same two letters in every surface; and that the
  * refusals a user hits name the fix instead of saying "error".
  *
- * The authorization model underneath is proved where it can be proved exactly —
- * `scripts/db/verify-engine.mjs` § "avatars" drives the real Storage and REST
+ * The authorization model underneath is proved where it can be proved exactly â€”
+ * `scripts/db/verify-engine.mjs` Â§ "avatars" drives the real Storage and REST
  * APIs with real user sessions and asserts that user A cannot write into user B's
  * folder, cannot escape it by traversal, cannot delete B's object, and cannot
  * point their profile at B's key or at an arbitrary string. Re-deriving that
@@ -153,7 +153,7 @@ test.describe("avatar", () => {
   }) => {
     // SVG is an XML document that can carry script. Serving one from our own
     // origin would be a stored-XSS vector, so it is not in the allow-list at
-    // all — not "allowed but sanitised", simply absent.
+    // all â€” not "allowed but sanitised", simply absent.
     await signIn(page, ACCOUNTS.seller.email);
     await page.goto("/settings");
 
@@ -192,8 +192,8 @@ test.describe("avatar", () => {
  *
  * A real photograph and the fallback initials rendered at the same time, in the
  * same frame, stacked on each other. `UserAvatar` used `next/image` rather than
- * Radix's `AvatarImage` — deliberately, because a plain `<img src>` made the
- * header download the original upload — but Radix's `status` is only ever moved
+ * Radix's `AvatarImage` â€” deliberately, because a plain `<img src>` made the
+ * header download the original upload â€” but Radix's `status` is only ever moved
  * by `AvatarImage`. It stayed `"loading"` forever, so `AvatarFallback` rendered
  * unconditionally, and `showImage ? <Image/> : null` guarded nothing.
  *
@@ -208,7 +208,31 @@ test.describe("avatar", () => {
  */
 test.describe("avatar rendering states", () => {
   /**
-   * Every avatar in `scope` must be showing exactly one of the two states.
+   * Wait until the single avatar in `scope` reports the expected state.
+   *
+   * This must be a retrying assertion rather than a single sample. The state is
+   * "initials" until the image has actually loaded, so at the instant a
+   * server-rendered avatar first appears the correct state is still "initials".
+   * Sampling once there reported the transition itself as a failure. If the image
+   * never loads â€” a real defect â€” this times out, which is the behaviour wanted.
+   */
+  async function expectState(
+    scope: import("@playwright/test").Locator,
+    expected: "image" | "initials"
+  ) {
+    await expect(scope).toHaveAttribute("data-avatar-state", expected, {
+      timeout: 30_000,
+    });
+  }
+
+  /**
+   * Every avatar in `scope` must be SHOWING exactly one of the two states.
+   *
+   * Presence in the DOM is deliberately not the test. While an image is loading
+   * it is present but hidden, and that is correct: an element that is not
+   * rendered cannot load at all, so requiring the image to be absent until it
+   * has loaded deadlocks and the picture never appears. What must never happen is
+   * both states being visible at once, so that is what is counted.
    *
    * Returns the states found so a test can assert which one, but throws if the
    * total is anything other than the number of avatars. "Two images and one set
@@ -217,35 +241,49 @@ test.describe("avatar rendering states", () => {
   async function assertExclusive(
     page: import("@playwright/test").Page,
     scope: import("@playwright/test").Locator,
-    expectedAvatars: number
+    /**
+     * How many avatar frames `scope` should contain. Omit to derive it: the
+     * invariant that matters is one state per frame, not how many frames a page
+     * happens to have. /settings carries two (the header and the preview), the
+     * profile page two, the home page one, and hardcoding those made this a test
+     * of page layout rather than of the avatar.
+     */
+    expectedAvatars?: number
   ) {
     const found = await scope.evaluate((root) => {
-      const images = root.querySelectorAll('[data-testid="user-avatar-image"]');
-      const initials = root.querySelectorAll('[data-testid="user-avatar-initials"]');
-      const roots = root.querySelectorAll('[data-testid="user-avatar"]');
-      // Also catch the overlap structurally: a frame that contains both an
-      // image and initials, however the states were produced.
-      const bothInOneFrame = [...roots].filter(
-        (r) =>
-          r.querySelector('[data-testid="user-avatar-image"]') &&
-          r.querySelector('[data-testid="user-avatar-initials"]')
-      ).length;
+      // `checkVisibility` is what the browser itself uses, and it accounts for
+      // `visibility: hidden`, zero size, and `display: none`.
+      const shown = (sel: string) =>
+        [...root.querySelectorAll(sel)].filter((el) =>
+          (el as HTMLElement).checkVisibility
+            ? (el as HTMLElement).checkVisibility()
+            : el.getClientRects().length > 0
+        ).length;
+      const roots = [...root.querySelectorAll('[data-testid="user-avatar"]')];
       return {
-        images: images.length,
-        initials: initials.length,
+        visibleImages: shown('[data-testid="user-avatar-image"]'),
+        visibleInitials: shown('[data-testid="user-avatar-initials"]'),
+        presentImages: root.querySelectorAll('[data-testid="user-avatar-image"]').length,
         roots: roots.length,
-        bothInOneFrame,
-        states: [...roots].map((r) => r.getAttribute("data-avatar-state")),
+        // A frame showing both at once is the original defect, however produced.
+        bothVisible: roots.filter(
+          (r) =>
+            r.querySelector('[data-testid="user-avatar-image"]')?.checkVisibility() &&
+            r.querySelector('[data-testid="user-avatar-initials"]')?.checkVisibility()
+        ).length,
+        states: roots.map((r) => r.getAttribute("data-avatar-state")),
       };
     });
 
-    expect(found.bothInOneFrame, "an avatar frame contained both states").toBe(0);
-    expect(found.roots, "unexpected number of avatar frames").toBe(expectedAvatars);
-    // The core assertion: image count + initials count === frame count.
+    expect(found.bothVisible, "an avatar frame was showing both states").toBe(0);
+    const frames = expectedAvatars ?? found.roots;
+    expect(found.roots, "unexpected number of avatar frames").toBe(frames);
+    expect(frames, "the scope contained no avatar at all").toBeGreaterThan(0);
+    // The core assertion: exactly one VISIBLE state per frame.
     expect(
-      found.images + found.initials,
-      `expected exactly one state per avatar, saw ${found.images} image(s) and ${found.initials} initial(s) across ${found.roots} frame(s)`
-    ).toBe(expectedAvatars);
+      found.visibleImages + found.visibleInitials,
+      `expected exactly one visible state per avatar, saw ${found.visibleImages} image(s) and ${found.visibleInitials} initial(s) across ${found.roots} frame(s)`
+    ).toBe(frames);
     return found;
   }
 
@@ -281,9 +319,10 @@ test.describe("avatar rendering states", () => {
       await signIn(page, ACCOUNTS.seller.email);
       await page.goto("/settings");
 
-      // With no picture: only initials, in every avatar on the page.
-      const noPicture = await assertExclusive(page, page.locator("body"), 1);
-      expect(noPicture.states).toEqual(["initials"]);
+      // With no picture: only initials, in every avatar on the page. The count
+      // is derived, because the invariant is one state per frame.
+      const noPicture = await assertExclusive(page, page.locator("body"));
+      expect(new Set(noPicture.states)).toEqual(new Set(["initials"]));
 
       // Store a real picture through the real uploader.
       await page.getByTestId("avatar-file-input").setInputFiles({
@@ -291,29 +330,47 @@ test.describe("avatar rendering states", () => {
         mimeType: "image/png",
         buffer: TINY_PNG,
       });
-      // The Remove control only appears once a picture is actually stored, so
-      // its presence is the signal that the round trip completed.
-      await expect(page.getByTestId("avatar-remove-button")).toBeVisible({
-        timeout: 60_000,
-      });
 
-      // Settings preview: the image, and nothing else in that frame.
-      const preview = page
+      const previewSection = page
         .getByTestId("avatar-upload-button")
         .locator("xpath=ancestor::section");
-      const withPicture = await assertExclusive(page, preview, 1);
+
+      /*
+       * The uploader is optimistic: a local blob and the Remove control both
+       * appear as soon as the file is picked, before the server has stored
+       * anything. So "the Remove button is visible" is not proof the round trip
+       * happened.
+       *
+       * The blob itself is deliberately NOT waited on. It is a transient
+       * optimistic state that the server round trip replaces, and against a
+       * local server that transition is often faster than a test can observe â€”
+       * asserting it was visible made this test fail for the right reason at the
+       * wrong moment. What matters is the stable end state: the preview is
+       * rendered from the stored key, and the blob is gone rather than left
+       * over the top of it.
+       */
+      await expectState(previewSection.getByTestId("user-avatar"), "image");
+      await expect(
+        previewSection.getByTestId("avatar-preview-blob")
+      ).toHaveCount(0);
+      await expect(page.getByTestId("avatar-remove-button")).toBeVisible();
+
+      // Settings preview: the image, and nothing else in that frame.
+      const withPicture = await assertExclusive(page, previewSection, 1);
       expect(withPicture.states).toEqual(["image"]);
 
       // A different surface, so this is not just the uploader's own state: the
       // header on the home page.
       await page.goto("/");
       const header = page.locator("header");
+      await expectState(header.getByTestId("user-avatar"), "image");
       const inHeader = await assertExclusive(page, header, 1);
       expect(inHeader.states).toEqual(["image"]);
 
       // And the public profile, the largest frame in the product.
       await page.goto(`/profile/${ACCOUNTS.seller.username}`);
       const profile = page.getByTestId("profile-header");
+      await expectState(profile.getByTestId("user-avatar"), "image");
       const onProfile = await assertExclusive(page, profile, 1);
       expect(onProfile.states).toEqual(["image"]);
     });
@@ -340,20 +397,16 @@ test.describe("avatar rendering states", () => {
     await page.goto(`/profile/${ACCOUNTS.seller.username}`);
 
     const profile = page.getByTestId("profile-header");
-    await expect(profile.getByTestId("user-avatar-initials")).toBeVisible({
-      timeout: 30_000,
-    });
+    await expectState(profile.getByTestId("user-avatar"), "initials");
     const broken = await assertExclusive(page, profile, 1);
     expect(broken.states).toEqual(["initials"]);
-    expect(broken.images, "a failed image was left in the DOM").toBe(0);
+    expect(broken.presentImages, "a failed image was left in the DOM").toBe(0);
 
     // The same failure in the header, which is the smallest frame and the one
     // that is on every page.
     await page.goto("/");
     const header = page.locator("header");
-    await expect(header.getByTestId("user-avatar-initials")).toBeVisible({
-      timeout: 30_000,
-    });
+    await expectState(header.getByTestId("user-avatar"), "initials");
     const inHeader = await assertExclusive(page, header, 1);
     expect(inHeader.states).toEqual(["initials"]);
   });

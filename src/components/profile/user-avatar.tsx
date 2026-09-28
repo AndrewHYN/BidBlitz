@@ -33,10 +33,17 @@ import { cn } from "@/lib/utils";
  *
  * ## The states, and why they are keyed by URL
  *
- *   no valid key            -> initials
- *   valid key, still loading -> initials
- *   valid key, loaded       -> the image
- *   valid key, failed       -> initials
+ *   no valid key            -> initials, and no image element
+ *   valid key, still loading -> initials visible, image present but hidden
+ *   valid key, loaded       -> image visible, initials not rendered
+ *   valid key, failed       -> initials, and the image element is removed
+ *
+ * Mutually exclusive **visually**, not structurally. The first attempt at this
+ * fix made them exclusive structurally, rendering the image only once it had
+ * loaded — which deadlocks, because `onLoad` cannot fire for an element that was
+ * never rendered, so the picture never appeared and every avatar stayed on
+ * initials. That was caught by looking at a rendered page, not by a test. See
+ * the render for the full reasoning.
  *
  * `loaded` and `failed` are both remembered **against the URL they refer to**.
  * That is what makes replacing a picture work: when the key changes, neither
@@ -89,9 +96,32 @@ export function UserAvatar({
   const [loadedUrl, setLoadedUrl] = useState<string | null>(null);
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
 
-  // Exactly one branch is ever taken, so the image and the initials can never
-  // both be in the frame. There is no code path that renders both.
-  const showImage = url !== null && loadedUrl === url && failedUrl !== url;
+  /*
+   * The image has to be IN THE DOM before it can load.
+   *
+   * The obvious way to guarantee "never both" is to render the image only once
+   * it has loaded — and that deadlocks: `onLoad` cannot fire for an element that
+   * was never rendered, so the picture never appears and the avatar is
+   * permanently initials. That is not a theoretical mistake; it is exactly what
+   * the first version of this fix did, and it was caught by looking at the
+   * rendered page rather than by a test.
+   *
+   * So the two are mutually exclusive *visually*, not structurally:
+   *
+   *   url is null              -> initials, no image element
+   *   url valid, loading       -> initials visible, image rendered but hidden
+   *   url valid, loaded        -> image visible, initials NOT rendered
+   *   url valid, failed        -> initials, image element removed
+   *
+   * While loading, the image is `invisible`, not merely transparent. That keeps
+   * it out of the accessibility tree and out of Playwright's visibility check,
+   * so "both are on screen" is not something the DOM can express or a test can
+   * accidentally pass.
+   */
+  const isFailed = url !== null && failedUrl === url;
+  const isLoaded = url !== null && loadedUrl === url;
+  const renderImage = url !== null && !isFailed;
+  const showInitials = !isLoaded;
   const initials = initialsFor(name);
 
   const stock: Record<string, number> = { sm: 24, default: 32, lg: 40 };
@@ -108,21 +138,28 @@ export function UserAvatar({
       data-testid="user-avatar"
       // Asserted by the e2e suite: this is the state, not a class that merely
       // happens to look right. "both" must be unrepresentable.
-      data-avatar-state={showImage ? "image" : "initials"}
+      data-avatar-state={isLoaded ? "image" : "initials"}
     >
-      {showImage ? (
+      {renderImage ? (
         <Image
           src={url}
           alt=""
           width={px}
           height={px}
           sizes={`${px}px`}
-          className="size-full rounded-full object-cover"
+          className={cn(
+            "size-full rounded-full object-cover",
+            // `invisible` rather than `opacity-0`: opacity alone leaves the node
+            // visible to assistive tech and to any visibility check.
+            isLoaded ? "opacity-100" : "invisible opacity-0"
+          )}
           data-testid="user-avatar-image"
           onLoad={() => setLoadedUrl(url)}
           onError={() => setFailedUrl(url)}
         />
-      ) : (
+      ) : null}
+
+      {showInitials ? (
         <span
           aria-hidden="true"
           data-testid="user-avatar-initials"
@@ -134,7 +171,7 @@ export function UserAvatar({
         >
           {initials}
         </span>
-      )}
+      ) : null}
     </Avatar>
   );
 }

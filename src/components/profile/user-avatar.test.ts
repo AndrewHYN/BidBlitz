@@ -67,19 +67,39 @@ describe("UserAvatar rendering states", () => {
     expect(src).not.toMatch(/AvatarImage/);
   });
 
-  it("renders the image and the initials in exclusive branches", () => {
+  it("keeps the two states visually exclusive, and still lets the image load", () => {
     const src = code();
 
-    // The image is a direct child of the root, guarded by the state.
-    expect(src).toMatch(/\{showImage\s*\?\s*\(/);
-    // ...and the initials occupy the other side of that same conditional.
-    expect(src).toMatch(/\)\s*:\s*\(\s*<span/);
+    /*
+     * This is the invariant, and getting it wrong in either direction is a real
+     * bug that has now happened once.
+     *
+     * Too exclusive — rendering the image only after `loadedUrl` is set — is a
+     * deadlock: an element that is not rendered cannot fire `onLoad`, so the
+     * picture never arrives and the avatar is initials forever. That is what the
+     * first version of the fix did.
+     *
+     * Too loose — leaving the image and the initials both painted — is the
+     * original defect: a photograph with letters on top of it.
+     *
+     * The correct shape: the image is rendered whenever there is a usable key so
+     * it can load, and it is hidden until it has. The initials are rendered
+     * exactly when the image is not the visible thing.
+     */
+    expect(src).toMatch(/const renderImage = url !== null && !isFailed;/);
+    expect(src).toMatch(/const showInitials = !isLoaded;/);
 
-    // Belt and braces on the state itself: it must be impossible for both to be
-    // true, so it is built from a loaded marker AND a failed marker rather than
-    // from a single "broken" flag.
-    expect(src).toMatch(/loadedUrl === url/);
-    expect(src).toMatch(/failedUrl !== url/);
+    // The image must be rendered from the "has a usable key" condition, NOT
+    // from the "has loaded" condition.
+    expect(src).toMatch(/\{renderImage \? \(/);
+    expect(src).not.toMatch(/\{showImage \? \(/);
+
+    // The initials are the complement of "the image is showing".
+    expect(src).toMatch(/\{showInitials \? \(/);
+
+    // Hidden means `invisible`, not just transparent: `opacity-0` leaves the
+    // node in the accessibility tree and passes any naive visibility check.
+    expect(src).toMatch(/isLoaded \? "opacity-100" : "invisible opacity-0"/);
   });
 
   it("drives every visual state from a URL-keyed marker, so replacing a picture retries", () => {
@@ -102,7 +122,7 @@ describe("UserAvatar rendering states", () => {
     const src = code();
     // A screenshot can be argued about; an attribute cannot. The e2e suite
     // asserts this, and asserts that "both" is not a value it can ever emit.
-    expect(src).toMatch(/data-avatar-state=\{showImage \? "image" : "initials"\}/);
+    expect(src).toMatch(/data-avatar-state=\{isLoaded \? "image" : "initials"\}/);
     // "both" is deliberately absent from that expression.
     expect(src).not.toMatch(/data-avatar-state=\{[^}]*both/);
   });
