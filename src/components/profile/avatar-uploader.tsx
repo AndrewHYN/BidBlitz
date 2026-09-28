@@ -139,23 +139,40 @@ export function AvatarUploader({
 
       <div className="flex flex-wrap items-center gap-4">
         <div className="relative size-20 shrink-0 overflow-hidden rounded-full border bg-muted">
-          {shown ? (
-            // next/image for the fixed box, so the frame is reserved and the
-            // CDN variant is used. `unoptimized` is NOT set: the optimiser
-            // needs this host in `images.remotePatterns`.
+          {/*
+            Two sources, and the split is deliberate.
+
+            A local blob: the file the user just picked, shown while the upload
+            is in flight. It cannot 404, so it needs no error handling of its
+            own, and it is deliberately NOT routed through `UserAvatar` — that
+            component accepts a storage key and builds the URL itself, precisely
+            so no caller can hand it an arbitrary origin. Adding a raw-URL
+            escape hatch for this one case would weaken that guarantee to save
+            a few lines.
+
+            Everything else: `UserAvatar`, with the real key. That is where the
+            broken-object case actually bites. This preview used to be its own
+            implementation, and a picture removed on another device, or one the
+            CDN has not caught up with, rendered as a torn image in the one
+            place a user is actively managing their picture. It now falls back
+            to initials exactly like the header and the profile do.
+          */}
+          {preview && serverUrl !== preview.replaces ? (
             <Image
-              src={shown}
+              src={preview.url}
               alt=""
               fill
+              unoptimized
               sizes="80px"
               className="object-cover"
-              data-testid="avatar-preview-image"
+              data-testid="avatar-preview-blob"
             />
           ) : (
             <UserAvatar
-              avatarPath={null}
+              avatarPath={avatarPath}
               name={displayName}
-              className="size-20 text-xl"
+              pixelSize={80}
+              className="size-20"
             />
           )}
           {busy && (

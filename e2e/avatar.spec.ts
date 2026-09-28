@@ -184,3 +184,177 @@ test.describe("avatar", () => {
     await expect(page.getByTestId("profile-listings")).toBeVisible();
   });
 });
+
+/**
+ * The two avatar states are mutually exclusive, proven in a real browser.
+ *
+ * ## The defect
+ *
+ * A real photograph and the fallback initials rendered at the same time, in the
+ * same frame, stacked on each other. `UserAvatar` used `next/image` rather than
+ * Radix's `AvatarImage` — deliberately, because a plain `<img src>` made the
+ * header download the original upload — but Radix's `status` is only ever moved
+ * by `AvatarImage`. It stayed `"loading"` forever, so `AvatarFallback` rendered
+ * unconditionally, and `showImage ? <Image/> : null` guarded nothing.
+ *
+ * ## Why this needed a browser
+ *
+ * Every other signal was green while this was broken. The component typechecked,
+ * linted, rendered a correct-looking frame, and 263 unit tests and 136 database
+ * checks all passed. The unit-level tripwire in
+ * `src/components/profile/user-avatar.test.ts` holds the shape, but only a real
+ * render can prove that exactly one node is in the DOM and that the initials
+ * are not painted over the photograph.
+ */
+test.describe("avatar rendering states", () => {
+  /**
+   * Every avatar in `scope` must be showing exactly one of the two states.
+   *
+   * Returns the states found so a test can assert which one, but throws if the
+   * total is anything other than the number of avatars. "Two images and one set
+   * of initials" is the bug; so is one avatar painting both.
+   */
+  async function assertExclusive(
+    page: import("@playwright/test").Page,
+    scope: import("@playwright/test").Locator,
+    expectedAvatars: number
+  ) {
+    const found = await scope.evaluate((root) => {
+      const images = root.querySelectorAll('[data-testid="user-avatar-image"]');
+      const initials = root.querySelectorAll('[data-testid="user-avatar-initials"]');
+      const roots = root.querySelectorAll('[data-testid="user-avatar"]');
+      // Also catch the overlap structurally: a frame that contains both an
+      // image and initials, however the states were produced.
+      const bothInOneFrame = [...roots].filter(
+        (r) =>
+          r.querySelector('[data-testid="user-avatar-image"]') &&
+          r.querySelector('[data-testid="user-avatar-initials"]')
+      ).length;
+      return {
+        images: images.length,
+        initials: initials.length,
+        roots: roots.length,
+        bothInOneFrame,
+        states: [...roots].map((r) => r.getAttribute("data-avatar-state")),
+      };
+    });
+
+    expect(found.bothInOneFrame, "an avatar frame contained both states").toBe(0);
+    expect(found.roots, "unexpected number of avatar frames").toBe(expectedAvatars);
+    // The core assertion: image count + initials count === frame count.
+    expect(
+      found.images + found.initials,
+      `expected exactly one state per avatar, saw ${found.images} image(s) and ${found.initials} initial(s) across ${found.roots} frame(s)`
+    ).toBe(expectedAvatars);
+    return found;
+  }
+
+  /** Make the optimizer's fetch of the avatar fail, as a dead object would. */
+  async function breakAvatarImages(page: import("@playwright/test").Page) {
+    await page.route("**/_next/image**", async (route) => {
+      const target = new URL(route.request().url()).searchParams.get("url") ?? "";
+      if (target.includes("/storage/v1/object/public/avatars/")) {
+        await route.abort("failed");
+        return;
+      }
+      await route.continue();
+    });
+  }
+
+  test.afterEach(async ({ page }) => {
+    // Never leave a picture on a QA account. The residue check in
+    // `db:verify` counts avatar rows, so a test that fails midway must not turn
+    // into a permanent trace.
+    await page.goto("/settings").catch(() => {});
+    const remove = page.getByTestId("avatar-remove-button");
+    if (await remove.isVisible().catch(() => false)) {
+      await remove.click();
+      await expect(remove).toHaveCount(0, { timeout: 30_000 }).catch(() => {});
+    }
+  });
+
+  for (const width of [390, 1440]) {
+    test(`a real picture and the initials are never both in the frame (${width}px)`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
+      await signIn(page, ACCOUNTS.seller.email);
+      await page.goto("/settings");
+
+      // With no picture: only initials, in every avatar on the page.
+      const noPicture = await assertExclusive(page, page.locator("body"), 1);
+      expect(noPicture.states).toEqual(["initials"]);
+
+      // Store a real picture through the real uploader.
+      await page.getByTestId("avatar-file-input").setInputFiles({
+        name: "me.png",
+        mimeType: "image/png",
+        buffer: TINY_PNG,
+      });
+      // The Remove control only appears once a picture is actually stored, so
+      // its presence is the signal that the round trip completed.
+      await expect(page.getByTestId("avatar-remove-button")).toBeVisible({
+        timeout: 60_000,
+      });
+
+      // Settings preview: the image, and nothing else in that frame.
+      const preview = page
+        .getByTestId("avatar-upload-button")
+        .locator("xpath=ancestor::section");
+      const withPicture = await assertExclusive(page, preview, 1);
+      expect(withPicture.states).toEqual(["image"]);
+
+      // A different surface, so this is not just the uploader's own state: the
+      // header on the home page.
+      await page.goto("/");
+      const header = page.locator("header");
+      const inHeader = await assertExclusive(page, header, 1);
+      expect(inHeader.states).toEqual(["image"]);
+
+      // And the public profile, the largest frame in the product.
+      await page.goto(`/profile/${ACCOUNTS.seller.username}`);
+      const profile = page.getByTestId("profile-header");
+      const onProfile = await assertExclusive(page, profile, 1);
+      expect(onProfile.states).toEqual(["image"]);
+    });
+  }
+
+  test("an avatar that fails to load falls back to initials and nothing else", async ({
+    page,
+  }) => {
+    await signIn(page, ACCOUNTS.seller.email);
+    await page.goto("/settings");
+    await page.getByTestId("avatar-file-input").setInputFiles({
+      name: "me.png",
+      mimeType: "image/png",
+      buffer: TINY_PNG,
+    });
+    await expect(page.getByTestId("avatar-remove-button")).toBeVisible({
+      timeout: 60_000,
+    });
+
+    // A deleted object, a stale CDN entry, an optimiser failure: all arrive as
+    // a failed image request, and all must end at letters rather than a torn
+    // icon or a photo with letters on top of it.
+    await breakAvatarImages(page);
+    await page.goto(`/profile/${ACCOUNTS.seller.username}`);
+
+    const profile = page.getByTestId("profile-header");
+    await expect(profile.getByTestId("user-avatar-initials")).toBeVisible({
+      timeout: 30_000,
+    });
+    const broken = await assertExclusive(page, profile, 1);
+    expect(broken.states).toEqual(["initials"]);
+    expect(broken.images, "a failed image was left in the DOM").toBe(0);
+
+    // The same failure in the header, which is the smallest frame and the one
+    // that is on every page.
+    await page.goto("/");
+    const header = page.locator("header");
+    await expect(header.getByTestId("user-avatar-initials")).toBeVisible({
+      timeout: 30_000,
+    });
+    const inHeader = await assertExclusive(page, header, 1);
+    expect(inHeader.states).toEqual(["initials"]);
+  });
+});
