@@ -52,6 +52,19 @@ right, and no longer spends any of BidBlitz's budget.
 limit to something a marketplace can use. That needs the owner's own email
 provider account and credentials.
 
+**Password reset also depends on this, and was not obvious.** Reset was built on
+2026-09-28 and is complete in code: `/forgot-password`, the emailed link, a new
+password, and an explained state for an expired or already-used link. But it
+sends email, so it is subject to the same 2-per-hour quota. Until SMTP is
+configured, **a user who forgets their password cannot recover their account** —
+the flow will accept the request and no email will arrive. The UI does not lie
+about this: it shows the provider throttle honestly rather than claiming an
+email was sent.
+
+That quota is also what made an account-enumeration oracle possible, and it is
+why the reset action normalises every provider response rather than forwarding
+errors. See §J12.
+
 ☐ **0.1. Choose a transactional email provider** and create an account.
 
 ☐ **0.2. Add its SMTP host, port, username and password to Supabase Auth.**
@@ -533,3 +546,35 @@ on an empty marketplace and concludes it is not a real business.
 **BidBlitz is not commercially live until K0–K13 are closed.** A complete
 codebase, a passing test suite and a deployed site do not make it live; they
 make the software ready for a business that is ready to trade.
+
+☑ **J12. Password reset is built, and its account-enumeration trap was found and
+closed.** The flow is complete: `/forgot-password`, the emailed link routed
+through the existing `/auth/callback`, `/reset-password`, and an explained
+state for a link that was never issued, has expired, or was already used.
+
+The trap is worth recording because the first implementation got it wrong on
+reasonable-sounding grounds. It forwarded provider errors so the user would
+never be told to check an inbox when no email had actually been sent. Measured
+against the live provider on 2026-09-28:
+
+```
+unknown address  -> HTTP 200, {}
+real account     -> HTTP 429, over_email_send_rate_limit
+```
+
+The provider answers a known address differently, and the difference is an
+error — so forwarding it turns the reset form into an oracle that answers "does
+this person have a BidBlitz account?" for any address submitted. Because
+`rate_limit_email_sent` is 2 per hour, that quota is exhausted in ordinary use,
+so the oracle was open **in production**, not only in principle.
+
+Every provider response is now normalised to the same generic outcome. The only
+failure still surfaced is BidBlitz's own budget, which is scoped to the request
+IP and the submitted address and therefore returns the same answer whether or
+not the account exists. `e2e/password-reset.spec.ts` fails if anyone forwards a
+provider error again.
+
+**Still blocked by the owner:** reset sends email, so it inherits the §0 mailer
+limit. Until SMTP is configured, a user who forgets their password cannot
+recover their account. The UI says so honestly rather than claiming a message
+was sent.
