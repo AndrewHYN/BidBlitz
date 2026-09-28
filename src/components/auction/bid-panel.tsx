@@ -537,12 +537,19 @@ export function BidPanel({
           ) : (
             <>
               Bids are final.{" "}
-              <a
+              <Link
                 href="/help/rules"
                 className="font-medium text-primary underline-offset-2 hover:underline"
               >
                 Read the bidding rules
-              </a>
+              </Link>{" "}
+              ·{" "}
+              <Link
+                href="/help/fees"
+                className="font-medium text-primary underline-offset-2 hover:underline"
+              >
+                fees
+              </Link>
               .
             </>
           )}
@@ -574,22 +581,6 @@ export function BidPanel({
         </motion.p>
       )}
 
-      <p className="text-xs text-muted-foreground">
-        Bids are final.{" "}
-        <Link
-          href="/help/rules"
-          className="font-medium text-primary hover:underline"
-        >
-          Bidding rules
-        </Link>{" "}
-        ·{" "}
-        <Link
-          href="/help/fees"
-          className="font-medium text-primary hover:underline"
-        >
-          Fees
-        </Link>
-      </p>
     </form>
   );
 }
