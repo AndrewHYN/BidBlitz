@@ -132,8 +132,13 @@ export default async function BrowsePage({
       </div>
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+        {/* Pluralised properly. This read "1 auctions" until the owner's own
+            first real listing made a result count of exactly 1 possible - the
+            page had never been rendered with one result, so the string was
+            never seen. The count is the user's first indication of whether their
+            search worked, so it is worth being grammatically correct. */}
         <p data-testid="browse-result-count" className="text-sm text-muted-foreground">
-          {result.total} auctions
+          {result.total} {result.total === 1 ? "auction" : "auctions"}
         </p>
       </div>
 
