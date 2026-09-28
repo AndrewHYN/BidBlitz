@@ -257,12 +257,28 @@ export default async function AdminPage() {
                 description="A row appears once a buyer's payment has been confirmed by Paynow."
               />
             ) : (
-              <ul className="space-y-4">
+              {/*
+                A queue, not a set of cards.
+
+                Each payout was a shadowed card with 16px of space around it, so
+                an operator working a backlog of twenty payouts was scrolling
+                past twenty floating islands rather than reading a list. The
+                frame stays — a queue row still needs an edge you can scan down
+                — but the drop shadow goes, and the rows sit closer together so
+                the eye can compare them. Density is what an operations console
+                is for; a consumer-style card per row is the opposite.
+
+                NOT VISUALLY VERIFIED: /admin needs the owner's own credentials,
+                which are never handled here, so this is reviewed from source
+                and by the non-admin refusal path. It should be looked at on the
+                first real payout before it is trusted.
+              */}
+              <ul className="space-y-2">
                 {payouts.map((row) => (
                   <li
                     key={row.payoutId}
                     data-testid="admin-payout-row"
-                    className="space-y-4 rounded-xl border bg-background p-4 shadow-sm"
+                    className="rounded-lg border bg-background p-4"
                   >
                     <PayoutRow row={row} />
                   </li>
@@ -304,12 +320,12 @@ export default async function AdminPage() {
               description="Reports filed by users appear here while they are open or under review."
             />
           ) : (
-            <ul className="space-y-3">
+            <ul className="space-y-2">
               {reports.map((report) => (
                 <li
                   key={report.id}
                   data-testid="admin-report-row"
-                  className="space-y-3 rounded-xl border bg-card p-4 shadow-sm"
+                  className="space-y-3 rounded-lg border bg-card p-4"
                 >
                   <div className="space-y-1">
                     <div className="flex flex-wrap items-center gap-2">

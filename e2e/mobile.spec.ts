@@ -38,8 +38,18 @@ test.describe("mobile shell", () => {
 
     const opened = await openHeaderMenu(page);
     if (!opened) {
-      // No menu control is exposed yet — reported rather than guessed at.
-      test.skip(true, "no header menu control is exposed by the UI yet");
+      /*
+       * Reached only when this spec runs in a project whose viewport is wide
+       * enough that the mobile control is correctly hidden (`lg:hidden`). The
+       * control exists and is exercised in the mobile project, and it opens,
+       * marks the current section and closes on Escape. The old message here
+       * said "no menu control is exposed by the UI yet", which would tell a
+       * future reader the feature was missing — and they would go looking.
+       */
+      test.skip(
+        true,
+        "mobile menu control is hidden at this viewport; it is covered in the mobile project"
+      );
     }
 
     const menuPanel = page.getByRole("dialog").or(page.getByRole("menu"));
