@@ -23,7 +23,7 @@ export default defineConfig({
   // listings sitting on the public homepage, which is exactly what happened
   // before 2026-09-28. Best-effort by design: it warns loudly when it cannot
   // clean up, and never hides a skipped cleanup behind a green run.
-  globalTeardown: "./e2e/global-teardown.ts",
+  globalTeardown: "./e2e/global-teardown.mjs",
   use: {
     baseURL,
     trace: "retain-on-failure",

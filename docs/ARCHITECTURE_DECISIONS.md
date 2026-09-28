@@ -112,6 +112,41 @@ The browser never predicts a win, a price or an auction end. Countdown is
 rendered from server timestamps plus a synchronized clock offset
 (`src/lib/clock.ts`), so local clock manipulation cannot affect validity.
 
+### An event is a hint, and now a bounded one (2026-09-28)
+
+"Never authority" was the rule, but the implementation had a gap that a
+2026-09-28 audit found by reading the code rather than the comment.
+
+`auction:{id}` and `user:{id}` are **public** Broadcast channels, so an event
+payload is attacker-controlled input for anyone holding the publishable key.
+The detail page renders the *newest* of three server-delivered sources, and the
+comparison was made on each source's `serverTime`. Two forgeries therefore beat
+the server-rendered snapshot:
+
+- an event with **no** `serverTime`, which fell back to the client mount time
+  and so always looked newer than the server's own value;
+- an event claiming a timestamp **years in the future**.
+
+Either one overwrote the mirrored status, price and bid count in every other
+viewer's browser, and because the mirrored `status` is what `<BidPanel>` renders,
+a live auction could be made to look *ended* — removing the bid form for every
+viewer until they reloaded. That is a denial of service against the
+marketplace, and it needed no account.
+
+**Decision: an event only reaches the mirror if it carries a timestamp within
+`MAX_EVENT_FUTURE_SKEW_MS` of the newest timestamp the server has already
+confirmed.** Every genuine publisher sets a real `serverTime`
+(`place_bid`, `settle_auction`, `publish_auction`), so live bidding is
+unaffected; the bound is enforced in `use-auction-realtime`, i.e. where the
+event enters state, so a forged value is never rendered even briefly.
+
+What this explicitly is **not**: an authorization boundary. The server remains
+the only thing that decides whether a bid is valid, so a forged mirror cannot
+make a bid succeed, move money, or change a transaction — it can only make one
+browser briefly show a wrong public fact. The real fix is Supabase private
+channels plus `realtime.messages` RLS policies, which must be verified against
+live bidding before it ships; that stays on the backlog.
+
 ---
 
 ## ADR-006: Payments — provider abstraction, no fake checkout

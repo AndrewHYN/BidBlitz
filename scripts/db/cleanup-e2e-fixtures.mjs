@@ -20,11 +20,12 @@
  * match it either. Every candidate is printed before anything is removed, and
  * nothing is removed unless the caller passes --yes.
  *
- * Storage is handled separately and more conservatively: an object in the
- * auction-images bucket is an orphan if no `auction_images` row points at it and
- * it is more than an hour old (the margin covers an in-flight upload whose row
- * has not been written yet). An orphan is unreferenced by definition, so this
- * cannot remove a live image.
+ * Storage is handled in two passes, both conservative but neither heuristic-only:
+ * the objects this run's own fixtures referenced are captured before their rows
+ * are deleted and removed exactly, and separately a bucket sweep removes any
+ * object older than an hour that no `auction_images` row references (which
+ * covers rows deleted by an earlier run). An orphan is unreferenced by
+ * definition, so neither pass can remove a live image.
  *
  * ORDER matters and is enforced by the foreign keys: reviews, then the payout
  * audit trail and payouts (payouts RESTRICT the transaction), then payment
@@ -63,16 +64,40 @@ async function sql(query) {
 
 const rows = (x) => (Array.isArray(x) ? x : []);
 
+/**
+ * Storage objects in the auction-images bucket that nothing references.
+ *
+ * Two independent tests, because "old enough" alone is not enough and is not
+ * necessary either:
+ *
+ *   1. older than an hour, which covers a row deleted by an earlier run - the
+ *      margin protects an upload whose row has not been written yet; or
+ *   2. the auction named in the first path segment does not exist at all, which
+ *      can never be in flight no matter how new it is.
+ *
+ * The join is on the bare object name: `auction_images.storage_path` is the key
+ * INSIDE the bucket, so the bucket is implicit and must not be prefixed on. An
+ * earlier version compared `storage_path` to `bucket_id || '/' || name`, which
+ * never matched - so orphans accumulated in silence while the script reported
+ * that everything was already clean.
+ */
 const orphanObjects = rows(
   JSON.parse(
     await sql(`
       select o.bucket_id, o.name
         from storage.objects o
        where o.bucket_id = 'auction-images'
-         and o.created_at < now() - interval '1 hour'
          and not exists (
            select 1 from public.auction_images i
-            where i.storage_path = o.bucket_id || '/' || o.name
+            where i.storage_path = o.name
+         )
+         and (
+              o.created_at < now() - interval '1 hour'
+              or not exists (
+                select 1 from public.auctions a
+                 where a.id::text = split_part(o.name, '/', 1)
+                   and split_part(o.name, '/', 1) ~ '^[0-9a-fA-F-]{36}$'
+              )
          )
        order by o.created_at
     `)
@@ -120,6 +145,31 @@ if (dryRun) {
   process.exit(0);
 }
 
+// The storage keys this run's own fixtures referenced, captured BEFORE the rows
+// are deleted. `auction_images.storage_path` IS the object key inside the
+// bucket (the bucket is implicit, which is why it must not be split off the
+// front - an earlier version of this script did that and silently deleted
+// nothing). Deleting these exactly is deterministic; the time-gated orphan
+// sweep above is only a safety net for objects whose row was already gone.
+const fixturePaths = fixtures.length
+  ? rows(
+      JSON.parse(
+        await sql(
+          `select distinct i.storage_path
+             from public.auction_images i
+            where i.auction_id in (${fixtures.map((f) => `'${f.auction_id}'`).join(",")})`
+        )
+      )
+    ).map((r) => r.storage_path)
+  : [];
+
+const targets = [
+  ...new Set([
+    ...fixturePaths,
+    ...orphanObjects.map((o) => o.name),
+  ]),
+];
+
 if (fixtures.length > 0) {
   const ids = fixtures.map((f) => `'${f.auction_id}'`).join(",");
   const steps = [
@@ -163,13 +213,13 @@ if (fixtures.length > 0) {
 // Storage last, through the Storage API: deleting the row alone would orphan
 // the blob. Only HTTP 2xx counts as removed; anything else is reported, never
 // quietly swallowed.
-if (orphanObjects.length > 0) {
+if (targets.length > 0) {
   const pub = requireEnv("NEXT_PUBLIC_SUPABASE_URL");
   const key = requireEnv("SUPABASE_SECRET_KEY");
   let removed = 0;
-  for (const o of orphanObjects) {
-    const encoded = String(o.name).split("/").map(encodeURIComponent).join("/");
-    const url = `${pub}/storage/v1/object/${o.bucket_id}/${encoded}`;
+  for (const name of targets) {
+    const encoded = String(name).split("/").map(encodeURIComponent).join("/");
+    const url = `${pub}/storage/v1/object/auction-images/${encoded}`;
     try {
       const res = await fetch(url, {
         method: "DELETE",
@@ -181,23 +231,19 @@ if (orphanObjects.length > 0) {
       } else {
         const body = await res.text().catch(() => "");
         console.log(
-          `[db:cleanup-e2e] storage ${res.status} for ${o.name} - ${body.slice(0, 120)}`
+          `[db:cleanup-e2e] storage ${res.status} for ${name} - ${body.slice(0, 120)}`
         );
       }
     } catch (e) {
-      console.log(`[db:cleanup-e2e] storage error for ${o.name}: ${String(e).slice(0, 90)}`);
+      console.log(`[db:cleanup-e2e] storage error for ${name}: ${String(e).slice(0, 90)}`);
     }
   }
-  console.log(
-    `[db:cleanup-e2e] removed ${removed}/${orphanObjects.length} storage object(s)`
-  );
+  console.log(`[db:cleanup-e2e] removed ${removed}/${targets.length} storage object(s)`);
 }
 
 // Prove it rather than assuming it.
 const auctionIds = fixtures.map((f) => `'${f.auction_id}'`).join(",");
-const objectNames = orphanObjects
-  .map((o) => `'${String(o.name).replace(/'/g, "")}'`)
-  .join(",");
+const objectNames = targets.map((n) => `'${String(n).replace(/'/g, "")}'`).join(",");
 const check = rows(
   JSON.parse(
     await sql(`
