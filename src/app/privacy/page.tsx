@@ -2,11 +2,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Mail, Phone } from "lucide-react";
 import {
-  LegalContactCard,
-  LegalCrossLinks,
-  LegalDocument,
-  LegalSection,
-} from "@/components/legal/legal-document";
+  DocumentContactCard,
+  DocumentCrossLinks,
+  DocumentPage,
+  DocumentSection,
+} from "@/components/document-page";
 import { PageHeader } from "@/components/auction/page-header";
 
 export const metadata: Metadata = {
@@ -41,16 +41,16 @@ function PrivacySection({
   children: React.ReactNode;
 }) {
   return (
-    <LegalSection id={id} title={title}>
+    <DocumentSection id={id} title={title}>
       {children}
-    </LegalSection>
+    </DocumentSection>
   );
 }
 
 export default function PrivacyPage() {
   return (
     <div data-testid="privacy-page">
-      <LegalDocument toc={SECTIONS}>
+      <DocumentPage toc={SECTIONS}>
         <header className="space-y-4">
           <PageHeader
             title="Privacy Policy"
@@ -201,7 +201,7 @@ export default function PrivacyPage() {
           </p>
         </PrivacySection>
 
-        <LegalContactCard>
+        <DocumentContactCard>
             <p>
               Questions about your data? Reach us directly — we answer as
               individuals, not a faceless support queue:
@@ -227,10 +227,10 @@ export default function PrivacyPage() {
               </li>
             </ul>
             <p className="mt-4 text-sm text-muted-foreground">
-              <LegalCrossLinks />
+              <DocumentCrossLinks />
             </p>
-          </LegalContactCard>
-      </LegalDocument>
+          </DocumentContactCard>
+      </DocumentPage>
     </div>
   );
 }

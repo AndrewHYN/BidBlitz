@@ -1,7 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, Coins, Handshake, Mail, Phone, Scale, ShieldAlert } from "lucide-react";
-import { PageHeader, SectionHeading } from "@/components/auction/page-header";
+import { PageHeader } from "@/components/auction/page-header";
+import {
+  DocumentContactCard,
+  DocumentPage,
+  DocumentSection,
+} from "@/components/document-page";
 import { isPaymentProviderConfigured } from "@/server/payments/config";
 
 export const metadata: Metadata = {
@@ -34,8 +39,8 @@ const TOPICS = [
 
 export default function HelpPage() {
   return (
-    <div data-testid="help-page" className="page-container py-10 sm:py-14">
-      <div className="mx-auto w-full max-w-3xl space-y-10">
+    <div data-testid="help-page">
+      <DocumentPage>
         <PageHeader
           title="Help"
           description="Only what BidBlitz actually does today — no promises we haven't built."
@@ -82,9 +87,7 @@ export default function HelpPage() {
           ))}
         </ul>
 
-        <section id="settlement" className="scroll-mt-24 space-y-4">
-          <SectionHeading title="How settlement works" />
-          <div className="space-y-4 rounded-xl border bg-card p-5 text-sm leading-relaxed sm:p-6">
+        <DocumentSection id="settlement" title="How settlement works">
             <ol className="list-decimal space-y-3 pl-5">
               <li>
                 <strong>The auction ends on the server clock.</strong> When the
@@ -126,17 +129,14 @@ export default function HelpPage() {
                 can write them, and they show up on each profile.
               </li>
             </ol>
-          </div>
-        </section>
+        </DocumentSection>
 
-        <section id="contact" className="scroll-mt-24 space-y-4">
-          <SectionHeading title="Contact us" />
-          <div className="space-y-3 rounded-xl border bg-card p-5 text-sm leading-relaxed sm:p-6">
-            <p>
+        <DocumentContactCard title="Contact us">
+            <p className="mb-3 text-[0.9375rem] leading-[1.75] text-muted-foreground">
               A question, or something on the site that looks wrong? Reach us
               directly:
             </p>
-            <ul className="space-y-2">
+            <ul className="space-y-2 text-[0.9375rem]">
               <li className="flex items-center gap-2">
                 <Phone className="size-4 shrink-0 text-primary" aria-hidden />
                 <a
@@ -164,20 +164,25 @@ export default function HelpPage() {
                 reports go straight to the BidBlitz team for review.
               </span>
             </p>
-            <p className="text-xs text-muted-foreground">
+            <p className="mt-4 text-sm text-muted-foreground">
               See also:{" "}
-              <Link href="/terms" className="font-medium text-primary hover:underline">
+              <Link
+                href="/terms"
+                className="font-medium text-primary underline-offset-2 hover:underline"
+              >
                 Terms of Use
               </Link>{" "}
               and{" "}
-              <Link href="/privacy" className="font-medium text-primary hover:underline">
+              <Link
+                href="/privacy"
+                className="font-medium text-primary underline-offset-2 hover:underline"
+              >
                 Privacy Policy
               </Link>
               .
             </p>
-          </div>
-        </section>
-      </div>
+        </DocumentContactCard>
+      </DocumentPage>
     </div>
   );
 }

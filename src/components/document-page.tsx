@@ -2,16 +2,18 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 
 /**
- * The treatment for long-form legal and policy pages.
+ * The treatment for every long-form page: the terms, the privacy policy and the
+ * three help pages.
  *
- * These pages were previously a stack of identical cards — twelve of them on
- * the Terms page — which is the "unrelated paragraph, own box" failure the
- * design direction warns about. It also read badly: legal text is read, not
+ * They were previously a stack of identical cards — twelve of them on the Terms
+ * page, four on Help — which is the "unrelated paragraph, own box" failure the
+ * design direction warns about. It also read badly: this text is read, not
  * skimmed, and a border around every three-paragraph block breaks the
- * paragraph rhythm that reading depends on while adding twelve competing
+ * paragraph rhythm that reading depends on while adding a dozen competing
  * frames.
  *
- * The decision here is that a policy is a **document**. So:
+ * The decision is that these are **documents**, and that one decision should
+ * serve all five pages rather than each page inventing its own spacing. So:
  *
  *  - one continuous measure (68ch, close to the readable line for body text at
  *    this size) instead of a narrow centred column inside a card;
@@ -25,7 +27,7 @@ import { cn } from "@/lib/utils";
  * The card is kept for exactly one thing on these pages: the contact block,
  * which is a real object — a way to reach a person — and earns a box.
  */
-export function LegalDocument({
+export function DocumentPage({
   children,
   toc,
   className,
@@ -103,7 +105,7 @@ export function LegalDocument({
  * place in a long page, and that rule does the work a card border used to do
  * without interrupting the text.
  */
-export function LegalSection({
+export function DocumentSection({
   id,
   title,
   children,
@@ -127,22 +129,44 @@ export function LegalSection({
 }
 
 /**
- * The one box on a legal page.
+ * The one box a document page is allowed.
  *
  * Contact details are an object a user acts on, so a frame is honest here —
- * and it gives the page a single, deliberate edge rather than twelve.
+ * and it gives the page a single, deliberate edge rather than a dozen.
  */
-export function LegalContactCard({ children }: { children: React.ReactNode }) {
+export function DocumentContactCard({
+  title = "Contact",
+  children,
+}: {
+  title?: string;
+  children: React.ReactNode;
+}) {
   return (
     <section id="contact" className="scroll-mt-24">
-      <h2 className="mb-4 text-lg font-semibold tracking-tight sm:text-xl">Questions</h2>
+      <h2 className="mb-4 border-t border-border/70 pt-8 text-lg font-semibold tracking-tight sm:text-xl">
+        {title}
+      </h2>
       <div className="rounded-xl border bg-card/60 p-5 sm:p-6">{children}</div>
     </section>
   );
 }
 
+/**
+ * A framed block inside a document — for content that genuinely is an object.
+ *
+ * A worked fee example is a receipt: you read it line by line and compare the
+ * numbers, which is exactly what a frame is for. Prose is not, and gets no
+ * frame. Keeping both in one document is what stops the page from drifting
+ * back to "every block is a card".
+ */
+export function DocumentFigure({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="divide-y rounded-xl border bg-card/60 px-5 py-1 sm:px-6">{children}</div>
+  );
+}
+
 /** The small "also see" links that close a policy page. */
-export function LegalCrossLinks() {
+export function DocumentCrossLinks() {
   return (
     <p className="text-sm text-muted-foreground">
       See also:{" "}

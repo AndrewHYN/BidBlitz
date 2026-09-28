@@ -2,11 +2,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Mail, Phone } from "lucide-react";
 import {
-  LegalContactCard,
-  LegalCrossLinks,
-  LegalDocument,
-  LegalSection,
-} from "@/components/legal/legal-document";
+  DocumentContactCard,
+  DocumentCrossLinks,
+  DocumentPage,
+  DocumentSection,
+} from "@/components/document-page";
 import { PageHeader } from "@/components/auction/page-header";
 import { isPaymentProviderConfigured } from "@/server/payments/config";
 
@@ -52,9 +52,9 @@ function TermsSection({
   children: React.ReactNode;
 }) {
   return (
-    <LegalSection id={id} title={title}>
+    <DocumentSection id={id} title={title}>
       {children}
-    </LegalSection>
+    </DocumentSection>
   );
 }
 
@@ -65,7 +65,7 @@ export default function TermsPage() {
 
   return (
     <div data-testid="terms-page">
-      <LegalDocument toc={SECTIONS}>
+      <DocumentPage toc={SECTIONS}>
         <header className="space-y-4">
           <PageHeader
             title="Terms of Use"
@@ -319,7 +319,7 @@ export default function TermsPage() {
           </p>
         </TermsSection>
 
-        <LegalContactCard>
+        <DocumentContactCard>
           <p className="mb-3 text-[0.9375rem] leading-[1.75] text-muted-foreground">
             If anything here is unclear, ask us before you bid or list.
           </p>
@@ -344,10 +344,10 @@ export default function TermsPage() {
             </li>
           </ul>
           <p className="mt-4 text-sm text-muted-foreground">
-            <LegalCrossLinks />
+            <DocumentCrossLinks />
           </p>
-        </LegalContactCard>
-      </LegalDocument>
+        </DocumentContactCard>
+      </DocumentPage>
     </div>
   );
 }

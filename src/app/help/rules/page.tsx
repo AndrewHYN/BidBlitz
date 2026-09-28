@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, Coins, FileCheck, Lock, Scale, Timer, Undo2 } from "lucide-react";
-import { PageHeader, SectionHeading } from "@/components/auction/page-header";
+import { PageHeader } from "@/components/auction/page-header";
+import { DocumentPage } from "@/components/document-page";
 
 export const metadata: Metadata = {
   title: "Bidding rules",
@@ -50,34 +51,42 @@ const RULES = [
 
 export default function HelpRulesPage() {
   return (
-    <div data-testid="help-rules-page" className="page-container py-10 sm:py-14">
-      <div className="mx-auto w-full max-w-3xl space-y-10">
+    <div data-testid="help-rules-page">
+      <DocumentPage>
         <PageHeader
           title="Bidding rules"
           description="The rules the auction engine enforces on every single bid."
         />
 
-        <section className="space-y-4">
-          <SectionHeading title="The rules" />
-          <ul className="space-y-3">
-            {RULES.map((rule) => (
-              <li
-                key={rule.title}
-                className="flex gap-4 rounded-xl border bg-card p-4 sm:p-5"
+        {/*
+          Seven rules, each previously a card with an icon in a tinted square.
+          These are not seven features competing for attention — they are one
+          list a bidder reads straight through, and framing each item made the
+          page look like a spec sheet of components instead of rules you can
+          follow. As rows they scan as a sequence, which is how they are meant
+          to be read, and the icon becomes an index marker rather than a badge.
+        */}
+        <ol className="border-t border-border/70">
+          {RULES.map((rule, i) => (
+            <li
+              key={rule.title}
+              className="flex gap-4 border-b border-border/70 py-4 sm:gap-5"
+            >
+              <span
+                className="mt-0.5 shrink-0 tabular-nums text-sm font-medium text-muted-foreground/60"
+                aria-hidden
               >
-                <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-accent text-accent-foreground">
-                  <rule.icon className="size-4" aria-hidden />
-                </span>
-                <div className="space-y-1">
-                  <h3 className="text-sm font-semibold">{rule.title}</h3>
-                  <p className="text-sm leading-relaxed text-muted-foreground">
-                    {rule.body}
-                  </p>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </section>
+                {String(i + 1).padStart(2, "0")}
+              </span>
+              <div className="min-w-0 space-y-1">
+                <h3 className="font-medium">{rule.title}</h3>
+                <p className="text-[0.9375rem] leading-[1.7] text-muted-foreground text-pretty">
+                  {rule.body}
+                </p>
+              </div>
+            </li>
+          ))}
+        </ol>
 
         <p className="text-sm">
           <Link href="/help/fees" className="font-medium text-primary hover:underline">
@@ -85,7 +94,7 @@ export default function HelpRulesPage() {
             <ArrowRight className="inline size-3.5" aria-hidden />
           </Link>
         </p>
-      </div>
+      </DocumentPage>
     </div>
   );
 }

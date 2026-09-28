@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, CreditCard, ReceiptText } from "lucide-react";
 import { PageHeader, SectionHeading } from "@/components/auction/page-header";
+import { DocumentPage } from "@/components/document-page";
 import { Money } from "@/components/auction/money";
 import { previewFeeMinor } from "@/lib/money";
 import { isPaymentProviderConfigured } from "@/server/payments/config";
@@ -102,8 +103,8 @@ export default function HelpFeesPage() {
   const paymentConfigured = isPaymentProviderConfigured();
 
   return (
-    <div data-testid="help-fees-page" className="page-container py-10 sm:py-14">
-      <div className="mx-auto w-full max-w-[68ch] space-y-10">
+    <div data-testid="help-fees-page" >
+      <DocumentPage>
         <PageHeader
           title="Fees"
           description="What the seller pays BidBlitz, and what the buyer pays Paynow. Two separate amounts."
@@ -280,7 +281,7 @@ export default function HelpFeesPage() {
             <ArrowRight className="inline size-3.5" aria-hidden />
           </Link>
         </p>
-      </div>
+      </DocumentPage>
     </div>
   );
 }
