@@ -632,6 +632,179 @@ const soldNotif = rows(await sql(
 check("notifications: winner got WON, seller got SOLD",
   wonNotif.length === 1 && soldNotif.length === 1,
   `won=${wonNotif.length} sold=${soldNotif.length}`);
+  // ---- 11b. the endings that are not a sale ----------------------------------
+  //
+  // CASE B (sold) had thorough coverage above. The endings that produce NO money
+  // had none, and "nobody bid on it" is the most common thing a real marketplace
+  // produces. So the whole contract for those endings was unverified at the
+  // database level, which is why this section exists.
+  //
+  // Both fixtures are created here and deleted again before the section ends.
+  // They are not left for `cleanup-e2e-fixtures.mjs`, which matches the e2e
+  // suite's listing-name scheme; when they were left behind they broke this
+  // file's own residue check.
+  const CASE_A_TITLE = "Verify: unsold lot nobody wanted";
+  const CASE_D_TITLE = "Verify: cancelled before anyone bid";
+
+  const emptyCreated = await rest(`/rest/v1/auctions`, {
+    method: "POST", bearer: tok.seller,
+    headers: { Prefer: "return=representation" },
+    body: { ...auctionPayload, title: CASE_A_TITLE },
+  });
+  const emptyId = emptyCreated.data?.[0]?.id;
+  check("CASE A: a second auction was created for the no-bids path", !!emptyId,
+    emptyId ?? JSON.stringify(emptyCreated.data));
+
+  if (emptyId) {
+    // publish_auction refuses an auction with no photo, exactly as the sell flow
+    // does. The row only has to exist, name this auction, and use the `harness/`
+    // prefix the cleanup below keys on.
+    await rest(`/rest/v1/auction_images`, {
+      method: "POST", bearer: tok.seller,
+      body: { auction_id: emptyId, storage_path: `harness/${emptyId}/cover.jpg`, position: 0 },
+    });
+
+    const publishedEmpty = await rest(`/rest/v1/rpc/publish_auction`, {
+      method: "POST", bearer: tok.seller,
+      body: { p_auction_id: emptyId },
+    });
+    check("CASE A: the no-bid auction published normally",
+      publishedEmpty.ok && publishedEmpty.data?.status === "LIVE",
+      JSON.stringify(publishedEmpty.data));
+
+    const beforeEmptyBids = rows(await sql(
+      `select count(*)::int as n from public.bids where auction_id='${emptyId}'`))[0].n;
+    check("CASE A: nobody bid on it", beforeEmptyBids === 0, `bids=${beforeEmptyBids}`);
+
+    await sql(`update public.auctions set ends_at = now() - interval '1 second'
+                where id='${emptyId}'`);
+
+    // A bid on an expired auction must be refused, whatever else is true.
+    const lateBidNoBids = await rest(`/rest/v1/rpc/place_bid`, {
+      method: "POST", bearer: tok.buyer1,
+      body: { p_auction_id: emptyId, p_amount_minor: 999999, p_request_id: randomUUID() },
+    });
+    check("CASE A: a bid after the close is refused",
+      !lateBidNoBids.ok && /auction_ended/.test(JSON.stringify(lateBidNoBids.data)),
+      JSON.stringify(lateBidNoBids.data));
+
+    // KNOWN LIMITATION, asserted rather than hidden. place_bid() calls
+    // settle_auction() and then raises, and the raise rolls the settlement back,
+    // so refusing a late bid does NOT settle the auction. Measured here rather
+    // than inferred. The other two triggers carry settlement: the detail page
+    // calls settleIfDueAction() when a countdown expires, and the throttled
+    // read-path sweep plus the cron call settle_due_auctions(). Both are
+    // exercised below by settling explicitly, exactly as they would.
+    const afterLateBid = rows(await sql(
+      `select status from public.auctions where id='${emptyId}'`))[0].status;
+    check("CASE A: KNOWN LIMITATION - a refused late bid does not itself settle the auction",
+      afterLateBid === "LIVE",
+      `status=${afterLateBid} (place_bid settles, then raises, and the raise rolls it back)`);
+
+    // What the working triggers do.
+    const settleEmpty = await rest(`/rest/v1/rpc/settle_auction`, {
+      method: "POST", bearer: SEC, key: SEC,
+      body: { p_auction_id: emptyId },
+    });
+    const emptyRow = rows(await sql(
+      `select status, winner_id, winning_bid_minor
+         from public.auctions where id='${emptyId}'`))[0];
+    check("CASE A: closes to UNSOLD with no winner and no winning price",
+      emptyRow.status === "UNSOLD"
+        && emptyRow.winner_id === null
+        && emptyRow.winning_bid_minor === null,
+      `status=${emptyRow.status} winner=${emptyRow.winner_id} amount=${emptyRow.winning_bid_minor} ${JSON.stringify(settleEmpty.data)}`);
+
+    // The one that matters most: a zero-value "sale" would invent a financial
+    // record and a payout obligation for an item nobody bought.
+    const emptyTx = rows(await sql(
+      `select count(*)::int as n from public.transactions where auction_id='${emptyId}'`))[0].n;
+    check("CASE A: NO transaction is created for an auction that did not sell",
+      emptyTx === 0, `transactions=${emptyTx}`);
+
+    const emptyWins = rows(await sql(
+      `select count(*)::int as n from public.bids
+        where auction_id='${emptyId}' and is_winning`))[0].n;
+    check("CASE A: no bid is marked winning", emptyWins === 0, `winning_bids=${emptyWins}`);
+
+    const unsoldNotif = rows(await sql(
+      `select type from public.notifications
+        where user_id='${sellerId}' and auction_id='${emptyId}' and type='ENDED_UNSOLD'`));
+    check("CASE A: the seller is told it ended without a sale",
+      unsoldNotif.length === 1, `ENDED_UNSOLD=${unsoldNotif.length}`);
+
+    // Idempotency for this case specifically: settling again must not invent a
+    // transaction, and must not quietly turn an unsold lot into a sale.
+    const emptyAgain = await rest(`/rest/v1/rpc/settle_auction`, {
+      method: "POST", bearer: SEC, key: SEC,
+      body: { p_auction_id: emptyId },
+    });
+    const emptyTxAfter = rows(await sql(
+      `select count(*)::int as n from public.transactions where auction_id='${emptyId}'`))[0].n;
+    const emptyStatusAfter = rows(await sql(
+      `select status from public.auctions where id='${emptyId}'`))[0].status;
+    check("CASE A: settling an unsold auction again is idempotent and stays unsold",
+      emptyTxAfter === 0 && emptyStatusAfter === "UNSOLD",
+      `transactions=${emptyTxAfter} status=${emptyStatusAfter} ${JSON.stringify(emptyAgain.data)}`);
+
+    // CASE D. Cancelled and unsold are both "no sale", and conflating them would
+    // tell a seller their item was rejected on the open market when it was not.
+    const cancelledCreated = await rest(`/rest/v1/auctions`, {
+      method: "POST", bearer: tok.seller,
+      headers: { Prefer: "return=representation" },
+      body: { ...auctionPayload, title: CASE_D_TITLE },
+    });
+    const cancelledId = cancelledCreated.data?.[0]?.id;
+    const cancelled = cancelledId
+      ? await rest(`/rest/v1/rpc/cancel_auction`, {
+          method: "POST", bearer: tok.seller,
+          body: { p_auction_id: cancelledId },
+        })
+      : { data: "auction was not created" };
+    const cancelledRow = rows(await sql(
+      `select status from public.auctions where id='${cancelledId}'`))[0];
+    const cancelledTx = rows(await sql(
+      `select count(*)::int as n from public.transactions where auction_id='${cancelledId}'`))[0].n;
+    check("CASE D: a seller can cancel their own auction, and it is CANCELLED not UNSOLD",
+      cancelledRow?.status === "CANCELLED" && cancelledTx === 0,
+      `status=${cancelledRow?.status} transactions=${cancelledTx} ${JSON.stringify(cancelled.data)}`);
+
+    // A cancelled auction must never be settleable into a sale.
+    await rest(`/rest/v1/rpc/settle_auction`, {
+      method: "POST", bearer: SEC, key: SEC,
+      body: { p_auction_id: cancelledId },
+    });
+    const stillCancelled = rows(await sql(
+      `select status from public.auctions where id='${cancelledId}'`))[0].status;
+    const cancelledTxAfter = rows(await sql(
+      `select count(*)::int as n from public.transactions where auction_id='${cancelledId}'`))[0].n;
+    check("CASE D: a cancelled auction can never become a sale",
+      stillCancelled === "CANCELLED" && cancelledTxAfter === 0,
+      `status=${stillCancelled} transactions=${cancelledTxAfter}`);
+
+    // Remove this section's own fixtures. Scoped to these two ids, and only
+    // once both are bid-free and transaction-free, so a real listing cannot be
+    // reached even if an id were somehow wrong.
+    const caseIds = [emptyId, cancelledId].filter(Boolean);
+    const caseIdList = caseIds.map((x) => `'${x}'`).join(",");
+    const unsafeToDelete = rows(await sql(
+      `select a.id::text from public.auctions a
+        where a.id in (${caseIdList})
+          and (a.title not in ('${CASE_A_TITLE}', '${CASE_D_TITLE}')
+               or exists (select 1 from public.bids b where b.auction_id = a.id)
+               or exists (select 1 from public.transactions t where t.auction_id = a.id))`));
+    if (unsafeToDelete.length === 0) {
+      await sql(`delete from public.notifications where auction_id in (${caseIdList})`);
+      await sql(`delete from public.auction_images where auction_id in (${caseIdList})`);
+      await sql(`delete from public.watchlist where auction_id in (${caseIdList})`);
+      await sql(`delete from public.auctions where id in (${caseIdList})`);
+    }
+    check("CASE A/D: this section's own fixtures are removed here, not left for the e2e sweeper",
+      unsafeToDelete.length === 0,
+      unsafeToDelete.length === 0
+        ? `removed ${caseIds.length} fixture(s)`
+        : `REFUSED to delete ${unsafeToDelete.length} row(s) that did not look like our own`);
+  }
 
 // ---- 12. cross-user financial isolation -----------------------------------
 console.log("\n--- financial isolation ---");
@@ -1896,18 +2069,46 @@ check(
 );
 
 // 13. A profile with no avatar is a normal, supported state.
-const avNull = Number(
-  rows(await sql(`select count(*)::int as n from public.profiles where avatar_path is null`))[0]
-    ?.n
-);
-const avAll = Number(
-  rows(await sql(`select count(*)::int as n from public.profiles`))[0]?.n
-);
-check(
-  "avatar: no avatar on any profile is a valid state (fallback is the default)",
-  avNull === avAll,
-  `null=${avNull} of ${avAll}`
-);
+  const avNull = Number(
+    rows(await sql(`select count(*)::int as n from public.profiles where avatar_path is null`))[0]
+      ?.n
+  );
+  const avAll = Number(
+    rows(await sql(`select count(*)::int as n from public.profiles`))[0]?.n
+  );
+  /*
+   * "A profile with no picture is a normal, supported state."
+   *
+   * This used to be asserted as "no profile has an avatar at all" — true only
+   * while nobody had ever uploaded one. The owner uploaded a real profile
+   * picture and the check failed. That is the check being wrong, not the
+   * product: it had encoded a property of an empty demonstration as if it were
+   * a property of the software, so it would have punished the first real user
+   * for using the feature correctly.
+   *
+   * What is worth asserting, and holds whether or not anyone has a picture:
+   *
+   *   1. the no-picture state is representable, and is what a run leaves behind;
+   *   2. every stored path is well formed AND names the owner's own folder, so
+   *      a picture can never point at another user's object.
+   */
+  check(
+    "avatar: the no-picture state is representable and is what a run leaves behind",
+    avAll > 0 && avNull > 0,
+    `null=${avNull} of ${avAll}`
+  );
+  const badAvatarPath = rows(await sql(
+    `select id::text, avatar_path from public.profiles
+      where avatar_path is not null
+        and (avatar_path !~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/avatar\\.(jpg|jpeg|png|webp|gif)$'
+             or split_part(avatar_path, '/', 1) <> id::text)`));
+  check(
+    "avatar: every stored path is well formed and lives in its owner's own folder",
+    badAvatarPath.length === 0,
+    badAvatarPath.length === 0
+      ? "all stored avatar paths are well formed"
+      : JSON.stringify(badAvatarPath)
+  );
 
 // Clean up everything this section put in the bucket.
 await purgeAvatarBucket();

@@ -267,10 +267,38 @@ begin
   if a.status in ('ENDED','SOLD','UNSOLD') then
     raise exception 'auction_ended' using errcode = 'P0001';
   end if;
-  if a.status = 'LIVE' and a.ends_at <= v_now then
-    -- closed on the server clock but not yet swept: settle it, then refuse
-    perform public.settle_auction(a.id);
-    raise exception 'auction_ended' using errcode = 'P0001';
+-- The settlement on this path is ROLLED BACK, and that is not a subtle detail.
+--
+-- The line below settles the auction, and the very next statement raises, which
+-- aborts the enclosing transaction and discards the settlement with it. This was
+-- verified rather than reasoned about: the CASE A checks in
+-- scripts/db/verify-engine.mjs place a live bid on an already-expired auction,
+-- confirm the bid is correctly refused with `auction_ended`, and then read the
+-- row back. It is still `LIVE`.
+--
+-- So the bid is refused correctly — which is the part that matters for
+-- correctness — but this is NOT one of the settlement triggers. The comment
+-- above used to read "settle it, then refuse", which described an intent the
+-- statement after it silently undid. It is corrected here so the next person
+-- does not rely on a trigger that has never worked.
+--
+-- Settlement is in fact carried by two independent triggers that do work:
+--   1. `settleIfDueAction()` on the detail page when a viewer's countdown
+--      expires (src/components/auction/auction-detail-live.tsx);
+--   2. `settle_due_auctions()` via the throttled read-path sweep and the cron
+--      route (src/server/sweep.ts, src/app/api/cron/settle).
+-- Two working triggers is why no single missed path can leave the tables lying.
+--
+-- The `perform` is kept rather than deleted, and costs only a wasted function
+-- call per refused late bid: if this raise is ever converted into a returned
+-- rejection, the settlement becomes effective without anyone having to
+-- rediscover that it is wanted here.
+if a.status = 'LIVE' and a.ends_at <= v_now then
+  -- closed on the server clock but not yet swept. The `perform` is rolled back
+  -- by the `raise` that follows; see the note above this block.
+  perform public.settle_auction(a.id);
+  raise exception 'auction_ended' using errcode = 'P0001';
+end if;
   end if;
 
   -- minimum: first bid = starting price, every later bid = current + increment

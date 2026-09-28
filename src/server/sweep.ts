@@ -4,12 +4,21 @@ import { createAdminClient, hasAdminCredentials } from "@/lib/supabase/admin";
 /**
  * Opportunistic settlement sweep ("reconcile on read").
  *
- * Postgres closes an auction the moment anything asks about it — `place_bid()`
- * settles an overdue auction before refusing the late bid, and the auction
- * detail page calls `settleIfDueAction()` when the countdown expires. Those two
- * are precise but event-driven: an auction nobody is watching could otherwise
- * sit in LIVE past `ends_at` until the next scheduled sweep, and a browse card
- * would then show a "Live" badge next to a countdown reading 00:00:00.
+ * Postgres closes an auction the moment anything asks about it, and the auction
+ * detail page calls `settleIfDueAction()` when a viewer's countdown expires.
+ * That is precise but event-driven: an auction nobody is watching could
+ * otherwise sit in LIVE past `ends_at` until the next scheduled sweep, and a
+ * browse card would then show a "Live" badge next to a countdown reading
+ * 00:00:00.
+ *
+ * `place_bid()` also settles an overdue auction before refusing a late bid, and
+ * that is written to read as a third trigger. It is not one. The settlement is
+ * rolled back by the exception that refuses the bid, which was measured rather
+ * than assumed — see the note in `20260924000003_auction_engine.sql` and the
+ * CASE A checks in `scripts/db/verify-engine.mjs`, which read the row back after
+ * a refused late bid and find it still `LIVE`. The bid is refused correctly; the
+ * settlement simply does not survive. The two triggers that do work are the page
+ * view above and the read paths below.
  *
  * So public read paths also nudge the sweep. It is deliberately:
  *
@@ -21,8 +30,9 @@ import { createAdminClient, hasAdminCredentials } from "@/lib/supabase/admin";
  *     invokes `settle_due_auctions()`, which re-derives every winner and fee
  *     inside SECURITY DEFINER code with `FOR UPDATE SKIP LOCKED`.
  *
- * It is the third of three independent triggers (page view / bid / cron + read
- * path), which is why no single missed trigger can leave the tables lying.
+ * It is one of two independent triggers that work (page view on countdown
+ * expiry, and this read-path nudge plus the cron), which is why no single missed
+ * path can leave the tables lying.
  */
 
 /** Minimum gap between sweep attempts from THIS instance. */
