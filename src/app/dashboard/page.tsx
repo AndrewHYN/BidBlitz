@@ -86,6 +86,35 @@ export default async function DashboardOverviewPage() {
   const nothingYet =
     buying.length === 0 && selling.length === 0 && watchlist.length === 0;
 
+  /*
+   * What actually needs the user, in order.
+   *
+   * The four counters were equal: bids placed, ending soon, active listings,
+   * watchlist. But they are not equally urgent, and treating them as equals is
+   * why the page felt like a reporting screen rather than a list of things to
+   * do. "You have 3 bids placed" is history. Being outbid is an action with a
+   * deadline.
+   *
+   * So the strip only appears when there is something in it. A dashboard whose
+   * first screen is four zeroes tells the user nothing and makes them scroll to
+   * find out what to do — the empty state below already answers that case in
+   * one sentence.
+   *
+   * Only being-outbid is lifted to the top. Settling an ended auction already
+   * has its own section on this page, with the actual SettleButton beside each
+   * auction, and repeating it here as a link would be the same fact twice with
+   * the weaker version first.
+   *
+   * `isWinning` and `won` come from the same query the Buying tab uses, so this
+   * cannot disagree with it: an auction is outbid only while it is still live
+   * and someone else holds the lead. An auction already won or already closed
+   * needs settling or paying, not bidding again.
+   */
+  const outbid = buying.filter(
+    (item) => !item.won && !item.isWinning && item.status === "LIVE"
+  );
+  const showCounts = !nothingYet;
+
   return (
     <div className="space-y-8">
       <PageHeader
@@ -93,27 +122,53 @@ export default async function DashboardOverviewPage() {
         description="Everything you’re bidding on, selling and watching."
       />
 
-      <div data-testid="dashboard-stats" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat label="Bids placed" value={buying.length} href="/dashboard/buying" icon={Gavel} />
-        <Stat
-          label="Ending soon"
-          value={endingSoon.length}
-          href="/dashboard/selling"
-          icon={Clock}
-        />
-        <Stat
-          label="Active listings"
-          value={activeListings}
-          href="/dashboard/selling"
-          icon={Tag}
-        />
-        <Stat
-          label="Watchlist"
-          value={watchlist.length}
-          href="/dashboard/watchlist"
-          icon={Activity}
-        />
-      </div>
+      {outbid.length > 0 && (
+        <section
+          aria-labelledby="dashboard-outbid"
+          data-testid="dashboard-outbid"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-ending/40 bg-ending/5 p-4 sm:p-5"
+        >
+          <h2
+            id="dashboard-outbid"
+            className="flex items-center gap-2 text-sm font-semibold tracking-tight"
+          >
+            <Gavel className="size-4 text-ending" aria-hidden />
+            {outbid.length === 1
+              ? "You have been outbid"
+              : `You have been outbid on ${outbid.length} auctions`}
+          </h2>
+          <Button asChild size="sm" variant="outline" data-testid="dashboard-bid-again">
+            <Link href="/dashboard/buying">Bid again</Link>
+          </Button>
+        </section>
+      )}
+
+      {showCounts && (
+        <div
+          data-testid="dashboard-stats"
+          className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
+        >
+          <Stat label="Bids placed" value={buying.length} href="/dashboard/buying" icon={Gavel} />
+          <Stat
+            label="Ending soon"
+            value={endingSoon.length}
+            href="/dashboard/selling"
+            icon={Clock}
+          />
+          <Stat
+            label="Active listings"
+            value={activeListings}
+            href="/dashboard/selling"
+            icon={Tag}
+          />
+          <Stat
+            label="Watchlist"
+            value={watchlist.length}
+            href="/dashboard/watchlist"
+            icon={Activity}
+          />
+        </div>
+      )}
 
       {nothingYet && (
         <EmptyState
