@@ -187,3 +187,87 @@ If there is no good answer, remove it.
   https://timarmstrongmarketing.com/blog/avoiding-ai-generated-website-design/
 
 These are used as design heuristics, not as proof that any particular visual choice is inherently bad.
+
+---
+
+# What the 2026-09-28 pass decided
+
+The direction above says *what* the product should feel like. This records the
+calls that pass actually made, so a later change has to argue with a decision
+rather than rediscover the problem.
+
+## The measurement that drove it
+
+The share of page elements that are a bordered, rounded box taller than 60px:
+
+| Page | Before | After |
+| --- | --- | --- |
+| Terms | 19% | 1% |
+| Privacy | 13% | 1% |
+| Fees | 11% | 4% |
+| Help | 5% | 5% (cards became an index) |
+| Browse | 5% | 2% |
+| Home | 2% | 0% |
+
+Not a target, just a way of finding where the frames were. Every reduction
+below was confirmed by looking at the rendered page afterwards.
+
+## Decisions
+
+**A long-form page is a document, not a set of cards.** Terms had twelve
+bordered sections; Privacy had nine. A border around every three-paragraph block
+breaks the paragraph rhythm reading depends on and adds a dozen competing
+frames. All five long-form pages — Terms, Privacy, Help, Fees, Bidding rules —
+now share `src/components/document-page.tsx`: one 68ch measure, sections divided
+by a rule, a sticky index at `lg` because twelve anchor targets with no visible
+index is a navigation problem, and a plain list below `lg` rather than a control
+that only exists with JavaScript.
+
+**An empty state is an answer, not a placeholder.** It was a `border-dashed` box
+at `py-16` holding ~60px of content, on the homepage and Browse. Dashed is the
+vocabulary of *incomplete*; an empty marketplace is neither — it is a true fact
+with a reason and a next step. Now a hairline and space, left-aligned at
+desktop to match the home page, with a bare muted glyph rather than a coloured
+disc.
+
+**A card is for an object.** Kept: auctions, transactions, the contact block (a
+way to reach a person), the worked fee examples (receipts, read line by line),
+and the picture on Settings. Removed: a card per legal section, a card per
+paragraph, three identical cards presenting a contents list, and seven cards
+presenting a list of rules.
+
+**Reputation is a sentence, not a KPI strip.** A profile read `RATING /
+SALES / PURCHASES` in 11px uppercase — the dashboard pattern the direction
+rejects, on the page that should read like a person. It is now "4.5 from 12
+reviews · 32 completed sales", with the rating carried by the star. Nothing
+invented: every number is a real aggregate.
+
+**The bid is the loudest thing on the auction page.** It was the smallest — a
+pale chip beside a wide empty field, inside a card inside the panel card. A bid
+is one number and one decision, so the amount and the action are both full width
+and 48px tall, stacked, and the form is no longer a card. The clock is one
+reading, "58m 13s", not a box per unit.
+
+**State is communicated once, in the strongest place.** Category, condition,
+location and the starting bid were each shown twice on the auction page, which
+makes a reader check which copy is current.
+
+## Motion added, and motion withheld
+
+Added: a 0.5px arrow nudge and background shift on index rows, so a row reads as
+pressable without a lift that would fight the page.
+
+Withheld: no entrance animation on any of the changes above. They are structural —
+a box became a rule, a chip became a full-width button. Animating a structural
+change delays the moment the user can read the new layout, and none of these
+pages have a state worth animating in. The existing bid/outbid crossfade, card
+lift and button press already carry the state changes, and they are unchanged.
+
+## Still open
+
+- **Password reset does not exist.** The design direction calls for it and the
+  brief requires it. It is a feature gap, not a design gap.
+- **No real inventory.** The empty states were designed against, but an auction
+  page with a real photograph has not been seen, because production correctly has
+  no listings. One temporary QA listing was published to review the auction page
+  and removed; with a real photo, the gallery still needs a look.
