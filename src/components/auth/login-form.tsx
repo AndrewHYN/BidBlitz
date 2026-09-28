@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRef, useState, useTransition } from "react";
 import { Gavel } from "lucide-react";
 import { signInAction } from "@/server/actions/auth";
+import { useMounted } from "@/hooks/use-mounted";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,6 +28,22 @@ export function LoginForm({
   initialError?: string;
 }) {
   const [error, setError] = useState<string | null>(initialError ?? null);
+  /*
+   * Whether React has taken over this form.
+   *
+   * Exposed as `data-hydrated` because it is a real, observable state and
+   * something genuinely needs to know about it: the automated suites submit
+   * this form, and a submit that lands before hydration is now a *safe* native
+   * POST (see the `method` comment below) rather than a password in the URL —
+   * which is the right trade, but it means an automated submit that beats
+   * hydration sees nothing happen. Without this flag, that race showed up as an
+   * intermittent test failure and looked like a product bug.
+   *
+   * A person never hits it: typing an email and a password takes far longer
+   * than the bundle takes to load. This is about making an automated submit
+   * wait for the same thing a person naturally waits for.
+   */
+  const hydrated = useMounted();
   // See signup-form.tsx: `isPending` from `useTransition` is not synchronous,
   // so it cannot be what disables the button. `submitting` + `busyRef` make a
   // double-click a single sign-in request — repeated duplicate submissions are
@@ -78,6 +95,7 @@ export function LoginForm({
        */
       method="post"
       data-testid="login-form"
+      data-hydrated={hydrated ? "true" : undefined}
       className="space-y-5 rounded-xl border bg-card p-6 shadow-sm sm:p-8"
     >
       <div className="space-y-1.5 text-center">

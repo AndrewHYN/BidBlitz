@@ -278,6 +278,10 @@ export function HeaderBar({
                     <UserAvatar
                       avatarPath={user.avatarPath}
                       name={user.displayName}
+                      // `size-7` is 28px; the default stock size (32px) is
+                      // asked for, which over-delivers slightly rather than
+                      // upscaling a 28px image across 32px.
+                      pixelSize={32}
                       className="size-7"
                     />
                     <span className="hidden max-w-28 truncate text-sm md:inline">

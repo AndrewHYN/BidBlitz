@@ -35,6 +35,35 @@ export function uniqueTitle(prefix: string): string {
  * successful sign-in performs. Cookies are cleared first so a previously
  * signed-in visitor cannot be bounced away from the form by a redirect.
  */
+/**
+ * Wait until a form's React has taken over, then assert it is on screen.
+ *
+ * Why this exists. The sign-in and sign-up forms declare `method="post"` on
+ * purpose: before hydration a submit is a native browser submit, and without
+ * that attribute a native submit would be a GET that appends the email and the
+ * PASSWORD to the URL (see src/components/form-method.test.ts). Declaring POST
+ * makes an un-hydrated submit a safe failure instead of a credential leak.
+ *
+ * A person never notices, because typing an email and a password takes far
+ * longer than the bundle takes to load. A test can: `toBeVisible()` returns as
+ * soon as the server-rendered HTML is on screen, which is *before* hydration,
+ * so an automated submit could beat it and observe nothing happening. That
+ * surfaced as an intermittent failure in `auth.spec.ts` and read like a product
+ * bug when it was a test-side race.
+ *
+ * `data-hydrated` states the real fact — the client is live — so the test waits
+ * for the same thing a person naturally waits for. No retry, no sleep, and no
+ * weakened assertion.
+ */
+export async function waitForHydratedForm(
+  page: Page,
+  testId: "login-form" | "signup-form"
+): Promise<void> {
+  const form = page.getByTestId(testId);
+  await expect(form).toBeVisible({ timeout: 30_000 });
+  await expect(form).toHaveAttribute("data-hydrated", "true", { timeout: 30_000 });
+}
+
 export async function signIn(
   page: Page,
   email: string,
@@ -48,6 +77,7 @@ export async function signIn(
   await expect(
     page.getByTestId("login-form").or(page.getByTestId("email-field")).first()
   ).toBeVisible({ timeout: 30_000 });
+  await waitForHydratedForm(page, "login-form");
   await page.getByTestId("email-field").fill(email);
   await page.getByTestId("password-field").fill(password);
   await page.getByTestId("sign-in-button").click();

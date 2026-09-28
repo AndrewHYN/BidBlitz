@@ -1,10 +1,14 @@
 import { expect, test } from "@playwright/test";
-import { ACCOUNTS, TEST_PASSWORD, signIn } from "./fixtures";
+import { ACCOUNTS, TEST_PASSWORD, signIn, waitForHydratedForm } from "./fixtures";
 
 test.describe("authentication", () => {
   test("a wrong password renders an auth error", async ({ page }) => {
     await page.goto("/login");
-    await expect(page.getByTestId("login-form")).toBeVisible({ timeout: 30_000 });
+    // Wait for React, not just for the HTML: the form is deliberately
+    // `method="post"` so a pre-hydration native submit cannot put the password
+    // in the URL, which means a submit that beats hydration is a safe no-op
+    // rather than a leak. A person cannot beat hydration; a test can.
+    await waitForHydratedForm(page, "login-form");
 
     await page.getByTestId("email-field").fill(ACCOUNTS.seller.email);
     await page.getByTestId("password-field").fill("DefinitelyWrong!2026");
@@ -16,7 +20,7 @@ test.describe("authentication", () => {
 
   test("a double-click on sign-in sends exactly one request", async ({ page }) => {
     await page.goto("/login");
-    await expect(page.getByTestId("login-form")).toBeVisible({ timeout: 30_000 });
+    await waitForHydratedForm(page, "login-form");
 
     let loginPosts = 0;
     page.on("request", (request) => {
@@ -77,7 +81,7 @@ test.describe("authentication", () => {
 
   test("signing up asks the user to confirm their email", async ({ page }) => {
     await page.goto("/signup");
-    await expect(page.getByTestId("signup-form")).toBeVisible({ timeout: 30_000 });
+    await waitForHydratedForm(page, "signup-form");
 
     const stamp = `${Date.now()}`;
     // Ground truth (probed 2026-09-25 against this project's GoTrue):

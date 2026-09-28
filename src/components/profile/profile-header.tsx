@@ -50,10 +50,17 @@ export function ProfileHeader({ profile, isSelf }: { profile: Profile; isSelf: b
       className="rounded-xl border bg-card p-5 sm:p-7"
     >
       <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
+        {/* The frame is 64px on a phone and 80px from `sm` up. The
+            `pixelSize` is the LARGER of the two, so the optimiser builds a
+            variant big enough for the largest rendering rather than a 32px
+            image stretched across 80px — which is how this component ended up
+            asking the image pipeline for a picture smaller than the hole it
+            had to fill. */}
         <UserAvatar
           avatarPath={profile.avatar_path}
           name={profile.display_name}
-          className="size-16 sm:size-20 text-lg"
+          pixelSize={80}
+          className="size-16 text-lg sm:size-20"
         />
 
         <div className="min-w-0 flex-1 space-y-3">

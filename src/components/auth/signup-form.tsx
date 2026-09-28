@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRef, useState, useTransition } from "react";
 import { MailCheck } from "lucide-react";
 import { signUpAction } from "@/server/actions/auth";
+import { useMounted } from "@/hooks/use-mounted";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -34,6 +35,10 @@ export function SignupForm() {
   const busyRef = useRef(false);
   // Set only when the account was created AND email confirmation is pending.
   const [sentTo, setSentTo] = useState<string | null>(null);
+  // "Has React taken over this form?" — see the identical flag on login-form.
+  // Exposed so an automated submit can wait for hydration, exactly as a person
+  // naturally does while typing an email and choosing a password.
+  const hydrated = useMounted();
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -113,6 +118,7 @@ export function SignupForm() {
        */
       method="post"
       data-testid="signup-form"
+      data-hydrated={hydrated ? "true" : undefined}
       className="space-y-5 rounded-xl border bg-card p-6 shadow-sm sm:p-8"
     >
       <div className="space-y-1.5 text-center">
