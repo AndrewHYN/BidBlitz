@@ -126,15 +126,12 @@ export function AvatarUploader({
   }
 
   return (
-    <section
-      aria-labelledby="avatar-heading"
-      className="space-y-4 rounded-xl border bg-card p-5 sm:p-6"
-    >
+    <section aria-labelledby="avatar-heading" className="space-y-4">
       <div className="space-y-1">
-        <h2 id="avatar-heading" className="text-sm font-semibold">
+        <h2 id="avatar-heading" className="text-base font-semibold tracking-tight">
           Profile picture
         </h2>
-        <p className="text-xs text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           A square JPEG, PNG, WebP or GIF, up to 2 MB. It appears next to your
           name wherever you take part in a sale.
         </p>

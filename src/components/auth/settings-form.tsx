@@ -81,15 +81,30 @@ export function SettingsForm({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-10">
+      {/*
+        These are sections of one account page, not three cards. The details
+        form had no heading at all, so "Display name / Location / Bio / Save
+        changes" floated between the picture block and the account block with
+        nothing naming it - a form dumped into a card. Each group is now a
+        heading, a line saying who can see it, and the controls, with a rule
+        between groups. The only thing still framed is the picture itself,
+        which is the one object here.
+      */}
       <form
         onSubmit={handleSubmit}
         /* POST: a pre-hydration native GET would put the display name, location
            and bio into the URL and into the access log. See login-form.tsx. */
         method="post"
         data-testid="settings-form"
-        className="space-y-5 rounded-xl border bg-card p-5 sm:p-6"
+        className="space-y-5 border-t border-border/70 pt-8"
       >
+        <div className="space-y-1">
+          <h2 className="text-base font-semibold tracking-tight">Public profile</h2>
+          <p className="text-sm text-muted-foreground">
+            This is what other people see on your profile.
+          </p>
+        </div>
         {error && (
           <div
             data-testid="settings-error"
@@ -156,10 +171,10 @@ export function SettingsForm({
         </Button>
       </form>
 
-      <div className="space-y-4 rounded-xl border bg-card p-5 sm:p-6">
+      <div className="space-y-4 border-t border-border/70 pt-8">
         <div className="space-y-1">
-          <h2 className="text-sm font-semibold">Account</h2>
-          <p className="text-xs text-muted-foreground">
+          <h2 className="text-base font-semibold tracking-tight">Account</h2>
+          <p className="text-sm text-muted-foreground">
             Your sign-in credentials. Changing your email isn&apos;t available yet.
           </p>
         </div>
