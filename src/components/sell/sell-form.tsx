@@ -146,8 +146,19 @@ export function SellForm({
          URL. See login-form.tsx for the full reasoning. */
       method="post"
       data-testid="sell-form"
-      className="space-y-8 rounded-xl border bg-card p-6 shadow-sm"
+      className="space-y-8"
     >
+      {/*
+        The sections are the structure.
+
+        This was one tall bordered card with a shadow around all four steps -
+        item, details, pricing, timing - so a 1500px page was a single box with
+        four headings inside it, and the eye had nothing to hold on to between
+        steps. Each step is now its own block divided by a rule, which is what
+        makes it read as a workflow you move through rather than a form you fill
+        in. The fee explanation below keeps its own frame: it is a thing the
+        seller has to agree to, not another field.
+      */}
       <section className="space-y-5" aria-labelledby="sell-basics-heading">
         <h2 id="sell-basics-heading" className="text-base font-semibold tracking-tight">
           The item
@@ -185,7 +196,7 @@ export function SellForm({
         </div>
       </section>
 
-      <section className="space-y-5" aria-labelledby="sell-details-heading">
+      <section className="space-y-5 border-t border-border/70 pt-8" aria-labelledby="sell-details-heading">
         <h2 id="sell-details-heading" className="text-base font-semibold tracking-tight">
           Details
         </h2>
@@ -252,7 +263,7 @@ export function SellForm({
         </div>
       </section>
 
-      <section className="space-y-5" aria-labelledby="sell-pricing-heading">
+      <section className="space-y-5 border-t border-border/70 pt-8" aria-labelledby="sell-pricing-heading">
         <h2 id="sell-pricing-heading" className="text-base font-semibold tracking-tight">
           Pricing
         </h2>
@@ -315,7 +326,7 @@ export function SellForm({
         </p>
       </section>
 
-      <section className="space-y-5" aria-labelledby="sell-timing-heading">
+      <section className="space-y-5 border-t border-border/70 pt-8" aria-labelledby="sell-timing-heading">
         <h2 id="sell-timing-heading" className="text-base font-semibold tracking-tight">
           Timing
         </h2>

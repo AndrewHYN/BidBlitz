@@ -123,7 +123,22 @@ export default async function TransactionsPage() {
                     </span>
                   </TableCell>
                   <TableCell className="font-medium" data-numeric>
-                    <Money minor={row.net_minor} currency={row.currency} />
+                    {/* A buyer reading their own purchase sees a net figure in
+                        this column, and "Seller proceeds $23.75" next to a price
+                        of $25.00 is easy to misread as money coming their way.
+                        The header names the seller, but a column of bare
+                        numbers reads faster than a header, so the cell carries
+                        the qualifier too. */}
+                    {row.seller_id === user.id ? (
+                      <Money minor={row.net_minor} currency={row.currency} />
+                    ) : (
+                      <>
+                        <span className="text-xs font-normal text-muted-foreground">
+                          seller&apos;s
+                        </span>{" "}
+                        <Money minor={row.net_minor} currency={row.currency} />
+                      </>
+                    )}
                     {/* The payout is a separate record from the payment, and it
                         is what actually answers "have I been paid?". Showing it
                         only for the selling side avoids implying a buyer has a
