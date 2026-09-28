@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { BadgeCheck, CalendarDays, MapPin, Pencil, Star } from "lucide-react";
 import { UserAvatar } from "@/components/profile/user-avatar";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { getProfileByUsername } from "@/server/queries";
 
@@ -27,29 +26,58 @@ function joinedLabel(iso: string): string {
   });
 }
 
-function Stat({ label, value }: { label: string; value: React.ReactNode }) {
+/**
+ * One reputation figure, in a sentence.
+ *
+ * This used to be a three-up KPI strip: RATING / SALES / PURCHASES in 11px
+ * uppercase, which is the dashboard pattern the design direction explicitly
+ * rejects, on the one page that should read like a person. None of the three
+ * leads anywhere either — a visitor to a profile wants to know who they are
+ * dealing with and whether that person has delivered before, and "32" on its
+ * own says neither.
+ *
+ * So reputation is written out, in words, with the rating carried by the star
+ * it belongs to. "No reviews yet" and "32 sales" are both facts a seller
+ * actually cares about; a bare numeral in a labelled box is not.
+ */
+function Reputation({ profile }: { profile: Profile }) {
+  const average =
+    profile.rating_count > 0 ? profile.rating_sum / profile.rating_count : null;
+
   return (
-    <div className="min-w-20">
-      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-        {label}
-      </p>
-      <p className="text-sm font-semibold" data-numeric>
-        {value}
-      </p>
+    <div
+      data-testid="profile-stats"
+      className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground"
+    >
+      {average === null ? (
+        <span data-numeric>No reviews yet</span>
+      ) : (
+        <span className="flex items-center gap-1" data-numeric>
+          <Star className="size-4 fill-current text-primary" aria-hidden />
+          <span className="font-semibold text-foreground">{average.toFixed(1)}</span>
+          <span>
+            from {profile.rating_count}{" "}
+            {profile.rating_count === 1 ? "review" : "reviews"}
+          </span>
+        </span>
+      )}
+
+      {profile.sales_count > 0 && (
+        <>
+          <span aria-hidden className="text-border">·</span>
+          <span data-numeric>
+            {profile.sales_count} completed {profile.sales_count === 1 ? "sale" : "sales"}
+          </span>
+        </>
+      )}
     </div>
   );
 }
 
 export function ProfileHeader({ profile, isSelf }: { profile: Profile; isSelf: boolean }) {
-  const average =
-    profile.rating_count > 0 ? profile.rating_sum / profile.rating_count : null;
-
   return (
-    <header
-      data-testid="profile-header"
-      className="rounded-xl border bg-card p-5 sm:p-7"
-    >
-      <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
+    <header data-testid="profile-header" className="space-y-5">
+      <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:gap-6">
         {/* The frame is 64px on a phone and 80px from `sm` up. The
             `pixelSize` is the LARGER of the two, so the optimiser builds a
             variant big enough for the largest rendering rather than a 32px
@@ -63,7 +91,7 @@ export function ProfileHeader({ profile, isSelf }: { profile: Profile; isSelf: b
           className="size-16 text-lg sm:size-20"
         />
 
-        <div className="min-w-0 flex-1 space-y-3">
+        <div className="min-w-0 flex-1 space-y-2.5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
               <h1
@@ -89,56 +117,37 @@ export function ProfileHeader({ profile, isSelf }: { profile: Profile; isSelf: b
             )}
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            <Badge variant={profile.email_verified ? "secondary" : "outline"}>
-              {profile.email_verified ? (
-                <BadgeCheck aria-hidden />
-              ) : (
-                <span
-                  aria-hidden
-                  className="size-1.5 rounded-full bg-muted-foreground/60"
-                />
-              )}
-              {profile.email_verified ? "Email verified" : "Email not verified"}
-            </Badge>
-            <span className="flex items-center gap-1">
-              <CalendarDays className="size-3.5" aria-hidden />
+          {/* Identity facts read as one line of prose, not a row of chips. The
+              verified badge stays a badge because it is a state, not a fact
+              about the person. */}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
+            {profile.location && (
+              <span className="flex items-center gap-1.5">
+                <MapPin className="size-3.5 shrink-0" aria-hidden />
+                {profile.location}
+              </span>
+            )}
+            <span className="flex items-center gap-1.5">
+              <CalendarDays className="size-3.5 shrink-0" aria-hidden />
               Joined {joinedLabel(profile.created_at)}
             </span>
-            {profile.location && (
-              <span className="flex items-center gap-1">
-                <MapPin className="size-3.5" aria-hidden />
-                {profile.location}
+            {profile.email_verified && (
+              <span className="flex items-center gap-1.5">
+                <BadgeCheck className="size-3.5 shrink-0 text-primary" aria-hidden />
+                Email verified
               </span>
             )}
           </div>
 
-          <div
-            data-testid="profile-stats"
-            className="flex flex-wrap items-start gap-x-6 gap-y-3 border-t pt-3"
-          >
-            <div className="min-w-24">
-              <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                Rating
-              </p>
-              {average === null ? (
-                <p className="text-sm font-medium text-muted-foreground">No reviews yet</p>
-              ) : (
-                <p className="flex items-center gap-1 text-sm font-semibold" data-numeric>
-                  <Star className="size-4 fill-current text-primary" aria-hidden />
-                  {average.toFixed(1)}
-                  <span className="font-normal text-muted-foreground">
-                    ({profile.rating_count}{" "}
-                    {profile.rating_count === 1 ? "review" : "reviews"})
-                  </span>
-                </p>
-              )}
-            </div>
-            <Stat label="Sales" value={profile.sales_count} />
-            <Stat label="Purchases" value={profile.purchases_count} />
-          </div>
+          <Reputation profile={profile} />
         </div>
       </div>
+
+      {profile.bio && (
+        <p className="max-w-2xl border-t border-border/70 pt-5 text-[0.9375rem] leading-[1.7] text-muted-foreground text-pretty">
+          {profile.bio}
+        </p>
+      )}
     </header>
   );
 }
