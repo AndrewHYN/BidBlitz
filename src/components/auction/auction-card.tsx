@@ -36,8 +36,8 @@ export function AuctionCard({
     <Link
       href={href ?? `/auction/${auction.id}`}
       className={cn(
-        "group relative flex flex-col overflow-hidden rounded-xl border bg-card transition-all",
-        "hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5",
+        "group relative flex flex-col overflow-hidden rounded-lg border bg-card transition-[transform,box-shadow,border-color] duration-200 ease-out",
+        "hover:-translate-y-1 hover:border-primary/35 hover:shadow-lg hover:shadow-primary/5",
         "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
         className
       )}
@@ -49,9 +49,9 @@ export function AuctionCard({
           src={auction.imageUrl}
           alt=""
           loading="lazy"
-          className="size-full object-cover transition-transform duration-500 group-hover:scale-105"
+          className="size-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.03]"
           fallback={
-            <div className="grid size-full place-items-center bg-gradient-to-br from-muted via-muted to-accent">
+            <div className="grid size-full place-items-center bg-muted">
               <ImageIcon className="size-8 text-muted-foreground/60" aria-hidden />
             </div>
           }
