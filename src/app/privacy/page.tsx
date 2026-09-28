@@ -178,7 +178,7 @@ export default function PrivacyPage() {
               Edit your display name, bio and location in{" "}
               <Link
                 href="/settings"
-                className="font-medium text-primary hover:underline"
+                className="inline-flex min-h-6 items-center font-medium text-primary underline-offset-2 hover:underline"
               >
                 Settings
               </Link>
@@ -211,7 +211,7 @@ export default function PrivacyPage() {
                 <Phone className="size-4 shrink-0 text-primary" aria-hidden />
                 <a
                   href="tel:0789335669"
-                  className="font-medium text-primary hover:underline"
+                  className="inline-flex min-h-6 items-center font-medium text-primary underline-offset-2 hover:underline"
                 >
                   0789335669
                 </a>
@@ -220,7 +220,7 @@ export default function PrivacyPage() {
                 <Mail className="size-4 shrink-0 text-primary" aria-hidden />
                 <a
                   href="mailto:hyndrrx0@gmail.com"
-                  className="font-medium text-primary hover:underline"
+                  className="inline-flex min-h-6 items-center font-medium text-primary underline-offset-2 hover:underline"
                 >
                   hyndrrx0@gmail.com
                 </a>

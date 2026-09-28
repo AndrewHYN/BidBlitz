@@ -83,7 +83,14 @@ export function SiteFooter() {
 
         {COLUMNS.map((col) => (
           <nav key={col.title} aria-label={col.title} className="space-y-3">
-            <h3 className="text-sm font-medium">{col.title}</h3>
+            {/* An `h2`, not an `h3`. The footer columns are the last section of
+                every page, and they were the only headings on the page, so every
+                single page had a level skipped: `h1` in the content, then `h3`
+                here, with no `h2` between. That was measured on all twelve
+                public pages, not spotted in one. The visual size is unchanged —
+                only the level is corrected, so a screen reader navigating by
+                heading gets a proper outline of the page. */}
+            <h2 className="text-sm font-medium">{col.title}</h2>
             <ul className="space-y-1">
               {col.links.map((l) => (
                 <li key={l.href}>

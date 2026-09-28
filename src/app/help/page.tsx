@@ -99,7 +99,7 @@ export default function HelpPage() {
                 <strong>A transaction is created.</strong> It records the gross
                 winning price, the platform fee and the seller&apos;s net
                 amount. See{" "}
-                <Link href="/help/fees" className="font-medium text-primary hover:underline">
+                <Link href="/help/fees" className="inline-flex min-h-6 items-center font-medium text-primary underline-offset-2 hover:underline">
                   fees
                 </Link>{" "}
                 for the math.
@@ -141,7 +141,7 @@ export default function HelpPage() {
                 <Phone className="size-4 shrink-0 text-primary" aria-hidden />
                 <a
                   href="tel:0789335669"
-                  className="font-medium text-primary hover:underline"
+                  className="inline-flex min-h-6 items-center font-medium text-primary underline-offset-2 hover:underline"
                 >
                   0789335669
                 </a>
@@ -150,7 +150,7 @@ export default function HelpPage() {
                 <Mail className="size-4 shrink-0 text-primary" aria-hidden />
                 <a
                   href="mailto:hyndrrx0@gmail.com"
-                  className="font-medium text-primary hover:underline"
+                  className="inline-flex min-h-6 items-center font-medium text-primary underline-offset-2 hover:underline"
                 >
                   hyndrrx0@gmail.com
                 </a>

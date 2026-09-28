@@ -84,7 +84,7 @@ export default function TermsPage() {
             BidBlitz is a live auction marketplace. Every listing is a
             competitive auction with a real closing time — these terms, together
             with the{" "}
-            <Link href="/help/rules" className="font-medium text-primary hover:underline">
+            <Link href="/help/rules" className="inline-flex min-h-6 items-center font-medium text-primary underline-offset-2 hover:underline">
               bidding rules
             </Link>
             , explain what that means for you.
@@ -149,7 +149,7 @@ export default function TermsPage() {
             Outcomes are decided by BidBlitz&apos;s servers: the current price,
             the winner and the closing time all come from there. The countdown
             on your screen is a convenience. Please read the{" "}
-            <Link href="/help/rules" className="font-medium text-primary hover:underline">
+            <Link href="/help/rules" className="inline-flex min-h-6 items-center font-medium text-primary underline-offset-2 hover:underline">
               full bidding rules
             </Link>{" "}
             before you bid.
@@ -181,7 +181,7 @@ export default function TermsPage() {
             payment method, is calculated and displayed by Paynow before the
             buyer authorises the payment, and is not revenue received by
             BidBlitz. The current rate and a worked example are on the{" "}
-            <Link href="/help/fees" className="font-medium text-primary hover:underline">
+            <Link href="/help/fees" className="inline-flex min-h-6 items-center font-medium text-primary underline-offset-2 hover:underline">
               fees page
             </Link>
             . Review it before you bid or list.
@@ -328,7 +328,7 @@ export default function TermsPage() {
               <Phone className="size-4 shrink-0 text-primary" aria-hidden />
               <a
                 href="tel:0789335669"
-                className="font-medium text-primary hover:underline"
+                className="inline-flex min-h-6 items-center font-medium text-primary underline-offset-2 hover:underline"
               >
                 0789335669
               </a>
@@ -337,7 +337,7 @@ export default function TermsPage() {
               <Mail className="size-4 shrink-0 text-primary" aria-hidden />
               <a
                 href="mailto:hyndrrx0@gmail.com"
-                className="font-medium text-primary hover:underline"
+                className="inline-flex min-h-6 items-center font-medium text-primary underline-offset-2 hover:underline"
               >
                 hyndrrx0@gmail.com
               </a>
