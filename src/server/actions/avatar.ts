@@ -85,9 +85,20 @@ export async function uploadAvatarAction(
       // Passing that through would let a real JPEG be stored, and served, as
       // whatever the request claimed.
       contentType: mimeFor(validated.ext),
-      // A year, because the key changes when the picture changes, so a cached
-      // response can never be stale for its own URL.
-      cacheControl: "31536000",
+      // One hour, not a year. This image is REVOCABLE: the user can remove
+      // their picture, and after that the object is gone from storage while the
+      // public bucket URL keeps serving the old bytes from Supabase's CDN until
+      // the entry expires. Verified in production: after a removal that
+      // succeeded at the database AND the storage layer, GET on the public URL
+      // still returned 200 with the deleted image. A year would mean a photo
+      // someone chose to remove stays retrievable from a known URL for a year.
+      //
+      // One hour bounds that window to something a person would accept, and
+      // costs only an origin read per avatar per hour. A version counter in the
+      // key would remove the window entirely, but it would trade away the
+      // deterministic one-object-per-user property that stops replacements
+      // accumulating orphans — a worse trade. Recorded in the ADR.
+      cacheControl: "3600",
     });
 
   if (uploadError) {

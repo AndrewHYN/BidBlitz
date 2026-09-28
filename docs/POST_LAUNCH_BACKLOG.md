@@ -236,6 +236,15 @@ trust facts, buying-page payment state). What follows was judged safe to wait:
   fixed square frame, `next/image` with `sizes="80px"`, and a one-year
   `cache-control`. When a pipeline is added, resize to 512×512, re-encode to
   WebP, and delete the original.
+- **Version the avatar key to close the stale-cache window** — a removed avatar
+  is gone from the database and from storage, but Supabase's CDN keeps serving
+  the bytes from the public URL until the entry expires, and there is no cache
+  purge on the free tier. The TTL is one hour to bound that. Putting a version
+  counter in the key (`<uid>/<version>/avatar.<ext>`) would close the window
+  entirely, because a replacement would produce a URL no cache entry matches.
+  Not done now because it trades away the deterministic one-object-per-user
+  property, and orphans accumulating on every replacement are a worse failure
+  than a one-hour window. Do this if avatar replacement becomes common.
 - **`/sell/preview` route** — "Preview as a buyer" links to the draft
   detail page as the signed-in seller; a separate shareable preview route
   (for showing a draft to someone else) needs draft-access tokens.

@@ -942,8 +942,38 @@ component would refuse it and show initials.
   pointing at a different project needs no code change.
 - **No server-side resizing.** That needs an image pipeline the free-tier rule
   keeps out of the MVP. The controls are the 2 MB cap, `object-cover` in a fixed
-  square frame (so the space is reserved and nothing shifts), and a one-year
-  `cache-control`. Recorded in `docs/POST_LAUNCH_BACKLOG.md`.
+  square frame (so the space is reserved and nothing shifts), and `next/image`
+  with an explicit `sizes` hint. Recorded in `docs/POST_LAUNCH_BACKLOG.md`.
+
+### A limit worth stating plainly: deletion is not instant at the public URL
+
+Measured in production on 2026-09-28. After a user removed their picture, the
+`profiles.avatar_path` was null and `storage.objects` held **zero** rows in the
+`avatars` bucket — the removal had genuinely succeeded at both the database and
+the storage layer. A `GET` on the public bucket URL nevertheless returned
+**HTTP 200 with the deleted image**, because Supabase's CDN still had it.
+
+So the object is gone but the bytes remain retrievable from a URL the user (or
+anyone who saw it) can construct, until that cache entry expires. There is no
+cache-purge capability on the free tier, so the only lever is the TTL.
+
+`cacheControl` is therefore **one hour**, not the year this first shipped with. A
+year would mean a photograph someone deliberately removed stays downloadable
+from a known URL for a year; an hour bounds that to something a person would
+accept, at the cost of one origin read per avatar per hour. This is a real
+residual exposure and it is documented rather than papered over.
+
+**What would actually close it:** a version counter in the key, so a replacement
+produces a new URL (`<uid>/<version>/avatar.<ext>`) and an old cache entry is
+never consulted again. That was rejected for now because it gives up the
+deterministic one-object-per-user property, and orphan accumulation on repeated
+replacements is a worse and much more visible failure than a one-hour stale
+window. It is the right change if avatar replacement becomes common. Recorded in
+`docs/POST_LAUNCH_BACKLOG.md`.
+
+Note also that the app stops *referencing* a removed picture immediately —
+`avatar_path` is the only thing the UI reads — so the staleness is confined to
+someone who already has or can guess the object URL, not to the site itself.
 
 ### Verification
 
