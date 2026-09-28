@@ -225,11 +225,22 @@ export function BrowseFilters({
           </button>
         </div>
 
+        {/*
+          Driven by the class, not by the `hidden` attribute.
+
+          The first version used `hidden={!filtersOpen}` plus `sm:block` and it
+          silently did nothing on desktop: the browser showed the advanced
+          filters hidden at 1440px, where the whole panel should have been
+          visible. The UA rule for `[hidden]` and the `sm:block` utility have the
+          same specificity, and in this cascade the attribute won. Relying on an
+          attribute and a utility to disagree about `display` is fragile, so the
+          state is expressed once, in the class list, and the attribute is not
+          used at all.
+        */}
         <div
           id="browse-advanced-filters"
           data-testid="browse-advanced-filters"
-          hidden={!filtersOpen}
-          className="sm:block"
+          className={filtersOpen ? "block" : "hidden sm:block"}
         >
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <div className="space-y-1.5">
