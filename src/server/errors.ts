@@ -21,6 +21,7 @@ export type BidErrorCode =
   | "image_required"
   | "has_bids"
   | "rate_limited"
+  | "account_banned"
   | "unknown";
 
 export type BidRejection = {
@@ -48,6 +49,13 @@ const MESSAGES: Record<BidErrorCode, string> = {
   image_required: "Add at least one photo before publishing.",
   has_bids: "People have bid on this auction, so it can't be cancelled.",
   rate_limited: "Too many attempts. Wait a moment and try again.",
+  // Raised by the is_banned triggers (migration 20260928000003). It has to be
+  // in this table rather than falling through to `unknown`: the terms promise
+  // a user can be suspended, so "Something went wrong. Please try again." would
+  // tell a suspended account that retrying is the answer when it is not. The
+  // contact route is the one the site already publishes.
+  account_banned:
+    "Your account can't bid or list right now. If you think that's a mistake, get in touch.",
   unknown: "Something went wrong. Please try again.",
 };
 

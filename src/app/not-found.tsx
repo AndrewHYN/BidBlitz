@@ -1,10 +1,47 @@
+import type { Metadata } from "next";
+import { headers } from "next/headers";
 import Link from "next/link";
 import { Gavel, SearchX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-// No metadata export here: this Next version ignores metadata in
-// not-found.tsx (verified against the live build — the title stays the
-// root default). Per-route titles belong on real pages.
+/**
+ * Metadata for the router-level not-found.
+ *
+ * Two things need to be true for a 404, and this file is the only place both
+ * can come from:
+ *
+ *   1. It must not inherit the homepage's `<title>` and `<meta
+ *      name="description">`. An HTTP 404 carrying the site's marketing copy is
+ *      a soft-404 to a crawler, and a page that does not exist should never
+ *      advertise what the homepage advertises.
+ *   2. It must be explicitly `noindex`. "Index, follow" is the crawler default,
+ *      so leaving it unset means a 404 can be indexed. Measured against the
+ *      live site before this export existed: `/nope` answered 404 with the
+ *      homepage title, the homepage description, and no robots directive.
+ *
+ * When `src/proxy.ts` rewrote a missing auction or profile here it set
+ * `x-bidblitz-missing`, and the resource-specific title came from the root
+ * layout. A `metadata` export in this file takes precedence over the root
+ * layout for the not-found render, so the header is read here instead — one
+ * place decides all three cases, and the proxy's existing mechanism is reused
+ * rather than replaced. The proxy strips any inbound copy of that header, so a
+ * client cannot spoof a title or a directive.
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  const missing = (await headers()).get("x-bidblitz-missing");
+  const title =
+    missing === "auction"
+      ? "Auction not found"
+      : missing === "profile"
+        ? "Profile not found"
+        : "Page not found";
+
+  return {
+    title,
+    description: "That page does not exist on BidBlitz.",
+    robots: { index: false, follow: false },
+  };
+}
 
 export default function NotFound() {
   return (

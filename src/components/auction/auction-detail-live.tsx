@@ -28,6 +28,13 @@ import { cn } from "@/lib/utils";
  *
  * Nothing here derives a price: each source carries values the server already
  * decided (place_bid, settle_auction, the read model).
+ *
+ * Note what "server-delivered" means for source 1. The realtime channels are
+ * public, so an event is not trusted simply by arriving: useAuctionRealtime
+ * only admits one that carries a timestamp close to the newest the server has
+ * already confirmed (MAX_EVENT_FUTURE_SKEW_MS), and an event that fails that
+ * never reaches the mirror. This component still treats the mirror as a hint
+ * about a public fact and never as authority for anything.
  */
 type Snapshot = {
   serverTime: number;
@@ -84,6 +91,12 @@ export function AuctionDetailLive({
 }) {
   const router = useRouter();
 
+  // The server-rendered snapshot's own timestamp. Declared before the realtime
+  // hook because it seeds that hook's trust bound: an incoming event is only
+  // allowed to move the mirror forward relative to something the server
+  // actually said, never relative to the client's own clock.
+  const propsTime = Date.parse(serverUpdatedAt);
+
   const handleEvent = useCallback(
     (event: AuctionEvent) => {
       if (event.type === "auction.ended") router.refresh();
@@ -97,6 +110,7 @@ export function AuctionDetailLive({
   const { state } = useAuctionRealtime({
     auctionId,
     initial: { status, currentBidMinor, bidCount, endsAt, nextMinMinor },
+    serverTimeFloor: propsTime,
     onEvent: handleEvent,
   });
 
@@ -133,16 +147,16 @@ export function AuctionDetailLive({
   const handleEcho = useCallback((next: ServerEcho) => setEcho(next), []);
 
   // ---- pick the freshest server-delivered snapshot ------------------------
-  const [mountTime] = useState(() => Date.parse(serverUpdatedAt));
-  const propsTime = Date.parse(serverUpdatedAt);
-  // `transaction.updated` is the one event without a server timestamp; it
-  // changes no mirrored value, so it never wins the freshness comparison.
   const lastEvent = state.lastEvent;
   const eventTime =
     lastEvent && "serverTime" in lastEvent
       ? Date.parse(lastEvent.serverTime)
       : Number.NaN;
-  const stateTime = Number.isNaN(eventTime) ? mountTime : eventTime;
+  // An event that reached the mirror already passed the hook's plausibility
+  // bound (see MAX_EVENT_FUTURE_SKEW_MS), so its timestamp can be believed.
+  // One that did not is still `lastEvent` but has no usable time, and then the
+  // server-rendered snapshot wins rather than a fabricated value.
+  const stateTime = Number.isNaN(eventTime) ? propsTime : eventTime;
 
   const propsSnapshot: Snapshot = {
     serverTime: propsTime,

@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { headers } from "next/headers";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/providers";
@@ -19,6 +18,15 @@ const geistMono = Geist_Mono({
 
 const siteUrl = SITE_URL;
 
+/**
+ * Site-wide defaults, deliberately NOT stating an explicit
+ * `robots: { index: true, follow: true }`: "index, follow" is already the
+ * crawler default, and emitting it from the root layout once meant a streamed
+ * 404 carried BOTH that tag and a page-level `noindex` — a conflicting
+ * directive crawlers are told to resolve unpredictably. Anything that must not
+ * be indexed says so explicitly where it is rendered: see
+ * `src/app/not-found.tsx` and the auction/profile pages.
+ */
 const baseMetadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
@@ -36,39 +44,29 @@ const baseMetadata: Metadata = {
     url: siteUrl,
   },
   twitter: { card: "summary_large_image", title: "BidBlitz", description: "Live competitive auctions." },
-  // Deliberately NO `robots: { index: true, follow: true }` here: "index,
-  // follow" is already the crawler default, and emitting it from the root
-  // layout once meant a streamed 404 carried BOTH that tag and the page-level
-  // `noindex` — a conflicting directive crawlers are told to resolve
-  // unpredictably. Missing resources get their explicit `noindex` below.
 };
 
 /**
- * Root metadata resolves per request for exactly one reason: `src/proxy.ts`
- * sets `x-bidblitz-missing` when it rewrites a missing auction/profile URL
- * onto the router-level not-found path, and that response needs a
- * resource-specific title plus an explicit `noindex`. `not-found.tsx` cannot
- * export metadata (verified against the live build), so the root layout is the
- * only place both can come from — and the proxy strips any inbound copy of the
- * header, so a client cannot spoof the directive onto a real page.
+ * A static export again, on purpose.
  *
- * With no header set, this returns the same object the previous static export
- * was, so no normal page's head changes.
+ * This used to be an async `generateMetadata` that read the
+ * `x-bidblitz-missing` header, set by `src/proxy.ts`, purely so a missing
+ * auction or profile could be titled. It no longer needs to: a
+ * `generateMetadata` export inside `src/app/not-found.tsx` takes precedence
+ * over the root layout for the not-found render, and reads the same header
+ * there. Leaving both would have meant two sources of truth for one title, with
+ * the root copy silently dead.
+ *
+ * The fix this enabled is the real point. A URL that matches no route at all
+ * (`/nope`) never carried that header, so it answered 404 while quietly
+ * inheriting the homepage's `<title>` and `<meta name="description">` and
+ * emitted no robots directive — measured against the live site on 2026-09-28.
+ * A 404 advertising the homepage's marketing copy is a soft-404 to a crawler.
+ * That response now gets a truthful title, a truthful description and an
+ * explicit `noindex`, and the root layout no longer reads request headers on
+ * every request.
  */
-export async function generateMetadata(): Promise<Metadata> {
-  const missing = (await headers()).get("x-bidblitz-missing");
-  if (missing === "auction" || missing === "profile") {
-    return {
-      ...baseMetadata,
-      title: {
-        default: missing === "auction" ? "Auction not found" : "Profile not found",
-        template: "%s · BidBlitz",
-      },
-      robots: { index: false, follow: false },
-    };
-  }
-  return baseMetadata;
-}
+export const metadata: Metadata = baseMetadata;
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   // Seed the client clock from request time. This is a Server Component, which

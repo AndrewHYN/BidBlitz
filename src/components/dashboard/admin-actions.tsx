@@ -48,7 +48,11 @@ export async function updateReportStatusAction(
     .update({ status: parsed.data.status })
     .eq("id", parsed.data.reportId);
 
-  if (error) return { ok: false, message: error.message };
+  // Never pass a raw database error to the browser. PostgREST messages quote
+  // relation names, constraint names and occasionally values, which is noise
+  // for an operator at best and a small information leak at worst. The real
+  // diagnostic is the server log, which already has it.
+  if (error) return { ok: false, message: "That report update was refused. Reload and try again." };
 
   revalidatePath("/admin");
   return { ok: true, status: parsed.data.status };

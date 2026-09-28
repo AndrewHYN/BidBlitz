@@ -357,12 +357,34 @@ belong to a named person who has read `docs/MARKETPLACE_OPERATIONS.md`.
 ☐ **J7. The payout queue's populated view has not been seen in a browser.**
 Verified 2026-09-28: `public.transactions` is **empty** in production, so there
 is no paid sale for the queue to render — it shows its empty state. The
-mechanics underneath it *are* proven: 24 database checks drive the real
-`admin_transition_seller_payout` function over the real PostgREST API with a
+mechanics underneath it *are* proven: 25 database checks drive the real
+`admin_transition_seller_putation` function over the real PostgREST API with a
 real admin session, including the whole fulfilment ladder and the refusals. But
 the rendered rows, the confirmation dialog and the reference input should be
 looked at on the **first real paid sale**, before an operator is trusted with a
 live payout. Do not fabricate a paid transaction to rehearse it.
+
+☐ **J8. Production currently has no listings at all.** Verified 2026-09-28:
+`auctions`, `bids`, `transactions`, `auction_images` and the `auction-images`
+storage bucket all hold **zero** rows. That is correct — the ten test listings
+found there were e2e residue and have been removed (see
+`docs/POST_LAUNCH_BACKLOG.md`) — but it means a first-time visitor sees an
+empty marketplace. **List real items before opening the doors**, and confirm the
+homepage empty state reads as "nothing listed yet" rather than broken.
+
+☐ **J9. Decide where the test suite runs.** The e2e suite publishes real
+auctions, uploads real files and places real bids through the real app. It now
+cleans up after itself automatically, but cleanup is a safety net, not a
+boundary. The correct answer is a separate Supabase project for tests. That
+needs an owner action (provision it, set `.env` for the test run) and it is the
+only way a test run can never touch production.
+
+☐ **J10. Confirm no QA account is an administrator before launch.** The QA
+account password is in the public repository because the suites need it. That
+is only safe while none of those accounts can authorise a payout. The database
+harness now fails loudly if one is, but the check only runs when someone runs
+it. Never promote a `@bidblitz.test` account; rotate before any real account
+shares that password.
 
 ---
 
@@ -384,6 +406,8 @@ Launch is gated on the following being **closed**, not merely attempted:
 | K9 | Incident runbook written and rehearsed | Owner action | ☐ |
 | K10 | Paynow moved from test mode to live | External — Paynow | ☐ |
 | K11 | **An account actually has `is_admin` — today none does** | Owner action | ☐ |
+| K12 | **A transactional email provider is configured AND a signup is proven end to end** | Owner action | ☐ |
+| K13 | Real listings exist, so the marketplace is not empty on arrival | Owner action | ☐ |
 
 **K0 is the first gate chronologically.** It is also the cheapest: one SMTP
 configuration. Leaving it open means the marketplace has no way to admit a new
@@ -392,6 +416,9 @@ participant at all.
 **K11 is the gate that surprises people.** The payout machinery is built,
 audited and proven, and not one account can reach it.
 
-**BidBlitz is not commercially live until K0–K11 are closed.** A complete
+**K13 is the gate a customer notices first.** With no listings, a visitor lands
+on an empty marketplace and concludes it is not a real business.
+
+**BidBlitz is not commercially live until K0–K13 are closed.** A complete
 codebase, a passing test suite and a deployed site do not make it live; they
 make the software ready for a business that is ready to trade.

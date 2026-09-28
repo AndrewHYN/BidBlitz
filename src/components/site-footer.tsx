@@ -61,7 +61,10 @@ export function SiteFooter() {
               <Phone className="size-4 shrink-0" aria-hidden />
               <a
                 href="tel:0789335669"
-                className="transition-colors hover:text-foreground"
+                // Same target-size fix as the nav columns: these measured 20px
+                // tall on a 390px viewport. A tap target you have to hit twice is
+                // a support call.
+                className="-my-1 inline-block py-1 transition-colors hover:text-foreground"
               >
                 0789335669
               </a>
@@ -70,7 +73,7 @@ export function SiteFooter() {
               <Mail className="size-4 shrink-0" aria-hidden />
               <a
                 href="mailto:hyndrrx0@gmail.com"
-                className="transition-colors hover:text-foreground"
+                className="-my-1 inline-block py-1 transition-colors hover:text-foreground"
               >
                 hyndrrx0@gmail.com
               </a>
@@ -81,12 +84,21 @@ export function SiteFooter() {
         {COLUMNS.map((col) => (
           <nav key={col.title} aria-label={col.title} className="space-y-3">
             <h3 className="text-sm font-medium">{col.title}</h3>
-            <ul className="space-y-2">
+            <ul className="space-y-1">
               {col.links.map((l) => (
                 <li key={l.href}>
                   <Link
                     href={l.href}
-                    className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+                    // `inline-block` plus vertical padding grows the hit area to
+                    // ~30px tall for a 14px line. Measured on the live site at
+                    // 390px: these rendered 18px tall, which fails WCAG 2.5.8
+                    // Target Size (Minimum, AA: 24x24 CSS px) and is a genuine
+                    // mis-tap risk in a phone browser. The negative margin
+                    // absorbs the extra padding so the column keeps the same
+                    // visual rhythm, and the hover background is dropped
+                    // deliberately: it would paint a block behind text that
+                    // must not look like a button.
+                    className="-my-1 inline-block py-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
                   >
                     {l.label}
                   </Link>

@@ -17,6 +17,13 @@ export default defineConfig({
   // regression. A genuine defect fails both attempts and still reports red.
   retries: 1,
   reporter: [["list"], ["html", { open: "never" }]],
+  // The suite publishes real auctions, uploads real files and places real bids
+  // through the real app. Against a real Supabase project that means real rows,
+  // so they must be removed when the run ends - otherwise every run leaves test
+  // listings sitting on the public homepage, which is exactly what happened
+  // before 2026-09-28. Best-effort by design: it warns loudly when it cannot
+  // clean up, and never hides a skipped cleanup behind a green run.
+  globalTeardown: "./e2e/global-teardown.ts",
   use: {
     baseURL,
     trace: "retain-on-failure",

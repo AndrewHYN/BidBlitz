@@ -1274,6 +1274,149 @@ const failedPayout = rows(await sql(
 check("payout: a FAILED transaction never gets a payout row",
   failedPayout.length === 0, `${failedPayout.length} rows`);
 
+// ---- 15. security follow-ups closed on 2026-09-28 ---------------------------
+// Three documented items from the pre-launch sweep, re-evaluated against the
+// live database rather than taken on trust. Each is proved by attempting the
+// thing it is supposed to prevent.
+console.log("\n--- security follow-ups (2026-09-28) ---");
+
+// (a) A self-inserted profile can never arrive privileged. The escalation this
+// closes: any signed-in user whose profile row is missing could insert their
+// own row with is_admin = true and become an administrator.
+const forgedProfile = await rest(`/rest/v1/profiles`, {
+  method: "POST", bearer: tok.buyer3,
+  headers: { Prefer: "return=representation" },
+  body: {
+    id: buyer3Id, username: "forged-admin", display_name: "Forged Admin",
+    is_admin: true,
+  },
+});
+const adminProfiles = rows(await sql(
+  `select count(*)::int as n from public.profiles where is_admin`));
+check("security: a self-inserted profile cannot claim is_admin",
+  !forgedProfile.ok && Number(adminProfiles?.[0]?.n) === 0,
+  `status=${forgedProfile.status} ` +
+    `body=${JSON.stringify(forgedProfile.data)?.slice(0, 120)} ` +
+    `admins=${adminProfiles?.[0]?.n}`);
+
+// (b) storage_path must name its own auction and end in a file extension. The
+// app already enforces the first half; the database now does too.
+const fixtureAuction = rows(await sql(`
+  insert into public.auctions
+    (seller_id, title, description, condition, location,
+     starting_bid_minor, bid_increment_minor, status, starts_at, ends_at,
+     duration_seconds)
+  values ('${sellerId}', 'Harness image-check fixture',
+          'Synthetic fixture; never listed.', 'good', 'harness',
+          100, 10, 'DRAFT', now(), now() + interval '1 hour', 3600)
+  returning id`))[0]?.id;
+
+const badPath = await rest(`/rest/v1/auction_images`, {
+  method: "POST", bearer: tok.seller, body: {
+    auction_id: fixtureAuction, storage_path: "not-a-real-path.png", position: 0,
+  },
+});
+// A key that names a DIFFERENT auction's id is the case that matters: it would
+// let one listing's image row point at another listing's object.
+const crossPath = await rest(`/rest/v1/auction_images`, {
+  method: "POST", bearer: tok.seller, body: {
+    auction_id: fixtureAuction,
+    storage_path: `${soonAuction}/0.png`, position: 1,
+  },
+});
+const goodPath = await rest(`/rest/v1/auction_images`, {
+  method: "POST", bearer: tok.seller, body: {
+    auction_id: fixtureAuction,
+    storage_path: `harness/${fixtureAuction}/cover.jpg`, position: 0,
+  },
+});
+check("security: auction_images.storage_path must name its own auction and be a file",
+  !badPath.ok && !crossPath.ok && goodPath.ok,
+  `noauction=${badPath.status} crossauction=${crossPath.status} good=${goodPath.status} ` +
+    `crossBody=${JSON.stringify(crossPath.data)?.slice(0, 90)}`);
+
+// The one legal image row written above, plus its fixture auction.
+await sql(`delete from public.auction_images where auction_id='${fixtureAuction}'`);
+await sql(`delete from public.auctions where id='${fixtureAuction}'`);
+
+// (c) is_banned is now READ. Before this, nothing consulted it: setting the
+// flag achieved nothing, so an operator following the escalation manual
+// believed they had stopped an account that carried on bidding and listing.
+// Both attempts go through the same public surfaces a real user would use:
+// place_bid for bidding, and publish_auction for listing (a client has no
+// direct INSERT on auctions at all - the grants are revoked).
+const bannedDraft = rows(await sql(`
+  insert into public.auctions
+    (seller_id, title, description, condition, location,
+     starting_bid_minor, bid_increment_minor, status, starts_at, ends_at,
+     duration_seconds)
+  values ('${buyer1Id}', 'Harness banned-publish fixture',
+          'Synthetic fixture; never listed.', 'good', 'harness',
+          100, 10, 'DRAFT', now(), now() + interval '1 hour', 3600)
+  returning id`))[0]?.id;
+await sql(`
+  insert into public.auction_images (auction_id, storage_path, position)
+  values ('${bannedDraft}', 'harness/${bannedDraft}/cover.jpg', 0)`);
+
+await sql(`update public.profiles set is_banned = true where id='${buyer1Id}'`);
+const bannedBid = await rest(`/rest/v1/rpc/place_bid`, {
+  method: "POST", bearer: tok.buyer1,
+  body: {
+    p_auction_id: soonAuction, p_amount_minor: 999999,
+    p_request_id: randomUUID(),
+  },
+});
+const bannedPublish = await rest(`/rest/v1/rpc/publish_auction`, {
+  method: "POST", bearer: tok.buyer1,
+  body: { p_auction_id: bannedDraft },
+});
+await sql(`update public.profiles set is_banned = false where id='${buyer1Id}'`);
+
+// The same call after the flag is lifted must succeed, or this could be
+// passing because publishing is simply broken for this account.
+const unbannedPublish = await rest(`/rest/v1/rpc/publish_auction`, {
+  method: "POST", bearer: tok.buyer1,
+  body: { p_auction_id: bannedDraft },
+});
+const unbannedMessage = String(unbannedPublish.data?.message ?? "");
+
+check("security: a banned account cannot bid (account_banned)",
+  !bannedBid.ok &&
+    String(bannedBid.data?.message ?? "").includes("account_banned"),
+  JSON.stringify(bannedBid.data)?.slice(0, 140));
+check("security: a banned account cannot publish a listing (account_banned)",
+  !bannedPublish.ok &&
+    String(bannedPublish.data?.message ?? "").includes("account_banned"),
+  JSON.stringify(bannedPublish.data)?.slice(0, 140));
+check("security: unbanning lifts the block (the ban was the only reason it failed)",
+  !unbannedMessage.includes("account_banned") && unbannedPublish.ok,
+  `after unban: status=${unbannedPublish.status} message="${unbannedMessage}"`);
+
+await sql(`delete from public.auction_images where auction_id='${bannedDraft}'`);
+await sql(`delete from public.auctions where id='${bannedDraft}'`);
+
+// Banning must stop commerce, not strand a live auction: the engine still has
+// to be able to close and settle one belonging to a banned seller.
+const bannedSettle = rows(await sql(
+  `select status from public.auctions where id='${soonAuction}'`))[0];
+check("security: banning a seller does not block the engine settling their auction",
+  bannedSettle?.status === "LIVE",
+  `status=${bannedSettle?.status} - the check only fires on a move out of DRAFT, ` +
+    `so settlement of an already-live auction is unaffected`);
+
+// (d) A latent-critical check. The QA accounts' password is in this repository
+// (e2e/fixtures.ts and TEST_PASSWORD below) because the suite needs it. That is
+// only safe while NO QA account is an administrator - the harness itself
+// promotes buyer2 temporarily. If one were ever left admin, the password in a
+// public repo would be a full payout-authorisation credential.
+const qaAdmins = rows(await sql(
+  `select u.email from public.profiles p
+     join auth.users u on u.id = p.id
+    where p.is_admin and u.email like '%@bidblitz.test'`));
+check("security: no QA test account is an administrator (repo holds their password)",
+  qaAdmins.length === 0,
+  qaAdmins.length ? `ADMIN ON QA ACCOUNT: ${qaAdmins.map((r) => r.email).join(", ")}` : "");
+
 // --- hostile request surface ------------------------------------------------
 const payoutId = payPayout?.id ?? "00000000-0000-0000-0000-000000000000";
 

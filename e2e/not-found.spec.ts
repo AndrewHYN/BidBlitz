@@ -95,4 +95,41 @@ test.describe("not found", () => {
     const home = await page.goto("/");
     expect(home?.status()).toBe(200);
   });
+
+  test("a URL matching no route at all is a noindexed 404, not a soft-404", async ({
+    page,
+  }) => {
+    // The gap this pins down. `src/proxy.ts` only rewrites URLs that NAME a
+    // resource it can prove is missing (an auction id, a profile username). A
+    // path that matches no route at all never got that header, so its 404
+    // quietly inherited the root layout's metadata: measured against the live
+    // site on 2026-09-28, `/nope-nope` answered HTTP 404 with the HOMEPAGE's
+    // <title> and <meta name="description"> and no robots directive at all. A
+    // 404 carrying the homepage's marketing copy is a soft-404 to a crawler.
+    const response = await page.goto("/definitely-not-a-route-xyz");
+    expect(response?.status()).toBe(404);
+
+    await expect(page.getByTestId("not-found-page")).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(
+      page.getByRole("heading", { name: "This page went unsold" })
+    ).toBeVisible();
+
+    // Truthful head: its own title, its own description, explicitly noindex,
+    // and no conflicting `index, follow` anywhere.
+    await expect(page).toHaveTitle(/Page not found/);
+    await expect(
+      page.locator('meta[name="robots"][content*="noindex"]')
+    ).not.toHaveCount(0);
+    await expect(
+      page.locator('meta[name="robots"][content="index, follow"]')
+    ).toHaveCount(0);
+
+    // The decisive assertion: the description must NOT be the homepage's.
+    const desc = await page
+      .locator('meta[name="description"]')
+      .getAttribute("content");
+    expect(desc ?? "").not.toContain("live auction marketplace");
+  });
 });

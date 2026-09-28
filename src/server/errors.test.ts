@@ -63,6 +63,16 @@ describe("normalizeEngineError()", () => {
     });
   });
 
+  it("maps a banned account onto honest copy, not the generic fallback", () => {
+    // The is_banned triggers (migration 20260928000003) raise this. If it fell
+    // through to `unknown` a suspended account would be told to "try again",
+    // which is both useless and untrue.
+    const rejection = normalizeEngineError({ message: "account_banned" });
+    expect(rejection.code).toBe("account_banned");
+    expect(rejection.message).toMatch(/can't bid or list/i);
+    expect(rejection.message).not.toMatch(/try again/i);
+  });
+
   it("falls back to the generic copy for unknown text", () => {
     const rejection = normalizeEngineError(
       "something exploded at the connection pool"

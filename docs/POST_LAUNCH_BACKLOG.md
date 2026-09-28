@@ -333,47 +333,115 @@ on bid/list/report actions (`BID_LIMIT`, `AUCTION_CREATE_LIMIT`,
 server actions via the shared `src/lib/safe-next.ts`, `imageUrlFor()` refusing
 anything that is not a bare storage key, and the realtime header comment
 corrected (channels are public; consumption is notification-only — see below).
-The following were reviewed and deliberately left alone; each needs care the
-pre-launch window did not have, and none is a known path to money or data loss:
+
+### Re-reviewed 2026-09-28 against the live database
+
+Every item below was re-tested against the running system rather than taken on
+trust, and three of them are now closed. What the review actually established:
+
+**Confirmed sound, with evidence (no change needed):**
+
+- **Every table has RLS enabled** — zero exceptions in `public`.
+- **Every `SECURITY DEFINER` function pins `search_path = ''`** — zero
+  exceptions across `public` and `private`.
+- **`anon` can execute only three functions**, all `SECURITY INVOKER` and
+  harmless (`auction_effective_status`, `round_minor`, `server_now`). Every
+  privileged writer — `place_bid`, `settle_auction`, `cancel_auction`,
+  `publish_auction`, `mark_transaction_*`, `admin_transition_seller_payout` —
+  is refused to anon.
+- **`payment_events` and `payment_intents` have no policies at all**, so RLS
+  denies them to anon *and* authenticated. The payment audit log and the
+  `pollurl` capability token have no client surface.
+- **`profiles_update_self` already refuses to let anyone change `is_admin`,
+  `is_banned` or any counter.** This was already correct.
+
+**Now closed (migration `20260928000003_security_followups.sql`):**
+
+- **`profiles_insert_self` could mint an administrator.** The UPDATE policy
+  guarded every privilege column; the INSERT policy checked only
+  `id = auth.uid()`. Profiles come from the `handle_new_user` trigger, so the
+  reachable path needed a missing profile row — but any signed-in user in that
+  state could have inserted their own row with `is_admin = true`. A self-inserted
+  row must now arrive unprivileged and uncounted.
+- **`auction_images.storage_path` accepted any string.** It must now name its own
+  auction's id as a path segment and end in a file extension. This closes a
+  cross-auction image reference: an image row could previously point at another
+  listing's storage object.
+- **`is_banned` was read by nothing.** Two policies mentioned the column purely
+  to stop a user changing their own flag; no code path consulted it. Setting it
+  achieved nothing, so an operator following the fraud-escalation procedure in
+  `docs/MARKETPLACE_OPERATIONS.md` believed they had stopped an account that
+  carried on bidding and listing — and the terms promise users their account can
+  be suspended. Enforced now by two triggers: a banned account cannot bid, and
+  cannot create or publish a listing, while the engine still settles and closes
+  an already-live auction (banning must not strand one).
+
+  *Worth recording because the first attempt was wrong in an instructive way:*
+  the triggers initially carried a `current_user` bypass so the engine could
+  pass. `place_bid` and `publish_auction` are `SECURITY DEFINER`, so
+  `current_user` is `postgres` for a real user's bid too — the role identifies
+  the function owner, not the actor. The bypass silently disabled the whole
+  check, and the harness caught it: a banned account could still bid. There is
+  no role test; the conditions are scoped precisely enough not to need one.
+
+- **Admin surfaces no longer return raw database errors.** Both admin actions
+  translate a refusal into fixed copy, so PostgREST messages that quote relation
+  and constraint names never reach a browser.
+
+**Still open, with the reasoning:**
 
 - **Realtime channel authorization.** `auction:{id}` / `user:{id}` Broadcast
-  channels are created without `private: true` and no `realtime.messages` RLS
-  policies exist, so anyone holding the publishable key can subscribe to or
-  post on them. Safe today only because every consumer treats events as a
-  hint to re-read server state — no price, state, authorization or payment
-  decision is derived from a payload (documented at the top of
-  `src/lib/realtime/supabase.ts`). Closing it means Supabase private channels
-  + `realtime.messages` policies; it must be verified against live bidding
-  before it ships, so it was not risked pre-launch.
-- **`is_banned` enforcement.** The column and RLS references exist, but no
-  code path sets it (no admin surface does) and no action reads it. Wiring
-  enforcement before an admin tool can set it would be theatre; build the
-  admin operation first.
-- **`profiles_insert_self` INSERT policy** has no `is_admin = false` guard, so
-  a self-inserted row could claim admin. Profiles are actually created by the
-  `handle_new_user` trigger on signup and the app never INSERTs `profiles` from
-  the client, so the only way in is a manually inserted row for a missing
-  profile id. One-line `with check` tightening when migrations are next open.
-- **`auction_images.storage_path` has no DB format CHECK.** The server action
-  validates uploads and `imageUrlFor()` now refuses non-key values, but a
-  direct PostgREST write can still store an odd string. A CHECK constraint is
-  a follow-up migration.
+  channels are public, so anyone holding the publishable key can subscribe or
+  post. Re-verified 2026-09-28: **every genuine server-published event carries a
+  real `serverTime`** (`place_bid`, `settle_auction`, `publish_auction` all set
+  it), and the mirror only feeds *display*. Partial hardening added this pass:
+  an event must carry a timestamp within `MAX_EVENT_FUTURE_SKEW_MS` of the
+  newest server-confirmed time, or it never enters the mirror. That closes two
+  real forgeries that previously won the "newest source" comparison — an event
+  with no `serverTime` (which fell back to the client mount time) and an event
+  claiming a far-future timestamp — either of which could render a live auction
+  as ended and remove the bid form for every viewer. It is display hardening,
+  not authorization: the server still alone decides whether a bid is valid. The
+  proper fix is Supabase private channels + `realtime.messages` policies, which
+  must be verified against live bidding before it ships.
 - **Bid idempotency scope** is `(bidder_id, request_id)` — a request id reused
-  across two different auctions would resolve to the earlier bid. Clients
-  generate a fresh UUID per submit, so the collision is theoretical; scope the
-  key by auction id when the engine next changes.
-- **Anti-snipe `extension_count` is unbounded** — a determined bidder could
-  extend an auction repeatedly. A cap (e.g. max extensions per auction) is a
-  product rule that needs its own test; not added in the sweep.
-- **Admin raw error text** — the admin-only surface returns the provider's raw
-  `error.message` for operator diagnostics. Deliberate for now; genericize if
-  an admin UI ever becomes multi-user.
-- **`scripts/db/verify-engine.mjs` test credentials** — a local database
-  verification script carries its own test login. It is never deployed and
-  never touches production data; keep it out of any hosted context.
+  across two different auctions resolves to the earlier bid. Clients generate a
+  fresh UUID per submit, so the collision needs a broken client. **Deliberately
+  not changed:** the lookup is inside `place_bid`, so scoping it to the auction
+  means re-issuing the whole authoritative bidding function — the highest-risk
+  object in the system — for a bug with no reproducing test. Scope it when the
+  engine next changes, with a test that first demonstrates the collision.
+- **Anti-snipe `extension_count` is unbounded** — a determined bidder can extend
+  an auction repeatedly. A cap is a product rule that changes auction behaviour,
+  not a security fix. Not added.
+- **`scripts/db/verify-engine.mjs` and `e2e/fixtures.ts` carry the QA account
+  password**, because the suites need to sign in. Safe only while no QA account
+  is an administrator. The harness now **fails loudly** if one is
+  (`no QA test account is an administrator`), which turns a latent critical
+  issue into a loud failure. Never grant admin to a QA account; rotate before
+  any account with real access shares that password.
 - **Distributed rate limiting** — see *Infrastructure limits* above; the new
   budgets are in-memory per instance (sufficient on Hobby's single isolate,
   not a DDoS control).
+
+### The e2e suite wrote to production and nothing cleaned up after it
+
+Found during the 2026-09-28 browser audit, not by a test: production held ten
+listings titled `Race muk7t6qg-…`, `RLS muk7x9kz-…`, `Outbid muk7w9nr-…` and so
+on, owned by the QA profile, each with a 1×1-pixel fixture photo, all visible on
+the homepage. Every Playwright run added more. That is fabricated activity in a
+commercial product, which must never ship.
+
+- `scripts/db/cleanup-e2e-fixtures.mjs` removes it, matching only a QA seller's
+  address **and** the suite's exact title pattern, printing every candidate and
+  refusing to delete without `--yes`. It also deletes storage objects that no
+  `auction_images` row references. `npm run db:cleanup-e2e`.
+- `e2e/global-teardown.ts` runs it after every suite, wired through
+  `playwright.config.ts`. It is best-effort by design: it warns loudly rather
+  than failing a green run, and never hides a skipped cleanup.
+- **The real fix is not a cleanup script.** The suite should run against a
+  separate Supabase project so a test run can never touch production. That needs
+  an owner action (provision a project) and is the correct long-term answer.
 
 Never add:
 - fake counters
