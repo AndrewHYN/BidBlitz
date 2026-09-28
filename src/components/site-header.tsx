@@ -19,7 +19,7 @@ export async function SiteHeader() {
   if (user) {
     const { data: profile } = await supabase
       .from("profiles")
-      .select("display_name, username, avatar_url")
+      .select("display_name, username, avatar_path")
       .eq("id", user.id)
       .maybeSingle();
 
@@ -27,7 +27,9 @@ export async function SiteHeader() {
       id: user.id,
       displayName: profile?.display_name || user.email?.split("@")[0] || "Account",
       username: profile?.username ?? null,
-      avatarUrl: profile?.avatar_url ?? null,
+      // A storage KEY, never a URL: the component turns it into one and
+      // refuses anything that is not a key in our own bucket.
+      avatarPath: profile?.avatar_path ?? null,
       email: user.email ?? null,
     };
 

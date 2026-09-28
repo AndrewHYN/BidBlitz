@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PackageSearch } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
@@ -7,6 +8,7 @@ import { ProfileHeader } from "@/components/profile/profile-header";
 import { ReviewList } from "@/components/profile/review-list";
 import { AuctionGrid } from "@/components/auction/auction-card";
 import { EmptyState, SectionHeading } from "@/components/auction/page-header";
+import { Button } from "@/components/ui/button";
 
 export async function generateMetadata({
   params,
@@ -83,8 +85,19 @@ export default async function ProfilePage({
               <EmptyState
                 icon={PackageSearch}
                 title="No listings yet"
-                description="This seller has no public listings right now."
+                description={
+                  isSelf
+                    ? "You have no public listings yet. Publish an auction and it appears here."
+                    : "This seller has no public listings right now."
+                }
                 compact
+                action={
+                  isSelf ? (
+                    <Button asChild variant="outline" size="sm">
+                      <Link href="/sell">List an item</Link>
+                    </Button>
+                  ) : undefined
+                }
               />
             }
           />

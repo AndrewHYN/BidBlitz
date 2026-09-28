@@ -59,7 +59,7 @@ export default async function TransactionsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Transactions"
-        description="Every sale you were part of: the winning price, the BidBlitz fee, what the seller receives, and where the payment stands."
+        description="Every sale you were part of. Buyers pay the winning bid plus Paynow's payment charge; sellers receive the winning bid less BidBlitz's 5% fee, paid out separately."
       />
 
       <div>
@@ -81,8 +81,8 @@ export default async function TransactionsPage() {
                 <TableHead>Auction</TableHead>
                 <TableHead>Your side</TableHead>
                 <TableHead>Winning price</TableHead>
-                <TableHead>Fee</TableHead>
-                <TableHead>Proceeds</TableHead>
+                <TableHead>BidBlitz fee</TableHead>
+                <TableHead>Seller proceeds</TableHead>
                 <TableHead>Payment status</TableHead>
                 <TableHead>Recorded</TableHead>
                 <TableHead>Review</TableHead>
@@ -104,13 +104,22 @@ export default async function TransactionsPage() {
                   <TableCell>{row.seller_id === user.id ? "Seller" : "Buyer"}</TableCell>
                   <TableCell data-numeric>
                     <Money minor={row.gross_minor} currency={row.currency} />
+                    {/* A buyer paid this PLUS Paynow's own payment charge, which
+                        Paynow calculates and shows on its checkout page — we do
+                        not store it, so it must never be implied to be included
+                        in the number above. */}
+                    {row.buyer_id === user.id && (
+                      <span className="mt-1 block text-xs text-muted-foreground">
+                        plus Paynow&apos;s charge
+                      </span>
+                    )}
                   </TableCell>
                   <TableCell>
                     <span data-numeric>
                       <Money minor={row.fee_minor} currency={row.currency} />
                     </span>
                     <span className="ml-1 text-xs text-muted-foreground">
-                      ({feePercentLabel(row.fee_bps)} fee)
+                      ({feePercentLabel(row.fee_bps)} taken from the sale)
                     </span>
                   </TableCell>
                   <TableCell className="font-medium" data-numeric>

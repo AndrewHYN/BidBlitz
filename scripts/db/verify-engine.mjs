@@ -1293,11 +1293,38 @@ const forgedProfile = await rest(`/rest/v1/profiles`, {
 });
 const adminProfiles = rows(await sql(
   `select count(*)::int as n from public.profiles where is_admin`));
+const beforeAdmins = Number(adminProfiles?.[0]?.n);
 check("security: a self-inserted profile cannot claim is_admin",
-  !forgedProfile.ok && Number(adminProfiles?.[0]?.n) === 0,
+  !forgedProfile.ok && beforeAdmins === Number(
+    rows(await sql(
+      `select count(*)::int as n from public.profiles p
+         join auth.users u on u.id = p.id
+        where p.is_admin and u.email not like '%@bidblitz.test'`
+    ))[0]?.n
+  ),
   `status=${forgedProfile.status} ` +
     `body=${JSON.stringify(forgedProfile.data)?.slice(0, 120)} ` +
-    `admins=${adminProfiles?.[0]?.n}`);
+    `admins=${beforeAdmins}`);
+
+// (a2) The admin population itself, as a durable invariant rather than a
+// snapshot. The owner deliberately promoted their own real account on
+// 2026-09-28, so "there is no admin" is no longer the truth and must not be
+// asserted. What must stay true is that the ONLY administrator is a real
+// account: never a QA account, whose password lives in this repository.
+const adminIdentities = rows(await sql(
+  `select u.email from public.profiles p
+     join auth.users u on u.id = p.id
+    where p.is_admin order by u.email`));
+const adminQa = rows(await sql(
+  `select u.email from public.profiles p
+     join auth.users u on u.id = p.id
+    where p.is_admin and u.email like '%@bidblitz.test'`));
+check("security: exactly one administrator, and it is a real account",
+  adminIdentities.length === 1 && adminQa.length === 0,
+  adminIdentities.length === 0
+    ? "NO ADMIN AT ALL - /admin is unreachable by anyone"
+    : `admins=${adminIdentities.map((a) => a.email).join(", ")}` +
+      ` qaAdmins=${adminQa.length}`);
 
 // (b) storage_path must name its own auction and end in a file extension. The
 // app already enforces the first half; the database now does too.
@@ -1657,6 +1684,234 @@ await sql(`delete from public.transactions where auction_id='${auctionId}'`);
 await sql(`delete from public.bids where auction_id='${auctionId}'`);
 await sql(`delete from public.auction_images where auction_id='${auctionId}'`);
 await sql(`delete from public.auctions where id='${auctionId}'`);
+
+// ---- 16. avatars: namespaced storage + a key that cannot leave your folder --
+console.log("\n--- avatars ---");
+
+// A 1x1 PNG: the smallest valid thing that can pass the bucket's type gate.
+const PNG_1PX = Uint8Array.from([
+  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
+  0x00, 0x00, 0x00, 0x0a, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9c, 0x63, 0x00, 0x01, 0x00, 0x00,
+  0x05, 0x00, 0x01, 0x0d, 0x0a, 0x2d, 0xb4, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae,
+  0x42, 0x60, 0x82,
+]);
+
+/** `token` null means anon: the publishable key, no user session. */
+async function putAvatar(token, key) {
+  return rest(`/storage/v1/object/avatars/${key}`, {
+    method: "POST",
+    bearer: token ?? undefined,
+    headers: { "x-upsert": "true", "Content-Type": "image/png" },
+    raw: true,
+    body: PNG_1PX,
+  });
+}
+async function delAvatar(token, key) {
+  return rest(`/storage/v1/object/avatars/${key}`, { method: "DELETE", bearer: token });
+}
+async function avatarObjectCount(name) {
+  const r = rows(
+    await sql(
+      `select count(*)::int as n from storage.objects
+        where bucket_id = 'avatars' and name = '${name}'`
+    )
+  );
+  return Number(r[0]?.n);
+}
+async function profileAvatarPath(id) {
+  const r = rows(await sql(`select avatar_path from public.profiles where id = '${id}'`));
+  return r[0]?.avatar_path;
+}
+
+// Remove everything this section put in the bucket.
+//
+// Through the Storage API, not SQL: Supabase installs storage.protect_delete,
+// which refuses a direct DELETE on storage tables exactly to stop accidental
+// data loss. An earlier version of this section tried, and was correctly
+// rejected. Storage objects are not really rows either, so removing the row
+// alone would leave the blob behind.
+async function purgeAvatarBucket() {
+  const listed = rows(
+    await sql(`select name from storage.objects where bucket_id = 'avatars'`)
+  );
+  if (listed.length === 0) return;
+  const pub = requireEnv("NEXT_PUBLIC_SUPABASE_URL");
+  const svc = requireEnv("SUPABASE_SECRET_KEY");
+  for (const o of listed) {
+    await fetch(`${pub}/storage/v1/object/avatars/${o.name}`, {
+      method: "DELETE",
+      headers: { apikey: svc, Authorization: `Bearer ${svc}` },
+    });
+  }
+  await sql(`update public.profiles set avatar_path = null where avatar_path is not null`);
+}
+
+const AV_OWN = `${sellerId}/avatar.png`;
+const AV_OTHER = `${buyer1Id}/avatar.png`;
+
+// 1. A user can write their own folder...
+const avOwnUpload = await putAvatar(tok.seller, AV_OWN);
+check(
+  "avatar: a user CAN upload into their own folder",
+  avOwnUpload.ok && (await avatarObjectCount(AV_OWN)) === 1,
+  `status=${avOwnUpload.status} stored=${await avatarObjectCount(AV_OWN)}`
+);
+
+// 2. ...and cannot write somebody else's.
+const avCrossUpload = await putAvatar(tok.seller, AV_OTHER);
+check(
+  "avatar: user A cannot write into user B's folder",
+  !avCrossUpload.ok && (await avatarObjectCount(AV_OTHER)) === 0,
+  `status=${avCrossUpload.status} stored=${await avatarObjectCount(AV_OTHER)}`
+);
+
+// 3. ...and cannot escape its namespace by traversal.
+const avTraversal = await putAvatar(tok.seller, `${sellerId}/../${buyer1Id}/avatar.png`);
+check(
+  "avatar: path traversal out of the namespace is refused",
+  !avTraversal.ok && (await avatarObjectCount(AV_OTHER)) === 0,
+  `status=${avTraversal.status} landedInB=${await avatarObjectCount(AV_OTHER)}`
+);
+
+// 4. A second format for the same user coexists, and one file per extension.
+const avReplace = await putAvatar(tok.seller, `${sellerId}/avatar.jpg`);
+const avSellerObjects = Number(
+  rows(
+    await sql(
+      `select count(*)::int as n from storage.objects
+        where bucket_id = 'avatars' and name like '${sellerId}/%'`
+    )
+  )[0]?.n
+);
+check(
+  "avatar: one object per (user, format) and no runaway accumulation",
+  avReplace.ok && avSellerObjects === 2,
+  `status=${avReplace.status} objectsForSeller=${avSellerObjects}`
+);
+
+// 5. A user can point their OWN profile at their own key.
+await putAvatar(tok.seller, AV_OWN);
+const avOwnProfile = await rest(`/rest/v1/profiles?id=eq.${sellerId}`, {
+  method: "PATCH", bearer: tok.seller, body: { avatar_path: AV_OWN },
+});
+check(
+  "avatar: a user can point their own profile at their own picture",
+  avOwnProfile.ok,
+  `status=${avOwnProfile.status}`
+);
+
+// 6. A user cannot point their profile at ANOTHER user's key.
+const avCrossProfile = await rest(`/rest/v1/profiles?id=eq.${sellerId}`, {
+  method: "PATCH", bearer: tok.seller, body: { avatar_path: AV_OTHER },
+});
+check(
+  "avatar: a user cannot point their profile at another user's key",
+  !avCrossProfile.ok && (await profileAvatarPath(sellerId)) !== AV_OTHER,
+  `status=${avCrossProfile.status} avatar_path=${await profileAvatarPath(sellerId)}`
+);
+
+// 7. ...nor at an arbitrary string. This is exactly the defect the old
+//    free-text `avatar_url` column allowed: any value the user liked.
+for (const [label, value] of [
+  ["an external URL", "https://attacker.tld/pixel.png"],
+  ["a protocol-relative URL", "//attacker.tld/pixel.png"],
+  ["a traversal path", "../../etc/passwd"],
+  ["another bucket", "auction-images/x.png"],
+  ["a wrong filename", `${sellerId}/evil.php`],
+]) {
+  const bad = await rest(`/rest/v1/profiles?id=eq.${sellerId}`, {
+    method: "PATCH", bearer: tok.seller, body: { avatar_path: value },
+  });
+  const current = await profileAvatarPath(sellerId);
+  check(
+    `avatar: avatar_path refuses ${label}`,
+    !bad.ok && current !== value,
+    `status=${bad.status} value=${current}`
+  );
+}
+
+// 8. A user cannot delete another user's object.
+await putAvatar(tok.buyer1, AV_OTHER);
+const avCrossDelete = await delAvatar(tok.seller, AV_OTHER);
+check(
+  "avatar: user A cannot delete user B's picture",
+  !avCrossDelete.ok && (await avatarObjectCount(AV_OTHER)) === 1,
+  `status=${avCrossDelete.status} stillThere=${await avatarObjectCount(AV_OTHER)}`
+);
+
+// 9. A user CAN remove their own, and the reference can be cleared.
+const avOwnDelete = await delAvatar(tok.seller, AV_OWN);
+const avCleared = await rest(`/rest/v1/profiles?id=eq.${sellerId}`, {
+  method: "PATCH", bearer: tok.seller, body: { avatar_path: null },
+});
+check(
+  "avatar: a user CAN remove their own picture and clear the reference",
+  avOwnDelete.ok &&
+    avCleared.ok &&
+    (await avatarObjectCount(AV_OWN)) === 0 &&
+    (await profileAvatarPath(sellerId)) === null,
+  `delete=${avOwnDelete.status} avatar_path=${await profileAvatarPath(sellerId)}`
+);
+
+// 10. Anon can read (avatars are public) but cannot write.
+const avAnonRead = await rest(`/storage/v1/object/public/avatars/${AV_OWN}`);
+const avAnonUpload = await putAvatar(null, `${buyer2Id}/avatar.png`);
+check(
+  "avatar: reads are public, anon writes are not",
+  avAnonRead.status === 400 && !avAnonUpload.ok,
+  `read=${avAnonRead.status} (400 = no such object, so the read reached storage) ` +
+    `write=${avAnonUpload.status}`
+);
+
+// 11. The bucket is an independent second gate on size and type.
+const avBucket = rows(
+  await sql(
+    `select file_size_limit, allowed_mime_types::text as mimes
+       from storage.buckets where id = 'avatars'`
+  )
+)[0];
+const avMimes = String(avBucket?.mimes ?? "");
+check(
+  "avatar: the bucket caps size and allows raster types only (no SVG)",
+  Number(avBucket?.file_size_limit) === 2 * 1024 * 1024 &&
+    /image\/jpeg/.test(avMimes) &&
+    /image\/png/.test(avMimes) &&
+    /image\/webp/.test(avMimes) &&
+    !/svg/i.test(avMimes),
+  `limit=${avBucket?.file_size_limit} mimes=${avMimes}`
+);
+
+// 12. The column itself: avatar_path replaced the free-text avatar_url.
+const avColumns = rows(
+  await sql(
+    `select column_name from information_schema.columns
+      where table_schema = 'public' and table_name = 'profiles'
+        and column_name in ('avatar_path', 'avatar_url')`
+  )
+);
+check(
+  "avatar: avatar_path replaced the free-text avatar_url column",
+  avColumns.length === 1 && avColumns[0]?.column_name === "avatar_path",
+  `columns=${avColumns.map((c) => c.column_name).join(",")}`
+);
+
+// 13. A profile with no avatar is a normal, supported state.
+const avNull = Number(
+  rows(await sql(`select count(*)::int as n from public.profiles where avatar_path is null`))[0]
+    ?.n
+);
+const avAll = Number(
+  rows(await sql(`select count(*)::int as n from public.profiles`))[0]?.n
+);
+check(
+  "avatar: no avatar on any profile is a valid state (fallback is the default)",
+  avNull === avAll,
+  `null=${avNull} of ${avAll}`
+);
+
+// Clean up everything this section put in the bucket.
+await purgeAvatarBucket();
+await sql(`update public.profiles set avatar_path = null where avatar_path is not null`);
 
 // A finished run must leave no synthetic residue at all — this is the check
 // that makes the cleanup a promise rather than a hope.

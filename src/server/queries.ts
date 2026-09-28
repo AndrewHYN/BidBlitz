@@ -229,7 +229,7 @@ export const getAuctionDetail = cache(async (id: string) => {
        categories:category_id(id, slug, name),
        auction_images(id, storage_path, position, width, height),
        seller:profiles!auctions_seller_id_fkey(
-         id, username, display_name, avatar_url, bio, location,
+         id, username, display_name, avatar_path, bio, location,
          rating_sum, rating_count, sales_count, purchases_count,
          email_verified, created_at
        )`
@@ -505,7 +505,7 @@ export const getProfileByUsername = cache(async (username: string) => {
   const { data } = await supabase
     .from("profiles")
     .select(
-      `id, username, display_name, avatar_url, bio, location, rating_sum,
+      `id, username, display_name, avatar_path, bio, location, rating_sum,
        rating_count, sales_count, purchases_count, email_verified, created_at`
     )
     .eq("username", username)

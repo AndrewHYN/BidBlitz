@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { TriangleAlert } from "lucide-react";
+import { Gavel, TriangleAlert } from "lucide-react";
 
 import { getHomeFeed } from "@/server/queries";
 import { EmptyState } from "@/components/auction/page-header";
@@ -22,6 +22,11 @@ export const metadata: Metadata = {
 export default async function HomePage() {
   const feed = await getHomeFeed();
 
+  const marketplaceEmpty =
+    feed.live.length === 0 &&
+    feed.endingSoon.length === 0 &&
+    feed.recent.length === 0;
+
   return (
     <div className="page-container space-y-10 py-10 sm:py-14">
       <div className="space-y-6">
@@ -38,6 +43,30 @@ export default async function HomePage() {
             <Button asChild variant="outline">
               <Link href="/">Refresh</Link>
             </Button>
+          }
+        />
+      ) : marketplaceEmpty ? (
+        /* A marketplace with nothing in it must not look broken, and must not
+           look like it is hiding a catalogue either. One honest panel with two
+           working ways forward, instead of three rails saying the same thing. */
+        <EmptyState
+          icon={Gavel}
+          title="No auctions are listed yet"
+          description={
+            "BidBlitz is open, but no one has listed an item yet. " +
+            "Sellers can publish an auction in a couple of minutes, and it appears here " +
+            "the moment it goes live. If you come back later, anything currently open for " +
+            "bidding is on this page and under Browse."
+          }
+          action={
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              <Button asChild>
+                <Link href="/sell">List an item</Link>
+              </Button>
+              <Button asChild variant="outline">
+                <Link href="/browse">Browse auctions</Link>
+              </Button>
+            </div>
           }
         />
       ) : (
@@ -57,6 +86,11 @@ export default async function HomePage() {
             testid="home-live"
             emptyTitle="No live auctions right now"
             emptyDescription="Nothing is open for bidding at this moment — new auctions show up here as soon as they go live."
+            emptyAction={
+              <Button asChild variant="outline">
+                <Link href="/browse">Browse everything</Link>
+              </Button>
+            }
           />
           <AuctionRail
             title="Recently listed"
@@ -65,6 +99,11 @@ export default async function HomePage() {
             testid="home-recent"
             emptyTitle="No listings yet"
             emptyDescription="Be the first — list an item and it will appear here."
+            emptyAction={
+              <Button asChild>
+                <Link href="/sell">List an item</Link>
+              </Button>
+            }
           />
         </div>
       )}

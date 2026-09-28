@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/auction/page-header";
 import { SettingsForm } from "@/components/auth/settings-form";
+import { AvatarUploader } from "@/components/profile/avatar-uploader";
 
 export const metadata: Metadata = {
   title: "Settings",
@@ -19,7 +20,7 @@ export default async function SettingsPage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("display_name, bio, location")
+    .select("display_name, bio, location, avatar_path")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -34,6 +35,10 @@ export default async function SettingsPage() {
         <PageHeader
           title="Settings"
           description="Your public profile details and account session."
+        />
+        <AvatarUploader
+          avatarPath={profile?.avatar_path ?? null}
+          displayName={fallbackName}
         />
         <SettingsForm
           email={user.email ?? ""}

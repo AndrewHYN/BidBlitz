@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { BadgeCheck, CalendarDays, MapPin, Pencil, Star } from "lucide-react";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/profile/user-avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { getProfileByUsername } from "@/server/queries";
@@ -9,19 +9,13 @@ import type { getProfileByUsername } from "@/server/queries";
  * The profile masthead: identity, trust signals and the numbers buyers and
  * sellers actually care about. Server-renderable — no interactivity beyond
  * the (optional) edit link.
+ *
+ * Every number here is a real aggregate over real rows. There is no follower
+ * count, no view count and no "active now" figure, because nothing in the
+ * database could produce one truthfully.
  */
 
 type Profile = NonNullable<Awaited<ReturnType<typeof getProfileByUsername>>>["profile"];
-
-function initials(name: string): string {
-  return name
-    .split(/\s+/)
-    .map((p) => p[0])
-    .filter(Boolean)
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
-}
 
 function joinedLabel(iso: string): string {
   const d = new Date(iso);
@@ -56,10 +50,11 @@ export function ProfileHeader({ profile, isSelf }: { profile: Profile; isSelf: b
       className="rounded-xl border bg-card p-5 sm:p-7"
     >
       <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
-        <Avatar className="size-16 sm:size-20">
-          {profile.avatar_url ? <AvatarImage src={profile.avatar_url} alt="" /> : null}
-          <AvatarFallback className="text-lg">{initials(profile.display_name)}</AvatarFallback>
-        </Avatar>
+        <UserAvatar
+          avatarPath={profile.avatar_path}
+          name={profile.display_name}
+          className="size-16 sm:size-20 text-lg"
+        />
 
         <div className="min-w-0 flex-1 space-y-3">
           <div className="flex flex-wrap items-start justify-between gap-3">

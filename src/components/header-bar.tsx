@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/profile/user-avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -35,7 +35,8 @@ export type HeaderUser = {
   id: string;
   displayName: string;
   username: string | null;
-  avatarUrl: string | null;
+  /** Storage KEY of the avatar in the `avatars` bucket - never a URL. */
+  avatarPath: string | null;
   email: string | null;
 };
 
@@ -64,16 +65,6 @@ const AUTH_NAV = [
 function isActive(pathname: string, href: string, exact = false): boolean {
   if (exact) return pathname === href;
   return pathname === href || pathname.startsWith(`${href}/`);
-}
-
-function initials(name: string) {
-  return name
-    .split(/\s+/)
-    .map((p) => p[0])
-    .filter(Boolean)
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
 }
 
 function ThemeToggle() {
@@ -274,10 +265,11 @@ export function HeaderBar({
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="gap-2 px-2" aria-label="Account menu">
-                    <Avatar className="size-7">
-                      {user.avatarUrl ? <AvatarImage src={user.avatarUrl} alt="" /> : null}
-                      <AvatarFallback>{initials(user.displayName)}</AvatarFallback>
-                    </Avatar>
+                    <UserAvatar
+                      avatarPath={user.avatarPath}
+                      name={user.displayName}
+                      className="size-7"
+                    />
                     <span className="hidden max-w-28 truncate text-sm md:inline">
                       {user.displayName}
                     </span>

@@ -17,6 +17,7 @@ export function AuctionRail({
   testid,
   emptyTitle,
   emptyDescription,
+  emptyAction,
   browseHref = "/browse",
 }: {
   title: string;
@@ -25,6 +26,8 @@ export function AuctionRail({
   testid: "home-ending-soon" | "home-live" | "home-recent";
   emptyTitle: string;
   emptyDescription?: string;
+  /** A real, working call to action. An empty state with no way forward is a dead end. */
+  emptyAction?: React.ReactNode;
   browseHref?: string;
 }) {
   return (
@@ -54,6 +57,7 @@ export function AuctionRail({
             emptyDescription ??
             "Nothing to show in this rail right now — check back soon."
           }
+          action={emptyAction}
         />
       ) : (
         <div className="flex snap-x gap-4 overflow-x-auto pb-2">

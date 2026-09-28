@@ -93,10 +93,15 @@ function describe(parsed: Record<string, unknown>): string {
   const status = typeof parsed.status === "string" ? parsed.status : "";
   const changed = parsed.changed === true;
 
+  // This row is visible to the buyer AND the seller, so "paid" is ambiguous
+  // unless the sentence says whose money was confirmed. `PAID` means one
+  // specific thing: Paynow confirmed the BUYER's payment. The seller's payout
+  // is a separate state that this button does not touch, and saying so is the
+  // difference between a seller believing they have been paid and being wrong.
   if (status === "PAID") {
     return changed
-      ? "Payment confirmed. This sale is now marked paid."
-      : "Payment already confirmed. This sale is marked paid.";
+      ? "Paynow confirmed the buyer's payment, so this sale is marked paid. The seller's payout is recorded separately."
+      : "Paynow had already confirmed the buyer's payment. The seller's payout is recorded separately.";
   }
   if (status === "FAILED") {
     return changed

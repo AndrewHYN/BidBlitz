@@ -82,6 +82,21 @@ export default async function BrowsePage({
   const { values, location } = parseFilters(flat);
   const page = parsePage(flat.page);
 
+  /**
+   * "Nothing matches" and "there is nothing here" are different situations
+   * and must not say the same thing. With no filters applied, an empty result
+   * means the marketplace has no listings at all — which is a fact about the
+   * business, not a dead end, and the copy below says so.
+   */
+  const hasFilters = Boolean(
+    values.q ||
+      values.category ||
+      values.condition ||
+      values.min ||
+      values.max ||
+      location
+  );
+
   const [result, categories] = await Promise.all([
     browseAuctions({
       q: values.q || undefined,
@@ -139,12 +154,27 @@ export default async function BrowsePage({
         <div className="mt-6">
           <EmptyState
             icon={SearchX}
-            title="No auctions match those filters"
-            description="Try a wider price range or a different category — or clear everything and start over."
+            title={hasFilters ? "No auctions match those filters" : "No auctions are listed yet"}
+            description={
+              hasFilters
+                ? "Try a wider price range or a different category — or clear everything and start over."
+                : "BidBlitz is open, but no one has listed an item yet. Auctions appear here the moment a seller publishes one, and you can list the first one yourself."
+            }
             action={
-              <Button asChild>
-                <Link href="/browse">Clear filters</Link>
-              </Button>
+              hasFilters ? (
+                <Button asChild>
+                  <Link href="/browse">Clear filters</Link>
+                </Button>
+              ) : (
+                <div className="flex flex-wrap items-center justify-center gap-3">
+                  <Button asChild>
+                    <Link href="/sell">List an item</Link>
+                  </Button>
+                  <Button asChild variant="outline">
+                    <Link href="/">Back to home</Link>
+                  </Button>
+                </div>
+              )
             }
           />
         </div>

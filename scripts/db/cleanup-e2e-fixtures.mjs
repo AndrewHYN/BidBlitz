@@ -80,11 +80,19 @@ const rows = (x) => (Array.isArray(x) ? x : []);
  * earlier version compared `storage_path` to `bucket_id || '/' || name`, which
  * never matched - so orphans accumulated in silence while the script reported
  * that everything was already clean.
+ *
+ * TWO buckets, each with its own reference table: `auction-images` is
+ * referenced by `auction_images.storage_path`, `avatars` by
+ * `profiles.avatar_path`. Both use the one-hour grace, and for avatars that
+ * grace is essential rather than decorative - an avatar upload writes the
+ * object first and the profile row second, so a fresh object legitimately has
+ * nothing pointing at it for a moment. A sweep without the grace would delete
+ * the picture out from under a user who had just uploaded it.
  */
 const orphanObjects = rows(
   JSON.parse(
     await sql(`
-      select o.bucket_id, o.name
+      select o.bucket_id, o.name, o.created_at
         from storage.objects o
        where o.bucket_id = 'auction-images'
          and not exists (
@@ -99,11 +107,19 @@ const orphanObjects = rows(
                    and split_part(o.name, '/', 1) ~ '^[0-9a-fA-F-]{36}$'
               )
          )
-       order by o.created_at
+      union all
+      select o.bucket_id, o.name, o.created_at
+        from storage.objects o
+       where o.bucket_id = 'avatars'
+         and not exists (
+           select 1 from public.profiles p
+            where p.avatar_path = o.name
+         )
+         and o.created_at < now() - interval '1 hour'
+      order by created_at
     `)
   )
 );
-
 const fixtures = rows(
   JSON.parse(
     await sql(`
@@ -163,11 +179,19 @@ const fixturePaths = fixtures.length
     ).map((r) => r.storage_path)
   : [];
 
+// Every target carries its BUCKET, not just its name. Two buckets exist, and a
+// delete that guessed the bucket would either miss real objects or 404 on the
+// wrong ones while reporting success.
 const targets = [
-  ...new Set([
-    ...fixturePaths,
-    ...orphanObjects.map((o) => o.name),
-  ]),
+  ...new Map(
+    [
+      ...fixturePaths.map((p) => `auction-images/${p}`),
+      ...orphanObjects.map((o) => `${o.bucket_id}/${o.name}`),
+    ].map((k) => {
+      const at = k.indexOf("/");
+      return [k, { bucket: k.slice(0, at), name: k.slice(at + 1) }];
+    })
+  ).values(),
 ];
 
 if (fixtures.length > 0) {
@@ -217,9 +241,9 @@ if (targets.length > 0) {
   const pub = requireEnv("NEXT_PUBLIC_SUPABASE_URL");
   const key = requireEnv("SUPABASE_SECRET_KEY");
   let removed = 0;
-  for (const name of targets) {
-    const encoded = String(name).split("/").map(encodeURIComponent).join("/");
-    const url = `${pub}/storage/v1/object/auction-images/${encoded}`;
+  for (const t of targets) {
+    const encoded = t.name.split("/").map(encodeURIComponent).join("/");
+    const url = `${pub}/storage/v1/object/${t.bucket}/${encoded}`;
     try {
       const res = await fetch(url, {
         method: "DELETE",
@@ -231,19 +255,23 @@ if (targets.length > 0) {
       } else {
         const body = await res.text().catch(() => "");
         console.log(
-          `[db:cleanup-e2e] storage ${res.status} for ${name} - ${body.slice(0, 120)}`
+          `[db:cleanup-e2e] storage ${res.status} for ${t.bucket}/${t.name} - ${body.slice(0, 120)}`
         );
       }
     } catch (e) {
-      console.log(`[db:cleanup-e2e] storage error for ${name}: ${String(e).slice(0, 90)}`);
+      console.log(
+        `[db:cleanup-e2e] storage error for ${t.bucket}/${t.name}: ${String(e).slice(0, 90)}`
+      );
     }
   }
   console.log(`[db:cleanup-e2e] removed ${removed}/${targets.length} storage object(s)`);
 }
 
-// Prove it rather than assuming it.
+// Prove it rather than assuming it, across BOTH buckets.
 const auctionIds = fixtures.map((f) => `'${f.auction_id}'`).join(",");
-const objectNames = targets.map((n) => `'${String(n).replace(/'/g, "")}'`).join(",");
+const objectNames = targets
+  .map((t) => `'${t.bucket}/${String(t.name).replace(/'/g, "")}'`)
+  .join(",");
 const check = rows(
   JSON.parse(
     await sql(`
@@ -251,8 +279,8 @@ const check = rows(
         (select count(*)::int from public.auctions
           where id in (${auctionIds || "select null::uuid where false"})) as auctions,
         (select count(*)::int from storage.objects
-          where bucket_id = 'auction-images'
-            and name in (${objectNames || "select null where false"})) as objects
+          where bucket_id || '/' || name in (${objectNames || "select null where false"})
+        ) as objects
     `)
   )
 )[0];

@@ -854,3 +854,105 @@ otherwise indistinguishable from a button that pays people.
 - Seller bank details are **not** collected — no field, no column, no upload.
   Storing them is a separate decision with its own security and legal weight,
   and it should wait until Paynow has said what a seller must provide.
+
+## ADR-013: An avatar is a storage key in a user-scoped namespace, never a URL
+
+Date: 2026-09-28
+
+Status: Accepted
+
+### Context
+
+`profiles.avatar_url` was a free-text `text` column with a `CHECK` of none, and
+the UI rendered it straight into an `<img src>` in three places. Because
+`profiles_update_self` allows a user to update their own non-privilege columns,
+any signed-in user could set it to any string they liked and the site would then
+load a remote image of their choosing on the header of every page, the profile
+masthead and every auction they sell:
+
+- a **tracking pixel** for every visitor who loaded a page with that profile on
+  it, from a host the owner never approved;
+- a **per-visitor remote dependency** on a page about money, reachable by a
+  third party;
+- and a URL that could be **swapped after the fact** without leaving any audit
+  trail, so a picture on a profile was never evidence of anything.
+
+An avatar is public information. That is the only reason it was tempting to let
+a URL be acceptable — and it is also exactly why an avatar must still be an
+object *we* host.
+
+### Decision
+
+The free-text column is **removed**, not constrained, so the shape cannot be
+reintroduced by accident. `profiles.avatar_path` holds a storage **key**, and a
+key has exactly one legal shape:
+
+```
+<owner auth uid>/avatar.<ext>        ext in jpg | jpeg | png | webp | gif
+```
+
+Four independent layers enforce it, and each is a real boundary rather than
+defence-in-depth theatre:
+
+1. **The shape** — a `CHECK` constraint on the column. No scheme, no leading
+   slash, no backslash, no traversal segment, no other bucket.
+2. **The owner** — `WITH CHECK` on `profiles_update_self` requires
+   `split_part(avatar_path, '/', 1) = auth.uid()::text`. The `CHECK` proves the
+   value *looks* like a key; this proves it is *yours*. A user cannot point their
+   own profile at another user's valid key.
+3. **The folder** — every `storage.objects` INSERT/UPDATE/DELETE policy for the
+   `avatars` bucket requires `(storage.foldername(name))[1] = auth.uid()::text`
+   and a filename matching the caller's own uid. The folder is derived from the
+   verified session on the server, never from anything the browser sends.
+4. **The bytes** — the upload is a server action that identifies the format from
+   **magic bytes**, never from the browser's MIME type and never from the
+   filename, because both are chosen by whoever picked the file. SVG is excluded
+   outright: it is an XML document that can carry script, and serving one from
+   our own origin is a stored-XSS vector. The bucket's `allowed_mime_types` and
+   `file_size_limit` are an independent second gate on the same two properties.
+
+The bucket is **public for reads** — that is what keeps profile pages cacheable
+without a signed request per visitor — and closed for every write.
+
+**One avatar per user, at one deterministic key**, uploaded with `upsert`, so
+changing your picture cannot accumulate objects and cannot leave an orphan. A
+failed profile update removes the object it had just written, so the bucket
+cannot drift out of agreement with the table.
+
+`src/lib/avatar.ts` is the only place that turns a key into a URL, and it
+returns `null` for anything that is not one of ours. The single `UserAvatar`
+component is the only thing that renders one. That is why a URL can no longer
+reach an `<img>` even if a future query selects the column by accident: the
+component would refuse it and show initials.
+
+### Consequences
+
+- `alt=""` on the avatar image. The person's name is always adjacent as real
+  text, so the image is decorative and a non-empty alt would duplicate it. When
+  there is no picture the fallback initials are the name, marked `aria-hidden`.
+- The fallback is **deterministic** (`initialsFor`): the same name yields the
+  same two letters in every surface, never an empty circle, never more than two
+  characters. A face-less profile that changes shape between the header and the
+  profile page reads as broken.
+- The old `avatar_url` column was dropped, so any value in it was discarded
+  rather than migrated. Measured before the change: zero rows had one, so this
+  loses nothing.
+- `next/image` may only optimise hosts listed in `images.remotePatterns`, so the
+  Supabase hostname is read from `NEXT_PUBLIC_SUPABASE_URL` — not hard-coded, so
+  pointing at a different project needs no code change.
+- **No server-side resizing.** That needs an image pipeline the free-tier rule
+  keeps out of the MVP. The controls are the 2 MB cap, `object-cover` in a fixed
+  square frame (so the space is reserved and nothing shifts), and a one-year
+  `cache-control`. Recorded in `docs/POST_LAUNCH_BACKLOG.md`.
+
+### Verification
+
+`scripts/db/verify-engine.mjs` § "avatars" — 18 checks over the real Storage and
+REST APIs with real user sessions, proving among others that user A cannot write
+into user B's folder, cannot escape it by traversal, cannot delete B's object,
+and cannot point their profile at B's key or at any arbitrary string, that
+replacement is an upsert, that anon can read but not write, and that the bucket
+caps size and refuses SVG. `src/lib/avatar.test.ts` — 14 unit tests pinning the
+key shape, the magic-byte sniffing, the size and type messages, and the
+deterministic fallback. `e2e/avatar.spec.ts` — the UI contract, including that
+an oversized file and a text file are both refused with copy that names the fix.

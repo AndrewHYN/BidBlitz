@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { BadgeCheck, Calendar, MapPin, Package, Star } from "lucide-react";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/profile/user-avatar";
 import type { ProfileRow } from "@/server/queries";
 
 /** Rendered once per request, so the row never re-formats. */
@@ -28,15 +28,15 @@ export function SellerCard({ seller }: { seller: ProfileRow | null }) {
 
   const rating =
     seller.rating_count > 0 ? seller.rating_sum / seller.rating_count : null;
-  const initials = (seller.display_name || seller.username).slice(0, 2).toUpperCase();
 
   return (
     <section aria-label="Seller" className="rounded-xl border bg-card p-4" data-seller={seller.username}>
       <div className="flex items-start gap-3">
-        <Avatar size="lg">
-          {seller.avatar_url && <AvatarImage src={seller.avatar_url} alt="" />}
-          <AvatarFallback>{initials}</AvatarFallback>
-        </Avatar>
+        <UserAvatar
+          avatarPath={seller.avatar_path}
+          name={seller.display_name || seller.username}
+          size="lg"
+        />
 
         <div className="min-w-0 flex-1">
           <Link

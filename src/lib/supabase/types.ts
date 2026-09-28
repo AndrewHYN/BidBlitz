@@ -45,7 +45,14 @@ export interface Database {
           id: string;
           username: string;
           display_name: string;
-          avatar_url: string | null;
+          /**
+           * Storage KEY of this user's avatar inside the public `avatars`
+           * bucket: `<auth uid>/avatar.<ext>`. Never a URL — the old free-text
+           * `avatar_url` column was removed in migration 20260928000004 because
+           * the UI rendered it as an image source, which let any user point
+           * the site at a remote image of their choosing.
+           */
+          avatar_path: string | null;
           bio: string | null;
           location: string | null;
           rating_sum: number;

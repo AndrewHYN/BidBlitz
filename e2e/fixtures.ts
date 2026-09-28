@@ -7,11 +7,16 @@ import { expect, type Locator, type Page } from "@playwright/test";
  */
 export const TEST_PASSWORD = "Bl1tzVerify!2026";
 
+/**
+ * `username` is stated rather than derived, so a spec that needs a profile URL
+ * does not silently rebuild it from the email. These are the values the
+ * provisioning used; the auth trigger takes the local part of the email.
+ */
 export const ACCOUNTS = {
-  seller: { email: "seller@bidblitz.test", password: TEST_PASSWORD },
-  buyer1: { email: "buyer1@bidblitz.test", password: TEST_PASSWORD },
-  buyer2: { email: "buyer2@bidblitz.test", password: TEST_PASSWORD },
-  buyer3: { email: "buyer3@bidblitz.test", password: TEST_PASSWORD },
+  seller: { email: "seller@bidblitz.test", username: "seller", password: TEST_PASSWORD },
+  buyer1: { email: "buyer1@bidblitz.test", username: "buyer1", password: TEST_PASSWORD },
+  buyer2: { email: "buyer2@bidblitz.test", username: "buyer2", password: TEST_PASSWORD },
+  buyer3: { email: "buyer3@bidblitz.test", username: "buyer3", password: TEST_PASSWORD },
 } as const;
 
 /** A valid 1x1 PNG — enough to satisfy the "at least one image" gate. */

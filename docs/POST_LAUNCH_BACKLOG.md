@@ -226,6 +226,16 @@ trust facts, buying-page payment state). What follows was judged safe to wait:
   the Noop one (showing one would fake payment progress).
 
 ### Product/UX deferrals
+- **Avatar resizing, cropping and re-encoding** — the avatar path is
+  server-validated (magic bytes, 2 MB, raster only, no SVG) and stored at
+  `<owner uid>/avatar.<ext>` in the public `avatars` bucket, but the file is
+  stored exactly as uploaded. A 4000×3000 phone photo therefore stays
+  4000×3000, and the browser downloads the original. Doing better needs an
+  image pipeline (Sharp or an image service), which the free-tier rule keeps out
+  of the MVP. Until then the controls are the 2 MB cap, `object-cover` in a
+  fixed square frame, `next/image` with `sizes="80px"`, and a one-year
+  `cache-control`. When a pipeline is added, resize to 512×512, re-encode to
+  WebP, and delete the original.
 - **`/sell/preview` route** — "Preview as a buyer" links to the draft
   detail page as the signed-in seller; a separate shareable preview route
   (for showing a draft to someone else) needs draft-access tokens.

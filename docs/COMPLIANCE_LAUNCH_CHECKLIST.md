@@ -338,21 +338,45 @@ visitor cannot create an account at all until §0 is closed. This is a support
 issue before it is a growth issue: the first person who tries to join a
 marketplace and is told to wait is the first person who may never come back.
 
-☐ **J6. There is currently NO administrator.** Verified 2026-09-28: **zero** rows
-in `public.profiles` have `is_admin = true`. `/admin` — and with it the entire
-payout operations queue — is unreachable by any real person, and has always
-been. This must be set deliberately, by the owner, on their own account:
+☑ **J6. The owner account is the administrator. CLOSED 2026-09-28.** One row in
+`public.profiles` has `is_admin = true`, and it is the owner's own real account
+(`hyndrrx0@gmail.com`, uid `6a492b28-bb5b-43b1-8f6d-f1cdd8856c58`). Set by a
+single-row `update` guarded on both the auth id *and* the exact email, after
+verifying that exactly one `auth.users` row and exactly one `profiles` row
+matched, that the account was not a QA account, and that it had confirmed its
+email and signed in recently. No user was created, no email or password was
+touched, and the profile count was unchanged at 15 across the change.
 
-```sql
--- owner runs this in the Supabase SQL editor, for their own account only
-update public.profiles set is_admin = true where id = '<your own user id>';
+The authorization path was proved **without handling the owner's password**,
+which is never asked for, stored or logged. Simulating that account's JWT
+claims and asking Postgres directly:
+
+```
+private.is_admin()                     -> true
+auth.uid()                             -> 6a492b28-…  (resolves correctly)
+own profile rows visible               -> 1
+seller_payouts / seller_payout_events  -> readable under the admin policies
 ```
 
-Find the id under *Authentication → Users*, or by joining `auth.users` to
-`profiles`. Then prove it: sign in, open `/admin`, confirm **Payout operations**
-is present. Do not grant admin to a shared or test account, and do not guess —
-`is_admin` is the single flag that authorises moving seller money, and it should
-belong to a named person who has read `docs/MARKETPLACE_OPERATIONS.md`.
+and the same simulation for a `@bidblitz.test` account returns
+`private.is_admin() -> false` with no payout visibility. `db:verify` now asserts
+this as a standing invariant rather than a one-off (§J10, and the "exactly one
+administrator, and it is a real account" check).
+
+**Still needs doing by a human, once:** sign in as the owner and open `/admin` to
+confirm the page renders and **Payout operations** is present. The database has
+been asked the authorization question and answered correctly, but nobody has
+looked at the rendered admin page with those credentials yet.
+
+Do not grant admin to a shared or test account. `is_admin` is the single flag
+that authorises moving seller money, and it should belong to a named person who
+has read `docs/MARKETPLACE_OPERATIONS.md`. To move it to a different person:
+
+```sql
+-- read the new account's id under Authentication → Users, or by joining auth.users
+update public.profiles set is_admin = true  where id = '<new person id>';
+update public.profiles set is_admin = false where id = '<old id>';
+```
 
 ☐ **J7. The payout queue's populated view has not been seen in a browser.**
 Verified 2026-09-28: `public.transactions` is **empty** in production, so there
@@ -412,7 +436,7 @@ Launch is gated on the following being **closed**, not merely attempted:
 | K8 | Payout operator and reconciliation owner named | Owner action | ☐ |
 | K9 | Incident runbook written and rehearsed | Owner action | ☐ |
 | K10 | Paynow moved from test mode to live | External — Paynow | ☐ |
-| K11 | **An account actually has `is_admin` — today none does** | Owner action | ☐ |
+| K11 | **An account actually has `is_admin`** | Owner action | ☑ set 2026-09-28; see §J6 |
 | K12 | **A transactional email provider is configured AND a signup is proven end to end** | Owner action | ☐ |
 | K13 | Real listings exist, so the marketplace is not empty on arrival | Owner action | ☐ |
 
@@ -420,8 +444,11 @@ Launch is gated on the following being **closed**, not merely attempted:
 configuration. Leaving it open means the marketplace has no way to admit a new
 participant at all.
 
-**K11 is the gate that surprises people.** The payout machinery is built,
-audited and proven, and not one account can reach it.
+**K11 is closed in the database and open in the browser.** The owner account is
+an administrator and the authorization path answers correctly, but nobody has
+opened `/admin` with those credentials to confirm the page and the **Payout
+operations** queue render. That is one sign-in, and it should happen before an
+operator is trusted with a live payout.
 
 **K13 is the gate a customer notices first.** With no listings, a visitor lands
 on an empty marketplace and concludes it is not a real business.
