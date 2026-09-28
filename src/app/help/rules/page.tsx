@@ -79,7 +79,10 @@ export default function HelpRulesPage() {
                 {String(i + 1).padStart(2, "0")}
               </span>
               <div className="min-w-0 space-y-1">
-                <h3 className="font-medium">{rule.title}</h3>
+                {/* An h2, not an h3: these seven rules are the top-level content
+                    of the page, and the only heading above them is the page h1,
+                    so h3 skipped a level. */}
+                <h2 className="font-medium">{rule.title}</h2>
                 <p className="text-[0.9375rem] leading-[1.7] text-muted-foreground text-pretty">
                   {rule.body}
                 </p>

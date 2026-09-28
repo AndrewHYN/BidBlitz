@@ -20,6 +20,7 @@ export function AuctionCard({
   badge,
   meta,
   className,
+  headingLevel: Heading = "h3",
 }: {
   auction: AuctionCardData;
   href?: string;
@@ -28,6 +29,18 @@ export function AuctionCard({
   /** Extra row under the price (e.g. your bid). */
   meta?: React.ReactNode;
   className?: string;
+  /**
+   * The card title's heading level, which depends on where the card sits.
+   *
+   * A card appears in two places with different outlines. On the home page it
+   * lives under a `SectionHeading` (an `h2`), so the card title is correctly an
+   * `h3`. In the Browse grid the only heading above it is the page `h1`, and an
+   * `h3` there skipped a level — measured on /browse once real inventory
+   * existed, where it was the only heading defect on the page.
+   *
+   * Hardcoding one level gets the other context wrong, so the caller states it.
+   */
+  headingLevel?: "h2" | "h3";
 }) {
   const closed = isClosed(auction.status);
   const hasBids = auction.currentBidMinor !== null || auction.bidCount > 0;
@@ -76,9 +89,9 @@ export function AuctionCard({
 
       <div className="flex flex-1 flex-col gap-2 p-3.5">
         <div className="flex items-start justify-between gap-2">
-          <h3 className="line-clamp-2 text-sm font-medium leading-snug transition-colors group-hover:text-primary">
+          <Heading className="line-clamp-2 text-sm font-medium leading-snug transition-colors group-hover:text-primary">
             {auction.title}
-          </h3>
+          </Heading>
         </div>
 
         <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
@@ -131,10 +144,18 @@ export function AuctionGrid({
   items,
   empty,
   className,
+  headingLevel = "h3",
 }: {
   items: AuctionCardData[];
   empty?: React.ReactNode;
   className?: string;
+  /**
+   * See `AuctionCard`'s `headingLevel`. The grid is used in two places: under the
+   * page `h1` on /browse, where the cards must be `h2`, and under a
+   * `SectionHeading` on a profile, where `h3` is right. Defaulted to `h3` so
+   * the nested case is the default and the flat case is stated.
+   */
+  headingLevel?: "h2" | "h3";
 }) {
   if (items.length === 0 && empty) return <>{empty}</>;
 
@@ -146,7 +167,7 @@ export function AuctionGrid({
       )}
     >
       {items.map((a) => (
-        <AuctionCard key={a.id} auction={a} />
+        <AuctionCard key={a.id} auction={a} headingLevel={headingLevel} />
       ))}
     </div>
   );

@@ -181,7 +181,11 @@ export default async function BrowsePage({
       ) : (
         <>
           <div data-testid="browse-grid" className="mt-6">
-            <AuctionGrid items={result.items} />
+            {/* The results sit directly under the page h1, with no section heading in
+          between, so each card title is an h2. Under a profile's "Listings"
+          heading the same grid keeps h3, which is why this is stated rather than
+          hardcoded in the grid. */}
+      <AuctionGrid items={result.items} headingLevel="h2" />
           </div>
 
           {result.total > result.pageSize && (

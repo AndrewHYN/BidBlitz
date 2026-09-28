@@ -37,7 +37,10 @@ export function AuctionRail({
         action={
           <Link
             href={browseHref}
-            className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+            // `min-h-6` because this is not an inline link in a sentence: it is a
+            // standalone control in the rail header, so WCAG 2.5.8's 24px minimum
+            // applies and it measured 20px.
+            className="inline-flex min-h-6 items-center gap-1 text-sm font-medium text-primary underline-offset-2 hover:underline"
           >
             Browse all
             <ArrowRight className="size-3.5" aria-hidden />
