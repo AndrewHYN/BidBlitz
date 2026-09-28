@@ -389,12 +389,21 @@ looked at on the **first real paid sale**, before an operator is trusted with a
 live payout. Do not fabricate a paid transaction to rehearse it.
 
 ☐ **J8. Production currently has no listings at all.** Verified 2026-09-28:
-`auctions`, `bids`, `transactions`, `auction_images` and the `auction-images`
-storage bucket all hold **zero** rows. That is correct — the ten test listings
-found there were e2e residue and have been removed (see
-`docs/POST_LAUNCH_BACKLOG.md`) — but it means a first-time visitor sees an
-empty marketplace. **List real items before opening the doors**, and confirm the
-homepage empty state reads as "nothing listed yet" rather than broken.
+`auctions`, `bids`, `transactions`, `auction_images` and both storage buckets
+hold **zero** rows. That is correct — the ten test listings found there were e2e
+residue and have been removed (see `docs/POST_LAUNCH_BACKLOG.md`) — but it means
+a first-time visitor sees an empty marketplace. **List real items before opening
+the doors.**
+
+The empty state itself is no longer the risk it was. A completely empty
+marketplace now shows one purposeful panel — "No auctions are listed yet", with
+working routes to *List an item* and *Browse auctions* — instead of three
+near-identical empty rails, and Browse distinguishes "nothing matches your
+filters" from "there is nothing listed yet". Verified in a real browser at 390 /
+412 / 768 / 1440px: no overflow, no broken images, no console errors, and no
+invented counts (the only figure on the page is an honest `0`). No fake
+inventory, testimonials, user counts or GMV were added to make it look
+populated.
 
 ☐ **J9. Decide where the test suite runs.** The e2e suite publishes real
 auctions, uploads real files and places real bids through the real app. It now
@@ -415,7 +424,28 @@ account password is in the public repository because the suites need it. That
 is only safe while none of those accounts can authorise a payout. The database
 harness now fails loudly if one is, but the check only runs when someone runs
 it. Never promote a `@bidblitz.test` account; rotate before any real account
-shares that password.
+shares that password. Checked 2026-09-28: exactly one administrator exists, it
+is the owner's real account, and the harness asserts both facts every run.
+
+☑ **J11. Profile pictures are in, and one honest limitation is recorded.** Users
+can upload, replace and remove an avatar; it is stored in a namespaced public
+bucket, validated server-side from magic bytes (raster only, no SVG, 2 MB), and
+served through the image optimiser. Proven with 18 database checks, 14 unit
+tests and a full browser exercise of upload → storage → profile → header →
+remove.
+
+**The limitation the privacy policy must mention (K3):** when a user removes
+their picture, it is deleted from the database *and* from storage immediately,
+but Supabase's CDN keeps serving the bytes from the public URL until that cache
+entry expires — measured in production on 2026-09-28, where a `GET` on the
+public URL still returned the deleted image. There is no cache purge on the
+free tier, so the TTL is the only control and it is **one hour**. A
+version-counter key would close the window entirely and is written up in
+`docs/POST_LAUNCH_BACKLOG.md`; it was not taken now because it gives up the
+deterministic one-object-per-user property. The site itself stops referencing a
+removed picture at once, so the exposure is confined to someone who already has
+or can guess the object URL — but the policy should say so rather than claim
+instant deletion.
 
 ---
 
@@ -428,7 +458,7 @@ Launch is gated on the following being **closed**, not merely attempted:
 | K0 | **Transactional email provider configured and signup proven end to end** | Owner action | ☐ |
 | K1 | Legal entity facts supplied and confirmed | Owner action | ☐ |
 | K2 | Controller determined, contact published | Owner action | ☐ |
-| K3 | Privacy policy reviewed against actual behaviour | Owner action | ☐ |
+| K3 | Privacy policy reviewed against actual behaviour, **including the avatar CDN window (§J11)** | Owner action | ☐ |
 | K4 | Tax position confirmed, records plan agreed | Owner action | ☐ |
 | K5 | **Paynow marketplace model approved in writing** | External — Paynow | ☐ |
 | K6 | **`resulturl` delivery understood, or push-to-live accepted as unreliable** | External — Paynow | ☐ |
