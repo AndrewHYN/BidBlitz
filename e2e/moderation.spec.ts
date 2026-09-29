@@ -15,7 +15,7 @@ import { ACCOUNTS, createListing, signIn } from "./fixtures";
 test.describe("moderation", () => {
   test("a signed-out visitor is sent to login from /admin", async ({ page }) => {
     await page.goto("/admin");
-    await expect(page).toHaveURL(/\/login\?next=%2Fadmin/, { timeout: 30_000 });
+    await expect(page).toHaveURL(/\/login\?next=\/admin/, { timeout: 30_000 });
   });
 
   test("a signed-in non-admin is refused the admin area", async ({ page }) => {
