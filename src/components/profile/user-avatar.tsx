@@ -147,6 +147,7 @@ export function UserAvatar({
   // timer must never outlive the component. Read inside the cleanup, not
   // outside it: the value has to be the one held when the cleanup runs.
   const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const imgRef = useRef<HTMLImageElement | null>(null);
   useEffect(() => {
     return () => {
       if (retryTimer.current) {
@@ -156,9 +157,6 @@ export function UserAvatar({
     };
   }, [url]);
 
-  // Attempt-indexed delays: the first retry waits out a short propagation
-  // gap, the second waits out a long one. Indexed, not constant, so lengthening
-  // the window means changing a number here rather than restructuring.
   // Attempt-indexed delays: the first retry waits out a short propagation
   // gap, the second waits out a long one. Indexed, not constant, so lengthening
   // the window means changing a number here rather than restructuring.
@@ -225,6 +223,39 @@ export function UserAvatar({
         : url;
 
   /*
+   * A cached image can finish loading before React attaches onLoad.
+   *
+   * Measured: a header avatar with naturalWidth 1, opacity 0, state
+   * 'initials', and no further network traffic - a decoded image whose
+   * `load` event never arrived. A server-rendered <img> hydrating with a
+   * cache hit completes during parse, before hydration attaches the
+   * listener, so neither `load` nor `error` ever fires and the avatar sits
+   * on its initials holding decoded pixels. This is the documented React
+   * missed-load race, not a theory: instant cache hits reproduce it, slow
+   * fetches do not, which is also why the header failed on fresh navigations
+   * while client-side mounts kept working.
+   *
+   * So the ref callback checks completeness at mount, which is exactly the
+   * window the race lives in: after mount the listeners are attached and the
+   * events arrive normally. Either the events or this check observes each
+   * attempt, never both, because `complete` is monotonic per src. The gate on
+   * `!isLoaded && !isFailed` keeps a re-attach from recording anything twice:
+   * once an attempt is settled there is nothing left to observe.
+   *
+   * A ref callback rather than an effect, deliberately: the check belongs to
+   * the element's attachment, not to a render pass, and setting state
+   * synchronously inside an effect body is a cascading-render hazard the
+   * linter rightly refuses.
+   */
+  const attachAndCatchUp = (el: HTMLImageElement | null) => {
+    imgRef.current = el;
+    if (!el || !el.complete || imageSrc === null) return;
+    if (isLoaded || isFailed) return;
+    if (el.naturalWidth === 0) recordFailure();
+    else if (url !== null) setLoadedUrl(url);
+  };
+
+  /*
    * The image has to be IN THE DOM before it can load.
    *
    * The obvious way to guarantee "never both" is to render the image only once
@@ -286,6 +317,7 @@ export function UserAvatar({
             // top, so only one thing is ever painted.
             isLoaded ? "opacity-100" : "opacity-0"
           )}
+          ref={attachAndCatchUp}
           data-testid="user-avatar-image"
           onLoad={(event) => {
             /*

@@ -195,6 +195,31 @@ describe("UserAvatar rendering states", () => {
     expect(src).toMatch(/&m=\$\{mountNonce\}/);
   });
 
+  it("catches a load that finished before React attached onLoad", () => {
+    const src = code();
+    /*
+     * The missed-load race. A server-rendered <img> hydrating with a cache hit
+     * completes during parse, before hydration attaches the listener, so
+     * neither load nor error ever fires. Measured: a header avatar holding
+     * decoded 1x1 pixels at state "initials" with no further network traffic.
+     *
+     * The ref callback checks completeness at mount, which is exactly the
+     * window the race lives in. An effect would work too, but setting state
+     * synchronously in an effect body is a cascading-render hazard; the ref
+     * callback belongs to the element's attachment instead.
+     *
+     * Either the events or this check observes each attempt, never both, and
+     * the settled gate keeps a re-attach from recording anything twice.
+     */
+    expect(src).toMatch(/ref=\{attachAndCatchUp\}/);
+    expect(src).toMatch(/if \(!el \|\| !el\.complete \|\| imageSrc === null\) return;/);
+    expect(src).toMatch(/if \(isLoaded \|\| isFailed\) return;/);
+    // The check must route through the same two outcomes as the events: a
+    // zero-size completion is a failure, anything else is loaded.
+    expect(src).toMatch(/if \(el\.naturalWidth === 0\) recordFailure\(\);/);
+    expect(src).toMatch(/else if \(url !== null\) setLoadedUrl\(url\);/);
+  });
+
   it("routes both failure modes through the bound, so neither can loop forever", () => {
     const src = code();
     // `onError` for a failed fetch, and `onLoad` for an image that loads with
