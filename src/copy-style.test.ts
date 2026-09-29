@@ -168,6 +168,21 @@ function offencesIn(file: string, root: string): Offence[] {
   return found;
 }
 
+/**
+ * Parsing every source file with the TypeScript compiler costs seconds, not
+ * milliseconds, and that is the price of not guessing.
+ *
+ * It was left on vitest's default 5s budget and failed on a loaded machine while
+ * passing on an idle one: 8.3s observed, 5s allowed. A test whose result depends
+ * on how busy the machine is is not a test, it is a coin flip, and shipping one
+ * would mean the next engineer either retries until it goes green or deletes it.
+ *
+ * So the cost is declared rather than tolerated. Thirty seconds is generous on
+ * purpose: this is a build-time check, and a false failure costs far more than a
+ * slow one.
+ */
+const PARSE_TIMEOUT_MS = 30_000;
+
 describe("user-facing copy", () => {
   const root = process.cwd();
   const files = walk(join(root, "src"));
@@ -176,18 +191,30 @@ describe("user-facing copy", () => {
     expect(files.length).toBeGreaterThan(50);
   });
 
-  it("does not mistake a comment for copy", () => {
-    // The hand-rolled scanner reported the middle of multi-line engineering
-    // comments. If that ever comes back, this file will fail its own first
-    // finding, which is a cheap way to keep the test honest about itself.
-    const devComments = readFileSync(join(root, "src", "components", "document-page.tsx"), "utf8");
-    expect(devComments).toContain("Contact details are an object a user acts on");
-    const inThatFile = offencesIn(join(root, "src", "components", "document-page.tsx"), root);
-    const fromComments = inThatFile.filter((o) => o.text.startsWith("*"));
-    expect(fromComments.map((o) => o.text)).toEqual([]);
-  });
+  it(
+    "does not mistake a comment for copy",
+    () => {
+      // The hand-rolled scanner reported the middle of multi-line engineering
+      // comments. If that ever comes back, this file will fail its own first
+      // finding, which is a cheap way to keep the test honest about itself.
+      const devComments = readFileSync(
+        join(root, "src", "components", "document-page.tsx"),
+        "utf8"
+      );
+      expect(devComments).toContain("Contact details are an object a user acts on");
+      const inThatFile = offencesIn(
+        join(root, "src", "components", "document-page.tsx"),
+        root
+      );
+      const fromComments = inThatFile.filter((o) => o.text.startsWith("*"));
+      expect(fromComments.map((o) => o.text)).toEqual([]);
+    },
+    PARSE_TIMEOUT_MS
+  );
 
-  it("contains no em dash in a string a user can read", () => {
+  it(
+    "contains no em dash in a string a user can read",
+    () => {
     const offences = files.flatMap((f) => offencesIn(f, root));
 
     expect(
@@ -196,6 +223,8 @@ describe("user-facing copy", () => {
         `with a period, a comma, a colon, or parentheses. Do not substitute a double ` +
         `hyphen: that is worse punctuation, not better.\n\n` +
         offences.map((o) => `  ${o.file}:${o.line}  ${o.text}`).join("\n")
-    ).toEqual([]);
-  });
+      ).toEqual([]);
+    },
+    PARSE_TIMEOUT_MS
+  );
 });
