@@ -8,6 +8,7 @@ import { AuctionCard } from "@/components/auction/auction-card";
 import { EmptyState, PageHeader } from "@/components/auction/page-header";
 import { Button } from "@/components/ui/button";
 import { SettleButton } from "@/components/dashboard/settle-button";
+import { RelistButton } from "@/components/dashboard/relist-button";
 import { SaleSummary } from "@/components/dashboard/sale-summary";
 import { isClosed } from "@/lib/auction-status";
 
@@ -118,9 +119,15 @@ export default async function SellingPage() {
                       )}
 
                       {!tx && item.status === "UNSOLD" && (
-                        <p className="rounded-xl border bg-card p-4 text-sm text-muted-foreground">
-                          This auction ended with no bids, so nothing was sold.
-                        </p>
+                        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-4">
+                          <p className="text-sm text-muted-foreground">
+                            This auction ended with no bids, so nothing was
+                            sold. Listing it again copies the details into a
+                            new draft; photos need adding before it can be
+                            published.
+                          </p>
+                          <RelistButton auctionId={item.id} />
+                        </div>
                       )}
 
                       {!tx && item.status === "CANCELLED" && (

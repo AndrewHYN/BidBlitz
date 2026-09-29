@@ -104,6 +104,141 @@ export async function createAuctionAction(input: unknown): Promise<
 }
 
 /**
+ * List an unsold auction again. Copies the seller's own UNSOLD auction into a
+ * new DRAFT - same title, description, category, condition, location, pricing
+ * and timing - so the seller only has to add photos and publish.
+ *
+ * Deliberately narrow:
+ * - UNSOLD only. A cancelled auction was withdrawn on purpose; a sold one has
+ *   a buyer. Neither may be duplicated into a fresh listing.
+ * - Ownership is enforced twice: the read filters seller_id to the caller, so
+ *   RLS returns nothing for anyone else's auction, and the status check then
+ *   rejects anything that is not UNSOLD.
+ * - Every copied field is re-validated through createAuctionSchema, the same
+ *   schema the sell form uses. A value that was legal once but is not now is
+ *   refused with field errors rather than written.
+ * - Images are NOT copied: storage paths name their auction, and the old
+ *   pictures belong to a closed listing. The new draft starts photo-less, and
+ *   publish refuses it until photos are added - exactly like a fresh draft.
+ * - Rate-limited under the same listing budget as creation: duplicating is
+ *   creating, as far as abuse is concerned.
+ */
+export async function duplicateAuctionAction(input: {
+  auctionId: string;
+}): Promise<ActionResult<{ auctionId: string }>> {
+  const { supabase, user } = await requireUser();
+  if (!user) {
+    return {
+      ok: false,
+      rejection: { code: "not_authenticated", message: "Sign in to sell." },
+    };
+  }
+
+  const budget = rateLimit(
+    `auction:${user.id}`,
+    AUCTION_CREATE_LIMIT.limit,
+    AUCTION_CREATE_LIMIT.windowMs
+  );
+  if (!budget.allowed) {
+    return {
+      ok: false,
+      rejection: {
+        code: "rate_limited",
+        message: "You're creating listings very quickly. Wait a minute and try again.",
+      },
+    };
+  }
+
+  const { data: source, error: readError } = await supabase
+    .from("auctions")
+    .select(
+      `title, description, category_id, condition, location, currency,
+       starting_bid_minor, bid_increment_minor, duration_seconds,
+       anti_snipe_window_seconds, anti_snipe_extension_seconds, status`
+    )
+    .eq("id", input.auctionId)
+    .eq("seller_id", user.id)
+    .maybeSingle();
+
+  if (readError || !source) {
+    return {
+      ok: false,
+      rejection: { code: "not_owner", message: "You don't own this auction." },
+    };
+  }
+  if (source.status !== "UNSOLD") {
+    return {
+      ok: false,
+      rejection: {
+        code: "invalid_state",
+        message: "Only an auction that ended with no bids can be listed again.",
+      },
+    };
+  }
+
+  const parsed = createAuctionSchema.safeParse({
+    title: source.title,
+    description: source.description,
+    categoryId: source.category_id,
+    condition: source.condition,
+    location: source.location,
+    startingBidMinor: String(source.starting_bid_minor),
+    bidIncrementMinor: String(source.bid_increment_minor),
+    durationSeconds: source.duration_seconds,
+    antiSnipeWindowSeconds: source.anti_snipe_window_seconds,
+    antiSnipeExtensionSeconds: source.anti_snipe_extension_seconds,
+    currency: source.currency,
+  });
+  if (!parsed.success) {
+    const fieldErrors: Record<string, string[]> = {};
+    for (const issue of parsed.error.issues) {
+      const key = issue.path[0]?.toString() ?? "_";
+      (fieldErrors[key] ??= []).push(issue.message);
+    }
+    return {
+      ok: false,
+      rejection: {
+        code: "invalid_amount",
+        message: "The original listing no longer meets the current rules.",
+      },
+      fieldErrors,
+    };
+  }
+
+  const d = parsed.data;
+  const { data, error } = await supabase
+    .from("auctions")
+    .insert({
+      seller_id: user.id,
+      title: d.title,
+      description: d.description,
+      category_id: d.categoryId,
+      condition: d.condition,
+      location: d.location,
+      currency: d.currency,
+      starting_bid_minor: Number(d.startingBidMinor),
+      bid_increment_minor: Number(d.bidIncrementMinor),
+      duration_seconds: d.durationSeconds,
+      anti_snipe_window_seconds: d.antiSnipeWindowSeconds,
+      anti_snipe_extension_seconds: d.antiSnipeExtensionSeconds,
+      status: "DRAFT",
+    })
+    .select("id")
+    .single();
+
+  if (error || !data) {
+    return {
+      ok: false,
+      rejection: normalizeEngineError({ message: error?.message ?? "" }),
+    };
+  }
+
+  revalidatePath("/sell");
+  revalidatePath("/dashboard/selling");
+  return { ok: true, auctionId: data.id as string };
+}
+
+/**
  * Attach images to a draft. Called after Supabase Storage accepts the upload.
  * Validates that paths belong to this auction and that we stay under the cap.
  */

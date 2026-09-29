@@ -43,7 +43,7 @@ const REF = projectRef() ?? requireEnv("SUPABASE_PROJECT_REF");
 const dryRun = !process.argv.includes("--yes");
 
 /** Exactly the prefixes `e2e/*.spec.ts` pass to `createListing()`. */
-const PREFIXES = ["Race", "Countdown", "Loop", "Outbid", "RLS", "E2E listing"];
+const PREFIXES = ["Race", "Countdown", "Loop", "Outbid", "RLS", "Relist", "E2E listing"];
 
 // "<Prefix> " + base36 millisecond stamp + "-" + 6 base36 chars.
 // Anchored, so nothing that merely contains a prefix is matched.
