@@ -172,6 +172,25 @@ describe("UserAvatar rendering states", () => {
     // The counter advances only when the timer fires, never synchronously.
     expect(src).not.toMatch(/setFailures\(\(prev\) =>/);
     expect(src).toMatch(/v=\$\{failureCount\}/);
+
+    /*
+     * And different from every previous mount's, not just from attempt 0.
+     *
+     * A retry URL that an earlier upload/remove cycle already requested can
+     * already hold a poisoned cache entry, and retrying it fails identically
+     * forever. Measured: three attempts against previously-requested variant
+     * URLs all failed while the same bytes decoded fine, because those entries
+     * had been cached during earlier churn. A per-mount nonce makes each
+     * mount's retries URLs nobody has ever asked for, so they go to a live
+     * fetch instead.
+     *
+     * The nonce must be stable per mount (lazy state, not inline random, or
+     * the src churns and reloads every render) and must never appear on
+     * attempt 0 (the canonical URL is also what the server renders, so a
+     * different client value would be a hydration mismatch).
+     */
+    expect(src).toMatch(/const \[mountNonce\] = useState\(\(\) => Math\.random\(\)/);
+    expect(src).toMatch(/&m=\$\{mountNonce\}/);
   });
 
   it("routes both failure modes through the bound, so neither can loop forever", () => {

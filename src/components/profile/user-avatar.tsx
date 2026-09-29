@@ -155,7 +155,15 @@ export function UserAvatar({
   // Attempt-indexed delays: the first retry waits out a short propagation
   // gap, the second waits out a long one. Indexed, not constant, so lengthening
   // the window means changing a number here rather than restructuring.
-  const RETRY_DELAYS_MS = [2000, 8000];
+  // Attempt-indexed delays: the first retry waits out a short propagation
+  // gap, the second waits out a long one. Indexed, not constant, so lengthening
+  // the window means changing a number here rather than restructuring.
+  //
+  // The numbers have margin on purpose. One clean measurement put the blind
+  // window under 5s, but a later failure 12s after a write counsels against
+  // trusting that. Margin costs nothing visible: the user sees initials
+  // throughout, so a recovery at 15s looks exactly like a recovery at 2s.
+  const RETRY_DELAYS_MS = [3000, 12000];
 
   const recordFailure = () => {
     if (url === null || retryTimer.current) return;
@@ -182,15 +190,34 @@ export function UserAvatar({
   // so a missing key, or one that has exhausted its attempts, cannot produce a
   // broken <img> at all: the condition and the value are the same thing.
   //
-  // `next/image` hashes the query string, so the version parameter reaches
-  // the optimiser rather than being folded away. That is the point: a retry has to
-  // be a genuinely different request, or a cached entry comes straight back and
-  // the retry is theatre.
+  // `next/image` hashes the query string, so parameters reach the optimiser
+  // rather than being folded away. That is the point twice over:
+  //
+  // - `v` makes each attempt a different request, so a stale entry for one
+  //   attempt cannot be handed back for the next.
+  // - `m` makes each MOUNT's attempts different from every previous mount's.
+  //   A retry URL that an earlier upload/remove cycle already poisoned would
+  //   fail identically forever; a URL nobody has ever asked for goes to a live
+  //   fetch instead. Measured: three attempts against previously-requested
+  //   variant URLs all failed while the same bytes decoded fine, because every
+  //   one of those entries had been cached during earlier churn.
+  //
+  // Attempt 0 deliberately carries neither: it is the canonical, cacheable URL,
+  // and it is also what the server renders, so keeping it parameter-free means
+  // hydration never sees a different src on the client. The nonce only ever
+  // appears on retries, which by construction happen after hydration.
+  // Stable for the life of this mount. A lazy state initializer runs once,
+  // which is exactly the semantics needed: the same value on every render, a new
+  // one on every mount. Random per mount is fine because it never reaches the
+  // server render (see above). NOT useRef-during-render and NOT Math.random()
+  // inline, both of which the linter rightly refuses: the first reads a ref
+  // during render, the second would churn the src and reload on every render.
+  const [mountNonce] = useState(() => Math.random().toString(36).slice(2, 8));
   const imageSrc =
     url === null || isFailed
       ? null
       : failureCount > 0
-        ? `${url}${url.includes("?") ? "&" : "?"}v=${failureCount}`
+        ? `${url}${url.includes("?") ? "&" : "?"}v=${failureCount}&m=${mountNonce}`
         : url;
 
   /*
