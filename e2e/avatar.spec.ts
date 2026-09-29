@@ -323,16 +323,37 @@ test.describe("avatar rendering states", () => {
           return opacity > 0.01;
         }).length;
       const roots = [...root.querySelectorAll('[data-testid="user-avatar"]')];
+      // Painted, per frame: the same opacity-aware definition as `shown`
+      // above, because a transparent loading image beside visible initials is
+      // the correct loading state, not the original defect. Two measures of
+      // "visible" in one assertion would let the test disagree with itself.
+      const painted = (frame: Element, sel: string) => {
+        const el = frame.querySelector(sel) as HTMLElement | null;
+        if (!el) return false;
+        const onScreen = el.checkVisibility
+          ? el.checkVisibility()
+          : el.getClientRects().length > 0;
+        if (!onScreen) return false;
+        let opacity = 1;
+        let current: HTMLElement | null = el;
+        while (current && frame.contains(current)) {
+          const value = Number(getComputedStyle(current).opacity);
+          if (!Number.isNaN(value)) opacity *= value;
+          current = current.parentElement;
+        }
+        return opacity > 0.01;
+      };
       return {
         visibleImages: shown('[data-testid="user-avatar-image"]'),
         visibleInitials: shown('[data-testid="user-avatar-initials"]'),
         presentImages: root.querySelectorAll('[data-testid="user-avatar-image"]').length,
         roots: roots.length,
-        // A frame showing both at once is the original defect, however produced.
+        // A frame with both states PAINTED at once is the original defect,
+        // however produced. A transparent loading image does not count.
         bothVisible: roots.filter(
           (r) =>
-            r.querySelector('[data-testid="user-avatar-image"]')?.checkVisibility() &&
-            r.querySelector('[data-testid="user-avatar-initials"]')?.checkVisibility()
+            painted(r, '[data-testid="user-avatar-image"]') &&
+            painted(r, '[data-testid="user-avatar-initials"]')
         ).length,
         states: roots.map((r) => r.getAttribute("data-avatar-state")),
       };
