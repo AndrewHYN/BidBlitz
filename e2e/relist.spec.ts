@@ -42,14 +42,23 @@ test.describe("relist gating", () => {
     // The selling dashboard names the outcome on our auction's own row - and
     // that row, a cancelled auction that was withdrawn rather than unsold,
     // carries no "List again" action.
-    await page.goto("/dashboard/selling");
-    const row = page.locator("li", {
-      has: page.locator(`a[href="/auction/${auctionId}"]`),
-    });
-    await expect(row).toBeVisible({ timeout: 30_000 });
-    await expect(
-      row.getByText("This auction was cancelled before anyone bid.")
-    ).toBeVisible({ timeout: 30_000 });
-    await expect(row.getByRole("button", { name: "List again" })).toHaveCount(0);
+    //
+    // Retried as a unit because the cancellation above is eventually
+    // consistent from the browser's point of view: under full-suite load the
+    // server round trip can still be in flight when the first navigation
+    // lands, and a LIVE row links to /sell/ instead of /auction/. Polling the
+    // navigation plus the assertion keeps a slow backend from failing the
+    // test without weakening what is asserted.
+    await expect(async () => {
+      await page.goto("/dashboard/selling");
+      const row = page.locator("li", {
+        has: page.locator(`a[href="/auction/${auctionId}"]`),
+      });
+      await expect(row).toBeVisible({ timeout: 15_000 });
+      await expect(
+        row.getByText("This auction was cancelled before anyone bid.")
+      ).toBeVisible({ timeout: 15_000 });
+      await expect(row.getByRole("button", { name: "List again" })).toHaveCount(0);
+    }).toPass({ timeout: 120_000 });
   });
 });

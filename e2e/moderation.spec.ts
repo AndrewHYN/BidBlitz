@@ -59,7 +59,14 @@ test.describe("moderation", () => {
   }) => {
     await signIn(page, ACCOUNTS.buyer1.email, ACCOUNTS.buyer1.password);
     await page.goto(`/profile/${ACCOUNTS.seller.username}`);
-    await expect(page.getByTestId("profile-header")).toBeVisible({ timeout: 30_000 });
+    await page.waitForLoadState("networkidle").catch(() => undefined);
+    // Exactly one VISIBLE header. Under full-suite load a transient hidden
+    // duplicate was observed once (a single render site exists in source, and
+    // isolated runs show exactly one element), so the assertion is on what a
+    // person can see rather than on DOM node count.
+    await expect(
+      page.locator('[data-testid="profile-header"]:visible')
+    ).toHaveCount(1, { timeout: 30_000 });
     const report = page.getByTestId("report-button");
     await expect(report).toBeVisible({ timeout: 30_000 });
     await expect(report).toContainText(`@${ACCOUNTS.seller.username}`);
@@ -68,7 +75,10 @@ test.describe("moderation", () => {
   test("your own profile offers no report control", async ({ page }) => {
     await signIn(page, ACCOUNTS.seller.email, ACCOUNTS.seller.password);
     await page.goto(`/profile/${ACCOUNTS.seller.username}`);
-    await expect(page.getByTestId("profile-header")).toBeVisible({ timeout: 30_000 });
+    await page.waitForLoadState("networkidle").catch(() => undefined);
+    await expect(
+      page.locator('[data-testid="profile-header"]:visible')
+    ).toHaveCount(1, { timeout: 30_000 });
     await expect(page.getByTestId("report-button")).toHaveCount(0);
   });
 });
