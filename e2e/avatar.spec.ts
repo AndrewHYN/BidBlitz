@@ -387,11 +387,18 @@ test.describe("avatar rendering states", () => {
     // Never leave a picture on a QA account. The residue check in
     // `db:verify` counts avatar rows, so a test that fails midway must not turn
     // into a permanent trace.
-    await page.goto("/settings").catch(() => {});
+    //
+    // Both waits below are deliberately LOUD. An earlier version swallowed
+    // every failure here, and a cleanup that silently did nothing poisoned
+    // tests running minutes later with an avatar they never uploaded - five
+    // failures across a full run, all far from the test that left the residue.
+    // If cleanup cannot complete, the test that owned the picture fails here,
+    // at the source, with the cause attached.
+    await page.goto("/settings");
     const remove = page.getByTestId("avatar-remove-button");
     if (await remove.isVisible().catch(() => false)) {
       await remove.click();
-      await expect(remove).toHaveCount(0, { timeout: 30_000 }).catch(() => {});
+      await expect(remove).toHaveCount(0, { timeout: 30_000 });
     }
   });
 

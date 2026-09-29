@@ -2085,6 +2085,13 @@ await sql(`delete from public.auctions where id='${auctionId}'`);
       method: "POST", bearer: tok.seller,
       body: { p_auction_id: modId },
     });
+    // A genuine bid while the listing is live. Takedown must end the sale
+    // without erasing the history: the bid row survives, unmarked, with no
+    // transaction ever created for it.
+    await rest(`/rest/v1/rpc/place_bid`, {
+      method: "POST", bearer: tok.buyer1,
+      body: { p_auction_id: modId, p_amount_minor: 1000, p_request_id: randomUUID() },
+    });
 
     // ---- reports: create, duplicate, unauthorized mutation ------------------
     const rep1 = await rest(`/rest/v1/reports`, {
@@ -2240,6 +2247,14 @@ await sql(`delete from public.auctions where id='${auctionId}'`);
       method: "POST", bearer: tok.buyer2,
       body: { p_auction_id: modId, p_reason: "Trying to take down an already closed listing" },
     });
+    const keptBid = rows(await sql(
+      `select count(*)::int as n from public.bids where auction_id='${modId}'`))[0].n;
+    const keptWinning = rows(await sql(
+      `select count(*)::int as n from public.bids
+        where auction_id='${modId}' and is_winning`))[0].n;
+    check("MOD: a takedown preserves bid history instead of deleting it",
+      keptBid === 1 && keptWinning === 0,
+      `bids=${keptBid} winning=${keptWinning} (the sale ended, the record did not)`);
     check("MOD: taking down a closed listing is refused",
       !takeAgain.ok && /invalid_state/i.test(JSON.stringify(takeAgain.data)),
       `status=${takeAgain.status}`);
