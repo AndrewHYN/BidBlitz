@@ -94,7 +94,68 @@ export function UserAvatar({
   const url = avatarUrlFor(avatarPath);
 
   const [loadedUrl, setLoadedUrl] = useState<string | null>(null);
-  const [failedUrl, setFailedUrl] = useState<string | null>(null);
+  // Failures are COUNTED against the URL they describe, not remembered as a
+  // single "broken" flag. See "Why a failure is retried" below: the difference
+  // between those two is the whole bug.
+  const [failures, setFailures] = useState<{ url: string; count: number } | null>(null);
+
+  /*
+   * Why a failure is retried, rather than remembered.
+   *
+   * The storage key is deterministic: `<userId>/avatar.<ext>`. So replacing a
+   * picture with the same format produces the SAME `/_next/image` URL, and our
+   * own origin caches that entry for up to a year. A previous version remembered
+   * a single remembered-failure flag and, once an image failed, refused to render it for the
+   * life of the component, with no way back.
+   *
+   * Combined with that cache, it is a permanent and self-inflicted failure:
+   *
+   *   1. The optimiser is asked before the new object is visible, or a CDN edge
+   *      answers from a stale or failing entry. The image errors.
+   *   2. The component records the failure and never asks again.
+   *   3. The user re-uploads a correct picture in the same format. It lands at
+   *      the same key, therefore the same URL, and is still refused.
+   *
+   * The result is an avatar stuck on its initials while the upload reports
+   * success and the object is genuinely there. Measured in production: the
+   * underlying object answered 404 while `/_next/image?w=96` served a cached PNG
+   * with `age=92502`, about 25.7 hours, and the component would not retry.
+   *
+   * So a failure is bounded, not final. Each retry asks for a DIFFERENT URL, by
+   * adding a version parameter, so a stale cache entry cannot be handed back
+   * again and the optimiser genuinely re-fetches. A deleted object still settles
+   * on initials, because three attempts in quick succession are enough to be
+   * sure, and a transient failure recovers by itself.
+   */
+  const MAX_LOAD_ATTEMPTS = 3;
+  const failureCount = failures && failures.url === url ? failures.count : 0;
+  const isFailed = url !== null && failureCount >= MAX_LOAD_ATTEMPTS;
+  const isLoaded = url !== null && loadedUrl === url;
+
+  const recordFailure = () => {
+    if (url === null) return;
+    setFailures((prev) => ({
+      url,
+      count: (prev?.url === url ? prev.count : 0) + 1,
+    }));
+  };
+
+  // The URL actually requested, or null when there is nothing to show.
+  //
+  // Null is the guard. An image element is rendered only when there is a src,
+  // so a missing key, or one that has exhausted its attempts, cannot produce a
+  // broken <img> at all: the condition and the value are the same thing.
+  //
+  // `next/image` hashes the query string, so the version parameter reaches
+  // the optimiser rather than being folded away. That is the point: a retry has to
+  // be a genuinely different request, or a cached entry comes straight back and
+  // the retry is theatre.
+  const imageSrc =
+    url === null || isFailed
+      ? null
+      : failureCount > 0
+        ? `${url}${url.includes("?") ? "&" : "?"}v=${failureCount}`
+        : url;
 
   /*
    * The image has to be IN THE DOM before it can load.
@@ -118,9 +179,6 @@ export function UserAvatar({
    * so "both are on screen" is not something the DOM can express or a test can
    * accidentally pass.
    */
-  const isFailed = url !== null && failedUrl === url;
-  const isLoaded = url !== null && loadedUrl === url;
-  const renderImage = url !== null && !isFailed;
   const showInitials = !isLoaded;
   const initials = initialsFor(name);
 
@@ -140,9 +198,9 @@ export function UserAvatar({
       // happens to look right. "both" must be unrepresentable.
       data-avatar-state={isLoaded ? "image" : "initials"}
     >
-      {renderImage ? (
+      {imageSrc !== null ? (
         <Image
-          src={url}
+          src={imageSrc}
           alt=""
           width={px}
           height={px}
@@ -171,12 +229,12 @@ export function UserAvatar({
              */
             const img = event.currentTarget;
             if (img.naturalWidth === 0) {
-              setFailedUrl(url);
+              recordFailure();
               return;
             }
             setLoadedUrl(url);
           }}
-          onError={() => setFailedUrl(url)}
+          onError={recordFailure}
         />
       ) : null}
 

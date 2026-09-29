@@ -3,15 +3,16 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 /**
- * Guard: the avatar renders the image and the initials, but never both.
+ * Guard: the avatar renders the picture and the initials, but never both, and a
+ * failure is never final.
  *
- * ## The defect
+ * ## The first defect
  *
  * The avatar showed a real photograph with the fallback initials painted on top
  * of it, at the same time, in the same frame. The screenshot of it was the whole
  * reason this file exists.
  *
- * The cause is subtle and was invisible in review. `UserAvatar` used
+ * The cause was subtle and was invisible in review. `UserAvatar` used
  * `next/image` rather than Radix's `AvatarImage`, because a plain `<img src>`
  * made the header download the original multi-megabyte upload on every page for
  * every signed-in visitor. But Radix tracks image state through a context that
@@ -21,30 +22,36 @@ import { describe, expect, it } from "vitest";
  * therefore *always* in the tree, and since Radix's root is `relative flex` with
  * both children `size-full`, both were painted and stacked.
  *
- * `showImage ? <Image/> : null` never guarded anything, because the fallback was
- * not behind that condition.
+ * ## The second defect, which is worse
+ *
+ * A failed load was remembered permanently. The storage key is deterministic —
+ * `<userId>/avatar.<ext>` — so replacing a picture in the same format produces
+ * the *same* `/_next/image` URL, which our own origin caches for a year. Once the
+ * component recorded a failure for that URL it never asked again, and since a
+ * replacement arrives at the same URL, re-uploading could not clear it.
+ *
+ * The measured symptom: the upload action returned `ok`, the toast said the
+ * picture was updated, the row held the expected key, the object existed, and
+ * the avatar stayed on its initials forever. An underlying object answering 404
+ * while the optimiser served a cached PNG with `age=92502` (about 25.7 hours)
+ * is the fingerprint.
+ *
+ * So a failure is now counted per URL and bounded, and each retry asks for a
+ * different URL.
  *
  * ## Why a static rule and not only an e2e test
  *
- * The e2e suite asserts the rendered result, and that is the real proof — see
- * `e2e/avatar.spec.ts`, which uploads a picture, blocks the image request to
- * force a failure, and asserts exactly one of the two is in the DOM.
- *
- * This rule exists because the *shape* of the bug is what matters and it can be
- * checked without a browser: if the component ever again renders two children
- * that can both be visible, or reaches for a status-driven component it does not
- * drive, the defect returns even if the e2e test is later loosened. TypeScript
- * cannot express "these two must be mutually exclusive", and ESLint has no rule
- * for it — the same gap `form-method.test.ts` was written to close.
+ * The e2e suite asserts the rendered result, and that is the real proof. These
+ * rules hold the *shape*, which is what matters and which can be checked without
+ * a browser: if the component ever again renders two things that can both be
+ * visible, or reaches for a status-driven component it does not drive, or
+ * returns to a permanent failure, the defect returns even if the e2e test is
+ * later loosened. TypeScript cannot express "these two must be mutually
+ * exclusive", and ESLint has no rule for it — the same gap
+ * `form-method.test.ts` was written to close.
  */
 
-const SOURCE = join(
-  process.cwd(),
-  "src",
-  "components",
-  "profile",
-  "user-avatar.tsx"
-);
+const SOURCE = join(process.cwd(), "src", "components", "profile", "user-avatar.tsx");
 
 /** The source with comments removed, so prose about the bug cannot match. */
 function code(): string {
@@ -71,28 +78,34 @@ describe("UserAvatar rendering states", () => {
     const src = code();
 
     /*
-     * This is the invariant, and getting it wrong in either direction is a real
-     * bug that has now happened once.
+     * This invariant has to be right in both directions, and both mistakes are
+     * real ones that happened here.
      *
      * Too exclusive — rendering the image only after `loadedUrl` is set — is a
      * deadlock: an element that is not rendered cannot fire `onLoad`, so the
-     * picture never arrives and the avatar is initials forever. That is what the
-     * first version of the fix did.
+     * picture never arrives and the avatar is initials forever.
      *
      * Too loose — leaving the image and the initials both painted — is the
-     * original defect: a photograph with letters on top of it.
+     * original defect.
      *
-     * The correct shape: the image is rendered whenever there is a usable key so
+     * The correct shape: the image is rendered whenever there is a usable src so
      * it can load, and it is hidden until it has. The initials are rendered
      * exactly when the image is not the visible thing.
      */
-    expect(src).toMatch(/const renderImage = url !== null && !isFailed;/);
     expect(src).toMatch(/const showInitials = !isLoaded;/);
 
-    // The image must be rendered from the "has a usable key" condition, NOT
-    // from the "has loaded" condition.
-    expect(src).toMatch(/\{renderImage \? \(/);
+    // Rendered from "there is a src", NOT from "has loaded". `imageSrc` is null
+    // exactly when the key is unusable or the attempts are spent, so the
+    // condition and the value cannot drift apart.
+    expect(src).toMatch(/\{imageSrc !== null \? \(/);
+    expect(src).not.toMatch(/\{renderImage \? \(/);
     expect(src).not.toMatch(/\{showImage \? \(/);
+
+    // A src is a src, so TypeScript needs no assertion to narrow it. A cast here
+    // would hide the very null the guard exists to make impossible.
+    expect(src).toMatch(/src=\{imageSrc\}/);
+    expect(src).not.toMatch(/url!\}/);
+    expect(src).not.toMatch(/url as string/);
 
     // The initials are the complement of "the image is showing".
     expect(src).toMatch(/\{showInitials \? \(/);
@@ -102,30 +115,45 @@ describe("UserAvatar rendering states", () => {
     expect(src).toMatch(/isLoaded \? "opacity-100" : "invisible opacity-0"/);
   });
 
-  it("drives every visual state from a URL-keyed marker, so replacing a picture retries", () => {
+  it("counts failures against the URL, so a retry is a different request", () => {
     const src = code();
 
-    // A single `boolean broken` cannot distinguish "this picture failed" from
-    // "the previous picture failed", and a stale success cannot distinguish the
-    // old picture from the new one. Both markers are therefore remembered
-    // against the URL they describe.
-    expect(src).toMatch(/useState<string \| null>\(null\)/);
-    const markers = src.match(/useState<string \| null>\(null\)/g) ?? [];
-    expect(markers.length).toBeGreaterThanOrEqual(2);
+    /*
+     * The second defect. A permanent failure is wrong here for a specific
+     * reason, not as a matter of taste: the key is deterministic, so the same
+     * picture replacement reuses the same cached URL, and "never ask again"
+     * therefore becomes "never show this user's picture again".
+     */
+    expect(src).not.toMatch(/failedUrl/);
+    expect(src).not.toMatch(/setFailedUrl/);
+    expect(src).toMatch(
+      /const \[failures, setFailures\] = useState<\{ url: string; count: number \} \| null>\(null\)/
+    );
 
-    // Both transitions must record the URL that produced them. `onLoad` takes
-    // the element so it can reject a zero-size image; `onError` needs nothing.
-    expect(src).toMatch(/onLoad=\{\(event\)\s*=>/);
-    expect(src).toMatch(/onError=\{\(\)\s*=>\s*setFailedUrl\(url\)\}/);
+    // Bounded, so a genuinely deleted object still settles on initials quickly.
+    expect(src).toMatch(/const MAX_LOAD_ATTEMPTS = \d+;/);
+    expect(src).toMatch(/failureCount >= MAX_LOAD_ATTEMPTS/);
+
+    // Keyed on the URL, so a new picture starts from zero and the previous
+    // picture's failures are forgotten rather than inherited.
+    expect(src).toMatch(/failures && failures\.url === url \? failures\.count : 0/);
+
+    // And the retry really is a different request, not the same one again.
+    expect(src).toMatch(/v=\$\{failureCount\}/);
   });
 
-  it("exposes the rendered state so a test can assert it", () => {
+  it("routes both failure modes through the bound, so neither can loop forever", () => {
     const src = code();
-    // A screenshot can be argued about; an attribute cannot. The e2e suite
-    // asserts this, and asserts that "both" is not a value it can ever emit.
-    expect(src).toMatch(/data-avatar-state=\{isLoaded \? "image" : "initials"\}/);
-    // "both" is deliberately absent from that expression.
-    expect(src).not.toMatch(/data-avatar-state=\{[^}]*both/);
+    // `onError` for a failed fetch, and `onLoad` for an image that loads with
+    // zero pixels. Both must go through the counter, or one of them bypasses the
+    // bound.
+    expect(src).toMatch(/onError=\{recordFailure\}/);
+    // Three references: the definition, the zero-size call, and the onError
+    // handler. Anything fewer means a failure path was left un-routed.
+    const uses = src.match(/recordFailure/g) ?? [];
+    expect(uses.length).toBeGreaterThanOrEqual(3);
+    // Nothing may increment the counter directly and skip the bound.
+    expect(src).not.toMatch(/setFailures\(\{[^}]*count: \d+ \}\)/);
   });
 
   it("treats a zero-size loaded image as a failure, not a success", () => {
@@ -138,9 +166,18 @@ describe("UserAvatar rendering states", () => {
      * object the decoder rejected.
      */
     expect(src).toMatch(/naturalWidth === 0/);
-    expect(src).toMatch(/naturalWidth === 0[\s\S]{0,200}setFailedUrl\(url\)/);
+    expect(src).toMatch(/naturalWidth === 0[\s\S]{0,200}recordFailure\(\)/);
     // And the ordinary success path must still mark it loaded.
     expect(src).toMatch(/setLoadedUrl\(url\)/);
+  });
+
+  it("exposes the rendered state so a test can assert it", () => {
+    const src = code();
+    // A screenshot can be argued about; an attribute cannot. The e2e suite
+    // asserts this, and asserts that "both" is not a value it can ever emit.
+    expect(src).toMatch(/data-avatar-state=\{isLoaded \? "image" : "initials"\}/);
+    // "both" is deliberately absent from that expression.
+    expect(src).not.toMatch(/data-avatar-state=\{[^}]*both/);
   });
 
   it("keeps the image decorative, and the initials hidden from assistive tech", () => {
