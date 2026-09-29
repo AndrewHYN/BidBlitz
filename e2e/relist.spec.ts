@@ -11,6 +11,11 @@ import { ACCOUNTS, createListing, signIn } from "./fixtures";
  * here is the gate the seller actually sees: a CANCELLED auction - withdrawn
  * on purpose, not rejected by the market - offers no "List again", and says
  * plainly what happened to it.
+ *
+ * Assertions are scoped to this run's auction row (by its link), because both
+ * Playwright projects share the seller account and may each hold a cancelled
+ * fixture at once. A page-wide count would couple this test to whatever the
+ * other project is doing.
  */
 test.describe("relist gating", () => {
   test("a cancelled auction offers no List again action", async ({ page }) => {
@@ -34,13 +39,17 @@ test.describe("relist gating", () => {
       }
     }
 
-    // The selling dashboard names the outcome and offers no relist: a
-    // cancelled auction was withdrawn, not unsold, and must not be
-    // one click away from a fresh listing.
+    // The selling dashboard names the outcome on our auction's own row - and
+    // that row, a cancelled auction that was withdrawn rather than unsold,
+    // carries no "List again" action.
     await page.goto("/dashboard/selling");
+    const row = page.locator("li", {
+      has: page.locator(`a[href="/auction/${auctionId}"]`),
+    });
+    await expect(row).toBeVisible({ timeout: 30_000 });
     await expect(
-      page.getByText("This auction was cancelled before anyone bid.")
+      row.getByText("This auction was cancelled before anyone bid.")
     ).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByRole("button", { name: "List again" })).toHaveCount(0);
+    await expect(row.getByRole("button", { name: "List again" })).toHaveCount(0);
   });
 });
