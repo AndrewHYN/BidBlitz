@@ -59,6 +59,154 @@ export async function updateReportStatusAction(
 }
 
 // ---------------------------------------------------------------------------
+// Moderation enforcement
+// ---------------------------------------------------------------------------
+
+const takedownSchema = z.object({
+  auctionId: z.string().uuid("Invalid auction"),
+  reason: z
+    .string()
+    .trim()
+    .min(5, "Give a reason of at least 5 characters.")
+    .max(1000, "Reason is too long."),
+  reportId: z.string().uuid("Invalid report").optional(),
+});
+
+/**
+ * Remove a listing as the operator. Goes through
+ * `admin_takedown_auction()`, which locks the row, refuses anything already
+ * closed or still a draft, records CANCELLED, writes the moderation_events
+ * audit row (actor, previous status, reason, report), notifies the seller
+ * with safe copy, and resolves the originating report.
+ *
+ * The admin check happens twice, on purpose: here, for a fast honest refusal
+ * before any RPC, and inside the function, which is the boundary that matters
+ * because the RPC is directly callable. Either one alone would be a UI
+ * restriction pretending to be authorization.
+ */
+export async function takedownAuctionAction(
+  input: unknown
+): Promise<{ ok: true; status: string } | { ok: false; message: string }> {
+  const parsed = takedownSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      message: parsed.error.issues[0]?.message ?? "Invalid takedown.",
+    };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, message: "Sign in." };
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("is_admin")
+    .eq("id", user.id)
+    .maybeSingle();
+  if (!profile?.is_admin) return { ok: false, message: "Admins only." };
+
+  const { data, error } = await supabase.rpc("admin_takedown_auction", {
+    p_auction_id: parsed.data.auctionId,
+    p_reason: parsed.data.reason,
+    p_report_id: parsed.data.reportId ?? null,
+  });
+
+  if (error) return { ok: false, message: takedownErrorMessage(error.message) };
+
+  revalidatePath("/admin");
+  revalidatePath(`/auction/${parsed.data.auctionId}`);
+  revalidatePath("/dashboard/selling");
+  revalidatePath("/");
+  revalidatePath("/browse");
+  return { ok: true, status: (data as { status?: string } | null)?.status ?? "CANCELLED" };
+}
+
+/** Map the takedown function's refusal codes to copy an operator can act on. */
+function takedownErrorMessage(raw: string): string {
+  const m = raw.toLowerCase();
+  if (m.includes("not_admin")) return "Admins only.";
+  if (m.includes("auction_not_found")) return "That auction no longer exists.";
+  if (m.includes("invalid_reason")) return "Give a reason of at least 5 characters.";
+  if (m.includes("invalid_state"))
+    return "That auction is already closed or still a draft. There is nothing to take down.";
+  if (m.includes("not_authenticated")) return "Sign in.";
+  return "That takedown was refused. Reload and try again.";
+}
+
+const banSchema = z.object({
+  userId: z.string().uuid("Invalid user"),
+  banned: z.boolean(),
+  reason: z
+    .string()
+    .trim()
+    .min(5, "Give a reason of at least 5 characters.")
+    .max(1000, "Reason is too long."),
+  reportId: z.string().uuid("Invalid report").optional(),
+});
+
+/**
+ * Suspend or restore an account as the operator. Goes through
+ * `admin_set_banned()`, which refuses self-ban, is idempotent when already in
+ * the requested state, and writes the moderation_events audit row. The actual
+ * blocking is done by the is_banned triggers, unchanged: bids, publishing and
+ * listing creation are refused at the database boundary, not by hiding
+ * buttons.
+ */
+export async function setBannedAction(
+  input: unknown
+): Promise<{ ok: true; banned: boolean } | { ok: false; message: string }> {
+  const parsed = banSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      message: parsed.error.issues[0]?.message ?? "Invalid request.",
+    };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, message: "Sign in." };
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("is_admin")
+    .eq("id", user.id)
+    .maybeSingle();
+  if (!profile?.is_admin) return { ok: false, message: "Admins only." };
+
+  const { data, error } = await supabase.rpc("admin_set_banned", {
+    p_user_id: parsed.data.userId,
+    p_banned: parsed.data.banned,
+    p_reason: parsed.data.reason,
+    p_report_id: parsed.data.reportId ?? null,
+  });
+
+  if (error) return { ok: false, message: banErrorMessage(error.message) };
+
+  revalidatePath("/admin");
+  return {
+    ok: true,
+    banned: (data as { is_banned?: boolean } | null)?.is_banned ?? parsed.data.banned,
+  };
+}
+
+/** Map the ban function's refusal codes to copy an operator can act on. */
+function banErrorMessage(raw: string): string {
+  const m = raw.toLowerCase();
+  if (m.includes("not_admin")) return "Admins only.";
+  if (m.includes("cannot_ban_self")) return "You can't suspend your own account.";
+  if (m.includes("user_not_found")) return "That account no longer exists.";
+  if (m.includes("invalid_reason")) return "Give a reason of at least 5 characters.";
+  if (m.includes("not_authenticated")) return "Sign in.";
+  return "That action was refused. Reload and try again.";
+}
+
+// ---------------------------------------------------------------------------
 // Seller payouts
 // ---------------------------------------------------------------------------
 

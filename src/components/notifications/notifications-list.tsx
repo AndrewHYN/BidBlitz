@@ -112,6 +112,23 @@ function describe(
         headline: `${headline} ended with no bids`,
         detail: null,
       };
+    case "LISTING_REMOVED":
+      // A takedown notice names the outcome and where to ask about it - never
+      // who reported the listing and never the internal reason. Those live in
+      // moderation_events, which ordinary users cannot read.
+      return {
+        headline: `${headline} was removed by BidBlitz`,
+        detail: (
+          <>
+            The listing broke marketplace rules, so it is no longer public. If
+            you think that is a mistake,{" "}
+            <Link href="/help" className="font-medium text-foreground underline underline-offset-2">
+              get in touch through the help page
+            </Link>
+            .
+          </>
+        ),
+      };
     case "AUCTION_PUBLISHED":
       return {
         headline: `${headline} is live`,

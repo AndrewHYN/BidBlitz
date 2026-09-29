@@ -49,6 +49,33 @@ const RULES = [
   },
 ] as const;
 
+const MARKETPLACE_RULES = [
+  {
+    title: "List only what is really yours to sell",
+    body: "Stolen goods, counterfeits and items you do not own may not be listed. Electronics must be genuine: model numbers, storage sizes and included accessories have to match the actual item.",
+  },
+  {
+    title: "Describe the item honestly",
+    body: "Photos must show the actual item, and the description must match its condition, flaws included. A listing that misleads buyers on purpose is fraud, not marketing, and it is taken down.",
+  },
+  {
+    title: "Keep payment on BidBlitz",
+    body: "Winning bids are paid through the sale's transaction. Asking a buyer to pay elsewhere, or offering to complete a sale off the site, ends the listing and can end the account.",
+  },
+  {
+    title: "One account, yours alone",
+    body: "Shill bidding, bidding on your own auctions through another account, and creating a new account to dodge a suspension all lead to the same place: every involved account is suspended.",
+  },
+  {
+    title: "No abuse, no harassment",
+    body: "Threats, hate, scams and harassment in listings, messages, reviews or reports are treated as seriously as a fraudulent listing.",
+  },
+  {
+    title: "Reports are for real problems",
+    body: "File a report when a listing or an account breaks one of these rules. Deliberately false reports are themselves abuse and are treated that way.",
+  },
+] as const;
+
 export default function HelpRulesPage() {
   return (
     <div data-testid="help-rules-page">
@@ -83,6 +110,36 @@ export default function HelpRulesPage() {
                     of the page, and the only heading above them is the page h1,
                     so h3 skipped a level. */}
                 <h2 className="font-medium">{rule.title}</h2>
+                <p className="text-[0.9375rem] leading-[1.7] text-muted-foreground text-pretty">
+                  {rule.body}
+                </p>
+              </div>
+            </li>
+          ))}
+        </ol>
+
+        {/*
+          What the bidding rules do not cover: the listing itself. Each of
+          these maps to something the site can actually do about it - a report
+          reason a user can file, and a takedown or suspension an operator can
+          record. A rule without an enforcement path is decoration, so there
+          are only as many rules as there are actions.
+        */}
+        <h2 className="pt-2 font-medium">Marketplace rules</h2>
+        <ol className="border-t border-border/70">
+          {MARKETPLACE_RULES.map((rule, i) => (
+            <li
+              key={rule.title}
+              className="flex gap-4 border-b border-border/70 py-4 sm:gap-5"
+            >
+              <span
+                className="mt-0.5 shrink-0 tabular-nums text-sm font-medium text-muted-foreground/60"
+                aria-hidden
+              >
+                {String(i + 1).padStart(2, "0")}
+              </span>
+              <div className="min-w-0 space-y-1">
+                <h3 className="font-medium">{rule.title}</h3>
                 <p className="text-[0.9375rem] leading-[1.7] text-muted-foreground text-pretty">
                   {rule.body}
                 </p>

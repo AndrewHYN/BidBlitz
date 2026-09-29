@@ -5,6 +5,7 @@ import { PackageSearch } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getProfileByUsername } from "@/server/queries";
 import { ProfileHeader } from "@/components/profile/profile-header";
+import { ReportDialog } from "@/components/auction/report-dialog";
 import { ReviewList } from "@/components/profile/review-list";
 import { AuctionGrid } from "@/components/auction/auction-card";
 import { EmptyState, SectionHeading } from "@/components/auction/page-header";
@@ -66,6 +67,14 @@ export default async function ProfilePage({
   return (
     <div className="page-container space-y-10 py-10 sm:py-14">
       <ProfileHeader profile={data.profile} isSelf={isSelf} />
+      {/* Reporting someone is rare and serious, so it sits apart from the
+          profile itself rather than beside the name: one quiet control that a
+          visitor finds when they need it, invisible to the profile owner. */}
+      {!isSelf && (
+        <div className="flex justify-end">
+          <ReportDialog userId={data.profile.id} username={data.profile.username} />
+        </div>
+      )}
 
       <section className="space-y-4" aria-labelledby="profile-reviews-heading">
         <SectionHeading

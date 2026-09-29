@@ -2053,6 +2053,248 @@ await sql(`delete from public.bids where auction_id='${auctionId}'`);
 await sql(`delete from public.auction_images where auction_id='${auctionId}'`);
 await sql(`delete from public.auctions where id='${auctionId}'`);
 
+  // ---- 15b. moderation: reports, takedown audit, ban enforcement ------------
+  //
+  // The reports pipeline existed (table, RLS, reportAction, admin queue) but
+  // had no audit trail for enforcement: an admin takedown recorded nothing.
+  // Migration 20260929000002 added moderation_events plus admin_takedown_auction
+  // and admin_set_banned. This section proves the whole model at the boundary
+  // that matters - the database and RPC layer, never the UI - using the same
+  // temporary-admin pattern as the security section above, with restore.
+  //
+  // Fixtures are created here and removed at the end of the section, scoped to
+  // their ids, like CASE A/D and RACE above.
+  console.log("\n--- moderation ---");
+  const modSectionStarted = new Date().toISOString();
+  const MOD_TITLE = "Verify: reported listing with counterfeit claims";
+  const modCreated = await rest(`/rest/v1/auctions`, {
+    method: "POST", bearer: tok.seller,
+    headers: { Prefer: "return=representation" },
+    body: { ...auctionPayload, title: MOD_TITLE },
+  });
+  const modId = modCreated.data?.[0]?.id;
+  check("MOD: a fixture listing exists for the moderation path", !!modId,
+    modId ?? JSON.stringify(modCreated.data));
+
+  if (modId) {
+    await rest(`/rest/v1/auction_images`, {
+      method: "POST", bearer: tok.seller,
+      body: { auction_id: modId, storage_path: `harness/${modId}/cover.jpg`, position: 0 },
+    });
+    await rest(`/rest/v1/rpc/publish_auction`, {
+      method: "POST", bearer: tok.seller,
+      body: { p_auction_id: modId },
+    });
+
+    // ---- reports: create, duplicate, unauthorized mutation ------------------
+    const rep1 = await rest(`/rest/v1/reports`, {
+      method: "POST", bearer: tok.buyer1,
+      headers: { Prefer: "return=representation" },
+      body: { reporter_id: buyer1Id, target_type: "auction", target_id: modId, reason: "Counterfeit item with a fake serial number" },
+    });
+    const modReportId = rep1.data?.[0]?.id;
+    check("MOD: an ordinary user can file an auction report",
+      rep1.ok && !!modReportId, `status=${rep1.status}`);
+
+    // The (reporter, target) uniqueness refuses a second row: the reporter is
+    // told their first report stands, not that something broke.
+    const repDup = await rest(`/rest/v1/reports`, {
+      method: "POST", bearer: tok.buyer1,
+      body: { reporter_id: buyer1Id, target_type: "auction", target_id: modId, reason: "Reporting again with more detail here" },
+    });
+    check("MOD: a duplicate report is refused by the uniqueness constraint",
+      !repDup.ok && /23505|duplicate|already exists/i.test(JSON.stringify(repDup.data)),
+      `status=${repDup.status} ${JSON.stringify(repDup.data)?.slice(0, 120)}`);
+
+    // A different user cannot touch someone else's report (no UPDATE policy).
+    const repHijack = await rest(`/rest/v1/reports?id=eq.${modReportId}`, {
+      method: "PATCH", bearer: tok.buyer2,
+      body: { status: "DISMISSED" },
+    });
+    const repStillOpen = rows(await sql(
+      `select status from public.reports where id='${modReportId}'`))[0]?.status;
+    check("MOD: a non-admin cannot resolve or dismiss a report",
+      repStillOpen === "OPEN", `status=${repStillOpen} patch=${repHijack.status}`);
+
+    // A non-admin cannot invoke enforcement either.
+    const nonAdminTake = await rest(`/rest/v1/rpc/admin_takedown_auction`, {
+      method: "POST", bearer: tok.buyer1,
+      body: { p_auction_id: modId, p_reason: "Trying to take down a listing without rights" },
+    });
+    check("MOD: a non-admin cannot take down a listing through the RPC",
+      !nonAdminTake.ok && /not_admin/i.test(JSON.stringify(nonAdminTake.data)),
+      `status=${nonAdminTake.status} ${JSON.stringify(nonAdminTake.data)?.slice(0, 120)}`);
+    const nonAdminBan = await rest(`/rest/v1/rpc/admin_set_banned`, {
+      method: "POST", bearer: tok.buyer1,
+      body: { p_user_id: sellerId, p_banned: true, p_reason: "Trying to ban the seller without rights" },
+    });
+    check("MOD: a non-admin cannot ban through the RPC",
+      !nonAdminBan.ok && /not_admin/i.test(JSON.stringify(nonAdminBan.data)),
+      `status=${nonAdminBan.status}`);
+
+    // ---- admin: triage, takedown, audit --------------------------------------
+    await sql(`update public.profiles set is_admin = true where id='${buyer2Id}'`);
+    const triage = await rest(`/rest/v1/reports?id=eq.${modReportId}`, {
+      method: "PATCH", bearer: tok.buyer2,
+      headers: { Prefer: "return=representation" },
+      body: { status: "REVIEWING" },
+    });
+    check("MOD: admin can move a report to REVIEWING",
+      triage.ok, `status=${triage.status}`);
+
+    // Banning happens while the fixture is still LIVE, so the refused
+    // bid below proves the BAN trigger fires - not the close refusal, which
+    // would fire first on a taken-down auction and prove nothing.
+
+    // ---- admin: ban, enforcement, restore -------------------------------------
+    // The banal account cannot suspend itself: that would be a lockout button.
+    const selfBan = await rest(`/rest/v1/rpc/admin_set_banned`, {
+      method: "POST", bearer: tok.buyer2,
+      body: { p_user_id: buyer2Id, p_banned: true, p_reason: "An admin trying to suspend their own account" },
+    });
+    check("MOD: an admin cannot suspend their own account",
+      !selfBan.ok && /cannot_ban_self/i.test(JSON.stringify(selfBan.data)),
+      `status=${selfBan.status}`);
+
+    const ban = await rest(`/rest/v1/rpc/admin_set_banned`, {
+      method: "POST", bearer: tok.buyer2,
+      body: { p_user_id: buyer1Id, p_banned: true, p_reason: "Shill bidding across three auctions" },
+    });
+    check("MOD: admin can suspend an account",
+      ban.ok && ban.data?.is_banned === true, JSON.stringify(ban.data));
+
+    const banAudit = rows(await sql(
+      `select actor_id::text as actor, action, reason from public.moderation_events
+        where target_type = 'user' and target_id = '${buyer1Id}'
+        order by created_at desc limit 1`))[0];
+    check("MOD: suspension writes the audit row",
+      banAudit?.actor === buyer2Id && banAudit?.action === "BAN_USER"
+        && (banAudit?.reason ?? "").includes("Shill"),
+      JSON.stringify(banAudit));
+
+    // Enforcement is at the database boundary, not the buttons: a banned
+    // account calling the RPCs directly is refused with account_banned.
+    const bannedBid = await rest(`/rest/v1/rpc/place_bid`, {
+      method: "POST", bearer: tok.buyer1,
+      body: { p_auction_id: modId, p_amount_minor: 5000, p_request_id: randomUUID() },
+    });
+    check("MOD: a suspended account cannot bid, even direct",
+      !bannedBid.ok && /account_banned/i.test(JSON.stringify(bannedBid.data)),
+      `status=${bannedBid.status}`);
+
+    const take = await rest(`/rest/v1/rpc/admin_takedown_auction`, {
+      method: "POST", bearer: tok.buyer2,
+      body: { p_auction_id: modId, p_reason: "Counterfeit serial number confirmed against listing photos", p_report_id: modReportId },
+    });
+    check("MOD: admin can take down a violating listing",
+      take.ok && take.data?.status === "CANCELLED",
+      JSON.stringify(take.data));
+
+    const taken = rows(await sql(
+      `select status from public.auctions where id='${modId}'`))[0]?.status;
+    const audit = rows(await sql(
+      `select actor_id::text as actor, action, target_type, target_id::text as target,
+              prev_status, new_status, reason, report_id::text as report
+         from public.moderation_events
+        where target_type = 'auction' and target_id = '${modId}'
+        order by created_at desc limit 1`))[0];
+    check("MOD: takedown writes the audit row (actor, action, reason, report)",
+      taken === "CANCELLED"
+        && audit?.actor === buyer2Id && audit?.action === "TAKEDOWN_LISTING"
+        && audit?.prev_status === "LIVE" && audit?.new_status === "CANCELLED"
+        && (audit?.reason ?? "").includes("Counterfeit")
+        && audit?.report === modReportId,
+      `status=${taken} audit=${JSON.stringify(audit)}`);
+
+    const sellerNotice = rows(await sql(
+      `select type from public.notifications
+        where user_id='${sellerId}' and auction_id='${modId}' and type='LISTING_REMOVED'`));
+    check("MOD: the seller is told their listing was removed (safe copy)",
+      sellerNotice.length === 1, `LISTING_REMOVED=${sellerNotice.length}`);
+
+    const reportClosed = rows(await sql(
+      `select status from public.reports where id='${modReportId}'`))[0]?.status;
+    check("MOD: the originating report is resolved by the takedown",
+      reportClosed === "RESOLVED", `status=${reportClosed}`);
+
+    // A taken-down listing behaves as closed everywhere: no bids, no payment
+    // flow, history preserved.
+    const bidAfterTake = await rest(`/rest/v1/rpc/place_bid`, {
+      method: "POST", bearer: tok.buyer1,
+      body: { p_auction_id: modId, p_amount_minor: 5000, p_request_id: randomUUID() },
+    });
+    const settleTake = await rest(`/rest/v1/rpc/settle_auction`, {
+      method: "POST", bearer: SEC, key: SEC,
+      body: { p_auction_id: modId },
+    });
+    const takeTx = rows(await sql(
+      `select count(*)::int as n from public.transactions where auction_id='${modId}'`))[0].n;
+    check("MOD: no bid survives on a taken-down listing",
+      !bidAfterTake.ok, `status=${bidAfterTake.status}`);
+    check("MOD: a taken-down listing can never produce a transaction",
+      takeTx === 0 && settleTake.data?.status === "CANCELLED",
+      `transactions=${takeTx} settle=${JSON.stringify(settleTake.data)}`);
+
+    // Takedown refuses what is already closed: history is not rewritten.
+    const takeAgain = await rest(`/rest/v1/rpc/admin_takedown_auction`, {
+      method: "POST", bearer: tok.buyer2,
+      body: { p_auction_id: modId, p_reason: "Trying to take down an already closed listing" },
+    });
+    check("MOD: taking down a closed listing is refused",
+      !takeAgain.ok && /invalid_state/i.test(JSON.stringify(takeAgain.data)),
+      `status=${takeAgain.status}`);
+
+
+    // buyer2 stays admin through the restore, then loses it once, at the end.
+    const restore = await rest(`/rest/v1/rpc/admin_set_banned`, {
+      method: "POST", bearer: tok.buyer2,
+      body: { p_user_id: buyer1Id, p_banned: false, p_reason: "Appeal upheld with a warning recorded" },
+    });
+    const unbanAudit = rows(await sql(
+      `select action from public.moderation_events
+        where target_type = 'user' and target_id = '${buyer1Id}'
+        order by created_at desc limit 1`))[0]?.action;
+    await sql(`update public.profiles set is_admin = false where id='${buyer2Id}'`);
+    check("MOD: admin can restore an account, and the restoration is audited",
+      restore.ok && restore.data?.is_banned === false && unbanAudit === "UNBAN_USER",
+      `${JSON.stringify(restore.data)} audit=${unbanAudit}`);
+
+    // Ordinary users cannot read the trail, and cannot write it either: there
+    // is no insert/update/delete policy for any non-admin role.
+    const auditRead = await rest(`/rest/v1/moderation_events?select=id`, { bearer: tok.buyer1 });
+    check("MOD: a non-admin cannot read moderation events",
+      auditRead.ok && auditRead.data.length === 0, `${auditRead.data?.length} rows`);
+    const auditWrite = await rest(`/rest/v1/moderation_events`, {
+      method: "POST", bearer: tok.buyer1,
+      body: { actor_id: buyer1Id, action: "BAN_USER", target_type: "user", target_id: sellerId, reason: "Forged audit row by a non-admin" },
+    });
+    check("MOD: a non-admin cannot write moderation events",
+      !auditWrite.ok, `status=${auditWrite.status}`);
+
+    // Cleanup: this section's fixture and its trail. The audit rows reference
+    // the fixture, so they go first; the report follows; the auction last.
+    // Scoped to modId and modReportId only.
+    const modTitleOk = rows(await sql(
+      `select title from public.auctions where id='${modId}'`))[0]?.title === MOD_TITLE;
+    if (modTitleOk) {
+      await sql(`delete from public.moderation_events
+        where created_at >= '${modSectionStarted}'
+          and ((target_type = 'auction' and target_id = '${modId}')
+               or (target_type = 'user' and target_id = '${buyer1Id}'
+                   and action in ('BAN_USER', 'UNBAN_USER')))`);
+      await sql(`delete from public.notifications where auction_id in ('${modId}')`);
+      await sql(`delete from public.reports where id in ('${modReportId}')`);
+      await sql(`delete from public.bids where auction_id in ('${modId}')`);
+      await sql(`delete from public.auction_images where auction_id in ('${modId}')`);
+      await sql(`delete from public.watchlist where auction_id in ('${modId}')`);
+      await sql(`delete from public.auctions where id in ('${modId}')`);
+      check("MOD: this section's own fixture and trail were removed here", true, "removed 1 fixture");
+    } else {
+      check("MOD: this section's own fixture and trail were removed here", false,
+        "REFUSED: title did not match our fixture");
+    }
+  }
+
 // ---- 16. avatars: namespaced storage + a key that cannot leave your folder --
 console.log("\n--- avatars ---");
 

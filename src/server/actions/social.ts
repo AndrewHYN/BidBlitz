@@ -131,6 +131,32 @@ export async function reportAction(input: unknown): Promise<SimpleResult> {
     return { ok: false, rejection: { code: "invalid_request_id", message: parsed.error.issues[0]?.message ?? "Invalid report." } };
   }
 
+  // The target must exist and be visible to the reporter, or the queue fills
+  // with reports pointing nowhere. Auctions follow the same visibility rule
+  // as browsing (public, own, or admin); profiles are public by design.
+  if (parsed.data.targetType === "auction") {
+    const { data: target } = await supabase
+      .from("auctions")
+      .select("id")
+      .eq("id", parsed.data.targetId)
+      .maybeSingle();
+    if (!target) {
+      return { ok: false, rejection: { code: "invalid_request_id", message: "That listing is no longer available." } };
+    }
+  } else {
+    const { data: target } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("id", parsed.data.targetId)
+      .maybeSingle();
+    if (!target) {
+      return { ok: false, rejection: { code: "invalid_request_id", message: "That account is no longer available." } };
+    }
+    if (target.id === user.id) {
+      return { ok: false, rejection: { code: "invalid_request_id", message: "You can't report your own account." } };
+    }
+  }
+
   const { error } = await supabase.from("reports").insert({
     reporter_id: user.id,
     target_type: parsed.data.targetType,
@@ -138,7 +164,21 @@ export async function reportAction(input: unknown): Promise<SimpleResult> {
     reason: parsed.data.reason,
   });
 
-  if (error) return { ok: false, rejection: normalizeEngineError({ message: error.message }) };
+  if (error) {
+    // The (reporter, target) uniqueness violation is the duplicate-report
+    // path, not a failure: the first report is already queued.
+    const msg = `${error.message} ${(error as { code?: string }).code ?? ""}`;
+    if (/23505|duplicate|already exists/i.test(msg)) {
+      return {
+        ok: false,
+        rejection: {
+          code: "duplicate_report",
+          message: "You've already reported this. The team will review your first report.",
+        },
+      };
+    }
+    return { ok: false, rejection: normalizeEngineError({ message: error.message }) };
+  }
   return { ok: true };
 }
 

@@ -18,9 +18,26 @@ import { Textarea } from "@/components/ui/textarea";
 import { reportSchema } from "@/lib/validation";
 import { reportAction } from "@/server/actions/social";
 
-/** Report an auction to moderation. Validation mirrors the server schema so
- *  the user gets instant feedback, but the server remains authoritative. */
-export function ReportDialog({ auctionId }: { auctionId: string }) {
+/**
+ * Report an auction or a user to moderation. Validation mirrors the server
+ * schema so the user gets instant feedback, but the server remains
+ * authoritative. One component for both targets, because the two flows differ
+ * only in what is named: the action, the audit and the queue treat them the
+ * same until an operator decides otherwise.
+ */
+export function ReportDialog({
+  auctionId,
+  userId,
+  username,
+}: {
+  auctionId?: string;
+  userId?: string;
+  username?: string;
+}) {
+  const targetType = auctionId ? ("auction" as const) : ("user" as const);
+  const targetId = (auctionId ?? userId) as string;
+  const targetName =
+    targetType === "auction" ? "this auction" : `@${username ?? "this user"}`;
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
   const [pending, setPending] = useState(false);
@@ -31,8 +48,8 @@ export function ReportDialog({ auctionId }: { auctionId: string }) {
     setError(null);
 
     const parsed = reportSchema.safeParse({
-      targetType: "auction",
-      targetId: auctionId,
+      targetType,
+      targetId,
       reason: reason.trim(),
     });
     if (!parsed.success) {
@@ -45,7 +62,10 @@ export function ReportDialog({ auctionId }: { auctionId: string }) {
       const result = await reportAction(parsed.data);
       if (result.ok) {
         toast.success("Report received", {
-          description: "The BidBlitz team will review this listing.",
+          description:
+            targetType === "auction"
+              ? "The BidBlitz team will review this listing."
+              : "The BidBlitz team will review this account.",
         });
         setReason("");
         setOpen(false);
@@ -76,16 +96,19 @@ export function ReportDialog({ auctionId }: { auctionId: string }) {
           className="text-muted-foreground"
         >
           <Flag aria-hidden />
-          Report this auction
+          {targetType === "auction" ? "Report this auction" : `Report @${username ?? "user"}`}
         </Button>
       </DialogTrigger>
 
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Report this auction</DialogTitle>
+          <DialogTitle>
+            {targetType === "auction" ? "Report this auction" : `Report @${username ?? "user"}`}
+          </DialogTitle>
           <DialogDescription>
-            Tell us what&apos;s wrong. Reports go to the BidBlitz team and are
-            never shown to the seller.
+            Tell us what&apos;s wrong with {targetName}. Reports go to the
+            BidBlitz team and are never shown to{" "}
+            {targetType === "auction" ? "the seller" : "that account"}.
           </DialogDescription>
         </DialogHeader>
 

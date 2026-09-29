@@ -24,6 +24,7 @@ export type BidErrorCode =
   | "account_banned"
   | "invalid_input"
   | "reset_link_invalid"
+  | "duplicate_report"
   | "unknown";
 
 export type BidRejection = {
@@ -64,6 +65,12 @@ const MESSAGES: Record<BidErrorCode, string> = {
   invalid_input: "Check what you've entered and try again.",
   reset_link_invalid:
     "This reset link has expired or was already used. Request a new one.",
+  // A reporter filing the same target twice: the reports table refuses the
+  // second row with a uniqueness violation, and without this mapping the
+  // reporter would be told something went wrong when the truth is that their
+  // first report is already in the queue.
+  duplicate_report:
+    "You've already reported this. The team will review your first report.",
   unknown: "Something went wrong. Please try again.",
 };
 

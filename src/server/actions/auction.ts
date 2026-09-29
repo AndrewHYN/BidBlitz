@@ -52,6 +52,26 @@ export async function createAuctionAction(input: unknown): Promise<
     };
   }
 
+  // A suspended account is told so at the door, not after filling the form:
+  // the is_banned triggers would refuse the publish anyway, but "created,
+  // now it can't be published" is a worse answer than an honest refusal.
+  // The check reads the caller's own row, which RLS permits.
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("is_banned")
+    .eq("id", user.id)
+    .maybeSingle();
+  if (profile?.is_banned) {
+    return {
+      ok: false,
+      rejection: {
+        code: "account_banned",
+        message:
+          "Your account can't bid or list right now. If you think that's a mistake, get in touch.",
+      },
+    };
+  }
+
   // Per-account listing budget (in-memory, see rate-limit.ts): draft creation
   // is a write a human does a handful of times, never ten times a minute.
   const budget = rateLimit(
@@ -131,6 +151,25 @@ export async function duplicateAuctionAction(input: {
     return {
       ok: false,
       rejection: { code: "not_authenticated", message: "Sign in to sell." },
+    };
+  }
+
+  // Same door as creation: a suspended account cannot start a relist either.
+  // The publish would be refused by the is_banned triggers regardless, but an
+  // explicit refusal names the outcome instead of stranding a draft.
+  const { data: duplicator } = await supabase
+    .from("profiles")
+    .select("is_banned")
+    .eq("id", user.id)
+    .maybeSingle();
+  if (duplicator?.is_banned) {
+    return {
+      ok: false,
+      rejection: {
+        code: "account_banned",
+        message:
+          "Your account can't bid or list right now. If you think that's a mistake, get in touch.",
+      },
     };
   }
 

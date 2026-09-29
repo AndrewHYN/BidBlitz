@@ -12,6 +12,7 @@ import { badgeVariants, SellerPayoutBadge, TransactionBadge } from "@/components
 import { Money } from "@/components/auction/money";
 import { feePercentLabel } from "@/lib/money";
 import { ReportStatusControls } from "@/components/dashboard/report-status-controls";
+import { BanButton, TakedownButton } from "@/components/dashboard/moderation-controls";
 import { PayoutControls } from "@/components/dashboard/payout-controls";
 import { getAdminPayouts, type AdminPayoutRow } from "@/server/queries";
 import { isPaymentProviderConfigured } from "@/server/payments/config";
@@ -32,6 +33,34 @@ type ReportRow = {
   resolution: string | null;
   created_at: string;
   resolved_at: string | null;
+};
+
+type ReportedAuction = {
+  id: string;
+  title: string;
+  status: string;
+  created_at: string;
+  seller_id: string;
+  seller: { username: string } | null;
+};
+
+type ReportedUser = {
+  id: string;
+  username: string;
+  display_name: string;
+  is_banned: boolean;
+};
+
+type ModerationEvent = {
+  id: string;
+  created_at: string;
+  action: "TAKEDOWN_LISTING" | "BAN_USER" | "UNBAN_USER";
+  target_type: "auction" | "user";
+  target_id: string;
+  prev_status: string | null;
+  new_status: string | null;
+  reason: string;
+  report_id: string | null;
 };
 
 type FeeRow = {
@@ -221,6 +250,51 @@ export default async function AdminPage() {
   const fee = (feeRes.data ?? null) as FeeRow | null;
   const configured = isPaymentProviderConfigured();
 
+  // What the reports point at, so the queue shows names instead of UUIDs.
+  // A report target is one id in one of two tables; both reads are batched,
+  // and a target deleted since the report was filed simply shows as gone
+  // rather than breaking the row.
+  const reportedAuctionIds = [
+    ...new Set(
+      reports.filter((r) => r.target_type === "auction").map((r) => r.target_id)
+    ),
+  ];
+  const reportedUserIds = [
+    ...new Set(
+      reports.filter((r) => r.target_type === "user").map((r) => r.target_id)
+    ),
+  ];
+  const [auctionRows, userRows, eventsRes] = await Promise.all([
+    reportedAuctionIds.length > 0
+      ? supabase
+          .from("auctions")
+          .select(
+            "id, title, status, created_at, seller_id, seller:profiles!auctions_seller_id_fkey(username)"
+          )
+          .in("id", reportedAuctionIds)
+      : Promise.resolve({ data: [] as ReportedAuction[] }),
+    reportedUserIds.length > 0
+      ? supabase
+          .from("profiles")
+          .select("id, username, display_name, is_banned")
+          .in("id", reportedUserIds)
+      : Promise.resolve({ data: [] as ReportedUser[] }),
+    supabase
+      .from("moderation_events")
+      .select(
+        "id, created_at, action, target_type, target_id, prev_status, new_status, reason, report_id"
+      )
+      .order("created_at", { ascending: false })
+      .limit(20),
+  ]);
+  const auctionById = new Map(
+    ((auctionRows as { data: ReportedAuction[] }).data ?? []).map((a) => [a.id, a])
+  );
+  const userById = new Map(
+    ((userRows as { data: ReportedUser[] }).data ?? []).map((u) => [u.id, u])
+  );
+  const events = ((eventsRes as { data: ModerationEvent[] }).data ?? []) as ModerationEvent[];
+
   return (
     <div className="page-container py-10 sm:py-14 space-y-8" data-testid="admin-page">
       <PageHeader
@@ -321,37 +395,185 @@ export default async function AdminPage() {
             />
           ) : (
             <ul className="space-y-2">
-              {reports.map((report) => (
-                <li
-                  key={report.id}
-                  data-testid="admin-report-row"
-                  className="space-y-3 rounded-lg border bg-card p-4"
-                >
-                  <div className="space-y-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span
-                        className={
-                          report.status === "OPEN"
-                            ? badgeVariants({ tone: "ending" })
-                            : badgeVariants({ tone: "scheduled" })
-                        }
-                      >
-                        {STATUS_LABELS[report.status]}
-                      </span>
-                      <span className="text-xs uppercase tracking-wide text-muted-foreground">
-                        {report.target_type === "auction" ? "Auction" : "User"} report
-                      </span>
+              {reports.map((report) => {
+                const auction =
+                  report.target_type === "auction"
+                    ? auctionById.get(report.target_id)
+                    : undefined;
+                const reportedUser =
+                  report.target_type === "user"
+                    ? userById.get(report.target_id)
+                    : undefined;
+                return (
+                  <li
+                    key={report.id}
+                    data-testid="admin-report-row"
+                    className="space-y-3 rounded-lg border bg-card p-4"
+                  >
+                    <div className="space-y-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span
+                          className={
+                            report.status === "OPEN"
+                              ? badgeVariants({ tone: "ending" })
+                              : badgeVariants({ tone: "scheduled" })
+                          }
+                        >
+                          {STATUS_LABELS[report.status]}
+                        </span>
+                        <span className="text-xs uppercase tracking-wide text-muted-foreground">
+                          {report.target_type === "auction" ? "Auction" : "User"} report
+                        </span>
+                      </div>
+                      {/*
+                        The target as a name and a link, never a bare UUID. An
+                        operator cannot act on 36 hex characters; a missing
+                        target (deleted since the report) says so instead of
+                        breaking the row.
+                      */}
+                      {report.target_type === "auction" ? (
+                        auction ? (
+                          <p className="text-sm">
+                            <Link
+                              href={`/auction/${auction.id}`}
+                              className="font-medium hover:text-primary hover:underline"
+                            >
+                              {auction.title}
+                            </Link>{" "}
+                            <span className="text-muted-foreground">
+                              by {auction.seller?.username ?? "unknown seller"} ·{" "}
+                              {auction.status} · listed {formatDate(auction.created_at)}
+                            </span>
+                          </p>
+                        ) : (
+                          <p className="text-sm text-muted-foreground">
+                            The reported listing no longer exists.
+                          </p>
+                        )
+                      ) : reportedUser ? (
+                        <p className="text-sm">
+                          <Link
+                            href={`/profile/${reportedUser.username}`}
+                            className="font-medium hover:text-primary hover:underline"
+                          >
+                            @{reportedUser.username}
+                          </Link>{" "}
+                          <span className="text-muted-foreground">
+                            {reportedUser.display_name}
+                            {reportedUser.is_banned ? " · currently suspended" : ""}
+                          </span>
+                        </p>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">
+                          The reported account no longer exists.
+                        </p>
+                      )}
+                      <p className="text-sm font-medium">{report.reason}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Filed {formatDate(report.created_at)}
+                      </p>
                     </div>
-                    <p className="text-sm font-medium">{report.reason}</p>
-                    <p className="text-xs text-muted-foreground">
-                      Target {report.target_id} · filed {formatDate(report.created_at)}
-                    </p>
-                  </div>
 
-                  <ReportStatusControls
-                    reportId={report.id}
-                    status={report.status}
-                  />
+                    <div className="flex flex-wrap items-center gap-2 border-t pt-3">
+                      <ReportStatusControls
+                        reportId={report.id}
+                        status={report.status}
+                      />
+                      {/*
+                        Enforcement lives beside triage, not on another page:
+                        the operator reading the reason is the operator
+                        deciding. Each button confirms with the target named
+                        and writes the audit row; the RPC underneath refuses
+                        anything already closed, so a stale queue cannot
+                        double-enforce.
+                      */}
+                      {report.target_type === "auction" && auction &&
+                        (auction.status === "LIVE" || auction.status === "SCHEDULED") && (
+                          <TakedownButton
+                            auctionId={auction.id}
+                            auctionTitle={auction.title}
+                            reportId={report.id}
+                          />
+                        )}
+                      {report.target_type === "user" && reportedUser && (
+                        <BanButton
+                          userId={reportedUser.id}
+                          username={reportedUser.username}
+                          banned={reportedUser.is_banned}
+                          reportId={report.id}
+                        />
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      </section>
+
+      <section aria-labelledby="admin-audit-heading" className="space-y-4">
+        <SectionHeading
+          title={
+            <span id="admin-audit-heading" className="inline-flex items-center gap-2">
+              <ShieldAlert className="size-4 text-muted-foreground" aria-hidden />
+              Moderation record
+            </span>
+          }
+        />
+
+        {/*
+          What happened, as the database recorded it: every takedown and every
+          suspension, with the actor implied (only admins can write here), the
+          reason, and the time. Append-only by construction - no update or
+          delete policy exists for any role - so this list can only grow. A
+          seller asking "why was my listing removed" gets an answer from this
+          list, not a guess.
+        */}
+        <div data-testid="admin-audit" className="space-y-3">
+          {events.length === 0 ? (
+            <EmptyState
+              compact
+              icon={ShieldAlert}
+              title="No enforcement actions yet"
+              description="Takedowns and suspensions appear here with the reason recorded."
+            />
+          ) : (
+            <ul className="space-y-2">
+              {events.map((event) => (
+                <li
+                  key={event.id}
+                  data-testid="admin-audit-row"
+                  className="space-y-1 rounded-lg border bg-card p-4"
+                >
+                  <p className="text-sm">
+                    <span className="font-medium">
+                      {event.action === "TAKEDOWN_LISTING"
+                        ? "Listing taken down"
+                        : event.action === "BAN_USER"
+                          ? "Account suspended"
+                          : "Account restored"}
+                    </span>{" "}
+                    <span className="text-muted-foreground">
+                      {event.target_type === "auction" ? (
+                        <Link
+                          href={`/auction/${event.target_id}`}
+                          className="hover:text-primary hover:underline"
+                        >
+                          listing
+                        </Link>
+                      ) : (
+                        "account"
+                      )}{" "}
+                      · {formatDate(event.created_at)}
+                    </span>
+                  </p>
+                  {(event.prev_status || event.new_status) && (
+                    <p className="text-xs text-muted-foreground">
+                      {event.prev_status ?? "?"} → {event.new_status ?? "?"}
+                    </p>
+                  )}
+                  <p className="text-sm">{event.reason}</p>
                 </li>
               ))}
             </ul>
