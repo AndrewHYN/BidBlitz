@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { Avatar } from "@/components/ui/avatar";
 import { avatarUrlFor, initialsFor } from "@/lib/avatar";
@@ -123,21 +123,57 @@ export function UserAvatar({
    *
    * So a failure is bounded, not final. Each retry asks for a DIFFERENT URL, by
    * adding a version parameter, so a stale cache entry cannot be handed back
-   * again and the optimiser genuinely re-fetches. A deleted object still settles
-   * on initials, because three attempts in quick succession are enough to be
-   * sure, and a transient failure recovers by itself.
+   * again and the optimiser genuinely re-fetches.
+   *
+   * And the retries are SPACED, not immediate. Measured on a fresh upload:
+   * the component's own first request answered 400 while the object was not
+   * yet visible to the optimiser, and the same URL returned decodable bytes
+   * from t=5s onward for the next 70 seconds. Three retries inside 160ms all
+   * fail inside the same blind window and then give up forever, which is
+   * exactly what happened. Attempts at roughly t=0s, t=2s and t=10s land
+   * outside any plausible window while keeping the happy path instant and a
+   * genuinely deleted object settling on initials within seconds.
    */
   const MAX_LOAD_ATTEMPTS = 3;
   const failureCount = failures && failures.url === url ? failures.count : 0;
   const isFailed = url !== null && failureCount >= MAX_LOAD_ATTEMPTS;
   const isLoaded = url !== null && loadedUrl === url;
 
+  // A retry scheduled for a previous key must never fire for this one, and a
+  // timer must never outlive the component. Read inside the cleanup, not
+  // outside it: the value has to be the one held when the cleanup runs.
+  const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    return () => {
+      if (retryTimer.current) {
+        clearTimeout(retryTimer.current);
+        retryTimer.current = null;
+      }
+    };
+  }, [url]);
+
+  // Attempt-indexed delays: the first retry waits out a short propagation
+  // gap, the second waits out a long one. Indexed, not constant, so lengthening
+  // the window means changing a number here rather than restructuring.
+  const RETRY_DELAYS_MS = [2000, 8000];
+
   const recordFailure = () => {
-    if (url === null) return;
-    setFailures((prev) => ({
-      url,
-      count: (prev?.url === url ? prev.count : 0) + 1,
-    }));
+    if (url === null || retryTimer.current) return;
+    const current = failures && failures.url === url ? failures.count : 0;
+    if (current + 1 >= MAX_LOAD_ATTEMPTS) {
+      // Attempts spent. Settle on initials and remove the image element.
+      // Immediate, because there is nothing left to wait for.
+      setFailures({ url, count: MAX_LOAD_ATTEMPTS });
+      return;
+    }
+    // Not yet: schedule the next attempt after its delay. While it waits, the
+    // failed src stays rendered but inert - the browser does not re-request a
+    // src that already failed - so the visible state does not flicker.
+    const delay = RETRY_DELAYS_MS[current] ?? 8000;
+    retryTimer.current = setTimeout(() => {
+      retryTimer.current = null;
+      setFailures({ url, count: current + 1 });
+    }, delay);
   };
 
   // The URL actually requested, or null when there is nothing to show.

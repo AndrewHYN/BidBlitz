@@ -155,6 +155,23 @@ describe("UserAvatar rendering states", () => {
 
     // And the retry really is a different request, not the same one again.
     expect(src).toMatch(/v=\$\{failureCount\}/);
+
+    /*
+     * And the retries are SPACED. Measured on a fresh upload: the first
+     * request answered 400 while the object was not yet visible to the
+     * optimiser, and the same URL returned decodable bytes from t=5s onward.
+     * Three retries inside 160ms all fail inside the same blind window and
+     * then give up forever. A recordFailure that increments the counter
+     * synchronously is that bug, so it is refused here.
+     */
+    expect(src).toMatch(/const RETRY_DELAYS_MS = \[/);
+    expect(src).toMatch(/retryTimer\.current = setTimeout/);
+    // A retry scheduled for a previous key must never fire for this one.
+    expect(src).toMatch(/clearTimeout\(retryTimer\.current\)/);
+    expect(src).toMatch(/\}, \[url\]\);/);
+    // The counter advances only when the timer fires, never synchronously.
+    expect(src).not.toMatch(/setFailures\(\(prev\) =>/);
+    expect(src).toMatch(/v=\$\{failureCount\}/);
   });
 
   it("routes both failure modes through the bound, so neither can loop forever", () => {
@@ -163,10 +180,14 @@ describe("UserAvatar rendering states", () => {
     // zero pixels. Both must go through the counter, or one of them bypasses the
     // bound.
     expect(src).toMatch(/onError=\{recordFailure\}/);
-    // Three references: the definition, the zero-size call, and the onError
-    // handler. Anything fewer means a failure path was left un-routed.
+    // The definition, the zero-size call, and the onError handler: anything
+    // fewer means a failure path was left un-routed.
     const uses = src.match(/recordFailure/g) ?? [];
     expect(uses.length).toBeGreaterThanOrEqual(3);
+    // Exactly one place may advance the counter, and it is inside the timer.
+    // Two would mean a synchronous path that bypasses the spacing.
+    const advances = src.match(/count: current \+ 1/g) ?? [];
+    expect(advances.length).toBe(1);
     // Nothing may increment the counter directly and skip the bound.
     expect(src).not.toMatch(/setFailures\(\{[^}]*count: \d+ \}\)/);
   });

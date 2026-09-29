@@ -466,7 +466,17 @@ test.describe("avatar rendering states", () => {
     await expectState(profile.getByTestId("user-avatar"), "initials");
     const broken = await assertExclusive(page, profile, 1);
     expect(broken.states).toEqual(["initials"]);
-    expect(broken.presentImages, "a failed image was left in the DOM").toBe(0);
+    // The failed requests are retried on a delay before the component gives up,
+    // so the hidden image element is still present for seconds after the state
+    // already reads "initials". What matters is that it is eventually removed,
+    // not that it was never there: an element that is not rendered cannot load
+    // at all, and requiring its absence up front would reintroduce the deadlock
+    // the component was rewritten to escape.
+    await expect(profile.getByTestId("user-avatar-image")).toHaveCount(0, {
+      timeout: 30_000,
+    });
+    const settled = await assertExclusive(page, profile, 1);
+    expect(settled.presentImages, "a failed image was left in the DOM").toBe(0);
 
     // The same failure in the header, which is the smallest frame and the one
     // that is on every page.
