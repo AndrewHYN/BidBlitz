@@ -301,12 +301,27 @@ test.describe("avatar rendering states", () => {
     const found = await scope.evaluate((root) => {
       // `checkVisibility` is what the browser itself uses, and it accounts for
       // `visibility: hidden`, zero size, and `display: none`.
+      // "Shown" means painted, not present. The image is hidden with opacity
+      // while it loads - deliberately, because a visibility-hidden image is not
+      // decoded and then reads as a corrupt one - so a fully transparent image is
+      // in the DOM and on screen but shows nothing. Counting it would let "both
+      // states painted" pass, which is the bug this file exists to catch.
       const shown = (sel: string) =>
-        [...root.querySelectorAll(sel)].filter((el) =>
-          (el as HTMLElement).checkVisibility
-            ? (el as HTMLElement).checkVisibility()
-            : el.getClientRects().length > 0
-        ).length;
+        [...root.querySelectorAll(sel)].filter((el) => {
+          const node = el as HTMLElement;
+          const onScreen = node.checkVisibility
+            ? node.checkVisibility()
+            : node.getClientRects().length > 0;
+          if (!onScreen) return false;
+          let opacity = 1;
+          let current: HTMLElement | null = node;
+          while (current) {
+            const value = Number(getComputedStyle(current).opacity);
+            if (!Number.isNaN(value)) opacity *= value;
+            current = current.parentElement;
+          }
+          return opacity > 0.01;
+        }).length;
       const roots = [...root.querySelectorAll('[data-testid="user-avatar"]')];
       return {
         visibleImages: shown('[data-testid="user-avatar-image"]'),

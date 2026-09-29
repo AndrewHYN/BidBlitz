@@ -110,9 +110,24 @@ describe("UserAvatar rendering states", () => {
     // The initials are the complement of "the image is showing".
     expect(src).toMatch(/\{showInitials \? \(/);
 
-    // Hidden means `invisible`, not just transparent: `opacity-0` leaves the
-    // node in the accessibility tree and passes any naive visibility check.
-    expect(src).toMatch(/isLoaded \? "opacity-100" : "invisible opacity-0"/);
+    /*
+     * Hidden with OPACITY, and never with `visibility: hidden`.
+     *
+     * A visibility-hidden image is not decoded by the browser, so `load` arrives
+     * with `complete === true` and `naturalWidth === 0`. The zero-size guard -
+     * which is genuinely needed for a corrupt object - then reads a perfectly
+     * good image as broken, and the component removes it. Measured: three
+     * `w=96` requests, all `200 image/png`, and a frame with no <img> at all
+     * that stayed on its initials for 32 seconds.
+     *
+     * Opacity does not prevent decoding, and the initials are opaque and painted
+     * above it, so exactly one thing is ever visible.
+     */
+    expect(src).toMatch(/isLoaded \? "opacity-100" : "opacity-0"/);
+    expect(src).not.toMatch(/invisible/);
+    // And the letters must be pinned above the transparent image, not left to
+    // happen to come later in the document.
+    expect(src).toMatch(/relative z-10 grid size-full/);
   });
 
   it("counts failures against the URL, so a retry is a different request", () => {

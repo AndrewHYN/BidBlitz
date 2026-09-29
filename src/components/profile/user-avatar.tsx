@@ -207,9 +207,19 @@ export function UserAvatar({
           sizes={`${px}px`}
           className={cn(
             "size-full rounded-full object-cover",
-            // `invisible` rather than `opacity-0`: opacity alone leaves the node
-            // visible to assistive tech and to any visibility check.
-            isLoaded ? "opacity-100" : "invisible opacity-0"
+            // Hidden with OPACITY, never with `visibility: hidden`. A hidden
+            // image is not decoded, so `load` arrives with naturalWidth === 0,
+            // which the zero-size check reads as a corrupt object - and then the
+            // component removes a picture that loaded fine. The initials below
+            // are opaque and sit on top, so only one thing is ever painted.
+            // decoded, so `load` can arrive with naturalWidth === 0 - which the
+            // zero-size check below then reads as a corrupt object, three times,
+            // and removes a picture that is perfectly fine. That is not
+            // hypothetical: it is what made the Settings preview permanently
+            // show initials while three successful 200 image/png responses came
+            // and went. A transparent image is still decoded, and the opaque
+            // initials are painted on top of it, so only one thing is ever seen.
+            isLoaded ? "opacity-100" : "opacity-0"
           )}
           data-testid="user-avatar-image"
           onLoad={(event) => {
@@ -243,7 +253,7 @@ export function UserAvatar({
           aria-hidden="true"
           data-testid="user-avatar-initials"
           className={cn(
-            "grid size-full place-items-center rounded-full bg-muted",
+            "relative z-10 grid size-full place-items-center rounded-full bg-muted",
             "text-muted-foreground",
             size === "sm" ? "text-xs" : pixelSize && pixelSize > 40 ? "text-lg" : "text-sm"
           )}
