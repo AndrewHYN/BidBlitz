@@ -102,8 +102,10 @@ describe("UserAvatar rendering states", () => {
     expect(src).not.toMatch(/\{showImage \? \(/);
 
     // A src is a src, so TypeScript needs no assertion to narrow it. A cast here
-    // would hide the very null the guard exists to make impossible.
-    expect(src).toMatch(/src=\{imageSrc\}/);
+    // would hide the very null the guard exists to make impossible. The src
+    // goes through the optimiser builder, which is pinned in lib/avatar.test.ts.
+    expect(src).toMatch(/src=\{optimizedAvatarSrc\(imageSrc, px\)\}/);
+    expect(src).not.toMatch(/src=\{imageSrc\}/);
     expect(src).not.toMatch(/url!\}/);
     expect(src).not.toMatch(/url as string/);
 
@@ -243,13 +245,24 @@ describe("UserAvatar rendering states", () => {
     expect(src).toMatch(/aria-hidden="true"/);
   });
 
-  it("keeps the next/image sizing hint, so the header still gets a 32px variant", () => {
+  it("renders a plain img fed by the optimiser builder, with no srcset machinery", () => {
     const src = code();
-    // This is the reason the component does not use `AvatarImage` at all. If the
-    // width/height/sizes triple is dropped, the optimiser is told nothing and
-    // serves a variant sized for the largest rendering.
+    /*
+     * Bisected twice in production: an element carrying srcset+sizes reported
+     * naturalWidth 0 for responses a bare element with the same URL decoded in
+     * the same minute. The component therefore emits no srcset at all - and
+     * `sizes` without a srcset is meaningless, so it goes too. What stays is
+     * the optimisation itself: the builder asks for exactly one width, so a
+     * 32px header never downloads the multi-megabyte original.
+     */
+    expect(src).not.toMatch(/from "next\/image"/);
+    expect(src).not.toMatch(/<Image/);
+    expect(src).toMatch(/<img/);
+    expect(src).toMatch(/src=\{optimizedAvatarSrc\(imageSrc, px\)\}/);
+    expect(src).not.toMatch(/sizes=/);
+    expect(src).not.toMatch(/srcSet|srcset/i);
+    // The rendered frame is still exactly the reserved size.
     expect(src).toMatch(/width=\{px\}/);
     expect(src).toMatch(/height=\{px\}/);
-    expect(src).toMatch(/sizes=\{`\$\{px\}px`\}/);
   });
 });

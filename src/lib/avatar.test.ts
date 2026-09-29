@@ -1,10 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   AVATAR_MAX_BYTES,
+  AVATAR_OPTIMIZER_WIDTHS,
   AVATAR_PATH_RE,
   avatarKeyFor,
   avatarUrlFor,
   initialsFor,
+  optimizedAvatarSrc,
   safeAvatarKey,
   sniffImageExt,
   validateAvatarBytes,
@@ -186,5 +188,49 @@ describe("initialsFor()", () => {
     expect(initialsFor("Ada")).toBe("AD");
     // A one-character name must still show something rather than nothing.
     expect(initialsFor("X")).toBe("X");
+  });
+});
+
+describe("optimizedAvatarSrc()", () => {
+  const STORAGE =
+    "https://zteakuiuvcikwpnkgxsn.supabase.co/storage/v1/object/public/avatars/39ecaf2c-6f7b-4eeb-8782-99ed5f4e13fc/avatar.png";
+
+  it("asks the optimiser for exactly one width, with no srcset machinery", () => {
+    // The component renders a plain <img> with this string as its src. There
+    // is no srcset and no sizes anywhere in it: a single request, a single
+    // cache entry, nothing for a selection algorithm to mis-pick.
+    const src = optimizedAvatarSrc(STORAGE, 80);
+    expect(src.startsWith("/_next/image?url=")).toBe(true);
+    expect(src).not.toContain("srcset");
+    expect(src).not.toContain("sizes=");
+  });
+
+  it("maps a rendered size to the smallest accepted width at double density", () => {
+    // Retina-aware and deterministic: server and client must compute the same
+    // string, or hydration mismatches on the src. 32px renders ask for 64 and
+    // 80px renders ask for 256 - small downloads either way, and never the
+    // multi-megabyte original.
+    expect(optimizedAvatarSrc(STORAGE, 32)).toContain("w=64");
+    expect(optimizedAvatarSrc(STORAGE, 80)).toContain("w=256");
+    for (const px of [24, 32, 40, 64, 80, 96]) {
+      const w = Number(optimizedAvatarSrc(STORAGE, px).match(/w=(\d+)/)?.[1]);
+      expect(AVATAR_OPTIMIZER_WIDTHS).toContain(w);
+      expect(w).toBeGreaterThanOrEqual(px);
+    }
+  });
+
+  it("keeps the storage URL, including retry parameters, inside the url value", () => {
+    // Retry parameters (?v=, &m=) belong to the nested storage URL, so each
+    // retry is a genuinely different optimiser entry. If they leaked to the
+    // outer query string instead, the optimiser would ignore them and every
+    // retry would return the same cached entry.
+    const retrying = `${STORAGE}?v=2&m=abc123`;
+    const src = optimizedAvatarSrc(retrying, 80);
+    const nested = new URL(src, "https://bidblitz.test").searchParams.get("url");
+    expect(nested).toBe(retrying);
+  });
+
+  it("keeps the quality setting the product standardised on", () => {
+    expect(optimizedAvatarSrc(STORAGE, 80)).toContain("q=75");
   });
 });

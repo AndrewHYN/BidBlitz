@@ -54,6 +54,46 @@ export function avatarUrlFor(path: string | null | undefined): string | null {
 }
 
 /**
+ * The widths our image optimiser accepts. This mirrors the framework defaults,
+ * and it is written out rather than imported because the whole point is a
+ * contract the component can rely on: any width produced here must be served,
+ * never refused with an invalid-request error.
+ */
+export const AVATAR_OPTIMIZER_WIDTHS = [16, 32, 48, 64, 96, 128, 256, 384];
+
+/**
+ * An optimiser URL for a storage URL, at a rendered size — without a srcset.
+ *
+ * The element this feeds is a plain `<img>`, deliberately, not `next/image`.
+ * Bisected twice in production: an `<img>` carrying the responsive-images
+ * machinery (`srcset` + `sizes`) reported `naturalWidth === 0` for responses
+ * that a bare `<img>` with the same URL decoded as 1x1 in the same minute.
+ * Same bytes, same browser, same page. The responsive selection is the only
+ * structural difference, and the failure followed it exactly: present 0x0,
+ * absent 1x1. The browser-internal mechanism was not identified, so rather
+ * than depend on it the component does not emit it.
+ *
+ * What is kept: the optimiser itself. A plain `<img src={storageUrl}>` would
+ * download the original multi-megabyte upload for a 32px header avatar, which
+ * is the performance defect this component was built to prevent. This builder
+ * asks the optimiser for exactly one width, so the download stays small and
+ * there is nothing for a selection algorithm to mis-pick.
+ *
+ * Width is retina-aware and deterministic: the smallest accepted width at or
+ * above twice the rendered size, so DPR-2 screens get real pixels rather than
+ * an upscale, and server and client always compute the same string (a value
+ * that differed between them would be a hydration mismatch). 32px renders ask
+ * for 64, 80px renders ask for 256.
+ */
+export function optimizedAvatarSrc(storageUrl: string, px: number): string {
+  const target = Math.max(1, px) * 2;
+  const w =
+    AVATAR_OPTIMIZER_WIDTHS.find((candidate) => candidate >= target) ??
+    AVATAR_OPTIMIZER_WIDTHS[AVATAR_OPTIMIZER_WIDTHS.length - 1];
+  return `/_next/image?url=${encodeURIComponent(storageUrl)}&w=${w}&q=75`;
+}
+
+/**
  * Identify an image from its leading bytes.
  *
  * Returns `null` for anything unrecognised, which is the rejection path: a

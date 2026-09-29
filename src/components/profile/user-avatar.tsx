@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Image from "next/image";
 import { Avatar } from "@/components/ui/avatar";
-import { avatarUrlFor, initialsFor } from "@/lib/avatar";
+import { avatarUrlFor, initialsFor, optimizedAvatarSrc } from "@/lib/avatar";
 import { cn } from "@/lib/utils";
 
 /**
@@ -13,9 +12,14 @@ import { cn } from "@/lib/utils";
  *
  * Radix's own `AvatarImage` is a plain `<img src>`, so the header avatar fetched
  * the *original* object from Supabase on every page for every signed-in visitor,
- * at whatever resolution it was uploaded. Measured in production: the settings
- * preview went through `/_next/image` correctly while the same avatar in the
- * header pulled the raw multi-megabyte file. So the image is `next/image`.
+ * at whatever resolution it was uploaded. The image therefore goes through the
+ * `/_next/image` optimiser — but as a plain `<img>` fed by `optimizedAvatarSrc`,
+ * not through the `next/image` component. That component emits `srcset`+`sizes`,
+ * and that machinery is what the latest defect turned on: bisected twice, an
+ * element carrying it reported `naturalWidth` 0 for responses a bare element
+ * with the same URL decoded in the same minute. The builder asks the optimiser
+ * for exactly one width, so the download stays small and there is no selection
+ * to misbehave.
  *
  * ## The bug this fixes
  *
@@ -262,26 +266,24 @@ export function UserAvatar({
       data-avatar-state={isLoaded ? "image" : "initials"}
     >
       {imageSrc !== null ? (
-        <Image
-          src={imageSrc}
+        // A plain <img>, not next/image, fed by the optimiser-URL builder.
+        // next/image emits srcset+sizes, and that machinery is what failed:
+        // bisected twice, an element carrying it reported naturalWidth 0 for
+        // responses a bare element with the same URL decoded in the same
+        // minute. The builder keeps the optimisation (a sized variant, never
+        // the multi-megabyte original) with nothing left to mis-pick.
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={optimizedAvatarSrc(imageSrc, px)}
           alt=""
           width={px}
           height={px}
-          sizes={`${px}px`}
+          decoding="async"
           className={cn(
             "size-full rounded-full object-cover",
-            // Hidden with OPACITY, never with `visibility: hidden`. A hidden
-            // image is not decoded, so `load` arrives with naturalWidth === 0,
-            // which the zero-size check reads as a corrupt object - and then the
-            // component removes a picture that loaded fine. The initials below
-            // are opaque and sit on top, so only one thing is ever painted.
-            // decoded, so `load` can arrive with naturalWidth === 0 - which the
-            // zero-size check below then reads as a corrupt object, three times,
-            // and removes a picture that is perfectly fine. That is not
-            // hypothetical: it is what made the Settings preview permanently
-            // show initials while three successful 200 image/png responses came
-            // and went. A transparent image is still decoded, and the opaque
-            // initials are painted on top of it, so only one thing is ever seen.
+            // Hidden with OPACITY while loading. A controlled matrix showed
+            // opacity does not prevent decoding, and the opaque initials sit on
+            // top, so only one thing is ever painted.
             isLoaded ? "opacity-100" : "opacity-0"
           )}
           data-testid="user-avatar-image"
