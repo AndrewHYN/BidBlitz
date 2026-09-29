@@ -43,7 +43,7 @@ const REF = projectRef() ?? requireEnv("SUPABASE_PROJECT_REF");
 const dryRun = !process.argv.includes("--yes");
 
 /** Exactly the prefixes `e2e/*.spec.ts` pass to `createListing()`. */
-const PREFIXES = ["Race", "Countdown", "Loop", "Outbid", "RLS", "Relist", "E2E listing"];
+const PREFIXES = ["Race", "Countdown", "Loop", "Outbid", "RLS", "Relist", "Moderation", "E2E listing"];
 
 // "<Prefix> " + base36 millisecond stamp + "-" + 6 base36 chars.
 // Anchored, so nothing that merely contains a prefix is matched.
@@ -218,6 +218,13 @@ if (fixtures.length > 0) {
       `delete from public.transactions where auction_id in (${ids})`,
     ],
     ["bids", `delete from public.bids where auction_id in (${ids})`],
+    [
+      // Reports point at targets by bare uuid (no FK), so they survive the
+      // auction delete and would linger as orphans pointing nowhere. Scoped
+      // to fixture ids, like everything else here.
+      "reports",
+      `delete from public.reports where target_type = 'auction' and target_id in (${ids})`,
+    ],
     [
       "notifications",
       `delete from public.notifications where auction_id in (${ids})`,
