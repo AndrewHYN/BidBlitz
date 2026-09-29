@@ -443,22 +443,39 @@ export const getSelling = cache(async (userId: string) => {
     .eq("seller_id", userId)
     .order("created_at", { ascending: false });
 
-  return (data ?? []) as unknown as Array<
+  type SellingTx = {
+    id: string;
+    status: string;
+    gross_minor: number;
+    fee_minor: number;
+    net_minor: number;
+    currency: string;
+  };
+
+  return ((data ?? []) as unknown as Array<
     AuctionCardData & {
       winner_id: string | null;
       winning_bid_minor: number | null;
       seller_id: string;
       created_at: string;
-      transactions: Array<{
-        id: string;
-        status: string;
-        gross_minor: number;
-        fee_minor: number;
-        net_minor: number;
-        currency: string;
-      }>;
+      // PostgREST shapes this embed by cardinality, not by what the query
+      // asks for: transactions.auction_id is UNIQUE, so one auction has at
+      // most one transaction and the embed arrives as an OBJECT or NULL,
+      // never an array. The page below was written for an array, so a row
+      // with no sale crashed it (null[0]) and a row with a sale silently hid
+      // its summary (object[0] is undefined). No e2e ever visited this page
+      // with rows, which is how a crash-on-every-listing survived every gate.
+      // Normalized here, once, so the declared type is the runtime truth.
+      transactions: SellingTx | SellingTx[] | null;
     }
-  >;
+  >).map((item) => ({
+    ...item,
+    transactions: Array.isArray(item.transactions)
+      ? item.transactions
+      : item.transactions
+        ? [item.transactions]
+        : [],
+  }));
 });
 
 export const getTransactions = cache(async (userId: string) => {
