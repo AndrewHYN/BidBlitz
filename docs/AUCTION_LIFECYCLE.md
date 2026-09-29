@@ -28,33 +28,47 @@ CANCELLED is also reachable from DRAFT, and from any state that has no bids.
 | `CANCELLED` | `cancel_auction` | Withdrawn before it could sell. |
 | `ENDED` | **nothing** | Unreachable. See below. |
 
-## `ENDED` is unreachable, and that is deliberate
+## `ENDED`: a display value, never a stored state
 
-No function, trigger or policy assigns it. It is verified rather than assumed:
-`select ... where status = 'ENDED'` is not in the suite, but a repository-wide
-search of the migrations finds no assignment, and the only places it appears are
-defensive — `isClosed()` and the guard in `place_bid` that refuses a bid on
-anything already finished.
+No function, trigger or policy assigns `ENDED` to the `status` column. Verified
+by repository-wide search of every migration: the only writers are
+`publish_auction` (DRAFT→SCHEDULED/LIVE), `place_bid` (bid projection only),
+`settle_auction` (LIVE→SOLD/UNSOLD), and `cancel_auction` (→CANCELLED).
 
-The reason it is not needed: **the clock decides that an auction has ended, and
-the status records the outcome.** An auction whose `ends_at` has passed but which
-has not been settled yet is still `LIVE`, and everything that matters reads the
-server clock rather than the status:
+`ENDED` does have one legitimate producer, and it is not a writer:
+`auction_effective_status()` returns the *text* `'ENDED'` for a LIVE row whose
+`ends_at` has passed. Nothing in the app calls that function today — the
+dashboards and cards re-derive the same fact inline (`status === "LIVE" &&
+ends_at <= now`), and the countdown shows "Ended · awaiting results" from the
+clock. Two dashboard filters also test `item.status === "ENDED"`; those
+branches are dead, because the status they read is the stored one, but each
+sits beside the live `LIVE`-plus-expired check that does the real work, so
+they are misleading rather than wrong.
+
+The rule, so nobody has to re-derive it: **the clock decides that an auction
+has ended, and the status records the outcome.** An auction whose `ends_at` has
+passed but which has not been settled yet is still `LIVE`, and everything that
+matters reads the server clock rather than the status:
 
 - `isBiddable()` returns false once `ends_at` is in the past, so no bid is
   accepted;
 - the bid panel shows the closed state;
 - the seller's dashboard offers the settle action;
-- the sweep and the countdown handler settle it.
+- the sweep, the countdown handler, and (since migration 20260929000001) a
+  late bid itself settle it.
 
-Introducing an `ENDED` intermediate state would mean deciding who moves an
+Introducing a stored `ENDED` intermediate would mean deciding who moves an
 auction into it, and every reader would then have to handle "ENDED but not yet
-sold". `SOLD` and `UNSOLD` already carry everything. It is left in the enum
-because removing an enum value is a schema migration with real risk and no
-benefit, and because the defensive references are harmless.
+sold". `SOLD` and `UNSOLD` already carry everything. It stays in the enum
+because removing a value is a schema migration with real risk and no benefit —
+`ALTER TYPE ... DROP VALUE` against a live database, plus every defensive
+reference (`isClosed()`, the `place_bid` guard, the badge, the type union)
+would have to change in lockstep — and because the defensive references are
+harmless as long as nobody mistakes them for producers.
 
-If a future change does need to assign it, the lifecycle table above is the
-contract to update first.
+If a future change does need to store it, the lifecycle table above is the
+contract to update first, and the two dead `=== "ENDED"` dashboard branches
+are the first place it would take effect.
 
 ## Settlement is idempotent, and proven so
 
@@ -88,37 +102,45 @@ sold, but one is "the market did not want it" and the other is "we withdrew
 it". Collapsing them would tell a seller their item was rejected on the open
 market when it was not.
 
-## Known limitation: a refused late bid does not settle the auction
+## Fixed: a refused late bid settles the auction (migration 20260929000001)
 
 `place_bid()` on an auction whose clock has passed calls `settle_auction()` and
-then raises `auction_ended` to refuse the bid. **The raise rolls the settlement
-back.** The bid is refused correctly; the settlement does not survive, and the
-row stays `LIVE`.
+then reports the refusal as a **returned** `{ok:false, error:'auction_ended'}`.
+The transaction commits with the settlement persisted and no bid written.
 
-This was measured, not reasoned about. The check is deliberately phrased as an
-assertion of the limitation rather than removed or left failing:
+This used to be a `raise`, and a raise aborts the enclosing transaction — so
+the settlement was rolled back with it, the bid was refused correctly, and the
+row stayed `LIVE`. It was measured, not reasoned about: the CASE A checks
+placed a bid on an expired auction, confirmed the refusal, read the row back,
+and found it still `LIVE`. The suite check was even phrased as an assertion of
+the limitation ("KNOWN LIMITATION - expects `LIVE`") rather than left failing.
 
-> `CASE A: KNOWN LIMITATION - a refused late bid does not itself settle the
-> auction` — expects `LIVE`.
+The fix keeps the caller contract intact on purpose. `placeBidAction()` already
+handles `!payload?.ok` through `normalizeEngineError()`, which reads the
+`error` field — so the user sees exactly what they saw before ("Auction has
+ended."). PostgREST callers see HTTP 200 with the error inside the body instead
+of HTTP 4xx with a raised message; the checks in `scripts/db/verify-engine.mjs`
+assert the new shape, including that the row is settled afterwards. Nothing any
+human reads changed; only the settlement now survives, which is the entire
+point of calling it.
 
-Settlement is carried by the other two triggers, both of which work:
+Every other `raise` in `place_bid()` is untouched, deliberately: those paths
+change nothing, so rolling back is correct there, and a refusal that writes
+nothing must keep failing closed with an exception.
 
-1. **Page view.** `auction-detail-live.tsx` calls `settleIfDueAction()` when a
+Settlement is therefore carried by three triggers that all work:
+
+1. **Bid.** `place_bid()` settles a clock-expired auction inside the same row
+   lock, then refuses the bid with the settlement committed.
+2. **Page view.** `auction-detail-live.tsx` calls `settleIfDueAction()` when a
    viewer's countdown reaches zero, then refreshes.
-2. **Read path and cron.** `sweepDueAuctions()` — throttled to once a minute per
+3. **Read path and cron.** `sweepDueAuctions()` — throttled to once a minute per
    instance, non-fatal, and non-authoritative — calls `settle_due_auctions()`,
    and the cron route calls the same function.
 
-Two working triggers is why no single missed path leaves the tables lying. The
-`perform settle_auction(...)` in `place_bid` is left in place: it costs one
-wasted function call per refused late bid, and it would become effective if that
-`raise` were ever converted into a returned rejection. Both comments that
-previously claimed this was a working trigger are corrected.
-
-Converting it would mean changing `place_bid`'s error contract from a raised
-exception to a returned rejection, which reaches the server actions, the
-classification layer and the tests. That is an engine contract change, not a
-defect fix, and it is not worth making without a reason that outlives this note.
+No single missed path can leave the tables lying, because no path depends on
+another: each one settles idempotently through `settle_auction()`, which closes
+exactly once no matter how many times it is called.
 
 ## What the UI shows, per ending
 

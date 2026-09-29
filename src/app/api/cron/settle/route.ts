@@ -11,7 +11,9 @@ import type { AuctionEvent } from "@/lib/realtime/types";
  *   1. this route, on a schedule (see vercel.json)
  *   2. `settleIfDueAction()` when a viewer watches the countdown expire
  *   3. `place_bid()` itself, which settles an overdue auction before refusing
- *      the late bid
+ *      the late bid — and since migration 20260929000001 that settlement
+ *      commits, because the refusal is returned rather than raised (raising
+ *      after settling rolled the settlement back)
  *
  * (3) is inside Postgres and cannot be bypassed by a missing cron tick, so an
  * auction can never end in a state where the database disagrees with the wall

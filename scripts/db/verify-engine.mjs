@@ -333,6 +333,40 @@ check("harness: resolved all four test identities",
   [sellerId, buyer1Id, buyer2Id, buyer3Id].every(Boolean),
   `seller=${!!sellerId} b1=${!!buyer1Id} b2=${!!buyer2Id} b3=${!!buyer3Id}`);
 
+  // Pre-flight fail-closed gate: no QA identity may hold admin, and the admin
+  // population must already be exactly the owner's real account - BEFORE this
+  // run writes, deletes, toggles, or purges anything. Every destructive
+  // statement below is scoped to QA identities or guarded fixture ids, so a
+  // real account cannot match any predicate; this gate makes that a verified
+  // precondition rather than an assumption, and stops the run while the
+  // database is still untouched if the world is not as expected.
+  //
+  // This exists because a previous version of this file destroyed the owner's
+  // real profile picture on a green run: the cleanup was unscoped, and nothing
+  // checked anything before writing. Scoping fixed that incident; this gate
+  // fixes the class.
+  const preflightQaAdmins = rows(await sql(
+    `select u.email from public.profiles p
+       join auth.users u on u.id = p.id
+      where p.is_admin and u.email like '%@bidblitz.test'`));
+  const preflightAdmins = rows(await sql(
+    `select u.email from public.profiles p
+       join auth.users u on u.id = p.id
+      where p.is_admin order by u.email`));
+  check("SAFETY pre-flight: no QA account holds admin before anything writes",
+    preflightQaAdmins.length === 0,
+    preflightQaAdmins.length === 0
+      ? "no QA admin"
+      : `REFUSING TO CONTINUE: ${preflightQaAdmins.map((a) => a.email).join(", ")}`);
+  check("SAFETY pre-flight: exactly one real admin and no QA admin",
+    preflightAdmins.length === 1 && preflightQaAdmins.length === 0,
+    `admins=${preflightAdmins.map((a) => a.email).join(", ") || "(none)"}`);
+  if (preflightQaAdmins.length !== 0 || preflightAdmins.length !== 1) {
+    console.log("SAFETY pre-flight failed: aborting before any write.");
+    process.exit(1);
+  }
+
+
 auctionPayload.seller_id = sellerId;
 
 const created = await rest(`/rest/v1/auctions`, {
@@ -585,9 +619,19 @@ const late = await rest(`/rest/v1/rpc/place_bid`, {
   method: "POST", bearer: tok.buyer1,
   body: { p_auction_id: auctionId, p_amount_minor: 999999, p_request_id: randomUUID() },
 });
-check("rule: bid after server-authoritative close rejected",
-  !late.ok && /auction_ended/.test(JSON.stringify(late.data)),
-  JSON.stringify(late.data));
+  // Since migration 20260929000001 the refusal is a RETURNED {ok:false}
+  // rather than a raise - HTTP 200 with the error inside the body - because
+  // raising after settling rolled the settlement back. Same user-visible
+  // refusal, but the close now survives it, which the next check proves on
+  // the row itself.
+  check("rule: bid after server-authoritative close rejected",
+    late.ok && late.data?.ok === false && late.data?.error === 'auction_ended',
+    JSON.stringify(late.data));
+  const afterLateBid = rows(await sql(
+    `select status from public.auctions where id='${auctionId}'`))[0].status;
+  check("settle: a refused late bid leaves the auction SETTLED, not LIVE",
+    afterLateBid === "SOLD",
+    `status=${afterLateBid} (the settlement committed instead of rolling back)`);
 
 const settled = await rest(`/rest/v1/rpc/settle_auction`, {
   method: "POST", bearer: SEC, key: SEC,
@@ -684,23 +728,24 @@ check("notifications: winner got WON, seller got SOLD",
       method: "POST", bearer: tok.buyer1,
       body: { p_auction_id: emptyId, p_amount_minor: 999999, p_request_id: randomUUID() },
     });
-    check("CASE A: a bid after the close is refused",
-      !lateBidNoBids.ok && /auction_ended/.test(JSON.stringify(lateBidNoBids.data)),
-      JSON.stringify(lateBidNoBids.data));
+      // A bid on an expired auction must be refused, whatever else is true -
+      // and since migration 20260929000001 the refusal is returned, not raised,
+      // so the settlement it performs commits instead of rolling back.
+      check("CASE A: a bid after the close is refused",
+        lateBidNoBids.ok && lateBidNoBids.data?.ok === false
+          && lateBidNoBids.data?.error === "auction_ended",
+        JSON.stringify(lateBidNoBids.data));
 
-    // KNOWN LIMITATION, asserted rather than hidden. place_bid() calls
-    // settle_auction() and then raises, and the raise rolls the settlement back,
-    // so refusing a late bid does NOT settle the auction. Measured here rather
-    // than inferred. The other two triggers carry settlement: the detail page
-    // calls settleIfDueAction() when a countdown expires, and the throttled
-    // read-path sweep plus the cron call settle_due_auctions(). Both are
-    // exercised below by settling explicitly, exactly as they would.
-    const afterLateBid = rows(await sql(
-      `select status from public.auctions where id='${emptyId}'`))[0].status;
-    check("CASE A: KNOWN LIMITATION - a refused late bid does not itself settle the auction",
-      afterLateBid === "LIVE",
-      `status=${afterLateBid} (place_bid settles, then raises, and the raise rolls it back)`);
-
+      // THE FIX, asserted directly. Before migration 20260929000001 this
+      // read LIVE: place_bid() settled and then raised, and the raise rolled
+      // the settlement back. Now the refused late bid leaves the auction
+      // SETTLED - UNSOLD with no winner, no transaction, and the seller
+      // notified - which the checks below verify one claim at a time.
+      const afterLateBid = rows(await sql(
+        `select status from public.auctions where id='${emptyId}'`))[0].status;
+      check("CASE A: a refused late bid settles the auction instead of leaving it LIVE",
+        afterLateBid === "UNSOLD",
+        `status=${afterLateBid} (settlement committed, bid refused)`);
     // What the working triggers do.
     const settleEmpty = await rest(`/rest/v1/rpc/settle_auction`, {
       method: "POST", bearer: SEC, key: SEC,
@@ -805,6 +850,156 @@ check("notifications: winner got WON, seller got SOLD",
         ? `removed ${caseIds.length} fixture(s)`
         : `REFUSED to delete ${unsafeToDelete.length} row(s) that did not look like our own`);
   }
+
+  // ---- 11d. the boundary race: settlement vs bid on an expired auction -------
+  //
+  // The auction below has real bids and a past ends_at. Three closers arrive at
+  // once: two explicit settles and one late bid. They serialize on the auction
+  // row lock in an order this test does not control and must not assume - the
+  // assertions hold for every interleaving, because every path funnels through
+  // the idempotent settle_auction().
+  //
+  // What each arrival does, whichever order they land in:
+  //   * settle_auction on LIVE: settles (SOLD, one transaction, one winner).
+  //   * settle_auction after that: already_settled, writes nothing.
+  //   * place_bid on LIVE-but-expired: settles first (same outcome), then
+  //     reports the refusal as a returned value - and since migration
+  //     20260929000001 that settlement commits instead of rolling back.
+  //   * place_bid after that: the row is SOLD, so it raises auction_ended
+  //     having written nothing.
+  //
+  // So no interleaving can produce two transactions, two winners, a lost bid,
+  // or a bid row from the late bidder. That is what is asserted: final state,
+  // never return values alone.
+  const RACE_TITLE = "Verify: settlement races a late bid";
+  const raceCreated = await rest(`/rest/v1/auctions`, {
+    method: "POST", bearer: tok.seller,
+    headers: { Prefer: "return=representation" },
+    body: { ...auctionPayload, title: RACE_TITLE },
+  });
+  const raceId = raceCreated.data?.[0]?.id;
+  check("RACE: a third auction was created for the boundary race", !!raceId,
+    raceId ?? JSON.stringify(raceCreated.data));
+
+  if (raceId) {
+    await rest(`/rest/v1/auction_images`, {
+      method: "POST", bearer: tok.seller,
+      body: { auction_id: raceId, storage_path: `harness/${raceId}/cover.jpg`, position: 0 },
+    });
+    await rest(`/rest/v1/rpc/publish_auction`, {
+      method: "POST", bearer: tok.seller,
+      body: { p_auction_id: raceId },
+    });
+    // Two real bids while live, so the only legal outcome is SOLD to buyer3.
+    await rest(`/rest/v1/rpc/place_bid`, {
+      method: "POST", bearer: tok.buyer1,
+      body: { p_auction_id: raceId, p_amount_minor: 5000, p_request_id: randomUUID() },
+    });
+    await rest(`/rest/v1/rpc/place_bid`, {
+      method: "POST", bearer: tok.buyer3,
+      body: { p_auction_id: raceId, p_amount_minor: 6000, p_request_id: randomUUID() },
+    });
+    await sql(`update public.auctions set ends_at = now() - interval '1 second'
+                where id='${raceId}'`);
+
+    const [raceSettle1, raceLateBid, raceSettle2] = await Promise.all([
+      rest(`/rest/v1/rpc/settle_auction`, {
+        method: "POST", bearer: SEC, key: SEC,
+        body: { p_auction_id: raceId },
+      }),
+      rest(`/rest/v1/rpc/place_bid`, {
+        method: "POST", bearer: tok.buyer2,
+        body: { p_auction_id: raceId, p_amount_minor: 999999, p_request_id: randomUUID() },
+      }),
+      rest(`/rest/v1/rpc/settle_auction`, {
+        method: "POST", bearer: SEC, key: SEC,
+        body: { p_auction_id: raceId },
+      }),
+    ]);
+
+    // The late bid is refused in every interleaving: either it settles first
+    // (returned ok:false) or it arrives after (raised auction_ended).
+    const lateRefused =
+      (raceLateBid.ok && raceLateBid.data?.ok === false && raceLateBid.data?.error === "auction_ended") ||
+      (!raceLateBid.ok && /auction_ended/.test(JSON.stringify(raceLateBid.data)));
+    check("RACE: the late bid is refused however the three closers interleave",
+      lateRefused, JSON.stringify(raceLateBid.data));
+
+    const raceFinal = rows(await sql(
+      `select status, winner_id, winning_bid_minor, bid_count,
+              (select count(*)::int from public.bids b where b.auction_id = a.id) as bid_rows,
+              (select count(*)::int from public.bids b where b.auction_id = a.id and is_winning) as winning_rows,
+              (select count(*)::int from public.bids b where b.auction_id = a.id and bidder_id = '${buyer2Id}') as late_rows,
+              (select count(*)::int from public.transactions t where t.auction_id = a.id) as tx_rows,
+              (select count(*)::int from public.notifications n where n.auction_id = a.id and n.type = 'WON') as won_rows,
+              (select count(*)::int from public.notifications n where n.auction_id = a.id and n.type = 'SOLD') as sold_rows
+         from public.auctions a where a.id = '${raceId}'`))[0];
+
+    check("RACE: one final outcome - SOLD to the highest bidder",
+      raceFinal.status === "SOLD" && raceFinal.winner_id === buyer3Id
+        && Number(raceFinal.winning_bid_minor) === 6000,
+      `status=${raceFinal.status} winner=${raceFinal.winner_id === buyer3Id} amount=${raceFinal.winning_bid_minor}`);
+    check("RACE: exactly one transaction, never two, never zero",
+      raceFinal.tx_rows === 1, `transactions=${raceFinal.tx_rows}`);
+    check("RACE: exactly one winning bid across all interleavings",
+      raceFinal.winning_rows === 1, `is_winning=${raceFinal.winning_rows}`);
+    check("RACE: the refused late bid left no bid row behind",
+      raceFinal.late_rows === 0 && raceFinal.bid_rows === 2 && raceFinal.bid_count === 2,
+      `late_rows=${raceFinal.late_rows} bid_rows=${raceFinal.bid_rows} bid_count=${raceFinal.bid_count}`);
+    check("RACE: exactly one WON and one SOLD notice, no duplicates",
+      raceFinal.won_rows === 1 && raceFinal.sold_rows === 1,
+      `won=${raceFinal.won_rows} sold=${raceFinal.sold_rows}`);
+    void raceSettle1;
+    void raceSettle2;
+
+    // Parallel identical request_id: the same submission fired twice at once.
+    // The unique index admits exactly one row; the loser errors rather than
+    // doubling. bids_idempotency_idx is the enforcer, not the SELECT above it.
+    const raceReqId = randomUUID();
+    const [dupA, dupB] = await Promise.all([
+      rest(`/rest/v1/rpc/place_bid`, {
+        method: "POST", bearer: tok.buyer1,
+        body: { p_auction_id: raceId, p_amount_minor: 7000, p_request_id: raceReqId },
+      }),
+      rest(`/rest/v1/rpc/place_bid`, {
+        method: "POST", bearer: tok.buyer1,
+        body: { p_auction_id: raceId, p_amount_minor: 7000, p_request_id: raceReqId },
+      }),
+    ]);
+    void dupA;
+    void dupB;
+    // Note: on a settled auction both are refused before reaching the write,
+    // so this races the REFUSAL path, not the insert. The insert race is
+    // covered by the live concurrency checks above plus the unique index.
+    const dupRows = rows(await sql(
+      `select count(*)::int as n from public.bids
+        where bidder_id = '${buyer1Id}' and request_id = '${raceReqId}'`))[0].n;
+    check("RACE: a doubled submission on a closed auction writes no bid row",
+      dupRows === 0, `rows=${dupRows}`);
+
+    // Remove this section's own fixture. Same discipline as CASE A/D: scoped
+    // to this id, refused unless it is bid-free of OUR bids... but this one
+    // HAS our two bids, so the guard is the exact title plus the QA seller
+    // plus zero transactions outside our single expected one. Simpler and
+    // safer: delete children explicitly, then the row, all scoped to raceId.
+    const raceTitleOk = rows(await sql(
+      `select title from public.auctions where id = '${raceId}'`))[0]?.title === RACE_TITLE;
+    const raceSellerOk = rows(await sql(
+      `select seller_id::text = '${sellerId}' as ok from public.auctions where id = '${raceId}'`))[0]?.ok === true;
+    if (raceTitleOk && raceSellerOk) {
+      await sql(`delete from public.notifications where auction_id in ('${raceId}')`);
+      await sql(`delete from public.bids where auction_id in ('${raceId}')`);
+      await sql(`delete from public.transactions where auction_id in ('${raceId}')`);
+      await sql(`delete from public.auction_images where auction_id in ('${raceId}')`);
+      await sql(`delete from public.watchlist where auction_id in ('${raceId}')`);
+      await sql(`delete from public.auctions where id in ('${raceId}')`);
+      check("RACE: this section's own fixture was removed here", true, "removed 1 fixture");
+    } else {
+      check("RACE: this section's own fixture was removed here", false,
+        "REFUSED: title or seller did not match our fixture");
+    }
+  }
+
 
 // ---- 12. cross-user financial isolation -----------------------------------
 console.log("\n--- financial isolation ---");

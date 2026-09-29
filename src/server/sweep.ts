@@ -12,13 +12,11 @@ import { createAdminClient, hasAdminCredentials } from "@/lib/supabase/admin";
  * 00:00:00.
  *
  * `place_bid()` also settles an overdue auction before refusing a late bid, and
- * that is written to read as a third trigger. It is not one. The settlement is
- * rolled back by the exception that refuses the bid, which was measured rather
- * than assumed — see the note in `20260924000003_auction_engine.sql` and the
- * CASE A checks in `scripts/db/verify-engine.mjs`, which read the row back after
- * a refused late bid and find it still `LIVE`. The bid is refused correctly; the
- * settlement simply does not survive. The two triggers that do work are the page
- * view above and the read paths below.
+ * since migration 20260929000001 that settlement commits: the refusal is a
+ * returned `{ok:false}` rather than a raise, because raising after settling
+ * rolled the settlement back (measured: the row stayed `LIVE`). So there are
+ * three triggers that all work — the page view above, the bid path, and the
+ * read paths below.
  *
  * So public read paths also nudge the sweep. It is deliberately:
  *
@@ -30,9 +28,9 @@ import { createAdminClient, hasAdminCredentials } from "@/lib/supabase/admin";
  *     invokes `settle_due_auctions()`, which re-derives every winner and fee
  *     inside SECURITY DEFINER code with `FOR UPDATE SKIP LOCKED`.
  *
- * It is one of two independent triggers that work (page view on countdown
- * expiry, and this read-path nudge plus the cron), which is why no single missed
- * path can leave the tables lying.
+ * It is one of three independent triggers that all work (page view on countdown
+ * expiry, the bid path which settles before refusing, and this read-path nudge
+ * plus the cron), which is why no single missed path can leave the tables lying.
  */
 
 /** Minimum gap between sweep attempts from THIS instance. */
