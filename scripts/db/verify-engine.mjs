@@ -3007,6 +3007,14 @@ await sql(`delete from public.auctions where id='${auctionId}'`);
   const oursInOrder = ((recentRes.data ?? []).filter((x) => rlIds.some(([id]) => id === x.id)));
   const oursTimes = oursInOrder.map((x) => Date.parse(x.listed_at));
   const orderedOk = oursTimes.every((x, i) => i === 0 || oursTimes[i - 1] >= x);
+  check("RL: window membership is exact (2h/71h in, 73h out, only LIVE/SCHEDULED)",
+    recentRes.ok && matrixOk && oursInOrder.length === 3,
+    `matched=${oursInOrder.length} ok=${recentRes.ok}`);
+  check("RL: newest published first",
+    orderedOk && oursInOrder.length === 3
+      && oursInOrder[0].title === "Verify: recent fresh scheduled"
+      && oursInOrder[2].title === "Verify: recent 71h live",
+    oursInOrder.map((x) => x.title).join(" | "));
   // A 73-hour LIVE row leaves the rail but stays discoverable in Browse terms.
   const oldId = rlIds.find(([, t]) => t === "Verify: recent 73h live")?.[0];
   const browseRes = await rest(
