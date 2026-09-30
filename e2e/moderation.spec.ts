@@ -32,7 +32,19 @@ test.describe("moderation", () => {
     page,
   }) => {
     test.setTimeout(240_000);
-    await signIn(page, ACCOUNTS.seller.email, ACCOUNTS.seller.password);
+    // The reported listing belongs to a one-off seller, NOT the shared
+    // seller account, on purpose: an OPEN report makes every later publish
+    // by that seller route to PENDING_REVIEW (reported sellers are reviewed
+    // by design), and no test can resolve it without the owner's
+    // credentials. Quarantining the report keeps the shared seller
+    // review-clean for every other spec in the run, whatever order files
+    // execute in. Desktop and mobile each get their own one-off seller
+    // (buyer3 / buyer2): the desktop run's still-open report would otherwise
+    // hold the mobile run's publish too, since teardown only runs at the
+    // very end. Neither account publishes anywhere else in the suite.
+    const oneOffSeller =
+      test.info().project.name === "mobile-chromium" ? ACCOUNTS.buyer2 : ACCOUNTS.buyer3;
+    await signIn(page, oneOffSeller.email, oneOffSeller.password);
     const auctionId = await createListing(page, { titlePrefix: "Moderation" });
 
     await signIn(page, ACCOUNTS.buyer1.email, ACCOUNTS.buyer1.password);

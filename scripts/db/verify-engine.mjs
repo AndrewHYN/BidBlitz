@@ -279,6 +279,10 @@ if (testIds.length) {
   await sql(`delete from public.notifications where user_id in (${list})`);
   await sql(`delete from public.watchlist where user_id in (${list})`);
   await sql(`delete from public.reports where reporter_id in (${list})`);
+  // Actions under test enqueue real outbox rows for QA recipients (never
+  // sent: no provider key here). They are synthetic, so the reset takes
+  // them; real addresses cannot match the QA domain.
+  await sql(`delete from public.email_outbox where recipient like '%@bidblitz.test'`);
   // Harness staff rows are unmistakable (every harness grant carries a
   // 'Harness:' reason): a crashed run's temp OWNER/ADMIN grants are removed
   // here so the next run starts clean. The is_admin mirror is recomputed from

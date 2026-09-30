@@ -232,6 +232,13 @@ if (fixtures.length > 0) {
       `delete from public.notifications where auction_id in (${ids})`,
     ],
     [
+      // Enqueued mail is never sent in tests (no provider key), but the rows
+      // are still synthetic: anything addressed to a QA account goes with the
+      // fixtures. Scoped to the QA test domain; real addresses cannot match.
+      "queued email",
+      `delete from public.email_outbox where recipient like '%@bidblitz.test'`,
+    ],
+    [
       "auction images",
       `delete from public.auction_images where auction_id in (${ids})`,
     ],
