@@ -59,7 +59,11 @@ export async function waitForHydratedForm(
   page: Page,
   testId: "login-form" | "signup-form"
 ): Promise<void> {
-  const form = page.getByTestId(testId);
+  // Scoped to #main: under full-suite load the login page was observed
+  // streaming the form twice (one hydrated node inside #main, one unhydrated
+  // shell outside it), and the unscoped assertion tripped strict mode on the
+  // duplicate. The hydrated form a person actually uses is the one in #main.
+  const form = page.locator("#main").getByTestId(testId);
   await expect(form).toBeVisible({ timeout: 30_000 });
   await expect(form).toHaveAttribute("data-hydrated", "true", { timeout: 30_000 });
 }
@@ -252,14 +256,22 @@ export async function createListing(
   }
 
   // Held for review rather than launched: the seller's first publish lands in
-  // PENDING_REVIEW by design, and nothing in the suite can approve it. List
-  // once more — the held listing is non-draft history now, so the second
-  // publish goes live — and hand back the live auction. The held row keeps
-  // its fixture title, so the teardown sweeper removes it with the rest.
-  if (
-    attempt < 2 &&
-    (await page.getByText("Under review").count()) > 0
-  ) {
+  // PENDING_REVIEW by design, and nothing in the suite can approve it. The
+  // verdict is read from a reloaded /sell/[id] - stable server-rendered state
+  // - never from the just-clicked panel, whose client state can lag the
+  // server by a render. A held listing counts as non-draft history, so the
+  // second publish goes live; the held row keeps its fixture title, so the
+  // teardown sweeper removes it with the rest. Bounded to one retry: a
+  // second hold fails fast here with a named cause instead of timing out
+  // five minutes later on a buyer's 404.
+  await page.reload();
+  await expect(page.getByTestId("sell-form").or(page.getByTestId("publish-button")).or(page.getByTestId("publish-success")).first()).toBeVisible({ timeout: 30_000 });
+  if ((await page.getByText("Under review").count()) > 0) {
+    if (attempt >= 2) {
+      throw new Error(
+        `createListing: second publish still held for review (auction ${id}); refusing to hand back an id buyers cannot see`
+      );
+    }
     return createListing(page, opts, attempt + 1);
   }
 
