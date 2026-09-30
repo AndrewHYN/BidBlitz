@@ -39,9 +39,15 @@ export function PublishButton({
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [launched, setLaunched] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // The status the server just returned for THIS publish click. The `status`
+  // prop is server-rendered and stale until refresh, so branching on it alone
+  // shows the wrong panel: a review-routed publish rendered "Live now" with
+  // share controls for a listing nobody else can see. The returned outcome is
+  // the truth from the moment it arrives and survives the refresh.
+  const [outcome, setOutcome] = useState<string | null>(null);
+  const effective = outcome ?? status;
 
   function handlePublish() {
     setError(null);
@@ -53,7 +59,7 @@ export function PublishButton({
           return;
         }
         setConfirmOpen(false);
-        setLaunched(true);
+        setOutcome(result.status);
         if (result.status === "PENDING_REVIEW") {
           toast.success("Sent for review", {
             description: "The team checks first listings before they go public.",
@@ -70,7 +76,7 @@ export function PublishButton({
     });
   }
 
-  if (status === "PENDING_REVIEW" && !launched) {
+  if (effective === "PENDING_REVIEW") {
     // Held for a human: not public, not biddable, nothing to share yet. The
     // review queue (not this button) moves it next; withdrawing returns it to
     // draft for edits.
@@ -89,18 +95,18 @@ export function PublishButton({
     );
   }
 
-  if (status !== "DRAFT" || launched) {
-    const label = isClosed(status)
-      ? status === "CANCELLED"
+  if (effective !== "DRAFT") {
+    const label = isClosed(effective)
+      ? effective === "CANCELLED"
         ? "This auction was cancelled"
         : "This auction is closed"
-      : status === "SCHEDULED"
+      : effective === "SCHEDULED"
         ? "Scheduled: waiting for the clock to start"
-        : status === "PAUSED"
+        : effective === "PAUSED"
           ? "Paused by BidBlitz"
           : "Live now";
 
-    const shareable = status === "LIVE" || status === "SCHEDULED";
+    const shareable = effective === "LIVE" || effective === "SCHEDULED";
 
     return (
       <div className="space-y-3" data-testid="publish-success">
@@ -108,8 +114,8 @@ export function PublishButton({
           <Rocket className="size-4 text-primary" aria-hidden />
           {label}
         </p>
-        {endsAt && <Countdown endsAt={endsAt} status={status} variant="boxes" />}
-        {status === "PAUSED" && (
+        {endsAt && <Countdown endsAt={endsAt} status={effective} variant="boxes" />}
+        {effective === "PAUSED" && (
           <p className="text-sm text-muted-foreground">
             Bidding is disabled while the hold lasts. Only an admin can resume
             it.
