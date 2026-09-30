@@ -2885,6 +2885,19 @@ await sql(`delete from public.auctions where id='${auctionId}'`);
       claimedOurs.length === 1 && claimedOurs[0].status === "SENDING"
         && claimedOurs[0].attempts === 1,
       `claimed=${claimedOurs.length}`);
+    // Claiming is server-only: the function carries no internal auth because
+    // only the service-role dispatcher may call it. Anon and authenticated
+    // callers must be refused at the grant boundary (regression for the
+    // authenticated EXECUTE grant removed in 20260930000007).
+    const claimAnon = await rest(`/rest/v1/rpc/claim_email_jobs`, {
+      method: "POST", body: { p_limit: 1 },
+    });
+    const claimUser = await rest(`/rest/v1/rpc/claim_email_jobs`, {
+      method: "POST", bearer: tok.buyer1, body: { p_limit: 1 },
+    });
+    check("OB-CALL: anon and authenticated callers cannot claim email jobs",
+      !claimAnon.ok && !claimUser.ok,
+      `anon=${claimAnon.status} user=${claimUser.status}`);
     await sql(`delete from public.email_outbox where idempotency_key='${obKey}'`);
 
     await sql(`insert into public.notification_preferences (user_id, outbid)
