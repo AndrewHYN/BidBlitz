@@ -251,16 +251,48 @@ if (testIds.length) {
               where payout_id in (select id from public.seller_payouts
                                    where seller_id in (${list}))`);
   await sql(`delete from public.seller_payouts where seller_id in (${list})`);
+  // Harness payment events are synthetic by provider name; orphaned ones (no
+  // parent transaction) come only from a crashed run whose end-cleanup never
+  // ran. Scoped to harness rows so a real Paynow audit row is unreachable.
+  await sql(`delete from public.payment_events
+              where provider like 'harness%'
+                and (transaction_id not in (select id from public.transactions)
+                     or transaction_id in (select id from public.transactions
+                                            where seller_id in (${list}) or buyer_id in (${list})))`);
   await sql(`delete from public.transactions where seller_id in (${list}) or buyer_id in (${list})`);
   await sql(`delete from public.bids where bidder_id in (${list})`);
   // Image rows first: explicit even if the FK cascades — a row whose object
   // never existed renders as a broken image on browse/detail.
   await sql(`delete from public.auction_images
               where auction_id in (select id from public.auctions where seller_id in (${list}))`);
+  // Lifecycle children (RESTRICT by design: a review/request row must not
+  // vanish with the auction it decides). They go before the auctions.
+  await sql(`delete from public.auction_cancellation_requests
+              where requester_id in (${list})
+                 or auction_id in (select id from public.auctions where seller_id in (${list}))`);
+  await sql(`delete from public.listing_reviews
+              where auction_id in (select id from public.auctions where seller_id in (${list}))`);
+  await sql(`delete from public.auction_cancellations
+              where actor_id in (${list})
+                 or auction_id in (select id from public.auctions where seller_id in (${list}))`);
   await sql(`delete from public.auctions where seller_id in (${list})`);
   await sql(`delete from public.notifications where user_id in (${list})`);
   await sql(`delete from public.watchlist where user_id in (${list})`);
   await sql(`delete from public.reports where reporter_id in (${list})`);
+  // Harness staff rows are unmistakable (every harness grant carries a
+  // 'Harness:' reason): a crashed run's temp OWNER/ADMIN grants are removed
+  // here so the next run starts clean. The is_admin mirror is recomputed from
+  // live assignments ONLY for those users - a QA admin holding access through
+  // any other path still trips the SAFETY pre-flight below, loudly.
+  const harnessStaff = rows(await sql(
+    `select distinct user_id from public.staff_assignments where reason like 'Harness:%'`));
+  if (harnessStaff.length) {
+    await sql(`delete from public.staff_assignments where reason like 'Harness:%'`);
+    for (const r of harnessStaff) {
+      await sql(`select public.staff_sync_is_admin('${r.user_id}')`);
+    }
+    console.log(`  reset harness staff rows for ${harnessStaff.length} user(s)`);
+  }
   console.log(`  reset state for ${testIds.length} test users`);
 }
 
@@ -442,12 +474,32 @@ check("security: image_count is not client-writable",
   `status ${forgedCount.status} / image_count=${afterForge.image_count}`);
 
 const pub = await rest(`/rest/v1/rpc/publish_auction`, {
-  method: "POST", bearer: tok.seller,
-  body: { p_auction_id: auctionId },
-});
-check("seller: publish_auction transitions DRAFT -> LIVE", pub.ok && pub.data?.status === "LIVE",
-  JSON.stringify(pub.data));
-
+    method: "POST", bearer: tok.seller,
+    body: { p_auction_id: auctionId },
+  });
+  // The seller holds no non-draft auctions at this point (every fixture is
+  // created and removed in its own section), so this first publish is
+  // deterministically routed to PENDING_REVIEW - which is exactly the AA
+  // scenario, exercised here on the main fixture instead of a throwaway. An
+  // operator approves it below, and everything downstream proceeds on a LIVE
+  // auction exactly as before.
+  check("seller: first publish routes to PENDING_REVIEW with recorded flags",
+    pub.ok && pub.data?.status === "PENDING_REVIEW"
+      && pub.data?.risk_flags?.first_listing === true,
+    JSON.stringify(pub.data));
+  await sql(`update public.profiles set is_admin = true where id='${buyer2Id}'`);
+  const mainReviewId = rows(await sql(
+    `select id from public.listing_reviews where auction_id='${auctionId}' and status='PENDING'`))[0]?.id;
+  const mainApprove = await rest(`/rest/v1/rpc/admin_decide_review`, {
+    method: "POST", bearer: tok.buyer2,
+    body: { p_review_id: mainReviewId, p_decision: "APPROVED" },
+  });
+  await sql(`update public.profiles set is_admin = false where id='${buyer2Id}'`);
+  const mainLive = rows(await sql(
+    `select status from public.auctions where id='${auctionId}'`))[0]?.status;
+  check("seller: approved review publishes the main fixture LIVE",
+    mainApprove.ok && mainLive === "LIVE",
+    `status=${mainLive} ${JSON.stringify(mainApprove.data)}`);
 // Cross-user Storage access (release gate): the bucket is public-read, but
 // only the auction owner may write into <auction_id>/* — and only while the
 // auction is open. Checked here, while the auction is genuinely LIVE.
@@ -612,7 +664,7 @@ check("anti-snipe: extension recorded + broadcast by the response",
 
 // ---- 11. close + winner + fee --------------------------------------------
 console.log("\n--- settlement ---");
-await sql(`update public.auctions set ends_at = now() - interval '1 second'
+await sql(`update public.auctions set starts_at = now() - interval '1 hour', ends_at = now() - interval '1 second'
             where id='${auctionId}'`);
 
 const late = await rest(`/rest/v1/rpc/place_bid`, {
@@ -720,7 +772,7 @@ check("notifications: winner got WON, seller got SOLD",
       `select count(*)::int as n from public.bids where auction_id='${emptyId}'`))[0].n;
     check("CASE A: nobody bid on it", beforeEmptyBids === 0, `bids=${beforeEmptyBids}`);
 
-    await sql(`update public.auctions set ends_at = now() - interval '1 second'
+    await sql(`update public.auctions set starts_at = now() - interval '1 hour', ends_at = now() - interval '1 second'
                 where id='${emptyId}'`);
 
     // A bid on an expired auction must be refused, whatever else is true.
@@ -839,6 +891,9 @@ check("notifications: winner got WON, seller got SOLD",
                or exists (select 1 from public.bids b where b.auction_id = a.id)
                or exists (select 1 from public.transactions t where t.auction_id = a.id))`));
     if (unsafeToDelete.length === 0) {
+      await sql(`delete from public.auction_cancellation_requests where auction_id in (${caseIdList})`);
+      await sql(`delete from public.listing_reviews where auction_id in (${caseIdList})`);
+      await sql(`delete from public.auction_cancellations where auction_id in (${caseIdList})`);
       await sql(`delete from public.notifications where auction_id in (${caseIdList})`);
       await sql(`delete from public.auction_images where auction_id in (${caseIdList})`);
       await sql(`delete from public.watchlist where auction_id in (${caseIdList})`);
@@ -899,7 +954,7 @@ check("notifications: winner got WON, seller got SOLD",
       method: "POST", bearer: tok.buyer3,
       body: { p_auction_id: raceId, p_amount_minor: 6000, p_request_id: randomUUID() },
     });
-    await sql(`update public.auctions set ends_at = now() - interval '1 second'
+    await sql(`update public.auctions set starts_at = now() - interval '1 hour', ends_at = now() - interval '1 second'
                 where id='${raceId}'`);
 
     const [raceSettle1, raceLateBid, raceSettle2] = await Promise.all([
@@ -987,6 +1042,9 @@ check("notifications: winner got WON, seller got SOLD",
     const raceSellerOk = rows(await sql(
       `select seller_id::text = '${sellerId}' as ok from public.auctions where id = '${raceId}'`))[0]?.ok === true;
     if (raceTitleOk && raceSellerOk) {
+      await sql(`delete from public.auction_cancellation_requests where auction_id in ('${raceId}')`);
+      await sql(`delete from public.listing_reviews where auction_id in ('${raceId}')`);
+      await sql(`delete from public.auction_cancellations where auction_id in ('${raceId}')`);
       await sql(`delete from public.notifications where auction_id in ('${raceId}')`);
       await sql(`delete from public.bids where auction_id in ('${raceId}')`);
       await sql(`delete from public.transactions where auction_id in ('${raceId}')`);
@@ -1788,6 +1846,9 @@ check("security: unbanning lifts the block (the ban was the only reason it faile
   `after unban: status=${unbannedPublish.status} message="${unbannedMessage}"`);
 
 await sql(`delete from public.auction_images where auction_id='${bannedDraft}'`);
+await sql(`delete from public.auction_cancellation_requests where auction_id='${bannedDraft}'`);
+await sql(`delete from public.listing_reviews where auction_id='${bannedDraft}'`);
+await sql(`delete from public.auction_cancellations where auction_id='${bannedDraft}'`);
 await sql(`delete from public.auctions where id='${bannedDraft}'`);
 
 // Banning must stop commerce, not strand a live auction: the engine still has
@@ -2023,6 +2084,9 @@ await sql(`delete from public.watchlist where auction_id='${soonAuction}'`);
 await sql(`delete from public.transactions where id='${payTx.id}'`);
 await sql(`delete from public.transactions where id='${failTx.id}'`);
 await sql(`delete from public.transactions where id='${refundTx.id}'`);
+await sql(`delete from public.auction_cancellation_requests where auction_id in ('${soonAuction}','${failFixture.auction}','${refundFixture.auction}')`);
+await sql(`delete from public.listing_reviews where auction_id in ('${soonAuction}','${failFixture.auction}','${refundFixture.auction}')`);
+await sql(`delete from public.auction_cancellations where auction_id in ('${soonAuction}','${failFixture.auction}','${refundFixture.auction}')`);
 await sql(`delete from public.auctions where id='${soonAuction}'`);
 await sql(`delete from public.auctions where id='${failFixture.auction}'`);
 await sql(`delete from public.auctions where id='${refundFixture.auction}'`);
@@ -2044,6 +2108,9 @@ await sql(`delete from public.seller_payout_events where payout_id in
             (select id from public.seller_payouts where transaction_id in ${fixtureTxIds})`);
 await sql(`delete from public.seller_payouts where transaction_id in ${fixtureTxIds}`);
 await sql(`delete from public.reviews where transaction_id in ${fixtureTxIds}`);
+await sql(`delete from public.auction_cancellation_requests where auction_id='${auctionId}'`);
+await sql(`delete from public.listing_reviews where auction_id='${auctionId}'`);
+await sql(`delete from public.auction_cancellations where auction_id='${auctionId}'`);
 await sql(`delete from public.notifications where auction_id='${auctionId}'`);
 await sql(`delete from public.watchlist where auction_id='${auctionId}'`);
 await sql(`delete from public.reports
@@ -2081,10 +2148,24 @@ await sql(`delete from public.auctions where id='${auctionId}'`);
       method: "POST", bearer: tok.seller,
       body: { auction_id: modId, storage_path: `harness/${modId}/cover.jpg`, position: 0 },
     });
-    await rest(`/rest/v1/rpc/publish_auction`, {
+    const modPub = await rest(`/rest/v1/rpc/publish_auction`, {
       method: "POST", bearer: tok.seller,
       body: { p_auction_id: modId },
     });
+    // The main fixture is long deleted by this point, so the seller holds no
+    // non-draft history and this publish routes to PENDING_REVIEW (first
+    // listing). Approve it through the temp-admin pattern so the moderation
+    // path below exercises a genuinely LIVE listing.
+    if (modPub.ok && modPub.data?.status === "PENDING_REVIEW") {
+      await sql(`update public.profiles set is_admin = true where id='${buyer2Id}'`);
+      const modReviewId = rows(await sql(
+        `select id from public.listing_reviews where auction_id='${modId}' and status='PENDING'`))[0]?.id;
+      await rest(`/rest/v1/rpc/admin_decide_review`, {
+        method: "POST", bearer: tok.buyer2,
+        body: { p_review_id: modReviewId, p_decision: "APPROVED" },
+      });
+      await sql(`update public.profiles set is_admin = false where id='${buyer2Id}'`);
+    }
     // A genuine bid while the listing is live. Takedown must end the sale
     // without erasing the history: the bid row survives, unmarked, with no
     // transaction ever created for it.
@@ -2297,6 +2378,9 @@ await sql(`delete from public.auctions where id='${auctionId}'`);
           and ((target_type = 'auction' and target_id = '${modId}')
                or (target_type = 'user' and target_id = '${buyer1Id}'
                    and action in ('BAN_USER', 'UNBAN_USER')))`);
+      await sql(`delete from public.auction_cancellation_requests where auction_id in ('${modId}')`);
+      await sql(`delete from public.listing_reviews where auction_id in ('${modId}')`);
+      await sql(`delete from public.auction_cancellations where auction_id in ('${modId}')`);
       await sql(`delete from public.notifications where auction_id in ('${modId}')`);
       await sql(`delete from public.reports where id in ('${modReportId}')`);
       await sql(`delete from public.bids where auction_id in ('${modId}')`);
@@ -2310,7 +2394,507 @@ await sql(`delete from public.auctions where id='${auctionId}'`);
     }
   }
 
+  // ---- 15c. lifecycle: review routing, pause/resume, cancellation requests --
+  //
+  // Migration 20260930000001/2 added PENDING_REVIEW, PAUSED, listing_reviews,
+  // cancellation_requests and auction_cancellations. This section proves the
+  // new states behave, in final database state, never in return values alone.
+  //
+  // Determinism note: the main fixture earlier in this run consumed the
+  // first-listing signal, so this fixture routes on its high value alone
+  // (starting bid at the $500 threshold). Either signal alone suffices.
+  console.log("\n--- lifecycle: review, pause, cancellation requests ---");
+
+  const LC_TITLE = "Verify: high-value listing needing review";
+  const lcCreated = await rest(`/rest/v1/auctions`, {
+    method: "POST", bearer: tok.seller,
+    headers: { Prefer: "return=representation" },
+    body: { ...auctionPayload, title: LC_TITLE, starting_bid_minor: 100000 },
+  });
+  const lcId = lcCreated.data?.[0]?.id;
+  check("LC: fixture listing created for the lifecycle path", !!lcId,
+    lcId ?? JSON.stringify(lcCreated.data));
+
+  if (lcId) {
+    await rest(`/rest/v1/auction_images`, {
+      method: "POST", bearer: tok.seller,
+      body: { auction_id: lcId, storage_path: `harness/${lcId}/cover.jpg`, position: 0 },
+    });
+    const lcPub = await rest(`/rest/v1/rpc/publish_auction`, {
+      method: "POST", bearer: tok.seller,
+      body: { p_auction_id: lcId },
+    });
+    check("LC-AA: a high-value listing routes to PENDING_REVIEW, not LIVE",
+      lcPub.ok && lcPub.data?.status === "PENDING_REVIEW",
+      JSON.stringify(lcPub.data));
+    const lcReview = rows(await sql(
+      `select status, risk_flags from public.listing_reviews where auction_id='${lcId}' order by created_at desc limit 1`))[0];
+    check("LC-AA: the review row records why it was held",
+      lcReview?.status === "PENDING"
+        && lcReview?.risk_flags?.high_value === true,
+      JSON.stringify(lcReview));
+    const lcNotice = rows(await sql(
+      `select type from public.notifications where user_id='${sellerId}' and auction_id='${lcId}' and type='REVIEW_SUBMITTED'`));
+    check("LC-AA: the seller is told their listing is under review",
+      lcNotice.length === 1, `REVIEW_SUBMITTED=${lcNotice.length}`);
+
+    // A bid on a held listing is refused before any write, like any non-live.
+    const lcEarlyBid = await rest(`/rest/v1/rpc/place_bid`, {
+      method: "POST", bearer: tok.buyer1,
+      body: { p_auction_id: lcId, p_amount_minor: 100000, p_request_id: randomUUID() },
+    });
+    check("LC: no bid can land on a listing waiting for review",
+      !lcEarlyBid.ok && /auction_not_live/.test(JSON.stringify(lcEarlyBid.data)),
+      JSON.stringify(lcEarlyBid.data));
+
+    // Non-admin review decisions are refused at the boundary.
+    const lcNonAdminDecide = await rest(`/rest/v1/rpc/admin_decide_review`, {
+      method: "POST", bearer: tok.buyer1,
+      body: { p_review_id: "00000000-0000-0000-0000-000000000000", p_decision: "APPROVED" },
+    });
+    check("LC-AF: a non-admin cannot decide reviews",
+      !lcNonAdminDecide.ok && /not_admin/i.test(JSON.stringify(lcNonAdminDecide.data)),
+      `status=${lcNonAdminDecide.status}`);
+
+    // Admin approves through the temp-admin pattern (restored after).
+    await sql(`update public.profiles set is_admin = true where id='${buyer2Id}'`);
+    const lcReviewId = rows(await sql(
+      `select id from public.listing_reviews where auction_id='${lcId}' and status='PENDING'`))[0]?.id;
+    const lcApprove = await rest(`/rest/v1/rpc/admin_decide_review`, {
+      method: "POST", bearer: tok.buyer2,
+      body: { p_review_id: lcReviewId, p_decision: "APPROVED" },
+    });
+    const lcAfterApprove = rows(await sql(
+      `select status from public.auctions where id='${lcId}'`))[0]?.status;
+    const lcApproveNotice = rows(await sql(
+      `select type from public.notifications where user_id='${sellerId}' and auction_id='${lcId}' and type='REVIEW_APPROVED'`));
+    check("LC-AB: admin approval publishes the listing and notifies the seller",
+      lcApprove.ok && lcAfterApprove === "LIVE" && lcApproveNotice.length === 1,
+      `status=${lcAfterApprove} notice=${lcApproveNotice.length} ${JSON.stringify(lcApprove.data)}`);
+
+    // Deciding twice is refused: the review is no longer pending.
+    const lcApproveAgain = await rest(`/rest/v1/rpc/admin_decide_review`, {
+      method: "POST", bearer: tok.buyer2,
+      body: { p_review_id: lcReviewId, p_decision: "REJECTED", p_reason: "Trying to decide twice" },
+    });
+    check("LC: a decided review cannot be decided again",
+      !lcApproveAgain.ok && /invalid_state/i.test(JSON.stringify(lcApproveAgain.data)),
+      `status=${lcApproveAgain.status}`);
+
+    // Pause: the hold freezes bidding with history intact.
+    await rest(`/rest/v1/rpc/place_bid`, {
+      method: "POST", bearer: tok.buyer1,
+      body: { p_auction_id: lcId, p_amount_minor: 100000, p_request_id: randomUUID() },
+    });
+    const lcPause = await rest(`/rest/v1/rpc/admin_pause_auction`, {
+      method: "POST", bearer: tok.buyer2,
+      body: { p_auction_id: lcId, p_reason: "Suspected shill pattern under investigation" },
+    });
+    const lcPaused = rows(await sql(
+      `select status, paused_at is not null as held, bid_count from public.auctions where id='${lcId}'`))[0];
+    check("LC-J: admin can pause a live auction, bids retained",
+      lcPause.ok && lcPaused?.status === "PAUSED" && lcPaused?.held === true && lcPaused?.bid_count === 1,
+      `status=${lcPaused?.status} bids=${lcPaused?.bid_count}`);
+
+    // A non-admin cannot pause, even the seller.
+    const lcSellerPause = await rest(`/rest/v1/rpc/admin_pause_auction`, {
+      method: "POST", bearer: tok.seller,
+      body: { p_auction_id: lcId, p_reason: "A seller trying to pause their own auction" },
+    });
+    check("LC: sellers cannot pause (hold is admin-only)",
+      !lcSellerPause.ok && /not_admin/i.test(JSON.stringify(lcSellerPause.data)),
+      `status=${lcSellerPause.status}`);
+
+    // LC-L: bidding on a paused auction is refused with its own code.
+    const lcPausedBid = await rest(`/rest/v1/rpc/place_bid`, {
+      method: "POST", bearer: tok.buyer3,
+      body: { p_auction_id: lcId, p_amount_minor: 200000, p_request_id: randomUUID() },
+    });
+    check("LC-L: a paused auction cannot accept bids",
+      !lcPausedBid.ok && /auction_paused/.test(JSON.stringify(lcPausedBid.data)),
+      JSON.stringify(lcPausedBid.data));
+
+    // LC-M: resume shifts the end forward by exactly the held duration.
+    await sql(`update public.auctions set paused_at = now() - interval '1 hour', ends_at = now() + interval '2 hours' where id='${lcId}'`);
+    const lcResume = await rest(`/rest/v1/rpc/admin_resume_auction`, {
+      method: "POST", bearer: tok.buyer2,
+      body: { p_auction_id: lcId, p_reason: "Pattern cleared, resuming" },
+    });
+    const lcResumed = rows(await sql(
+      `select status, paused_at, extract(epoch from (ends_at - now()))::int as remaining
+          from public.auctions where id='${lcId}'`))[0];
+    check("LC-K/M: resume restores LIVE with the held hour added back",
+      lcResume.ok && lcResumed?.status === "LIVE" && lcResumed?.paused_at === null
+        && lcResumed?.remaining >= 3 * 3600 - 120 && lcResumed?.remaining <= 3 * 3600 + 120,
+      `status=${lcResumed?.status} remaining=${lcResumed?.remaining}s (expected ~10800)`);
+    const lcPauseEvents = rows(await sql(
+      `select count(*)::int as n from public.moderation_events
+        where target_type='auction' and target_id='${lcId}'
+          and action in ('PAUSE_AUCTION','RESUME_AUCTION')`))[0].n;
+    check("LC: pause history survives the resume (two audit rows)",
+      lcPauseEvents === 2, `events=${lcPauseEvents}`);
+
+    // Cancellation request on the live with-bids auction.
+    const lcReq = await rest(`/rest/v1/rpc/request_cancellation`, {
+      method: "POST", bearer: tok.seller,
+      body: { p_auction_id: lcId, p_reason_code: "ITEM_DAMAGED", p_explanation: "Dropped during packing, corner dented" },
+    });
+    check("LC-E: seller can request cancellation of a with-bids auction",
+      lcReq.ok && lcReq.data?.status === "PENDING", JSON.stringify(lcReq.data));
+    const lcReqId = rows(await sql(
+      `select id from public.auction_cancellation_requests where auction_id='${lcId}' and status='PENDING'`))[0]?.id;
+    const lcDupReq = await rest(`/rest/v1/rpc/request_cancellation`, {
+      method: "POST", bearer: tok.seller,
+      body: { p_auction_id: lcId, p_reason_code: "OTHER", p_explanation: "Second attempt" },
+    });
+    check("LC-F: a duplicate pending request is refused, not duplicated",
+      !lcDupReq.ok && /duplicate_request/i.test(JSON.stringify(lcDupReq.data)),
+      `status=${lcDupReq.status}`);
+    const lcAdminNotice = rows(await sql(
+      `select count(*)::int as n from public.notifications
+        where auction_id='${lcId}' and type='CANCELLATION_REQUESTED'`))[0].n;
+    check("LC-V: the admin queue is notified of the request",
+      lcAdminNotice >= 1, `notices=${lcAdminNotice}`);
+
+    // Non-admin cannot decide it (seller trying to approve own request).
+    const lcSelfDecide = await rest(`/rest/v1/rpc/decide_cancellation`, {
+      method: "POST", bearer: tok.seller,
+      body: { p_request_id: lcReqId, p_approve: true },
+    });
+    check("LC-G: non-admin cannot approve a cancellation request",
+      !lcSelfDecide.ok && /not_admin/i.test(JSON.stringify(lcSelfDecide.data)),
+      `status=${lcSelfDecide.status}`);
+
+    // Reject without a reason is refused (the seller is owed the why).
+    const lcBareReject = await rest(`/rest/v1/rpc/decide_cancellation`, {
+      method: "POST", bearer: tok.buyer2,
+      body: { p_request_id: lcReqId, p_approve: false },
+    });
+    check("LC: rejecting without a reason is refused",
+      !lcBareReject.ok && /invalid_reason/i.test(JSON.stringify(lcBareReject.data)),
+      `status=${lcBareReject.status}`);
+
+    // Approve: CANCELLED, no winner, no transaction, bidders told.
+    const lcDecide = await rest(`/rest/v1/rpc/decide_cancellation`, {
+      method: "POST", bearer: tok.buyer2,
+      body: { p_request_id: lcReqId, p_approve: true, p_reason: "Damage confirmed by photos" },
+    });
+    const lcFinal = rows(await sql(
+      `select status, winner_id, winning_bid_minor,
+              (select count(*)::int from public.bids b where b.auction_id = a.id) as bids,
+              (select count(*)::int from public.bids b where b.auction_id = a.id and is_winning) as winning,
+              (select count(*)::int from public.transactions t where t.auction_id = a.id) as tx,
+              (select count(*)::int from public.notifications n where n.auction_id = a.id and n.type='AUCTION_CANCELLED' and n.user_id='${buyer1Id}') as bidder_told,
+              (select count(*)::int from public.notifications n where n.auction_id = a.id and n.type='CANCELLATION_DECIDED' and n.user_id='${sellerId}') as seller_told
+         from public.auctions a where a.id = '${lcId}'`))[0];
+    check("LC-H/T/U: approval cancels with no winner, no transaction, history kept, everyone told",
+      lcDecide.ok && lcFinal.status === "CANCELLED" && lcFinal.winner_id === null
+        && lcFinal.winning_bid_minor === null && lcFinal.bids === 1 && lcFinal.winning === 0
+        && lcFinal.tx === 0 && lcFinal.bidder_told === 1 && lcFinal.seller_told === 1,
+      `status=${lcFinal.status} bids=${lcFinal.bids} tx=${lcFinal.tx} bidder=${lcFinal.bidder_told} seller=${lcFinal.seller_told}`);
+    const lcClosure = rows(await sql(
+      `select actor_role, prev_status, reason_code from public.auction_cancellations where auction_id='${lcId}'`))[0];
+    check("LC-S: the approval writes the closure record (admin, prev LIVE, reason)",
+      lcClosure?.actor_role === "admin" && lcClosure?.prev_status === "LIVE"
+        && lcClosure?.reason_code === "ITEM_DAMAGED",
+      JSON.stringify(lcClosure));
+    await sql(`update public.profiles set is_admin = false where id='${buyer2Id}'`);
+
+    // Cleanup: fixture, requests, reviews, notices, bids, images.
+    const lcTitleOk = rows(await sql(
+      `select title from public.auctions where id='${lcId}'`))[0]?.title === LC_TITLE;
+    if (lcTitleOk) {
+      await sql(`delete from public.auction_cancellation_requests where auction_id in ('${lcId}')`);
+      await sql(`delete from public.listing_reviews where auction_id in ('${lcId}')`);
+      await sql(`delete from public.auction_cancellations where auction_id in ('${lcId}')`);
+      await sql(`delete from public.moderation_events where target_id in ('${lcId}')`);
+      await sql(`delete from public.notifications where auction_id in ('${lcId}')`);
+      await sql(`delete from public.bids where auction_id in ('${lcId}')`);
+      await sql(`delete from public.auction_images where auction_id in ('${lcId}')`);
+      await sql(`delete from public.watchlist where auction_id in ('${lcId}')`);
+      await sql(`delete from public.auctions where id in ('${lcId}')`);
+      check("LC: this section's own fixture and trail were removed here", true, "removed 1 fixture");
+    } else {
+      check("LC: this section's own fixture and trail were removed here", false,
+        "REFUSED: title did not match our fixture");
+    }
+  }
+
+
 // ---- 16. avatars: namespaced storage + a key that cannot leave your folder --
+  // ---- 15d. team RBAC + email outbox -----------------------------------------
+  //
+  // Migration 20260930000003 created staff_roles/permissions/assignments,
+  // team_invitations, staff_audit and the email_outbox + preferences tables.
+  // This section proves the authorization boundaries at the RPC layer with the
+  // same temp-privilege discipline as MOD/LC: buyer3 is promoted, suspended,
+  // restored and revoked here, and ends with no staff access - asserted.
+  console.log("\n--- team RBAC + email outbox ---");
+  const ownerId = rows(await sql(
+    `select id from public.profiles where is_admin order by created_at limit 1`))[0]?.id;
+  check("RB: exactly one owner exists to run this section", !!ownerId,
+    ownerId ?? "no is_admin profile");
+
+  if (ownerId) {
+    const perm = async (uid, p) =>
+      rows(await sql(`select public.has_permission('${uid}', '${p}') as ok`))[0]?.ok === true;
+
+    check("RB: OWNER implies every permission without a bundle row",
+      await perm(ownerId, "admin.access") && await perm(ownerId, "payouts.mark_paid"),
+      "owner holds admin.access + payouts.mark_paid");
+
+    // Anonymous and ordinary users cannot touch team management.
+    const anonAssign = await rest(`/rest/v1/rpc/admin_assign_role`, {
+      method: "POST",
+      body: { p_user_id: buyer1Id, p_role_key: "MODERATOR" },
+    });
+    check("RB-AH: anonymous cannot assign roles",
+      !anonAssign.ok && [401, 403, 404].includes(anonAssign.status),
+      `status=${anonAssign.status}`);
+    const userAssign = await rest(`/rest/v1/rpc/admin_assign_role`, {
+      method: "POST", bearer: tok.buyer1,
+      body: { p_user_id: buyer2Id, p_role_key: "MODERATOR" },
+    });
+    check("RB-AF/AI: an ordinary user cannot assign roles and cannot escalate",
+      !userAssign.ok && /not_admin/i.test(JSON.stringify(userAssign.data)),
+      `status=${userAssign.status}`);
+    const userPause = await rest(`/rest/v1/rpc/admin_pause_auction`, {
+      method: "POST", bearer: tok.buyer1,
+      body: { p_auction_id: "00000000-0000-0000-0000-000000000000", p_reason: "Trying to pause without rights" },
+    });
+    check("RB: an ordinary user cannot pause auctions",
+      !userPause.ok && /not_admin/i.test(JSON.stringify(userPause.data)),
+      `status=${userPause.status}`);
+
+    // The harness cannot sign in as the owner, so buyer2 holds a temporary
+    // OWNER assignment (inserted with the service role, exactly how the
+    // migration bootstrapped ownership) and acts through the RPCs; every check
+    // inside still runs, and the grant is removed at the end of the section.
+    await sql(`insert into public.staff_assignments (user_id, role_key, status, granted_by, reason)
+               values ('${buyer2Id}', 'OWNER', 'ACTIVE', '${ownerId}', 'Harness: temporary owner to exercise team RPCs')
+               on conflict do nothing`);
+    const promote = await rest(`/rest/v1/rpc/admin_assign_role`, {
+      method: "POST", bearer: tok.buyer2,
+      body: { p_user_id: buyer3Id, p_role_key: "MODERATOR", p_reason: "Harness: RBAC matrix check" },
+    });
+    check("RB: owner can assign MODERATOR",
+      promote.ok, JSON.stringify(promote.data));
+    check("RB: moderator holds moderation powers but not finance powers",
+      await perm(buyer3Id, "listings.takedown") && await perm(buyer3Id, "auctions.pause")
+        && !(await perm(buyer3Id, "payouts.mark_paid"))
+        && !(await perm(buyer3Id, "admin.manage_team")),
+      "moderation yes, payouts/team no");
+
+    // A moderator cannot assign roles (lacks admin.manage_team).
+    const modAssign = await rest(`/rest/v1/rpc/admin_assign_role`, {
+      method: "POST", bearer: tok.buyer3,
+      body: { p_user_id: buyer1Id, p_role_key: "SUPPORT" },
+    });
+    check("RB: a moderator cannot assign roles",
+      !modAssign.ok && /not_admin/i.test(JSON.stringify(modAssign.data)),
+      `status=${modAssign.status}`);
+
+    // Nobody gets OWNER through the assignment RPC, not even from an owner
+    // session: ownership transfer is a separate future workflow.
+    const ownerGrant = await rest(`/rest/v1/rpc/admin_assign_role`, {
+      method: "POST", bearer: tok.buyer2,
+      body: { p_user_id: buyer1Id, p_role_key: "OWNER" },
+    });
+    check("RB: ADMIN/ RPC cannot grant OWNER (transfer is a separate workflow)",
+      !ownerGrant.ok && /owner_only/i.test(JSON.stringify(ownerGrant.data)),
+      `status=${ownerGrant.status}`);
+
+    // Self-targeting is refused.
+    const selfGrant = await rest(`/rest/v1/rpc/admin_assign_role`, {
+      method: "POST", bearer: tok.buyer2,
+      body: { p_user_id: buyer2Id, p_role_key: "SUPPORT" },
+    });
+    check("RB: staff cannot change their own access",
+      !selfGrant.ok && /cannot_target_self/i.test(JSON.stringify(selfGrant.data)),
+      `status=${selfGrant.status}`);
+
+    // Suspension takes effect on the next check (no JWT, no session wait).
+    const modAssignment = rows(await sql(
+      `select id from public.staff_assignments
+        where user_id='${buyer3Id}' and role_key='MODERATOR' and status='ACTIVE'`))[0]?.id;
+    const suspend = await rest(`/rest/v1/rpc/admin_set_assignment_status`, {
+      method: "POST", bearer: tok.buyer2,
+      body: { p_assignment_id: modAssignment, p_status: "SUSPENDED", p_reason: "Harness: suspension check" },
+    });
+    check("RB: owner can suspend staff and it applies immediately",
+      suspend.ok && !(await perm(buyer3Id, "listings.takedown")),
+      JSON.stringify(suspend.data));
+    const restore = await rest(`/rest/v1/rpc/admin_set_assignment_status`, {
+      method: "POST", bearer: tok.buyer2,
+      body: { p_assignment_id: modAssignment, p_status: "ACTIVE" },
+    });
+    check("RB: suspended staff can be restored",
+      restore.ok && await perm(buyer3Id, "listings.takedown"),
+      JSON.stringify(restore.data));
+
+    const ownerAssignment = rows(await sql(
+      `select id from public.staff_assignments
+        where user_id='${ownerId}' and role_key='OWNER' and status='ACTIVE'`))[0]?.id;
+    // OWNER rows are untouchable by non-owners, even ones holding broad power.
+    // buyer3 gains ADMIN (which carries admin.manage_team) and still cannot
+    // move the owner's row: the refusal is owner_only, not a silent success.
+    // (Removing the sole owner is additionally guarded by a last_owner check
+    // inside the RPCs; it is unreachable while self-targeting is refused, so
+    // it stands as a tripwire for the future ownership-transfer workflow.)
+    const grantAdmin = await rest(`/rest/v1/rpc/admin_assign_role`, {
+      method: "POST", bearer: tok.buyer2,
+      body: { p_user_id: buyer3Id, p_role_key: "ADMIN", p_reason: "Harness: owner_only proof" },
+    });
+    const touchOwner = await rest(`/rest/v1/rpc/admin_set_assignment_status`, {
+      method: "POST", bearer: tok.buyer3,
+      body: { p_assignment_id: ownerAssignment, p_status: "SUSPENDED" },
+    });
+    check("RB: an ADMIN cannot suspend the OWNER (owner_only, not silent)",
+      grantAdmin.ok && !touchOwner.ok && /owner_only/i.test(JSON.stringify(touchOwner.data)),
+      `grant=${grantAdmin.ok} touch=${touchOwner.status}`);
+    // buyer3 returns to exactly MODERATOR before the suspend/restore/revoke
+    // proofs below, so the permission assertions stay single-variable.
+    const clearAdmin = await rest(`/rest/v1/rpc/admin_revoke_all_access`, {
+      method: "POST", bearer: tok.buyer2,
+      body: { p_user_id: buyer3Id, p_reason: "Harness: resetting to MODERATOR for the next proofs" },
+    });
+    const regrantMod = await rest(`/rest/v1/rpc/admin_assign_role`, {
+      method: "POST", bearer: tok.buyer2,
+      body: { p_user_id: buyer3Id, p_role_key: "MODERATOR", p_reason: "Harness: RBAC matrix check" },
+    });
+    check("RB: buyer3 reset to MODERATOR-only for the lifecycle proofs",
+      clearAdmin.ok && regrantMod.ok && await perm(buyer3Id, "listings.takedown")
+        && !(await perm(buyer3Id, "payouts.mark_paid")),
+      `reset=${clearAdmin.ok} regrant=${regrantMod.ok}`);
+
+    // Revoking everything clears access and the legacy mirror together.
+    const revokeAll = await rest(`/rest/v1/rpc/admin_revoke_all_access`, {
+      method: "POST", bearer: tok.buyer2,
+      body: { p_user_id: buyer3Id, p_reason: "Harness: end of RBAC matrix" },
+    });
+    const buyer3Admin = rows(await sql(
+      `select is_admin from public.profiles where id='${buyer3Id}'`))[0]?.is_admin;
+    check("RB: revoked staff loses access and the is_admin mirror clears",
+      revokeAll.ok && !(await perm(buyer3Id, "admin.access")) && buyer3Admin === false,
+      `revoked=${JSON.stringify(revokeAll.data)} is_admin=${buyer3Admin}`);
+
+    // Every change above wrote the audit trail, attributed to an actor.
+    const auditCount = rows(await sql(
+      `select count(*)::int as n from public.staff_audit
+        where target_user_id='${buyer3Id}'
+          and action in ('ROLE_ASSIGNED','STAFF_SUSPENDED','STAFF_RESTORED','STAFF_REVOKED')`))[0].n;
+    check("RB: every team change is audited (assign, suspend, restore, revoke)",
+      auditCount >= 4, `audit rows=${auditCount}`);
+    const auditForge = await rest(`/rest/v1/staff_audit`, {
+      method: "POST", bearer: tok.buyer1,
+      body: { actor_id: buyer1Id, action: "ROLE_ASSIGNED", target_user_id: buyer2Id },
+    });
+    check("RB: no staff member can write or alter the audit trail",
+      !auditForge.ok, `status=${auditForge.status}`);
+
+    // Invitations: single-use, expiring, revocable, and refusing duplicates.
+    const inviteEmail = `verify-invite-${Date.now()}@bidblitz.test`;
+    const invite = await rest(`/rest/v1/rpc/admin_invite_member`, {
+      method: "POST", bearer: tok.buyer2,
+      body: { p_email: inviteEmail, p_role_key: "MODERATOR" },
+    });
+    const inviteId = invite.data?.invitation_id;
+    check("RB: owner can invite, and the raw token is returned once (64 hex)",
+      invite.ok && !!inviteId && /^[0-9a-f]{64}$/.test(invite.data?.token ?? ""),
+      `ok=${invite.ok} id=${!!inviteId}`);
+    const dupInvite = await rest(`/rest/v1/rpc/admin_invite_member`, {
+      method: "POST", bearer: tok.buyer2,
+      body: { p_email: inviteEmail, p_role_key: "SUPPORT" },
+    });
+    check("RB: a duplicate active invitation is refused",
+      !dupInvite.ok && /duplicate_invite/i.test(JSON.stringify(dupInvite.data)),
+      `status=${dupInvite.status}`);
+    const acceptMismatch = await rest(`/rest/v1/rpc/accept_team_invite`, {
+      method: "POST", bearer: tok.buyer1,
+      body: { p_token: invite.data?.token },
+    });
+    check("RB: a signed-in account with a different email cannot accept",
+      !acceptMismatch.ok && /invalid_invite/i.test(JSON.stringify(acceptMismatch.data)),
+      `status=${acceptMismatch.status}`);
+    const revokeInvite = await rest(`/rest/v1/rpc/admin_revoke_invite`, {
+      method: "POST", bearer: tok.buyer2,
+      body: { p_invite_id: inviteId },
+    });
+    const acceptRevoked = await rest(`/rest/v1/rpc/accept_team_invite`, {
+      method: "POST", bearer: tok.buyer1,
+      body: { p_token: invite.data?.token },
+    });
+    check("RB: a revoked invitation cannot be accepted",
+      revokeInvite.ok && !acceptRevoked.ok && /invalid_invite/i.test(JSON.stringify(acceptRevoked.data)),
+      `revoked=${revokeInvite.ok} accept=${acceptRevoked.status}`);
+    // Expired invitations are refused the same way (expiry enforced in RPC).
+    const invite2 = await rest(`/rest/v1/rpc/admin_invite_member`, {
+      method: "POST", bearer: tok.buyer2,
+      body: { p_email: `verify-expired-${Date.now()}@bidblitz.test`, p_role_key: "SUPPORT" },
+    });
+    await sql(`update public.team_invitations set expires_at = now() - interval '1 minute'
+                where id='${invite2.data?.invitation_id}'`);
+    const acceptExpired = await rest(`/rest/v1/rpc/accept_team_invite`, {
+      method: "POST", bearer: tok.buyer1,
+      body: { p_token: invite2.data?.token },
+    });
+    check("RB: an expired invitation is refused",
+      !acceptExpired.ok && /invalid_invite/i.test(JSON.stringify(acceptExpired.data)),
+      `status=${acceptExpired.status}`);
+
+    // Tear down harness team state: temp OWNER grant, test invites, and the
+    // audit rows that reference only harness activity stay (audit is
+    // append-only by design; residue checks do not count staff_audit).
+    await sql(`delete from public.staff_assignments where user_id='${buyer2Id}' and role_key='OWNER'`);
+    await sql(`delete from public.team_invitations where id in ('${inviteId}','${invite2.data?.invitation_id}')`);
+    await sql(`update public.profiles set is_admin = false where id='${buyer2Id}'`);
+    const buyer2Clean = rows(await sql(
+      `select is_admin, (select count(*)::int from public.staff_assignments
+                          where user_id='${buyer2Id}' and status in ('ACTIVE','SUSPENDED')) as live
+         from public.profiles where id='${buyer2Id}'`))[0];
+    const buyer3Clean = rows(await sql(
+      `select count(*)::int as n from public.staff_assignments
+        where user_id='${buyer3Id}' and status in ('ACTIVE','SUSPENDED')`))[0].n;
+    check("RB: harness team state removed (no temp owner, no live test grants)",
+      buyer2Clean?.is_admin === false && buyer2Clean?.live === 0 && buyer3Clean === 0,
+      `buyer2 admin=${buyer2Clean?.is_admin} live=${buyer2Clean?.live} buyer3live=${buyer3Clean}`);
+
+    // ---- email outbox ---------------------------------------------------------
+    // Duplicate delivery is refused by the key, not by memory: the same
+    // idempotency key twice stores one row.
+    const obKey = `verify-${Date.now()}-won`;
+    await sql(`insert into public.email_outbox (idempotency_key, recipient, template_key, payload)
+               values ('${obKey}', 'verify-outbox@bidblitz.test', 'won',
+                       '{"title":"Harness mail","auctionId":"00000000-0000-0000-0000-000000000000"}')`);
+    await sql(`insert into public.email_outbox (idempotency_key, recipient, template_key, payload)
+               values ('${obKey}', 'verify-outbox@bidblitz.test', 'won',
+                       '{"title":"Harness mail","auctionId":"00000000-0000-0000-0000-000000000000"}')
+               on conflict (idempotency_key) do nothing`);
+    const obRows = rows(await sql(
+      `select count(*)::int as n from public.email_outbox where idempotency_key='${obKey}'`))[0].n;
+    check("OB-X: a duplicate email event does not store twice",
+      obRows === 1, `rows=${obRows}`);
+    // Claiming is exclusive: one dispatcher owns each row.
+    const claimed = rows(await sql(`select * from public.claim_email_jobs(25)`));
+    const claimedOurs = claimed.filter((r) => r.idempotency_key === obKey);
+    check("OB: the dispatcher can claim queued mail exactly once",
+      claimedOurs.length === 1 && claimedOurs[0].status === "SENDING"
+        && claimedOurs[0].attempts === 1,
+      `claimed=${claimedOurs.length}`);
+    await sql(`delete from public.email_outbox where idempotency_key='${obKey}'`);
+
+    // Preferences are per-owner: buyer1 cannot read buyer2's row.
+    await sql(`insert into public.notification_preferences (user_id, outbid)
+               values ('${buyer2Id}', false)
+               on conflict (user_id) do update set outbid = false`);
+    const prefLeak = await rest(
+      `/rest/v1/notification_preferences?select=user_id`, { bearer: tok.buyer1 });
+    check("OB-Y: notification preferences are private to their owner",
+      prefLeak.ok && (prefLeak.data ?? []).length === 0,
+      `rows=${(prefLeak.data ?? []).length}`);
+    await sql(`delete from public.notification_preferences where user_id='${buyer2Id}'`);
+  }
+
 console.log("\n--- avatars ---");
 
 /*

@@ -91,8 +91,9 @@ Operator checks before a listing goes live:
 - [ ] Reserve price / starting price is realistic. A low starting price with a
       high increment produces dead auctions.
 
-Once published, terms are frozen. A wrong listing is handled by cancelling (only
-possible before the first bid) or by the dispute process, not by editing.
+Once published, terms are frozen. A wrong listing is handled by cancelling
+(before any bid, with a recorded reason) or by asking the team to end it (once
+bids exist — see §4A), not by editing.
 
 ---
 
@@ -114,6 +115,42 @@ An auction with no bids settles as `UNSOLD`. Nothing is owed to anyone.
 Verify after settling: one transaction row exists, its fee maths reconciles
 (`fee_minor + net_minor = gross_minor`, enforced in the database), and the
 notification went to the winner.
+
+---
+
+## 4A. Ending an auction early, pausing it, and reviewing listings
+
+**Seller cancellation.** There is no delete button on a live auction. What the
+seller gets depends on the state:
+
+- `DRAFT`: edit or delete permanently — no public transaction has begun.
+- `SCHEDULED`: edit safe fields, or cancel with a recorded reason.
+- `LIVE` with zero bids: end early with a reason from a controlled list
+  (`ITEM_UNAVAILABLE`, `ITEM_DAMAGED`, `LISTING_ERROR`, `SELLER_WITHDRAWAL`,
+  `TECHNICAL_PROBLEM`, `OTHER`).
+- `LIVE` with one or more bids: *request* cancellation with a reason and an
+  optional explanation. The auction stays live while the request is pending;
+  withdrawing the request is always allowed. Approval ends it as `CANCELLED`
+  with no winner and no transaction; rejection changes nothing. Every bidder
+  and the seller are notified either way.
+- `SOLD` / `UNSOLD` / `CANCELLED` are history and are never reopened.
+  "List again" creates a new auction.
+
+Every cancellation and every request decision records actor, previous and new
+status, reason and timestamp.
+
+**Admin pause.** An admin can place a live auction on safety hold (`PAUSED`):
+bidding stops, the countdown freezes, no winner can settle, and history is
+retained. Only an admin can resume it — resuming shifts the end forward by
+exactly the held duration, so nobody gains or loses bidding time — or cancel
+it. Sellers cannot pause, resume, or bid around the hold by calling the
+database directly; the engine refuses those paths.
+
+**Listing review.** First listings, high-value items, reported sellers and
+accounts with prior takedowns or bans are held as `PENDING_REVIEW` on publish:
+not public, not biddable. An admin approves (publishes on schedule), rejects,
+or requests changes (returns to draft with the reason). Sellers see "under
+review" and can withdraw to edit and resubmit. Every decision is audited.
 
 ---
 
@@ -345,11 +382,13 @@ it does.
 
 ## 13. What an administrator does, and what nobody does
 
-**As shipped, no account has this role.** Verified 2026-09-28: zero rows in
-`public.profiles` have `is_admin = true`, so `/admin` and everything in it is
-currently unreachable. The owner must set that flag on their own account
-first — see `docs/COMPLIANCE_LAUNCH_CHECKLIST.md` J6 — and should be someone
-who has read this document end to end.
+The operator's real account holds the `OWNER` role (verified: exactly one
+administrator, a real account, no QA account). `/admin` is reachable only to
+sessions holding the live `admin.access` permission; the header shows the
+Admin entry on that basis, and every route and action re-checks server-side.
+Day-to-day staff work through least-privilege roles — see
+`docs/ADMIN_RBAC.md` — so most operators never need the owner's powers.
+Whoever holds them should have read this document end to end.
 
 An administrator may:
 

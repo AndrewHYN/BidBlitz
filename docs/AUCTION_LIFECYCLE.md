@@ -6,14 +6,26 @@ claim can be re-tested rather than trusted.
 
 ## The statuses
 
-`auction_status_t` has seven values. Six are reachable. One is not.
+`auction_status_t` has nine values. Eight are reachable. One is not.
 
 ```
 DRAFT ──publish──> SCHEDULED ──clock──> LIVE ──settle──> SOLD      (had a winning bid)
-                     │                    │
-                     │                    └──────settle──> UNSOLD  (no bids)
-                     │
-                     └──cancel──> CANCELLED
+  │                  │                    │
+  │                  │                    └──────settle──> UNSOLD  (no bids)
+  │                  │                    │
+  │                  │                    ├──request──> PENDING request ──approve──> CANCELLED
+  │                  │                    │              (stays LIVE until decided)
+  │                  │                    │
+  │                  │                    └──pause──> PAUSED ──resume──> LIVE (clock shifted by held time)
+  │                  │                                  │
+  │                  │                                  └──cancel──> CANCELLED
+  │                  │
+  │                  └──cancel──> CANCELLED
+  │
+  ├──delete (no public transaction has begun)──> gone
+  └──publish──> PENDING_REVIEW ──approve──> SCHEDULED/LIVE
+                  (held listing)    ├──reject──> DRAFT
+                                    └──changes──> DRAFT
 
 CANCELLED is also reachable from DRAFT, and from any state that has no bids.
 ```
@@ -25,15 +37,22 @@ CANCELLED is also reachable from DRAFT, and from any state that has no bids.
 | `LIVE` | `publish_auction`, or the clock reaching `starts_at` | Open for bids. |
 | `SOLD` | `settle_auction`, had a winning bid | Closed with a winner. Exactly one transaction. |
 | `UNSOLD` | `settle_auction`, no bids | Closed with no sale. **No transaction.** |
-| `CANCELLED` | `cancel_auction` | Withdrawn before it could sell. |
+| `CANCELLED` | `cancel_auction`, takedown, approved cancellation request | Withdrawn before it could sell. Never stores a winner: the cancel transition clears every `is_winning` flag. |
+| `PAUSED` | `admin_pause_auction` (admin only) | Safety hold. Not biddable, not settleable, clock frozen; resume shifts `ends_at` by the held duration. |
+| `PENDING_REVIEW` | `publish_auction` risk routing | Held for a human. Not public, not biddable; approve publishes, reject/changes returns to draft. |
 | `ENDED` | **nothing** | Unreachable. See below. |
 
 ## `ENDED`: a display value, never a stored state
 
 No function, trigger or policy assigns `ENDED` to the `status` column. Verified
-by repository-wide search of every migration: the only writers are
-`publish_auction` (DRAFT→SCHEDULED/LIVE), `place_bid` (bid projection only),
-`settle_auction` (LIVE→SOLD/UNSOLD), and `cancel_auction` (→CANCELLED).
+by repository-wide search of every migration: the writers are
+`publish_auction` (DRAFT→SCHEDULED/LIVE/PENDING_REVIEW), `place_bid` (bid
+projection only), `settle_auction` (LIVE→SOLD/UNSOLD), `cancel_auction`
+(→CANCELLED), `admin_decide_review` (PENDING_REVIEW→SCHEDULED/LIVE/DRAFT),
+`withdraw_listing_review` (→DRAFT), `admin_pause_auction` (LIVE→PAUSED),
+`admin_resume_auction` (PAUSED→LIVE), `request_cancellation` (no status
+change), `decide_cancellation` (LIVE→CANCELLED on approval), and
+`admin_takedown_auction` (→CANCELLED).
 
 `ENDED` does have one legitimate producer, and it is not a writer:
 `auction_effective_status()` returns the *text* `'ENDED'` for a LIVE row whose

@@ -161,10 +161,20 @@ export type CreateListingOptions = {
  * Seller flow: /sell form -> draft at /sell/[id] -> (optionally) attach an
  * image if publishing requires one -> publish. Returns the auction id (the
  * draft id and the auction id are the same value).
+ *
+ * Review routing: the seller's first-ever publish (and any high-value or
+ * flagged one) is held as PENDING_REVIEW instead of going live, and no test
+ * holds admin credentials to approve it. When that happens the helper lists
+ * a second auction — the held first listing counts as non-draft history, so
+ * the second publish goes live deterministically — and returns the LIVE id.
+ * The held listing keeps its fixture title and is removed by the teardown
+ * sweeper like every other fixture. Bounded to one retry: a second hold
+ * means something real is wrong and the test must fail honestly.
  */
 export async function createListing(
   page: Page,
-  opts: CreateListingOptions = {}
+  opts: CreateListingOptions = {},
+  attempt = 1
 ): Promise<string> {
   const title = uniqueTitle(opts.titlePrefix ?? "E2E listing");
 
@@ -239,6 +249,18 @@ export async function createListing(
       await confirm.click();
       await expect(success).toBeVisible({ timeout: 30_000 });
     }
+  }
+
+  // Held for review rather than launched: the seller's first publish lands in
+  // PENDING_REVIEW by design, and nothing in the suite can approve it. List
+  // once more — the held listing is non-draft history now, so the second
+  // publish goes live — and hand back the live auction. The held row keeps
+  // its fixture title, so the teardown sweeper removes it with the rest.
+  if (
+    attempt < 2 &&
+    (await page.getByText("Under review").count()) > 0
+  ) {
+    return createListing(page, opts, attempt + 1);
   }
 
   return id;

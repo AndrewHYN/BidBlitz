@@ -54,6 +54,19 @@ configured.** The Playwright signup test skips itself with the provider-throttle
 message rather than reporting a false pass, so this must not be mistaken for a
 green suite proving signups work.
 
+### Transactional email (Resend) — architecture done, credentials pending
+
+`docs/EMAIL.md` is the contract. Implemented and tested without credentials:
+durable `email_outbox` with idempotency keys, 18-template catalogue, Resend API
+dispatcher that holds rows `QUEUED` when no key is configured, per-user
+preferences for optional mail (critical mail always sends), and a daily cron
+backstop. Remaining owner actions, all in dashboards, none in code:
+
+- Resend: verify the sending domain (SPF/DKIM/DMARC), create `RESEND_API_KEY`,
+  set Vercel `RESEND_API_KEY` / `EMAIL_FROM` / `APP_URL`.
+- Supabase Auth SMTP: `smtp.resend.com:465`, username `resend`, password the
+  API key. This is what unblocks the signup ceiling above, on the Free plan.
+
 ### Payments
 MVP deliberately does not fake payment.
 

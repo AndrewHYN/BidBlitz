@@ -29,8 +29,10 @@
  *
  * ORDER matters and is enforced by the foreign keys: reviews, then the payout
  * audit trail and payouts (payouts RESTRICT the transaction), then payment
- * events, then transactions, then bids, then images, then the auctions
- * themselves, then the unreferenced storage objects.
+ * events, then transactions, then bids, then images, then the lifecycle
+ * children (cancellation requests, listing reviews and cancellation records
+ * are all RESTRICT), then the auctions themselves, then the unreferenced
+ * storage objects.
  *
  * Run:  node scripts/db/cleanup-e2e-fixtures.mjs --yes
  */
@@ -43,7 +45,7 @@ const REF = projectRef() ?? requireEnv("SUPABASE_PROJECT_REF");
 const dryRun = !process.argv.includes("--yes");
 
 /** Exactly the prefixes `e2e/*.spec.ts` pass to `createListing()`. */
-const PREFIXES = ["Race", "Countdown", "Loop", "Outbid", "RLS", "Relist", "Moderation", "E2E listing"];
+const PREFIXES = ["Race", "Countdown", "Loop", "Outbid", "RLS", "Relist", "Moderation", "Lifecycle", "E2E listing"];
 
 // "<Prefix> " + base36 millisecond stamp + "-" + 6 base36 chars.
 // Anchored, so nothing that merely contains a prefix is matched.
@@ -232,6 +234,21 @@ if (fixtures.length > 0) {
     [
       "auction images",
       `delete from public.auction_images where auction_id in (${ids})`,
+    ],
+    [
+      // Lifecycle children are RESTRICT by design (a review/request row must
+      // not vanish with the auction it decides), so they go before the
+      // auctions themselves. Scoped to the same fixture ids.
+      "cancellation requests",
+      `delete from public.auction_cancellation_requests where auction_id in (${ids})`,
+    ],
+    [
+      "listing reviews",
+      `delete from public.listing_reviews where auction_id in (${ids})`,
+    ],
+    [
+      "cancellation records",
+      `delete from public.auction_cancellations where auction_id in (${ids})`,
     ],
     ["auctions", `delete from public.auctions where id in (${ids})`],
   ];
