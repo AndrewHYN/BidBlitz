@@ -13,6 +13,13 @@ import { Money } from "@/components/auction/money";
 import { feePercentLabel } from "@/lib/money";
 import { ReportStatusControls } from "@/components/dashboard/report-status-controls";
 import { BanButton, TakedownButton } from "@/components/dashboard/moderation-controls";
+import { Button } from "@/components/ui/button";
+import {
+  CancellationDecide,
+  PauseResumeButtons,
+  ReviewDecide,
+} from "@/components/dashboard/review-decisions";
+import { cancellationReasonLabel } from "@/lib/validation";
 import { PayoutControls } from "@/components/dashboard/payout-controls";
 import { getAdminPayouts, type AdminPayoutRow } from "@/server/queries";
 import { isPaymentProviderConfigured } from "@/server/payments/config";
@@ -54,13 +61,32 @@ type ReportedUser = {
 type ModerationEvent = {
   id: string;
   created_at: string;
-  action: "TAKEDOWN_LISTING" | "BAN_USER" | "UNBAN_USER";
+  action: "TAKEDOWN_LISTING" | "BAN_USER" | "UNBAN_USER" | "PAUSE_AUCTION" | "RESUME_AUCTION";
   target_type: "auction" | "user";
   target_id: string;
   prev_status: string | null;
   new_status: string | null;
   reason: string;
   report_id: string | null;
+};
+
+type QueueAuction = {
+  id: string;
+  title: string;
+  status: string;
+  current_bid_minor: number | null;
+  bid_count: number;
+  ends_at: string | null;
+  starting_bid_minor: number;
+  seller: { username: string } | null;
+};
+
+type PausedAuction = {
+  id: string;
+  title: string;
+  paused_at: string | null;
+  ends_at: string | null;
+  bid_count: number;
 };
 
 type FeeRow = {
@@ -192,19 +218,24 @@ export default async function AdminPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login?next=/admin");
 
-  // Same fact the old `is_admin()` RPC returned: whether THIS session's user
-  // carries the admin flag. Read straight from the profile row (RLS: everyone
-  // may read profiles), because migration 000010 moved that function out of
-  // the exposed API schema.
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("is_admin")
-    .eq("id", user.id)
-    .maybeSingle();
-  const isAdmin = profile?.is_admin ?? false;
+  // Whether THIS session may operate the console: the live admin.access
+  // permission, read from assignments (so revocation applies on the next page
+  // load), not the legacy is_admin mirror. Every mutation below re-checks
+  // inside its own RPC.
+  const { data: permission } = await supabase.rpc("has_permission", {
+    p_user_id: user.id,
+    p_permission: "admin.access",
+  });
+  const isAdmin = permission === true;
+  const { data: canManageTeam } = await supabase.rpc("has_permission", {
+    p_user_id: user.id,
+    p_permission: "admin.manage_team",
+  });
 
   // Not an admin: say so and run NO moderation queries. The report and fee
-  // reads below never execute for a caller who failed this check.
+  // reads below never execute for a caller who failed this check. The gate is
+  // the live admin.access permission (assignments, not the legacy flag),
+  // checked again by every mutation below.
   if (!isAdmin) {
     return (
       <div className="page-container py-10 sm:py-14" data-testid="admin-page">
@@ -295,11 +326,98 @@ export default async function AdminPage() {
   );
   const events = ((eventsRes as { data: ModerationEvent[] }).data ?? []) as ModerationEvent[];
 
+  // The operator's incoming work beyond reports: listings waiting for a
+  // human, sellers asking to end live auctions, and auctions on safety hold.
+  // All three reads are admin-visible; an empty result is a quiet queue, not
+  // an error. Names resolve in a second batched round through the one embed
+  // whose foreign-key name is proven (`auctions_seller_id_fkey`, used by the
+  // detail query), so the queue never shows bare UUIDs and never guesses at
+  // constraint names.
+  const [reviewsRes, cancelReqsRes, pausedRes] = await Promise.all([
+    supabase
+      .from("listing_reviews")
+      .select("id, auction_id, created_at, risk_flags")
+      .eq("status", "PENDING")
+      .order("created_at", { ascending: true })
+      .limit(50),
+    supabase
+      .from("auction_cancellation_requests")
+      .select("id, auction_id, requester_id, reason_code, explanation, created_at")
+      .eq("status", "PENDING")
+      .order("created_at", { ascending: true })
+      .limit(50),
+    supabase
+      .from("auctions")
+      .select("id, title, paused_at, ends_at, bid_count")
+      .eq("status", "PAUSED")
+      .order("paused_at", { ascending: true })
+      .limit(50),
+  ]);
+  type ReviewRow = {
+    id: string;
+    auction_id: string;
+    created_at: string;
+    risk_flags: Record<string, boolean>;
+  };
+  type CancelRow = {
+    id: string;
+    auction_id: string;
+    requester_id: string;
+    reason_code: string;
+    explanation: string | null;
+    created_at: string;
+  };
+  const reviewRows = ((reviewsRes.data ?? []) as ReviewRow[]);
+  const cancelRows = ((cancelReqsRes.data ?? []) as CancelRow[]);
+  const queueAuctionIds = [
+    ...new Set([...reviewRows.map((r) => r.auction_id), ...cancelRows.map((r) => r.auction_id)]),
+  ];
+  const queueRequesterIds = [...new Set(cancelRows.map((r) => r.requester_id))];
+  const [queueAuctionsRes, queueUsersRes] = await Promise.all([
+    queueAuctionIds.length > 0
+      ? supabase
+          .from("auctions")
+          .select(
+            "id, title, status, current_bid_minor, bid_count, ends_at, starting_bid_minor, seller:profiles!auctions_seller_id_fkey(username)"
+          )
+          .in("id", queueAuctionIds)
+      : Promise.resolve({ data: [] as unknown[] }),
+    queueRequesterIds.length > 0
+      ? supabase.from("profiles").select("id, username").in("id", queueRequesterIds)
+      : Promise.resolve({ data: [] as unknown[] }),
+  ]);
+  const queueAuctionById = new Map(
+    ((queueAuctionsRes.data ?? []) as QueueAuction[]).map((a) => [a.id, a])
+  );
+  const queueUserById = new Map(
+    ((queueUsersRes.data ?? []) as Array<{ id: string; username: string }>).map((u) => [
+      u.id,
+      u,
+    ])
+  );
+  const pendingReviews = reviewRows.map((r) => ({
+    ...r,
+    auction: queueAuctionById.get(r.auction_id) ?? null,
+  }));
+  const cancelRequests = cancelRows.map((r) => ({
+    ...r,
+    auction: queueAuctionById.get(r.auction_id) ?? null,
+    requester: queueUserById.get(r.requester_id) ?? null,
+  }));
+  const pausedAuctions = ((pausedRes.data ?? []) as PausedAuction[]);
+
   return (
     <div className="page-container py-10 sm:py-14 space-y-8" data-testid="admin-page">
       <PageHeader
         title="Admin"
         description="Payout operations, open moderation reports and the platform fee currently in force."
+        actions={
+          canManageTeam === true ? (
+            <Button asChild variant="outline" size="sm">
+              <Link href="/admin/team">Team</Link>
+            </Button>
+          ) : undefined
+        }
       />
 
       <section aria-labelledby="admin-payouts-heading" className="space-y-4">
@@ -495,6 +613,14 @@ export default async function AdminPage() {
                             reportId={report.id}
                           />
                         )}
+                      {report.target_type === "auction" && auction &&
+                        auction.status === "LIVE" && (
+                          <PauseResumeButtons
+                            auctionId={auction.id}
+                            auctionTitle={auction.title}
+                            paused={false}
+                          />
+                        )}
                       {report.target_type === "user" && reportedUser && (
                         <BanButton
                           userId={reportedUser.id}
@@ -507,6 +633,233 @@ export default async function AdminPage() {
                   </li>
                 );
               })}
+            </ul>
+          )}
+        </div>
+      </section>
+
+      <section aria-labelledby="admin-review-heading" className="space-y-4">
+        <SectionHeading
+          title={
+            <span id="admin-review-heading" className="inline-flex items-center gap-2">
+              <Flag className="size-4 text-muted-foreground" aria-hidden />
+              Listing review
+              {pendingReviews.length > 0 && (
+                <span
+                  className="rounded-full bg-ending px-2 py-0.5 text-xs font-medium text-ending-foreground"
+                  data-numeric
+                >
+                  {pendingReviews.length}
+                </span>
+              )}
+            </span>
+          }
+        />
+
+        <div data-testid="admin-reviews" className="space-y-3">
+          {reviewsRes.error ? (
+            <p role="alert" className="text-sm text-destructive">
+              Reviews could not be loaded: {reviewsRes.error.message}
+            </p>
+          ) : pendingReviews.length === 0 ? (
+            <EmptyState
+              compact
+              icon={Flag}
+              title="No listings waiting"
+              description="First and flagged listings appear here before they can go public."
+            />
+          ) : (
+            <ul className="space-y-2">
+              {pendingReviews.map((review) => (
+                <li
+                  key={review.id}
+                  data-testid="admin-review-row"
+                  className="space-y-3 rounded-lg border bg-card p-4"
+                >
+                  <div className="space-y-1">
+                    {review.auction ? (
+                      <p className="text-sm">
+                        <Link
+                          href={`/sell/${review.auction.id}`}
+                          className="font-medium hover:text-primary hover:underline"
+                        >
+                          {review.auction.title}
+                        </Link>{" "}
+                        <span className="text-muted-foreground">
+                          by {review.auction.seller?.username ?? "unknown seller"} ·{" "}
+                          <Money
+                            minor={review.auction.starting_bid_minor}
+                            currency="USD"
+                          />{" "}
+                          starting bid · filed {formatDate(review.created_at)}
+                        </span>
+                      </p>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        The listed auction no longer exists.
+                      </p>
+                    )}
+                    {Object.keys(review.risk_flags ?? {}).length > 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        Held for: {Object.keys(review.risk_flags).join(", ")}.
+                      </p>
+                    )}
+                  </div>
+                  <div className="border-t pt-3">
+                    <ReviewDecide reviewId={review.id} />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </section>
+
+      <section aria-labelledby="admin-cancellations-heading" className="space-y-4">
+        <SectionHeading
+          title={
+            <span id="admin-cancellations-heading" className="inline-flex items-center gap-2">
+              <Flag className="size-4 text-muted-foreground" aria-hidden />
+              Cancellation requests
+              {cancelRequests.length > 0 && (
+                <span
+                  className="rounded-full bg-ending px-2 py-0.5 text-xs font-medium text-ending-foreground"
+                  data-numeric
+                >
+                  {cancelRequests.length}
+                </span>
+              )}
+            </span>
+          }
+        />
+
+        <div data-testid="admin-cancellations" className="space-y-3">
+          {cancelRequests.length === 0 ? (
+            <EmptyState
+              compact
+              icon={Flag}
+              title="No pending requests"
+              description="Sellers asking to end live auctions with bids appear here."
+            />
+          ) : (
+            <ul className="space-y-2">
+              {cancelRequests.map((request) => (
+                <li
+                  key={request.id}
+                  data-testid="admin-cancellation-row"
+                  className="space-y-3 rounded-lg border bg-card p-4"
+                >
+                  <div className="space-y-1">
+                    {request.auction ? (
+                      <p className="text-sm">
+                        <Link
+                          href={`/auction/${request.auction.id}`}
+                          className="font-medium hover:text-primary hover:underline"
+                        >
+                          {request.auction.title}
+                        </Link>{" "}
+                        <span className="text-muted-foreground">
+                          {request.auction.bid_count} bid
+                          {request.auction.bid_count === 1 ? "" : "s"}
+                          {request.auction.current_bid_minor !== null && (
+                            <>
+                              {" · "}
+                              <Money
+                                minor={request.auction.current_bid_minor}
+                                currency="USD"
+                              />{" "}
+                              top bid
+                            </>
+                          )}{" "}
+                          · {request.auction.status}
+                        </span>
+                      </p>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        The auction no longer exists.
+                      </p>
+                    )}
+                    <p className="text-sm font-medium">
+                      {cancellationReasonLabel(request.reason_code)}
+                      {request.requester && (
+                        <span className="font-normal text-muted-foreground">
+                          {" "}
+                          · @{request.requester.username}
+                        </span>
+                      )}
+                    </p>
+                    {request.explanation && (
+                      <p className="text-sm text-muted-foreground">{request.explanation}</p>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      Filed {formatDate(request.created_at)}
+                    </p>
+                  </div>
+                  <div className="border-t pt-3">
+                    <CancellationDecide requestId={request.id} />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </section>
+
+      <section aria-labelledby="admin-paused-heading" className="space-y-4">
+        <SectionHeading
+          title={
+            <span id="admin-paused-heading" className="inline-flex items-center gap-2">
+              <Flag className="size-4 text-muted-foreground" aria-hidden />
+              Paused auctions
+              {pausedAuctions.length > 0 && (
+                <span
+                  className="rounded-full bg-ending px-2 py-0.5 text-xs font-medium text-ending-foreground"
+                  data-numeric
+                >
+                  {pausedAuctions.length}
+                </span>
+              )}
+            </span>
+          }
+        />
+
+        <div data-testid="admin-paused" className="space-y-3">
+          {pausedAuctions.length === 0 ? (
+            <EmptyState
+              compact
+              icon={Flag}
+              title="Nothing on hold"
+              description="Auctions paused for safety review appear here until resumed or cancelled."
+            />
+          ) : (
+            <ul className="space-y-2">
+              {pausedAuctions.map((auction) => (
+                <li
+                  key={auction.id}
+                  data-testid="admin-paused-row"
+                  className="space-y-3 rounded-lg border bg-card p-4"
+                >
+                  <p className="text-sm">
+                    <Link
+                      href={`/auction/${auction.id}`}
+                      className="font-medium hover:text-primary hover:underline"
+                    >
+                      {auction.title}
+                    </Link>{" "}
+                    <span className="text-muted-foreground">
+                      {auction.bid_count} bid{auction.bid_count === 1 ? "" : "s"} · held
+                      since {auction.paused_at ? formatDate(auction.paused_at) : "unknown"}
+                    </span>
+                  </p>
+                  <div className="flex flex-wrap items-center gap-2 border-t pt-3">
+                    <PauseResumeButtons
+                      auctionId={auction.id}
+                      auctionTitle={auction.title}
+                      paused
+                    />
+                  </div>
+                </li>
+              ))}
             </ul>
           )}
         </div>

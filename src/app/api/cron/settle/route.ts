@@ -173,6 +173,56 @@ export async function GET(request: Request): Promise<Response> {
     console.error("[cron/settle] realtime announce failed", err);
   }
 
+  // 5. Outcome emails. Same keys the page-view settler uses, so whichever
+  // trigger closes an auction first owns the announcement and the others
+  // collapse into it. Best-effort after the commit, like the realtime fan-out.
+  let emailed = 0;
+  try {
+    const { notifySeller, notifyUser } = await import("@/server/email/notify");
+    const { emailKey } = await import("@/server/email/sender");
+    const { formatMoney, money } = await import("@/lib/money");
+    const { data: titles } = await admin
+      .from("auctions")
+      .select("id, title, seller_id")
+      .in(
+        "id",
+        settled.map((row) => row.id)
+      );
+    const titleById = new Map(
+      ((titles ?? []) as Array<{ id: string; title: string; seller_id: string }>).map((t) => [
+        t.id,
+        t,
+      ])
+    );
+    for (const row of settled) {
+      const info = titleById.get(row.id);
+      if (!info) continue;
+      if (row.status === "SOLD" && row.winner_id) {
+        await notifyUser(
+          row.winner_id,
+          "won",
+          {
+            title: info.title,
+            auctionId: row.id,
+            amount: formatMoney(money(row.winning_bid_minor ?? 0)),
+          },
+          emailKey("won", "auction", row.id)
+        ).catch(() => undefined);
+        emailed += 1;
+      } else if (row.status === "UNSOLD") {
+        await notifySeller(
+          info.seller_id,
+          "auction_unsold",
+          { title: info.title, auctionId: row.id },
+          emailKey("auction_unsold", "auction", row.id)
+        ).catch(() => undefined);
+        emailed += 1;
+      }
+    }
+  } catch (err) {
+    console.error("[cron/settle] outcome email failed", err);
+  }
+
   return json({
     ok: true,
     scanned: candidates.length,
@@ -180,6 +230,7 @@ export async function GET(request: Request): Promise<Response> {
     sold,
     unsold: settled.length - sold,
     announced,
+    emailed,
     endingSoon,
     durationMs: Date.now() - started,
   });

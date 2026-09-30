@@ -40,6 +40,10 @@ export function statusTone(status: string): BadgeTone {
       return "draft";
     case "ENDED":
       return "ended";
+    case "PAUSED":
+      return "scheduled";
+    case "PENDING_REVIEW":
+      return "draft";
     case "SOLD":
       return "sold";
     case "UNSOLD":
@@ -59,6 +63,8 @@ const STATUS_LABELS: Record<string, string> = {
   SOLD: "Sold",
   UNSOLD: "No bids",
   CANCELLED: "Cancelled",
+  PAUSED: "Paused",
+  PENDING_REVIEW: "Under review",
 };
 
 const TRANSACTION_LABELS: Record<string, string> = {

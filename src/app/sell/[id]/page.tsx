@@ -14,6 +14,11 @@ import { isClosed } from "@/lib/auction-status";
 import { ImageUploader } from "@/components/sell/image-uploader";
 import { PublishButton } from "@/components/sell/publish-button";
 import { CancelAuctionButton } from "@/components/sell/cancel-auction-button";
+import {
+  RequestCancellationButton,
+  WithdrawCancellationButton,
+  WithdrawReviewButton,
+} from "@/components/sell/cancellation-request-button";
 import { DeleteDraftButton } from "@/components/sell/delete-draft-button";
 
 export const metadata: Metadata = {
@@ -60,6 +65,28 @@ export default async function SellDraftPage({
     `${auction.duration_seconds} seconds`;
   const canCancel = auction.bid_count === 0 && !isClosed(auction.status);
   const canDelete = auction.status === "DRAFT" && auction.bid_count === 0;
+
+  // The seller's own pending business, if any: a cancellation request waiting
+  // on the team, or a review holding the listing. Both are the seller's rows
+  // (RLS), so a missing row here simply means nothing pending.
+  const [{ data: pendingRequest }, { data: pendingReview }] = await Promise.all([
+    supabase
+      .from("auction_cancellation_requests")
+      .select("id, reason_code, created_at")
+      .eq("auction_id", auction.id)
+      .eq("status", "PENDING")
+      .maybeSingle(),
+    supabase
+      .from("listing_reviews")
+      .select("id, created_at")
+      .eq("auction_id", auction.id)
+      .eq("status", "PENDING")
+      .maybeSingle(),
+  ]);
+  // A with-bids LIVE auction cannot be cancelled directly; it gets a request
+  // instead. PAUSED auctions get neither: the hold lifts only through admin.
+  const canRequestCancellation =
+    auction.status === "LIVE" && auction.bid_count > 0 && !pendingRequest;
 
   return (
     <div className="page-container py-10 sm:py-14">
@@ -196,7 +223,13 @@ export default async function SellDraftPage({
                   compact
                   icon={Images}
                   title="No photos yet"
-                  description="This auction is closed, so its photos are read-only."
+                  description={
+                    auction.status === "PENDING_REVIEW"
+                      ? "This listing is under review, so its photos are read-only for now. Withdraw the review to edit."
+                      : auction.status === "PAUSED"
+                        ? "This auction is paused, so its photos are read-only until it resumes."
+                        : "This auction is closed, so its photos are read-only."
+                  }
                 />
               )}
             </div>
@@ -251,6 +284,81 @@ export default async function SellDraftPage({
             </div>
           </section>
 
+          {auction.status === "PENDING_REVIEW" && (
+            <section
+              className="rounded-xl border bg-card p-6 shadow-sm"
+              aria-labelledby="draft-review-heading"
+            >
+              <SectionHeading
+                title={
+                  <span id="draft-review-heading" className="inline-flex items-center gap-2">
+                    <Eye className="size-4 text-muted-foreground" aria-hidden />
+                    Under review
+                  </span>
+                }
+              />
+              <p className="mt-1 text-sm text-muted-foreground">
+                {pendingReview
+                  ? "The BidBlitz team is checking this listing before it can go public. You will find the decision in your notifications."
+                  : "This listing is waiting for review."}{" "}
+                To edit it, withdraw the review first: withdrawing is always
+                safe, and publishing again re-runs the checks.
+              </p>
+              {pendingReview && (
+                <div className="mt-4">
+                  <WithdrawReviewButton auctionId={auction.id} />
+                </div>
+              )}
+            </section>
+          )}
+
+          {auction.status === "PAUSED" && (
+            <section
+              className="rounded-xl border bg-card p-6 shadow-sm"
+              aria-labelledby="draft-paused-heading"
+            >
+              <SectionHeading
+                title={
+                  <span id="draft-paused-heading" className="inline-flex items-center gap-2">
+                    <TriangleAlert className="size-4 text-muted-foreground" aria-hidden />
+                    Paused by BidBlitz
+                  </span>
+                }
+              />
+              <p className="mt-1 text-sm text-muted-foreground">
+                Bidding is disabled and the clock is stopped while the team
+                reviews an issue. Your bids and history stay recorded. Only an
+                admin can resume it; if you need to talk to one, use the help
+                page.
+              </p>
+            </section>
+          )}
+
+          {pendingRequest && (
+            <section
+              className="rounded-xl border bg-card p-6 shadow-sm"
+              aria-labelledby="draft-request-heading"
+            >
+              <SectionHeading
+                title={
+                  <span id="draft-request-heading" className="inline-flex items-center gap-2">
+                    <TriangleAlert className="size-4 text-muted-foreground" aria-hidden />
+                    Cancellation requested
+                  </span>
+                }
+              />
+              <p className="mt-1 text-sm text-muted-foreground">
+                The team is reviewing your request. Your auction stays live
+                until they decide.
+              </p>
+              <div className="mt-4">
+                <WithdrawCancellationButton
+                  requestId={(pendingRequest as { id: string }).id}
+                />
+              </div>
+            </section>
+          )}
+
           {(canCancel || canDelete) && (
             <section
               className="rounded-xl border border-destructive/25 bg-card p-6 shadow-sm"
@@ -274,6 +382,33 @@ export default async function SellDraftPage({
                   <CancelAuctionButton auctionId={auction.id} title={auction.title} />
                 )}
                 {canDelete && <DeleteDraftButton auctionId={auction.id} />}
+              </div>
+            </section>
+          )}
+
+          {canRequestCancellation && (
+            <section
+              className="rounded-xl border bg-card p-6 shadow-sm"
+              aria-labelledby="draft-request-new-heading"
+            >
+              <SectionHeading
+                title={
+                  <span id="draft-request-new-heading" className="inline-flex items-center gap-2">
+                    <TriangleAlert className="size-4 text-muted-foreground" aria-hidden />
+                    End this auction early
+                  </span>
+                }
+              />
+              <p className="mt-1 text-sm text-muted-foreground">
+                People have bid, so this listing can’t be removed directly. You
+                can ask the team to end it, with a reason they can act on.
+              </p>
+              <div className="mt-4">
+                <RequestCancellationButton
+                  auctionId={auction.id}
+                  title={auction.title}
+                  bidCount={auction.bid_count}
+                />
               </div>
             </section>
           )}

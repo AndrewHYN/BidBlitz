@@ -14,6 +14,16 @@ export const CLOSED_STATUSES = new Set([
   "CANCELLED",
 ]);
 
+/** Auction is under administrative hold: alive, but nothing may move. */
+export function isPaused(status: string): boolean {
+  return status === "PAUSED";
+}
+
+/** Listing is waiting for a human reviewer: not public, not biddable. */
+export function isPendingReview(status: string): boolean {
+  return status === "PENDING_REVIEW";
+}
+
 export function isClosed(status: string): boolean {
   return CLOSED_STATUSES.has(status);
 }

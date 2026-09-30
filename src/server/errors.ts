@@ -10,6 +10,8 @@ export type BidErrorCode =
   | "seller_cannot_bid"
   | "auction_not_live"
   | "auction_ended"
+  | "auction_paused"
+  | "duplicate_request"
   | "below_minimum"
   | "invalid_amount"
   | "invalid_request_id"
@@ -41,6 +43,14 @@ const MESSAGES: Record<BidErrorCode, string> = {
   seller_cannot_bid: "You can't bid on your own auction.",
   auction_not_live: "This auction isn't live yet.",
   auction_ended: "Auction has ended.",
+  // A paused auction is under administrative hold: bidding is disabled but the
+  // sale is not over, so "ended" would be a lie and "not live" would imply it
+  // never started. The countdown panel carries the fuller explanation.
+  auction_paused: "Bidding is paused while BidBlitz reviews this auction.",
+  // A second PENDING cancellation request for the same auction. The first one
+  // is already with the team, so this names that instead of erroring.
+  duplicate_request:
+    "A cancellation request for this auction is already waiting for review.",
   below_minimum: "Minimum bid is {amount}.",
   invalid_amount: "Enter a valid bid amount.",
   invalid_request_id: "Something went wrong with that request. Try again.",

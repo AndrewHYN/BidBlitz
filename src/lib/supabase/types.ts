@@ -17,7 +17,7 @@ export type Json =
   | Json[];
 
 export type AuctionStatus =
-  | "DRAFT" | "SCHEDULED" | "LIVE" | "ENDED" | "SOLD" | "UNSOLD" | "CANCELLED";
+  | "DRAFT" | "SCHEDULED" | "LIVE" | "ENDED" | "SOLD" | "UNSOLD" | "CANCELLED" | "PAUSED" | "PENDING_REVIEW";
 
 export type TransactionStatus =
   | "AWAITING_PAYMENT" | "PAID" | "SETTLED" | "REFUNDED" | "FAILED";

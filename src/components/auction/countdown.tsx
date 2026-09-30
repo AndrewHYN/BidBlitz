@@ -64,6 +64,17 @@ export function Countdown({
     );
   }
 
+  // A pause stops the clock: rendering the ticking parts would claim time is
+  // passing, and the remaining time resumes where it stopped. Static text,
+  // computed from nothing that ticks.
+  if (status === "PAUSED") {
+    return (
+      <span className={cn("text-sm font-medium text-muted-foreground", className)} data-countdown="paused">
+        Paused
+      </span>
+    );
+  }
+
   if (parts?.expired) {
     return (
       <span className={cn("text-sm font-medium text-muted-foreground", className)} data-countdown="expired">

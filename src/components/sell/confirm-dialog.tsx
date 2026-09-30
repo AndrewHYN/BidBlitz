@@ -27,6 +27,7 @@ export function ConfirmDialog({
   error,
   confirmVariant = "destructive",
   confirmTestId,
+  children,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -41,6 +42,9 @@ export function ConfirmDialog({
    *  positive actions like publishing. */
   confirmVariant?: "destructive" | "default";
   confirmTestId?: string;
+  /** Optional form fields between the description and the footer (reason
+   *  selects, explanations). The dialog owns nothing about them. */
+  children?: React.ReactNode;
 }) {
   return (
     <Dialog
@@ -63,6 +67,8 @@ export function ConfirmDialog({
             {error}
           </div>
         )}
+
+        {children && <div className="space-y-3">{children}</div>}
 
         <DialogFooter>
           <Button

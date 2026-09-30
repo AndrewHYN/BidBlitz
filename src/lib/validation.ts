@@ -17,6 +17,41 @@ export const conditionLabels: Record<(typeof CONDITIONS)[number], string> = {
   poor: "For parts",
 };
 
+/**
+ * The controlled vocabulary for ending an auction early. A seller picks one;
+ * free text can never smuggle an unlisted meaning into the audit row. Lives
+ * here (not in a `"use server"` module) so pages, client components and
+ * actions all read the same list: server modules may only export async
+ * functions.
+ */
+export const CANCELLATION_REASONS = [
+  "ITEM_UNAVAILABLE",
+  "ITEM_DAMAGED",
+  "LISTING_ERROR",
+  "SELLER_WITHDRAWAL",
+  "TECHNICAL_PROBLEM",
+  "OTHER",
+] as const;
+
+export type CancellationReason = (typeof CANCELLATION_REASONS)[number];
+
+export const cancellationReasonSchema = z.enum(CANCELLATION_REASONS);
+
+export const cancellationReasonLabels: Record<CancellationReason, string> = {
+  ITEM_UNAVAILABLE: "Item is no longer available",
+  ITEM_DAMAGED: "Item was damaged",
+  LISTING_ERROR: "I made an error in the listing",
+  SELLER_WITHDRAWAL: "Withdrawing the listing",
+  TECHNICAL_PROBLEM: "Technical problem",
+  OTHER: "Other",
+};
+
+export function cancellationReasonLabel(reason: string): string {
+  return (
+    cancellationReasonLabels[reason as CancellationReason] ?? "Other"
+  );
+}
+
 /** Durations offered in the sell flow (seconds). */
 export const DURATIONS = [
   { label: "1 hour", seconds: 3600 },

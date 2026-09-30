@@ -43,6 +43,11 @@ export function AuctionCard({
   headingLevel?: "h2" | "h3";
 }) {
   const closed = isClosed(auction.status);
+  // A paused auction keeps its endsAt in the future, but the clock is
+  // stopped: showing a ticking countdown would contradict the Paused badge
+  // on the same card, so the countdown hides exactly like a closed one.
+  // The badge (LiveStatus above) already says Paused.
+  const clockStopped = closed || auction.status === "PAUSED";
   const hasBids = auction.currentBidMinor !== null || auction.bidCount > 0;
 
   return (
@@ -80,7 +85,7 @@ export function AuctionCard({
           {badge}
         </div>
 
-        {auction.endsAt && !closed && (
+        {auction.endsAt && !clockStopped && (
           <span className="absolute bottom-2 right-2 rounded-md bg-background/90 px-2 py-1 backdrop-blur-sm">
             <Countdown endsAt={auction.endsAt} status={auction.status} className="text-xs" />
           </span>

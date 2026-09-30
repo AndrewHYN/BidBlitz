@@ -19,9 +19,18 @@ export async function SiteHeader() {
   if (user) {
     const { data: profile } = await supabase
       .from("profiles")
-      .select("display_name, username, avatar_path")
+      .select("display_name, username, avatar_path, is_admin")
       .eq("id", user.id)
       .maybeSingle();
+
+    // The menu entry follows the permission, not the legacy flag: a staffer
+    // holding admin.access through any role sees it, and a legacy is_admin
+    // without assignments does not. The RPC reads live assignments, so a
+    // revoked staffer loses the entry on their next page load.
+    const { data: canAdmin } = await supabase.rpc("has_permission", {
+      p_user_id: user.id,
+      p_permission: "admin.access",
+    });
 
     headerUser = {
       id: user.id,
@@ -31,6 +40,7 @@ export async function SiteHeader() {
       // refuses anything that is not a key in our own bucket.
       avatarPath: profile?.avatar_path ?? null,
       email: user.email ?? null,
+      isAdmin: canAdmin === true,
     };
 
     try {

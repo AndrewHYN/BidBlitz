@@ -119,7 +119,7 @@ export async function POST(request: Request): Promise<Response> {
   // stranger gets 404 rather than a signal about which ids exist.
   const { data: row, error: readError } = await supabase
     .from("transactions")
-    .select("id, status, gross_minor, currency, buyer_id, seller_id")
+    .select("id, status, gross_minor, currency, buyer_id, seller_id, auction_id")
     .eq("id", transactionId)
     .maybeSingle();
 
@@ -166,6 +166,34 @@ export async function POST(request: Request): Promise<Response> {
     if (afterError) {
       console.error("[payments/reconcile] re-read failed", afterError.message);
       return json({ ok: false, error: "reconcile_failed" }, 500);
+    }
+
+    // A transition into PAID is a money event the buyer must hear about by
+    // email as well as in-app. Keyed on the transaction, so re-polling the
+    // same paid sale reuses the row instead of re-mailing. Best-effort: the
+    // money already moved; this only announces it.
+    if (result.applied && after?.status === "PAID") {
+      const { notifyUser } = await import("@/server/email/notify");
+      const { emailKey } = await import("@/server/email/sender");
+      const { formatMoney, money } = await import("@/lib/money");
+      const { data: auctionRow } = await supabase
+        .from("auctions")
+        .select("id, title")
+        .eq("id", (row as { auction_id: string }).auction_id)
+        .maybeSingle();
+      const auction = auctionRow as { id: string; title: string } | null;
+      if (auction) {
+        await notifyUser(
+          row.buyer_id,
+          "payment_received",
+          {
+            title: auction.title,
+            auctionId: auction.id,
+            amount: formatMoney(money(row.gross_minor, row.currency)),
+          },
+          emailKey("payment_received", "transaction", row.id)
+        ).catch(() => undefined);
+      }
     }
 
     return json(

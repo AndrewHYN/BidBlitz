@@ -19,6 +19,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createServerRealtime } from "@/lib/realtime/supabase";
 import { placeBidSchema } from "@/lib/validation";
+import { formatMoney, money } from "@/lib/money";
 import { normalizeEngineError, type BidRejection } from "@/server/errors";
 import { BID_LIMIT, rateLimit } from "@/server/rate-limit";
 
@@ -163,6 +164,28 @@ export async function placeBidAction(input: {
         currency: "USD",
         serverTime,
       });
+      // The outbid email is optional mail (silenceable in settings); the
+      // realtime event above is the urgent channel. Keyed on the bid so a
+      // retried submission cannot mail twice.
+      const { notifyUser } = await import("@/server/email/notify");
+      const { emailKey } = await import("@/server/email/sender");
+      const { data: outbidAuction } = await supabase
+        .from("auctions")
+        .select("id, title")
+        .eq("id", parsed.data.auctionId)
+        .maybeSingle();
+      const outbidTitle =
+        (outbidAuction as { title?: string } | null)?.title ?? "An auction you bid on";
+      await notifyUser(
+        payload.outbid_user_id,
+        "outbid",
+        {
+          title: outbidTitle,
+          auctionId: parsed.data.auctionId,
+          amount: formatMoney(money(currentBidMinor)),
+        },
+        emailKey("outbid", "bid", payload.bid_id)
+      ).catch(() => undefined);
     }
 
     if (payload.extended) {

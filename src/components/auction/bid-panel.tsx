@@ -3,7 +3,7 @@
 import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Info, Timer, Trophy } from "lucide-react";
+import { Info, Pause, Timer, Trophy } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { toast } from "sonner";
 
@@ -267,6 +267,29 @@ export function BidPanel({
   }
 
   // ---------------------------------------------------------------- closed
+  if (status === "PAUSED") {
+    // An administrative safety hold, not a market outcome. Bidding is
+    // disabled, the clock is frozen, and nothing here may imply wrongdoing:
+    // the outcome of the review does not exist yet.
+    return (
+      <div
+        data-testid="auction-paused-panel"
+        className="space-y-3 rounded-xl border bg-card p-5"
+      >
+        <div className="flex items-center gap-2">
+          <Pause className="size-4 text-muted-foreground" aria-hidden />
+          <h2 className="font-semibold">Bidding is paused</h2>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          BidBlitz paused this auction while the team reviews an issue.
+          Bidding is temporarily disabled and the clock is stopped: when the
+          auction resumes, the remaining time continues exactly where it
+          stopped. Bids placed so far stay recorded, and nothing about the
+          sale has been decided.
+        </p>
+      </div>
+    );
+  }
   if (closed) {
     return (
       <div

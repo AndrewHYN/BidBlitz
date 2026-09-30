@@ -13,6 +13,7 @@ import {
   Moon,
   Plus,
   Search,
+  ShieldAlert,
   Sun,
   User as UserIcon,
   X,
@@ -38,6 +39,14 @@ export type HeaderUser = {
   /** Storage KEY of the avatar in the `avatars` bucket - never a URL. */
   avatarPath: string | null;
   email: string | null;
+  /**
+   * Whether the account menu and drawer show the Admin entry. Presentation
+   * only: every admin route and action re-checks server-side. This flag will
+   * be backed by the `admin.access` permission once the RBAC migration lands
+   * (docs/ADMIN_RBAC.md); until then it mirrors profiles.is_admin, which is
+   * the current source of truth.
+   */
+  isAdmin: boolean;
 };
 
 const NAV = [
@@ -128,6 +137,13 @@ export function HeaderBar({
 
   const links = user ? [...NAV, ...AUTH_NAV] : NAV;
   const desktopLinks = user ? [...NAV, ...DESKTOP_AUTH_NAV] : NAV;
+  // Admin discoverability: the entry appears if and only if the server says
+  // the session is an admin. Visibility is not authorization - /admin and
+  // every admin action re-check server-side - but an operator should not have
+  // to guess the URL.
+  const adminLink = user?.isAdmin
+    ? [{ label: "Admin", href: "/admin", exact: true } as const]
+    : [];
   /** Any in-header navigation also closes the drawer. */
   const closeMenu = () => setOpen(false);
 
@@ -153,7 +169,7 @@ export function HeaderBar({
       </form>
 
       <nav aria-label="Mobile" className="grid gap-1">
-        {links.map((l) => (
+        {[...links, ...adminLink].map((l) => (
           <Link
             key={l.href}
             href={l.href}
@@ -312,6 +328,13 @@ export function HeaderBar({
                       <Gavel className="size-4" /> Transactions
                     </Link>
                   </DropdownMenuItem>
+                  {user.isAdmin && (
+                    <DropdownMenuItem asChild>
+                      <Link href="/admin" onClick={closeMenu} data-testid="admin-menu-link">
+                        <ShieldAlert className="size-4" /> Admin
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     onSelect={(e) => {

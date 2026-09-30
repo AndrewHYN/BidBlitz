@@ -5,6 +5,10 @@
     {
       "path": "/api/cron/settle",
       "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/email/dispatch",
+      "schedule": "0 5 * * *"
     }
   ]
 }

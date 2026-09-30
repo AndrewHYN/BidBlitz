@@ -11,9 +11,15 @@ import { randomUUID } from "node:crypto";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createServerRealtime } from "@/lib/realtime/supabase";
-import { createAuctionSchema, publishAuctionSchema } from "@/lib/validation";
+import {
+  CANCELLATION_REASONS,
+  createAuctionSchema,
+  publishAuctionSchema,
+} from "@/lib/validation";
 import { normalizeEngineError, type BidRejection } from "@/server/errors";
 import { AUCTION_CREATE_LIMIT, rateLimit } from "@/server/rate-limit";
+import { notifySeller } from "@/server/email/notify";
+import { emailKey } from "@/server/email/sender";
 
 export type ActionResult<T = unknown> =
   | ({ ok: true } & T)
@@ -368,6 +374,13 @@ export async function publishAuctionAction(input: unknown): Promise<
 
   const payload = data as { status: string; ends_at: string; ok: boolean };
 
+  // A held listing gets an email as well as the in-app notice: the seller
+  // needs to know to wait, and "under review" with no message looks stuck.
+  // Best-effort and keyed: a retry of this action reuses the row.
+  if (payload.status === "PENDING_REVIEW") {
+    await notifySeller(user.id, "review_submitted", { auctionId: parsed.data.auctionId }, emailKey("review_submitted", "auction", parsed.data.auctionId)).catch(() => undefined);
+  }
+
   try {
     const admin = createAdminClient();
     const rt = createServerRealtime(admin);
@@ -392,16 +405,33 @@ export async function publishAuctionAction(input: unknown): Promise<
   return { ok: true, status: payload.status, endsAt: payload.ends_at };
 }
 
-export async function cancelAuctionAction(input: { auctionId: string }): Promise<
-  ActionResult<{ status: string }>
-> {
+export async function cancelAuctionAction(input: {
+  auctionId: string;
+  reasonCode?: string;
+  explanation?: string;
+}): Promise<ActionResult<{ status: string }>> {
   const { supabase, user } = await requireUser();
   if (!user) {
     return { ok: false, rejection: { code: "not_authenticated", message: "Sign in." } };
   }
 
+  // Reason codes are the controlled vocabulary from CANCELLATION_REASONS: a
+  // seller picks one, never free-types one, so a misleading reason cannot
+  // smuggle an unlisted meaning into the audit row.
+  if (
+    input.reasonCode !== undefined &&
+    !(CANCELLATION_REASONS as readonly string[]).includes(input.reasonCode)
+  ) {
+    return {
+      ok: false,
+      rejection: { code: "invalid_input", message: "Pick a reason from the list." },
+    };
+  }
+
   const { data, error } = await supabase.rpc("cancel_auction", {
     p_auction_id: input.auctionId,
+    p_reason_code: input.reasonCode ?? null,
+    p_explanation: input.explanation?.slice(0, 1000) ?? null,
   });
   if (error) {
     return { ok: false, rejection: normalizeEngineError({ message: error.message, hint: error.hint }) };
@@ -413,6 +443,86 @@ export async function cancelAuctionAction(input: { auctionId: string }): Promise
 }
 
 /**
+ * Ask the team to end a live auction that has bids. The auction stays LIVE
+ * while the request is pending - the request is a question, not a lever - and
+ * the partial unique index refuses a second PENDING request for the same
+ * auction, so double-submits collapse into the duplicate answer.
+ */
+export async function requestCancellationAction(input: {
+  auctionId: string;
+  reasonCode: string;
+  explanation?: string;
+}): Promise<ActionResult<{ status: string }>> {
+  const { supabase, user } = await requireUser();
+  if (!user) {
+    return { ok: false, rejection: { code: "not_authenticated", message: "Sign in." } };
+  }
+  if (!(CANCELLATION_REASONS as readonly string[]).includes(input.reasonCode)) {
+    return {
+      ok: false,
+      rejection: { code: "invalid_input", message: "Pick a reason from the list." },
+    };
+  }
+
+  const { data, error } = await supabase.rpc("request_cancellation", {
+    p_auction_id: input.auctionId,
+    p_reason_code: input.reasonCode,
+    p_explanation: input.explanation?.slice(0, 1000) ?? null,
+  });
+  if (error) {
+    return { ok: false, rejection: normalizeEngineError({ message: error.message, hint: error.hint }) };
+  }
+
+  revalidatePath(`/auction/${input.auctionId}`);
+  revalidatePath("/dashboard/selling");
+  revalidatePath("/admin");
+  return { ok: true, status: (data as { status: string }).status ?? "PENDING" };
+}
+
+/** Withdraw your own pending cancellation request. Never touches the auction. */
+export async function withdrawCancellationAction(input: {
+  requestId: string;
+}): Promise<ActionResult> {
+  const { supabase, user } = await requireUser();
+  if (!user) {
+    return { ok: false, rejection: { code: "not_authenticated", message: "Sign in." } };
+  }
+
+  const { error } = await supabase.rpc("withdraw_cancellation", {
+    p_request_id: input.requestId,
+  });
+  if (error) {
+    return { ok: false, rejection: normalizeEngineError({ message: error.message, hint: error.hint }) };
+  }
+
+  revalidatePath("/dashboard/selling");
+  revalidatePath("/admin");
+  return { ok: true };
+}
+
+/** Withdraw your own pending listing review to edit and resubmit. */
+export async function withdrawReviewAction(input: {
+  auctionId: string;
+}): Promise<ActionResult> {
+  const { supabase, user } = await requireUser();
+  if (!user) {
+    return { ok: false, rejection: { code: "not_authenticated", message: "Sign in." } };
+  }
+
+  const { error } = await supabase.rpc("withdraw_listing_review", {
+    p_auction_id: input.auctionId,
+  });
+  if (error) {
+    return { ok: false, rejection: normalizeEngineError({ message: error.message, hint: error.hint }) };
+  }
+
+  revalidatePath(`/sell/${input.auctionId}`);
+  revalidatePath("/dashboard/selling");
+  revalidatePath("/admin");
+  return { ok: true };
+}
+
+/**
  * Closing is triggered by page views and by /api/cron/settle. Both funnel
  * through the same idempotent engine function.
  */
@@ -420,9 +530,57 @@ export async function settleIfDueAction(auctionId: string): Promise<{ settled: b
   const { supabase } = await requireUser();
   const { data, error } = await supabase.rpc("settle_auction", { p_auction_id: auctionId });
   if (error) return { settled: false };
-  const payload = data as { ok: boolean; already_settled?: boolean; status?: string };
+  const payload = data as {
+    ok: boolean;
+    already_settled?: boolean;
+    status?: string;
+    winner_id?: string;
+    winning_bid_minor?: number | string;
+    transaction_id?: string;
+    currency?: string;
+  };
   const settled = Boolean(payload?.ok) && payload?.status === "SOLD";
   if (settled) revalidatePath(`/auction/${auctionId}`);
+
+  // Outcome emails, best-effort and keyed: a viewer-triggered settle that
+  // actually closed the auction announces it once, however many viewers watch
+  // the same countdown expire. already_settled runs skip silently because the
+  // first settler already queued these keys.
+  if (payload?.ok && !payload?.already_settled && (payload?.status === "SOLD" || payload?.status === "UNSOLD")) {
+    const { notifySeller, notifyUser } = await import("@/server/email/notify");
+    const { emailKey } = await import("@/server/email/sender");
+    const { formatMoney, money } = await import("@/lib/money");
+    const { data: closed } = await supabase
+      .from("auctions")
+      .select("id, title, seller_id")
+      .eq("id", auctionId)
+      .maybeSingle();
+    const row = closed as { id: string; title: string; seller_id: string } | null;
+    if (row) {
+      if (payload.status === "SOLD" && payload.winner_id) {
+        const amount = formatMoney(
+          money(payload.winning_bid_minor ?? 0, payload.currency ?? "USD")
+        );
+        // Auction-scoped key, matching the cron sweeper below: one winner
+        // per auction ever, so one key covers every trigger that might
+        // announce it. A page view and a sweep racing the same close send one
+        // email between them, not one each.
+        await notifyUser(
+          payload.winner_id,
+          "won",
+          { title: row.title, auctionId: row.id, amount },
+          emailKey("won", "auction", row.id)
+        ).catch(() => undefined);
+      } else {
+        await notifySeller(
+          row.seller_id,
+          "auction_unsold",
+          { title: row.title, auctionId: row.id },
+          emailKey("auction_unsold", "auction", row.id)
+        ).catch(() => undefined);
+      }
+    }
+  }
   return { settled };
 }
 

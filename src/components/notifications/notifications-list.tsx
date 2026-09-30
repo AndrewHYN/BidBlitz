@@ -112,6 +112,84 @@ function describe(
         headline: `${headline} ended with no bids`,
         detail: null,
       };
+    case "BID_CONFIRMED":
+      return {
+        headline: `Bid placed on ${headline}`,
+        detail: (
+          <>
+            <Money minor={amountOf(p.amount_minor)} currency={currency} />. Bids
+            are final: if you win, you pay this amount plus the payment charge.
+          </>
+        ),
+      };
+    case "REVIEW_SUBMITTED":
+      return {
+        headline: `${headline} sent for review`,
+        detail: <>The team checks first listings before they go public.</>,
+      };
+    case "REVIEW_APPROVED":
+      return {
+        headline: `${headline} approved`,
+        detail: (
+          <>
+            Your listing is public.{" "}
+            {typeof p.ends_at === "string" && (
+              <>Bidding closes {formatDate(p.ends_at)}.</>
+            )}
+          </>
+        ),
+      };
+    case "REVIEW_REJECTED":
+      return {
+        headline: `${headline} was not approved`,
+        detail: (
+          <>{typeof p.reason === "string" ? p.reason : "See the listing page for what to fix."}</>
+        ),
+      };
+    case "REVIEW_CHANGES_REQUESTED":
+      return {
+        headline: `${headline} needs changes`,
+        detail: (
+          <>{typeof p.reason === "string" ? p.reason : "See the listing page for what to fix."}</>
+        ),
+      };
+    case "CANCELLATION_REQUESTED":
+      return {
+        headline: `Cancellation requested for ${headline}`,
+        detail: <>The team reviews it while the auction stays live.</>,
+      };
+    case "CANCELLATION_DECIDED":
+      return p.approved === true
+        ? {
+            headline: `Cancellation approved for ${headline}`,
+            detail: <>The auction is cancelled. No winner, no payment, history kept.</>,
+          }
+        : {
+            headline: `Cancellation request declined for ${headline}`,
+            detail: (
+              <>{typeof p.reason === "string" ? p.reason : "The auction stays live."}</>
+            ),
+          };
+    case "AUCTION_PAUSED":
+      return {
+        headline: `${headline} paused by BidBlitz`,
+        detail: <>Bidding is disabled and the clock is stopped while the team reviews an issue.</>,
+      };
+    case "AUCTION_RESUMED":
+      return {
+        headline: `${headline} is running again`,
+        detail: (
+          <>
+            Bidding is open and the clock continues where it stopped.
+            {typeof p.ends_at === "string" && <> It now ends {formatDate(p.ends_at)}.</>}
+          </>
+        ),
+      };
+    case "AUCTION_CANCELLED":
+      return {
+        headline: `${headline} was cancelled`,
+        detail: <>No winner, no payment. Your bids stay in the history.</>,
+      };
     case "LISTING_REMOVED":
       // A takedown notice names the outcome and where to ask about it - never
       // who reported the listing and never the internal reason. Those live in

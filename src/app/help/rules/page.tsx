@@ -43,6 +43,11 @@ const RULES = [
     body: "The seller of an auction is blocked from bidding on it, so nobody can shill their own price up.",
   },
   {
+    icon: Timer,
+    title: "A paused auction stops, it does not end",
+    body: "BidBlitz can freeze an auction while the team reviews an issue. Bidding is disabled and the clock is stopped; existing bids stay recorded. When it resumes, the remaining time continues exactly where it stopped.",
+  },
+  {
     icon: Lock,
     title: "Deal terms are locked at publish",
     body: "Once an auction is published, its starting price, bid increment, duration and closing time are frozen. Nobody, not even the seller, can quietly change them. Bids and the anti-snipe extension are the only things that can move the price or the clock.",
@@ -61,6 +66,22 @@ const MARKETPLACE_RULES = [
   {
     title: "Keep payment on BidBlitz",
     body: "Winning bids are paid through the sale's transaction. Asking a buyer to pay elsewhere, or offering to complete a sale off the site, ends the listing and can end the account.",
+  },
+  {
+    title: "First listings are checked before they go public",
+    body: "A seller's first listing, high-value items, and accounts with reports or past violations are reviewed by the BidBlitz team before buyers can see them. Rejected listings return to draft with the reason; fixing and resubmitting is always allowed.",
+  },
+  {
+    title: "Ending an auction early follows the rules",
+    body: "A seller can end an auction with no bids, giving a reason. Once bids exist, the auction can only be ended through a reviewed cancellation request: it stays live until the team decides, approval ends it with no winner and no payment, and rejection changes nothing.",
+  },
+  {
+    title: "Some things may never be listed",
+    body: "Counterfeits, stolen goods, items you do not own, weapons, and anything illegal to sell in Zimbabwe may not be listed. Listings that break this rule are taken down and the account is suspended.",
+  },
+  {
+    title: "Auction sales are final: no cooling-off return",
+    body: "Bids are binding and a win is a sale. Zimbabwe's Consumer Protection Act excludes transactions conducted by auction from its cooling-off provision, so there is no automatic return window. Problems after a sale go through support and the dispute process, never through cancelling the auction itself.",
   },
   {
     title: "One account, yours alone",

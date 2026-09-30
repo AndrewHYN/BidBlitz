@@ -54,14 +54,39 @@ export function PublishButton({
         }
         setConfirmOpen(false);
         setLaunched(true);
-        toast.success("Your auction is live", {
-          description: "Share it to get your first bids in.",
-        });
+        if (result.status === "PENDING_REVIEW") {
+          toast.success("Sent for review", {
+            description: "The team checks first listings before they go public.",
+          });
+        } else {
+          toast.success("Your auction is live", {
+            description: "Share it to get your first bids in.",
+          });
+        }
         router.refresh();
       } catch {
         setError("Something went wrong while publishing. Please try again.");
       }
     });
+  }
+
+  if (status === "PENDING_REVIEW" && !launched) {
+    // Held for a human: not public, not biddable, nothing to share yet. The
+    // review queue (not this button) moves it next; withdrawing returns it to
+    // draft for edits.
+    return (
+      <div className="space-y-3" data-testid="publish-success">
+        <p className="flex items-center gap-2 text-sm font-medium">
+          <Rocket className="size-4 text-primary" aria-hidden />
+          Under review
+        </p>
+        <p className="text-sm text-muted-foreground">
+          The BidBlitz team is checking this listing before it can go public.
+          Most reviews finish quickly; you will find the decision in your
+          notifications.
+        </p>
+      </div>
+    );
   }
 
   if (status !== "DRAFT" || launched) {
@@ -71,7 +96,9 @@ export function PublishButton({
         : "This auction is closed"
       : status === "SCHEDULED"
         ? "Scheduled: waiting for the clock to start"
-        : "Live now";
+        : status === "PAUSED"
+          ? "Paused by BidBlitz"
+          : "Live now";
 
     const shareable = status === "LIVE" || status === "SCHEDULED";
 
@@ -82,6 +109,12 @@ export function PublishButton({
           {label}
         </p>
         {endsAt && <Countdown endsAt={endsAt} status={status} variant="boxes" />}
+        {status === "PAUSED" && (
+          <p className="text-sm text-muted-foreground">
+            Bidding is disabled while the hold lasts. Only an admin can resume
+            it.
+          </p>
+        )}
         {shareable && (
           <p className="text-sm text-muted-foreground">
             Share your auction to get the first bids in.

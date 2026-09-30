@@ -4,6 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/auction/page-header";
 import { SettingsForm } from "@/components/auth/settings-form";
 import { AvatarUploader } from "@/components/profile/avatar-uploader";
+import { EmailPreferences } from "@/components/auth/email-preferences";
+import { getPreferencesAction } from "@/server/actions/preferences";
 
 export const metadata: Metadata = {
   title: "Settings",
@@ -48,6 +50,7 @@ export default async function SettingsPage() {
             location: profile?.location ?? "",
           }}
         />
+        <EmailPreferences initial={await getPreferencesAction()} />
       </div>
     </div>
   );
