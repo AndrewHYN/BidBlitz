@@ -2903,6 +2903,135 @@ await sql(`delete from public.auctions where id='${auctionId}'`);
     await sql(`delete from public.notification_preferences where user_id='${buyer2Id}'`);
   }
 
+  // ---- 15e. recently-listed freshness -----------------------------------------
+  //
+  // Migration 20260930000006 added listed_at (stamped once at first public
+  // availability) and the homepage rail filters on it. This section proves
+  // the stamp, the window and the exclusions in final database state, using
+  // the seller account and cleaning everything it makes.
+  console.log("\n--- recently listed ---");
+
+  // Two publishes: the first is held (first listing - seller starts clean),
+  // which proves the held path leaves listed_at NULL; the second goes live,
+  // which proves the trigger stamps the public path.
+  const RL_TITLE_A = "Verify: recent held listing";
+  const rlA = await rest(`/rest/v1/auctions`, {
+    method: "POST", bearer: tok.seller,
+    headers: { Prefer: "return=representation" },
+    body: { ...auctionPayload, title: RL_TITLE_A },
+  });
+  const rlIdA = rlA.data?.[0]?.id;
+  let rlIdB = null;
+  check("RL: fixture A created", !!rlIdA, rlIdA ?? JSON.stringify(rlA.data));
+  if (rlIdA) {
+    await rest(`/rest/v1/auction_images`, {
+      method: "POST", bearer: tok.seller,
+      body: { auction_id: rlIdA, storage_path: `harness/${rlIdA}/cover.jpg`, position: 0 },
+    });
+    const pubA = await rest(`/rest/v1/rpc/publish_auction`, {
+      method: "POST", bearer: tok.seller, body: { p_auction_id: rlIdA },
+    });
+    const listedA = rows(await sql(
+      `select status, listed_at from public.auctions where id='${rlIdA}'`))[0];
+    check("RL: a review-held publish leaves listed_at NULL (never public)",
+      pubA.data?.status === "PENDING_REVIEW" && listedA?.listed_at === null,
+      `status=${listedA?.status} listed_at=${listedA?.listed_at}`);
+
+    const RL_TITLE_B = "Verify: recent live listing";
+    const rlB = await rest(`/rest/v1/auctions`, {
+      method: "POST", bearer: tok.seller,
+      headers: { Prefer: "return=representation" },
+      body: { ...auctionPayload, title: RL_TITLE_B },
+    });
+    rlIdB = rlB.data?.[0]?.id;
+    await rest(`/rest/v1/auction_images`, {
+      method: "POST", bearer: tok.seller,
+      body: { auction_id: rlIdB, storage_path: `harness/${rlIdB}/cover.jpg`, position: 0 },
+    });
+    const before = Date.now();
+    const pubB = await rest(`/rest/v1/rpc/publish_auction`, {
+      method: "POST", bearer: tok.seller, body: { p_auction_id: rlIdB },
+    });
+    const listedB = rows(await sql(
+      `select status, listed_at from public.auctions where id='${rlIdB}'`))[0];
+    const stampedMs = listedB?.listed_at ? Date.parse(listedB.listed_at) : NaN;
+    check("RL: a public publish stamps listed_at at publish time",
+      pubB.data?.status === "LIVE" && !Number.isNaN(stampedMs)
+        && stampedMs >= before - 5000 && stampedMs <= Date.now() + 5000,
+      `status=${listedB?.status} listed_at=${listedB?.listed_at}`);
+  }
+
+  // Window + exclusion matrix, inserted with explicit timestamps (the trigger
+  // only fills NULL, so explicit values survive and the matrix is exact).
+  const RL_H = 3600 * 1000;
+  const rlNow = Date.now();
+  const rlIso = (ms) => new Date(ms).toISOString();
+  const rlRows = [
+    ["Verify: recent 2h live", "LIVE", rlIso(rlNow - 2 * RL_H), true],
+    ["Verify: recent 71h live", "LIVE", rlIso(rlNow - 71 * RL_H), true],
+    ["Verify: recent 73h live", "LIVE", rlIso(rlNow - 73 * RL_H), false],
+    ["Verify: recent fresh draft", "DRAFT", rlIso(rlNow - 3600 * 1000), false],
+    ["Verify: recent fresh review", "PENDING_REVIEW", null, false],
+    ["Verify: recent fresh paused", "PAUSED", rlIso(rlNow - 3600 * 1000), false],
+    ["Verify: recent fresh sold", "SOLD", rlIso(rlNow - 3600 * 1000), false],
+    ["Verify: recent fresh unsold", "UNSOLD", rlIso(rlNow - 3600 * 1000), false],
+    ["Verify: recent fresh cancelled", "CANCELLED", rlIso(rlNow - 3600 * 1000), false],
+    ["Verify: recent fresh scheduled", "SCHEDULED", rlIso(rlNow - 3600 * 1000), true],
+  ];
+  const rlIds = [];
+  for (const [title, status, listed, want] of rlRows) {
+    const r = rows(await sql(
+      // SOLD rows must carry a winner (sold_has_winner_chk): buyer1 won it
+      // for the floor price. Nothing else about the row matters - the rail
+      // query never looks at winners, only status + listed_at.
+      `insert into public.auctions (seller_id, title, description, condition, location,
+         starting_bid_minor, bid_increment_minor, status, listed_at, starts_at, ends_at, duration_seconds,
+         winner_id, winning_bid_minor)
+       values ('${sellerId}', '${title}', 'Freshness matrix fixture; removed after.',
+               'good', 'harness', 100, 10, '${status}',
+               ${listed ? `'${listed}'` : "null"},
+               now() - interval '80 hours', now() + interval '1 hour', 3600,
+               case when '${status}' = 'SOLD' then '${buyer1Id}'::uuid end,
+               case when '${status}' = 'SOLD' then 100 end)
+       returning id`));
+    if (r[0]?.id) rlIds.push([r[0].id, title, want]);
+  }
+  // The app's exact recent filter, through the same public boundary buyers use.
+  const cutoff = new Date(rlNow - 72 * RL_H).toISOString();
+  const recentRes = await rest(
+    `/rest/v1/auctions?select=id,title,listed_at&status=in.(LIVE,SCHEDULED)&listed_at=gt.${encodeURIComponent(cutoff)}&order=listed_at.desc`,
+    { bearer: tok.buyer1 });
+  const recentIds = new Set(((recentRes.data ?? [])).map((x) => x.id));
+  const matrixOk = rlIds.every(([id, , want]) => recentIds.has(id) === want);
+  // Ordering newest-first, restricted to OUR rows (other fixtures may exist).
+  const oursInOrder = ((recentRes.data ?? []).filter((x) => rlIds.some(([id]) => id === x.id)));
+  const oursTimes = oursInOrder.map((x) => Date.parse(x.listed_at));
+  const orderedOk = oursTimes.every((x, i) => i === 0 || oursTimes[i - 1] >= x);
+  // A 73-hour LIVE row leaves the rail but stays discoverable in Browse terms.
+  const oldId = rlIds.find(([, t]) => t === "Verify: recent 73h live")?.[0];
+  const browseRes = await rest(
+    `/rest/v1/auctions?select=id&status=neq.DRAFT&status=neq.CANCELLED&id=eq.${oldId}`,
+    { bearer: tok.buyer1 });
+  check("RL: an aged listing stays in Browse (freshness is display-only)",
+    (browseRes.data ?? []).length === 1, `rows=${(browseRes.data ?? []).length}`);
+
+  // Cleanup: own fixtures only, by exact id.
+  const allRl = [...rlIds.map(([id]) => id), rlIdA, rlIdB].filter(Boolean);
+  if (allRl.length) {
+    const idList = allRl.map((x) => `'${x}'`).join(",");
+    await sql(`delete from public.listing_reviews where auction_id in (${idList})`);
+    await sql(`delete from public.auction_cancellation_requests where auction_id in (${idList})`);
+    await sql(`delete from public.auction_cancellations where auction_id in (${idList})`);
+    await sql(`delete from public.notifications where auction_id in (${idList})`);
+    await sql(`delete from public.bids where auction_id in (${idList})`);
+    await sql(`delete from public.auction_images where auction_id in (${idList})`);
+    await sql(`delete from public.watchlist where auction_id in (${idList})`);
+    await sql(`delete from public.auctions where id in (${idList})`);
+    const gone = rows(await sql(
+      `select count(*)::int as n from public.auctions where id in (${idList})`))[0].n;
+    check("RL: freshness fixtures fully removed", gone === 0, `remaining=${gone}`);
+  }
+
 console.log("\n--- avatars ---");
 
 /*

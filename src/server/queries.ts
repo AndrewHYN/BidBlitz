@@ -3,6 +3,7 @@ import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sweepDueAuctions } from "@/server/sweep";
+import { recentlyListedCutoffIso } from "@/lib/auction-status";
 import type { Database, SellerPayoutStatus, TransactionStatus } from "@/lib/supabase/types";
 
 /**
@@ -110,6 +111,9 @@ export const getHomeFeed = cache(async () => {
   // badge next to an expired countdown. Throttled to one call per minute.
   await sweepDueAuctions();
   const supabase = await createClient();
+  // Server clock, never the browser's: freshness membership is decided here,
+  // in this server query, and the client receives only the result.
+  const recentCutoffIso = recentlyListedCutoffIso(Date.now());
 
   const [live, ending, recent, categories] = await Promise.all([
     supabase
@@ -124,11 +128,16 @@ export const getHomeFeed = cache(async () => {
       .eq("status", "LIVE")
       .order("ends_at", { ascending: true })
       .limit(8),
+    // Recently listed is a merchandising window, not a lifecycle state:
+    // publicly discoverable (LIVE/SCHEDULED) AND stamped within the window,
+    // newest first. Leaving the window changes nothing about the auction -
+    // it stays in Browse, search and the seller's listings.
     supabase
       .from("auctions")
       .select(CARD_SELECT)
-      .neq("status", "DRAFT")
-      .order("created_at", { ascending: false })
+      .in("status", ["LIVE", "SCHEDULED"])
+      .gt("listed_at", recentCutoffIso)
+      .order("listed_at", { ascending: false })
       .limit(12),
     supabase.from("categories").select("id, slug, name, emoji, sort_order").order("sort_order"),
   ]);
