@@ -239,6 +239,13 @@ if (fixtures.length > 0) {
       `delete from public.email_outbox where recipient like '%@bidblitz.test'`,
     ],
     [
+      // The preferences spec saves a real settings row as a QA user. It is
+      // test-owned like everything else here, so the sweep removes QA rows;
+      // a real user's row can never match the domain filter.
+      "notification preferences",
+      `delete from public.notification_preferences where user_id in (select id from auth.users where email like '%@bidblitz.test')`,
+    ],
+    [
       "auction images",
       `delete from public.auction_images where auction_id in (${ids})`,
     ],

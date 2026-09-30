@@ -2887,15 +2887,19 @@ await sql(`delete from public.auctions where id='${auctionId}'`);
       `claimed=${claimedOurs.length}`);
     await sql(`delete from public.email_outbox where idempotency_key='${obKey}'`);
 
-    // Preferences are per-owner: buyer1 cannot read buyer2's row.
     await sql(`insert into public.notification_preferences (user_id, outbid)
                values ('${buyer2Id}', false)
                on conflict (user_id) do update set outbid = false`);
     const prefLeak = await rest(
       `/rest/v1/notification_preferences?select=user_id`, { bearer: tok.buyer1 });
+    // Per-owner means buyer2's row stays invisible to buyer1. Scoped to
+    // buyer2's id, not to an empty table: buyer1 legitimately sees their
+    // OWN row (the e2e preferences test saves one), and that must not read
+    // as a leak in either direction.
+    const leakedIds = ((prefLeak.data ?? [])).map((r) => r.user_id);
     check("OB-Y: notification preferences are private to their owner",
-      prefLeak.ok && (prefLeak.data ?? []).length === 0,
-      `rows=${(prefLeak.data ?? []).length}`);
+      prefLeak.ok && !leakedIds.includes(buyer2Id),
+      `buyer2 visible=${leakedIds.includes(buyer2Id)} rows=${leakedIds.length}`);
     await sql(`delete from public.notification_preferences where user_id='${buyer2Id}'`);
   }
 
