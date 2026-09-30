@@ -100,8 +100,21 @@ fall back to safe defaults.
 
 Architecture, catalogue, outbox, dispatcher, preferences and the admin
 delivery-failures read path are implemented and unit-tested, and the database
-queue is proven (`OB:` checks in `db:verify`). **External delivery is NOT
-verified**: no `RESEND_API_KEY` is configured in this environment, no domain
-is verified, and Supabase Auth still uses the built-in provider. Until the
-three dashboard steps above are done, mail queues but does not send — which is
+queue is proven (`OB:` checks in `db:verify`).
+
+Provider key verified 2026-09-30: a `RESEND_API_KEY` has been issued and a
+live API test through it returned `200` with a Resend message id, so the key
+authenticates and delivers. Two things are still true:
+
+- The test sent from Resend's permitted test sender. Sending from a Gmail
+  address was refused (`gmail.com` is not verifiable): **production mail
+  needs a verified custom domain** (Resend dashboard → Domains → SPF/DKIM/
+  DMARC), then `EMAIL_FROM` becomes that domain sender.
+- The key is not deployed anywhere yet: `RESEND_API_KEY`, `EMAIL_FROM` and
+  `APP_URL` must be added in the Vercel dashboard (Environment Variables),
+  and Supabase Auth custom SMTP (`smtp.resend.com:465`, user `resend`,
+  password the API key) is still unconfigured — signup stays rate-capped
+  until then.
+
+Until those two owner steps are done, mail queues but does not send — which is
 the designed behaviour, not a failure.
