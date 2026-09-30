@@ -113,4 +113,20 @@ test.describe("password reset", () => {
     const field = page.getByTestId("reset-email-field");
     await expect(field).toHaveAttribute("type", "email");
   });
+
+  test("a forged callback link fails closed to the login error", async ({
+    page,
+  }) => {
+    // The callback accepts ?code=, ?token_hash=&type= (allowlisted) and the
+    // session fragment; anything else must land on the login error without
+    // creating a session. A 64-hex token_hash with no matching issuance is
+    // the closest a browser test can come to a tampered link.
+    await page.goto(
+      "/auth/callback?token_hash=" + "0".repeat(64) + "&type=recovery&next=%2Freset-password"
+    );
+    await expect(page).toHaveURL(/\/login\?error=callback/, { timeout: 30_000 });
+    await expect(page.getByText(/couldn't complete sign-in/i)).toBeVisible({
+      timeout: 15_000,
+    });
+  });
 });
