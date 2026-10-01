@@ -19,8 +19,17 @@ function requireConfig(): [string, string] {
  * Uses ONLY the publishable key (sb_publishable_...), which is safe to ship in
  * a bundle because every query it makes is constrained by RLS. The secret key
  * must never be imported into any module reachable from a client component.
+ *
+ * `options` is a narrow passthrough for per-page auth behaviour — currently
+ * only `detectSessionInUrl`. The email-link callback disables auto-detection
+ * so the fragment is handled deterministically in one place (see
+ * callback-runner.tsx): the library otherwise reads and clears
+ * `window.location.hash` concurrently with the manual handling, which turns a
+ * valid link into a race.
  */
-export function createClient() {
+export function createClient(options?: {
+  auth?: { detectSessionInUrl?: boolean };
+}) {
   const [resolvedUrl, resolvedKey] = requireConfig();
-  return createBrowserClient(resolvedUrl, resolvedKey);
+  return createBrowserClient(resolvedUrl, resolvedKey, options);
 }

@@ -407,3 +407,50 @@ export async function updatePasswordAction(input: {
 
   return { ok: true };
 }
+
+/**
+ * Change the password for an already-authenticated user (Settings → Security).
+ *
+ * This is NOT the recovery flow: the caller holds a normal session, not a
+ * single-use recovery grant. Supabase's `updateUser({ password })` is the same
+ * primitive, but the preconditions and the outcome differ — a missing session
+ * here means "sign in again", never "request a new reset link", and the
+ * session survives the change (the user stays signed in). No current-password
+ * check: GoTrue does not require it for an authenticated `updateUser`, and
+ * asking for a credential the server never verifies would be theater.
+ */
+export async function changePasswordAction(input: {
+  password: string;
+}): Promise<{ ok: true } | { ok: false; rejection: BidRejection }> {
+  if (input.password.length < MIN_PASSWORD_LENGTH) {
+    return {
+      ok: false,
+      rejection: {
+        code: "invalid_input",
+        message: `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`,
+      },
+    };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return {
+      ok: false,
+      rejection: {
+        code: "not_authenticated",
+        message: "Sign in again, then try changing your password.",
+      },
+    };
+  }
+
+  const { error } = await supabase.auth.updateUser({ password: input.password });
+  if (error) {
+    return { ok: false, rejection: friendlyAuthError(error.message) };
+  }
+
+  return { ok: true };
+}

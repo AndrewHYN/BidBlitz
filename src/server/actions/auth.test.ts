@@ -2,7 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { AUTH_LIMIT, peekRateLimit, rateLimit, resetRateLimits } from "@/server/rate-limit";
-import { signInAction, signUpAction } from "./auth";
+import {
+  changePasswordAction,
+  signInAction,
+  signUpAction,
+  updatePasswordAction,
+} from "./auth";
 
 /**
  * Auth rate-limiting contract.
@@ -45,6 +50,25 @@ let signInError: ProviderError = null;
 let signUpError: ProviderError = null;
 /** GoTrue's signup payload: auto-confirm off ⇒ session null, user present. */
 let signUpData: { session: unknown; user: unknown } = { session: null, user: { id: "u-1" } };
+let sessionUser: { id: string } | null = { id: "u-1" };
+let updateUserError: ProviderError = null;
+
+function mockSupabase() {
+  vi.mocked(createClient).mockResolvedValue({
+    auth: {
+      signInWithPassword: vi.fn(async () => ({
+        data: signInError ? {} : { user: { id: "u-1" }, session: { access_token: "t" } },
+        error: signInError,
+      })),
+      signUp: vi.fn(async () => ({ data: signUpData, error: signUpError })),
+      getUser: vi.fn(async () => ({ data: { user: sessionUser }, error: null })),
+      updateUser: vi.fn(async () => ({
+        data: updateUserError ? {} : { user: sessionUser },
+        error: updateUserError,
+      })),
+    },
+  } as unknown as Awaited<ReturnType<typeof createClient>>);
+}
 
 function budget() {
   return peekRateLimit(KEY, AUTH_LIMIT.limit, AUTH_LIMIT.windowMs);
@@ -56,16 +80,10 @@ beforeEach(() => {
   signInError = null;
   signUpError = null;
   signUpData = { session: null, user: { id: "u-1" } };
+  sessionUser = { id: "u-1" };
+  updateUserError = null;
 
-  vi.mocked(createClient).mockResolvedValue({
-    auth: {
-      signInWithPassword: vi.fn(async () => ({
-        data: signInError ? {} : { user: { id: "u-1" }, session: { access_token: "t" } },
-        error: signInError,
-      })),
-      signUp: vi.fn(async () => ({ data: signUpData, error: signUpError })),
-    },
-  } as unknown as Awaited<ReturnType<typeof createClient>>);
+  mockSupabase();
 });
 
 afterEach(() => {
@@ -246,5 +264,62 @@ describe("signInAction", () => {
     if (result.ok) return;
     expect(result.rejection.message).toBe("Email or password is incorrect.");
     expect(budget().remaining).toBe(AUTH_LIMIT.limit - 1);
+  });
+});
+
+describe("updatePasswordAction (recovery)", () => {
+  it("refuses a short password before contacting the provider", async () => {
+    const result = await updatePasswordAction({ password: "short" });
+    expect(result).toEqual({
+      ok: false,
+      rejection: {
+        code: "invalid_input",
+        message: "Password must be at least 8 characters.",
+      },
+    });
+  });
+
+  it("refuses without a session and names the dead link, not a typo", async () => {
+    sessionUser = null;
+    mockSupabase();
+
+    const result = await updatePasswordAction({ password: "a-brand-new-password" });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.rejection.code).toBe("reset_link_invalid");
+  });
+
+  it("updates the password for the recovery session's own user", async () => {
+    const result = await updatePasswordAction({ password: "a-brand-new-password" });
+    expect(result).toEqual({ ok: true });
+  });
+});
+
+describe("changePasswordAction (authenticated)", () => {
+  it("refuses a short password before contacting the provider", async () => {
+    const result = await changePasswordAction({ password: "short" });
+    expect(result).toEqual({
+      ok: false,
+      rejection: {
+        code: "invalid_input",
+        message: "Password must be at least 8 characters.",
+      },
+    });
+  });
+
+  it("asks for a sign-in when there is no session — never a reset link", async () => {
+    sessionUser = null;
+    mockSupabase();
+
+    const result = await changePasswordAction({ password: "a-brand-new-password" });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.rejection.code).toBe("not_authenticated");
+    expect(result.rejection.message).toMatch(/sign in again/i);
+  });
+
+  it("changes the password for the signed-in user", async () => {
+    const result = await changePasswordAction({ password: "a-brand-new-password" });
+    expect(result).toEqual({ ok: true });
   });
 });

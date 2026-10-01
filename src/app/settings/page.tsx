@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/auction/page-header";
 import { SettingsForm } from "@/components/auth/settings-form";
+import { ChangePasswordForm } from "@/components/auth/change-password-form";
 import { AvatarUploader } from "@/components/profile/avatar-uploader";
 import { EmailPreferences } from "@/components/auth/email-preferences";
 import { getPreferencesAction } from "@/server/actions/preferences";
@@ -50,6 +51,7 @@ export default async function SettingsPage() {
             location: profile?.location ?? "",
           }}
         />
+        <ChangePasswordForm />
         <EmailPreferences initial={await getPreferencesAction()} />
       </div>
     </div>

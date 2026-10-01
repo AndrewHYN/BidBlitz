@@ -11,6 +11,16 @@ import { safeNext } from "@/lib/safe-next";
  * receive the URL fragment, so `?code=` handling alone silently dropped the
  * recovery flow. Any failure lands on /login?error=callback, the same
  * fail-closed destination as before; invalid links never create a session.
+ *
+ * Auto-detection is disabled for this client (see `createClient`). The
+ * underlying library otherwise processes `window.location.hash` on
+ * initialization AND clears it (`window.location.hash = ''`) while this
+ * effect reads it — a valid recovery link then looks credential-less and
+ * bounces to /login?error=callback despite holding a good session. Handling
+ * the fragment deterministically here removes the race. As a second guard,
+ * an already-established session is honoured: if the credentials are gone
+ * but a session exists, the user proceeds instead of failing closed on a
+ * link the browser already consumed.
  */
 export function CallbackRunner() {
   const router = useRouter();
@@ -20,17 +30,42 @@ export function CallbackRunner() {
   useEffect(() => {
     let cancelled = false;
 
+    async function sessionExists(
+      supabase: ReturnType<typeof createClient>
+    ): Promise<boolean> {
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        return !!session;
+      } catch {
+        return false;
+      }
+    }
+
     async function run() {
       const next = safeNext(params.get("next"));
-      const supabase = createClient();
+      // Deterministic handling: no concurrent auto-detection racing this
+      // effect for the same fragment (see the note above).
+      const supabase = createClient({ auth: { detectSessionInUrl: false } });
 
       try {
+        // A session the browser already holds (second visit, back button, or
+        // a link the auto-detector consumed before this build) is not a
+        // failure — proceed where the link intended.
+        if (await sessionExists(supabase)) {
+          if (!cancelled) router.replace(next);
+          return;
+        }
+
         const code = params.get("code");
         if (code) {
           const { error } = await supabase.auth.exchangeCodeForSession(code);
           if (!cancelled) {
-            if (error) router.replace("/login?error=callback");
-            else router.replace(next);
+            if (error) {
+              if (await sessionExists(supabase)) router.replace(next);
+              else router.replace("/login?error=callback");
+            } else router.replace(next);
           }
           return;
         }
@@ -46,8 +81,10 @@ export function CallbackRunner() {
             type,
           });
           if (!cancelled) {
-            if (error) router.replace("/login?error=callback");
-            else router.replace(next);
+            if (error) {
+              if (await sessionExists(supabase)) router.replace(next);
+              else router.replace("/login?error=callback");
+            } else router.replace(next);
           }
           return;
         }
@@ -61,9 +98,25 @@ export function CallbackRunner() {
             refresh_token: refreshToken,
           });
           if (!cancelled) {
-            if (error) router.replace("/login?error=callback");
-            else router.replace(next);
+            if (error) {
+              if (await sessionExists(supabase)) router.replace(next);
+              else router.replace("/login?error=callback");
+            } else {
+              // Prove the session is readable (cookies set) before leaving:
+              // the reset page is a server component that sees only cookies,
+              // so navigating without them renders an expired-link state.
+              if (await sessionExists(supabase)) router.replace(next);
+              else router.replace("/login?error=callback");
+            }
           }
+          return;
+        }
+
+        // No credentials in the URL. One last check before failing closed:
+        // the session may have been established before the fragment was
+        // cleared (or the user is already signed in).
+        if (await sessionExists(supabase)) {
+          if (!cancelled) router.replace(next);
           return;
         }
 
