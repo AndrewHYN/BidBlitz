@@ -48,7 +48,7 @@ function amountOf(value: Json | undefined): bigint | number | string | null {
 function describe(
   type: string,
   payload: Json
-): { headline: string; detail: React.ReactNode } {
+): { headline: string; detail: React.ReactNode; threadId?: string | null } {
   const p = asRecord(payload);
   const title = typeof p.title === "string" ? p.title : null;
   const currency = typeof p.currency === "string" ? p.currency : "USD";
@@ -233,6 +233,14 @@ function describe(
           </>
         ),
       };
+    case "NEW_MESSAGE": {
+      const transactionId = typeof p.transactionId === "string" ? p.transactionId : null;
+      return {
+        headline: `New message about ${headline}`,
+        detail: <>Open the conversation to read it and reply.</>,
+        threadId: transactionId,
+      };
+    }
     default:
       return { headline, detail: null };
   }
@@ -243,9 +251,10 @@ export function NotificationsList({ items }: { items: NotificationItem[] }) {
     <ul data-testid="notifications-list" className="space-y-3">
       {items.map((item) => {
         const unread = item.read_at === null;
-        const { headline, detail } = describe(item.type, item.payload);
+        const { headline, detail, threadId } = describe(item.type, item.payload);
         // WON/SOLD/REVIEW_REQUEST carry the reader to the transaction itself:
         // payment state, fee breakdown and the review dialog all live there.
+        // NEW_MESSAGE deep-links to the private thread.
         const transactionLinked =
           item.type === "WON" ||
           item.type === "SOLD" ||
@@ -281,7 +290,14 @@ export function NotificationsList({ items }: { items: NotificationItem[] }) {
             </div>
 
             <div className="flex shrink-0 items-center gap-2">
-              {transactionLinked ? (
+              {threadId ? (
+                <Link
+                  href={`/dashboard/transactions/${threadId}`}
+                  className="text-sm font-medium text-muted-foreground hover:text-foreground hover:underline"
+                >
+                  Read message
+                </Link>
+              ) : transactionLinked ? (
                 <Link
                   href="/dashboard/transactions"
                   className="text-sm font-medium text-muted-foreground hover:text-foreground hover:underline"

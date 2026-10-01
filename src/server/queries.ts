@@ -526,6 +526,101 @@ export const getTransactions = cache(async (userId: string) => {
   }>).map((row) => ({ ...row, reviewed: reviewed.has(row.id) }));
 });
 
+// ---------------------------------------------------------------------------
+// Post-win threads: exactly the two parties, enforced by RLS twice over
+// (the transaction row and every message row). A forged id, or a signed-in
+// non-party, reads zero rows — the page answers "not available" either way.
+// ---------------------------------------------------------------------------
+
+export type ThreadMessage = {
+  id: string;
+  sender_id: string;
+  body: string;
+  read_at: string | null;
+  created_at: string;
+};
+
+export type ThreadCounterparty = { id: string; username: string; display_name: string };
+
+export type ThreadView = {
+  id: string;
+  auction_id: string;
+  title: string;
+  seller_id: string;
+  buyer_id: string;
+  status: string;
+  counterparty: ThreadCounterparty;
+  messages: ThreadMessage[];
+} | null;
+
+/**
+ * The thread for one transaction, or null when it does not exist, is not
+ * the viewer's, or the messaging migration has not been applied yet. All
+ * three look identical on purpose: no existence oracle for forged ids.
+ */
+export const getThread = cache(async (userId: string, transactionId: string): Promise<ThreadView> => {
+  const supabase = await createClient();
+  const { data: tx, error: txError } = await supabase
+    .from("transactions")
+    .select("id, auction_id, seller_id, buyer_id, status, auctions:auction_id(title)")
+    .eq("id", transactionId)
+    .maybeSingle();
+  if (txError || !tx) return null;
+  const row = tx as unknown as {
+    id: string;
+    auction_id: string;
+    seller_id: string;
+    buyer_id: string;
+    status: string;
+    auctions: { title: string } | null;
+  };
+  if (row.seller_id !== userId && row.buyer_id !== userId) return null;
+
+  const counterpartyId = row.seller_id === userId ? row.buyer_id : row.seller_id;
+  const [{ data: counterparty }, { data: messages }] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("id, username, display_name")
+      .eq("id", counterpartyId)
+      .maybeSingle(),
+    supabase
+      .from("transaction_messages")
+      .select("id, sender_id, body, read_at, created_at")
+      .eq("transaction_id", row.id)
+      .order("created_at", { ascending: true })
+      .limit(200),
+  ]);
+  // A missing table (migration pending) must read as "not available", never
+  // as a crash: messages is null only on query failure.
+  if (!counterparty || !messages) return null;
+  return {
+    id: row.id,
+    auction_id: row.auction_id,
+    title: row.auctions?.title ?? "your sale",
+    seller_id: row.seller_id,
+    buyer_id: row.buyer_id,
+    status: row.status,
+    counterparty: counterparty as unknown as ThreadCounterparty,
+    messages: messages as unknown as ThreadMessage[],
+  };
+});
+
+/** Unread inbound counts per transaction for the viewer (badge on the table). */
+export const getMessageUnreadCounts = cache(async (userId: string): Promise<Map<string, number>> => {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("transaction_messages")
+    .select("transaction_id")
+    .neq("sender_id", userId)
+    .is("read_at", null)
+    .limit(500);
+  const counts = new Map<string, number>();
+  for (const row of (data ?? []) as Array<{ transaction_id: string }>) {
+    counts.set(row.transaction_id, (counts.get(row.transaction_id) ?? 0) + 1);
+  }
+  return counts;
+});
+
 export const getProfileByUsername = cache(async (username: string) => {
   const supabase = await createClient();
   const { data } = await supabase

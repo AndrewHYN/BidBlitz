@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Check, ReceiptText } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { getMySellerPayouts, getTransactions } from "@/server/queries";
+import { getMessageUnreadCounts, getMySellerPayouts, getTransactions } from "@/server/queries";
 import { EmptyState, PageHeader } from "@/components/auction/page-header";
 import { Money } from "@/components/auction/money";
 import { feePercentLabel } from "@/lib/money";
@@ -45,9 +45,10 @@ export default async function TransactionsPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login?next=/dashboard/transactions");
 
-  const [rows, payouts] = await Promise.all([
+  const [rows, payouts, unread] = await Promise.all([
     getTransactions(user.id),
     getMySellerPayouts(),
+    getMessageUnreadCounts(user.id),
   ]);
   const configured = isPaymentProviderConfigured();
   // Payment status and payout status are two different records on purpose:
@@ -84,6 +85,7 @@ export default async function TransactionsPage() {
                 <TableHead>BidBlitz fee</TableHead>
                 <TableHead>Seller proceeds</TableHead>
                 <TableHead>Payment status</TableHead>
+                <TableHead>Messages</TableHead>
                 <TableHead>Recorded</TableHead>
                 <TableHead>Review</TableHead>
               </TableRow>
@@ -172,6 +174,23 @@ export default async function TransactionsPage() {
                     </div>
                   </TableCell>
                   <TableCell className="text-muted-foreground">{formatDate(row.created_at)}</TableCell>
+                  <TableCell>
+                    <Link
+                      href={`/dashboard/transactions/${row.id}`}
+                      data-testid="message-link"
+                      className="font-medium text-primary underline-offset-2 hover:underline"
+                    >
+                      Messages
+                      {(unread.get(row.id) ?? 0) > 0 && (
+                        <span
+                          data-testid="message-unread"
+                          className="ml-1.5 inline-grid size-5 place-items-center rounded-full bg-primary px-1 text-[11px] font-semibold text-primary-foreground"
+                        >
+                          {unread.get(row.id)}
+                        </span>
+                      )}
+                    </Link>
+                  </TableCell>
                   <TableCell>
                     {row.reviewed ? (
                       <span

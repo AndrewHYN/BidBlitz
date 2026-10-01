@@ -309,6 +309,24 @@ export const EMAIL_TEMPLATES: Record<string, EmailTemplate> = {
       cta: { label: "Accept the invitation", href: `${appUrl}/admin/team/accept?token=${d.token}` },
     }),
   },
+  new_message: {
+    key: "new_message",
+    // Critical, not preference-gated: this is how a buyer and seller finish
+    // a sale they have already committed to. A silenced "you have a message"
+    // is a stalled fulfilment, not a quieter inbox.
+    critical: true,
+    subject: (d) => `New message about ${d.title}`,
+    content: (d, appUrl) => ({
+      subject: `New message about ${d.title}`,
+      name: d.name,
+      headline: `New message about “${d.title}”`,
+      paragraphs: [
+        `${d.senderName} wrote to you about the sale. Sign in to read it and reply.`,
+        "Keep personal details inside this thread: it is visible only to you and the other party.",
+      ],
+      cta: { label: "Read the message", href: `${appUrl}/dashboard/transactions/${d.transactionId}` },
+    }),
+  },
 };
 
 export function getTemplate(key: string): EmailTemplate | null {

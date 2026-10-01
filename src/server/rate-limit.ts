@@ -98,3 +98,10 @@ export const BID_LIMIT = { limit: 30, windowMs: 10_000 };
 export const AUCTION_CREATE_LIMIT = { limit: 10, windowMs: 60_000 };
 export const REPORT_LIMIT = { limit: 5, windowMs: 60_000 };
 export const AUTH_LIMIT = { limit: 5, windowMs: 60_000 };
+/**
+ * Transaction thread budget: 20 messages a minute per account. Generous
+ * enough that a real delivery arrangement never hits it, tight enough that a
+ * scripted harasser cannot flood a counterparty. Separate key per sender, so
+ * one abusive account cannot spend another's budget.
+ */
+export const MESSAGE_LIMIT = { limit: 20, windowMs: 60_000 };

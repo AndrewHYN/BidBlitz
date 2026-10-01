@@ -33,7 +33,7 @@ export type SellerPayoutStatus =
 
 export type NotificationType =
   | "AUCTION_PUBLISHED" | "NEW_BID" | "OUTBID" | "ENDING_SOON"
-  | "WON" | "SOLD" | "ENDED_UNSOLD" | "REVIEW_REQUEST";
+  | "WON" | "SOLD" | "ENDED_UNSOLD" | "REVIEW_REQUEST" | "NEW_MESSAGE";
 
 export type Condition = "new" | "like_new" | "good" | "fair" | "poor";
 
@@ -182,6 +182,15 @@ export interface Database {
         };
         Insert: { id?: string; reporter_id: string; target_type: "auction" | "user"; target_id: string; reason: string };
         Update: { status?: string; resolution?: string | null };
+      };
+      transaction_messages: {
+        Row: {
+          id: string; transaction_id: string; sender_id: string; body: string;
+          read_at: string | null; created_at: string;
+        };
+        Insert: { id?: string; transaction_id: string; sender_id: string; body: string };
+        // The recipient marks read; the history trigger freezes everything else.
+        Update: { read_at?: string | null };
       };
       seller_payouts: {
         Row: {

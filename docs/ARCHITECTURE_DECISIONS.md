@@ -1054,3 +1054,49 @@ form fails three of the five assertions, and restoring it passes them.
   so they work pre-hydration) is a possible later improvement. It was not done
   here because it is a rewrite of each form's submit handling, and the security
   defect is fully closed without it.
+
+## ADR-015: Post-win communication is a transaction thread, not a social inbox
+
+Date: 2026-10-02
+
+Status: Accepted
+
+### Context
+
+After SOLD the winner and the seller had no way to reach each other inside
+BidBlitz: no Q&A, no messaging, no contact exchange. The privacy page promises
+emails are never shown to other users, so there was deliberately no public
+contact path — which left the private path as a gap rather than a guarantee.
+
+The rejected shape was a generic social inbox (conversations to create, join,
+invite into; DMs between arbitrary users). That is a second product with its
+own abuse surface, and nothing in the launch loop needs it.
+
+### Decision
+
+**One thread per transaction, keyed by `transaction_id` itself.** There is
+nothing to create or join: the sale IS the conversation. Exactly the buyer and
+the seller read and write (RLS, parties-only); message history is immutable
+except the recipient's `read_at`; realtime Broadcast is a doorbell that only
+triggers a server re-read; new-message alerts reuse the existing notification
+row + `email_outbox` catalogue (one `new_message` critical template).
+
+Abuse reporting reuses the existing user-target `reportAction` from inside the
+thread — no new report type, no new queue. Banned accounts keep reading but
+cannot write (cutting them off mid-sale would punish the counterparty).
+
+Explicitly deferred, not forgotten: pre-sale auction Q&A, structured
+delivery/contact fields (delivery is arranged in-thread for now, privately),
+buyer-initiated disputes (admin can already HELD/DISPUTED a payout),
+non-payment expiry, and the dead `PAID → SETTLED` edge.
+
+### Consequences
+
+- New table `transaction_messages` + `NEW_MESSAGE` notification type; both land
+  via `supabase/migrations/20261001000001_transaction_messaging.sql` and must
+  be applied with `npm run db:migrate` before the thread UI can load a thread
+  (the page renders "not available" rather than crashing until then).
+- The thread page answers forged ids, non-parties, and missing migration with
+  the identical "not available" state: no existence oracle.
+- RLS proof procedure lives in `scripts/db/verify-messaging-rls.mjs` and runs
+  post-migration; action-level contract in `src/server/actions/messages.test.ts`.

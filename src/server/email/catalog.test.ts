@@ -31,6 +31,7 @@ const DATA: Record<string, Record<string, string>> = {
   payment_required: { title: "Radio", auctionId: "a-1", name: "Buyer", amount: "$30.00" },
   payment_received: { title: "Radio", auctionId: "a-1", name: "Buyer", amount: "$30.00" },
   team_invite: { role: "MODERATOR", token: "abc" },
+  new_message: { title: "Radio", name: "Buyer", senderName: "Seller", transactionId: "t-1" },
 };
 
 describe("email catalog", () => {

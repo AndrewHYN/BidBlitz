@@ -164,6 +164,20 @@ export const markNotificationsReadSchema = z.object({
   ids: z.array(z.string().uuid()).min(1).max(200),
 });
 
+/**
+ * One message in a post-win transaction thread.
+ *
+ * Length cap is shared by the form, the action and the database CHECK, so
+ * the three can never disagree about what a valid message is. 2000 chars is
+ * enough to arrange delivery and short enough to keep moderation readable.
+ */
+export const messageSchema = z.object({
+  transactionId: z.string().uuid("Invalid transaction"),
+  body: z.string().trim().min(1, "Write a message first.").max(2000, "Keep it under 2000 characters."),
+});
+
+export type MessageInput = z.infer<typeof messageSchema>;
+
 // ---------------------------------------------------------------------------
 // Discovery / URL state — keeps /browse links shareable
 // ---------------------------------------------------------------------------

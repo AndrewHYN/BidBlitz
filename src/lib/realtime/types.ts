@@ -67,6 +67,15 @@ export type AuctionEvent =
       auctionId: string;
       transactionId: string;
       status: string;
+    }
+  | {
+      // Notification only: the recipient's thread view refreshes from the
+      // server on receipt. No body travels here — the channel is public.
+      type: "message.received";
+      auctionId: string;
+      transactionId: string;
+      senderId: string;
+      serverTime: string;
     };
 
 export type Unsubscribe = () => void;
