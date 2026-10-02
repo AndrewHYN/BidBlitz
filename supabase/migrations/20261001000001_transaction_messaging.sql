@@ -59,15 +59,18 @@ create trigger transaction_messages_protect_history
   before update on public.transaction_messages
   for each row execute function public.transaction_messages_protect_history();
 
--- ---- RLS: exactly the two parties, nothing else -----------------------------
+-- ---- RLS: exactly the two parties, plus team moderation -----------------------
 alter table public.transaction_messages enable row level security;
 
 -- Reading needs the same party check as writing: a forged transaction id
 -- returns zero rows rather than an error the caller could distinguish.
+-- Administrators can read (reported messages are evidence, and the queue is
+-- useless without it) but never write: no insert/update path admits them.
 create policy transaction_messages_select_parties
   on public.transaction_messages for select to authenticated
   using (
-    exists (
+    private.is_admin()
+    or exists (
       select 1 from public.transactions t
       where t.id = transaction_messages.transaction_id
         and (t.buyer_id = (select auth.uid()) or t.seller_id = (select auth.uid()))

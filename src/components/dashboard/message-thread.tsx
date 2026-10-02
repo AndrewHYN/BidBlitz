@@ -23,11 +23,13 @@ export function MessageThread({
   viewerId,
   counterpartyName,
   initial,
+  readOnly = false,
 }: {
   transactionId: string;
   viewerId: string;
   counterpartyName: string;
   initial: ThreadMessage[];
+  readOnly?: boolean;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -136,6 +138,12 @@ export function MessageThread({
         )}
       </div>
 
+      {readOnly ? (
+        <p data-testid="message-readonly" className="rounded-xl border bg-card p-4 text-sm text-muted-foreground">
+          Read-only moderation view. The team reviews reported threads here but
+          never posts in them.
+        </p>
+      ) : (
       <form
         onSubmit={onSubmit}
         method="post"
@@ -178,6 +186,7 @@ export function MessageThread({
           </Button>
         </div>
       </form>
+      )}
     </div>
   );
 }

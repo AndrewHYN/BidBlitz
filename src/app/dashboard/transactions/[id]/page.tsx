@@ -57,14 +57,18 @@ export default async function TransactionThreadPage({
     );
   }
 
-  const role = thread.seller_id === user.id ? "Seller" : "Buyer";
+  const role = thread.role === "moderator" ? "Moderator" : thread.seller_id === user.id ? "Seller" : "Buyer";
 
   return (
     <div className="page-container space-y-6 py-10 sm:py-14">
       <div className="mx-auto w-full max-w-2xl space-y-6">
         <PageHeader
           title={thread.title}
-          description={`Private conversation with ${thread.counterparty.display_name} (@${thread.counterparty.username}) · you are the ${role.toLowerCase()}. Only the two of you can read this.`}
+          description={
+            thread.role === "moderator"
+              ? `Moderation view of the sale between ${thread.counterparty.display_name} (@${thread.counterparty.username}) and the other party. Read-only: the team never posts here.`
+              : `Private conversation with ${thread.counterparty.display_name} (@${thread.counterparty.username}) · you are the ${role.toLowerCase()}. Only the two of you can read this.`
+          }
         />
         <div className="flex flex-wrap items-center gap-2">
           <TransactionBadge status={thread.status} />
@@ -84,6 +88,7 @@ export default async function TransactionThreadPage({
           viewerId={user.id}
           counterpartyName={thread.counterparty.display_name}
           initial={thread.messages}
+          readOnly={thread.role === "moderator"}
         />
         <p className="text-xs text-muted-foreground">
           Arrange payment questions, delivery or pickup here rather than by

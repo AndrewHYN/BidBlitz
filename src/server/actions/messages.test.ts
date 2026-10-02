@@ -183,6 +183,26 @@ describe("sendMessageAction", () => {
     const result = await sendMessageAction({ transactionId: TX_ID, body: "Paying now." });
     expect(result).toEqual({ ok: true });
   });
+
+  it("broadcasts a doorbell with no body, contact, or secret in it", async () => {
+    await sendMessageAction({ transactionId: TX_ID, body: "My number is 07700, call me" });
+    expect(publishToUserMock).toHaveBeenCalledTimes(1);
+    const [recipientId, auctionId, event] = publishToUserMock.mock.calls[0] as unknown as [
+      string,
+      string,
+      Record<string, unknown>,
+    ];
+    // Routed to the counterparty's private channel, never the public one.
+    expect(recipientId).toBe(OTHER);
+    expect(auctionId).toBe("a-1");
+    expect(event.type).toBe("message.received");
+    const joined = JSON.stringify(event).toLowerCase();
+    expect(joined).not.toContain("my number");
+    expect(joined).not.toContain("07700");
+    for (const key of Object.keys(event)) {
+      expect(["type", "auctionId", "transactionId", "senderId", "serverTime"]).toContain(key);
+    }
+  });
 });
 
 describe("markThreadReadAction", () => {

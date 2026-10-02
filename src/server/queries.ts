@@ -549,6 +549,7 @@ export type ThreadView = {
   seller_id: string;
   buyer_id: string;
   status: string;
+  role: "buyer" | "seller" | "moderator";
   counterparty: ThreadCounterparty;
   messages: ThreadMessage[];
 } | null;
@@ -557,14 +558,20 @@ export type ThreadView = {
  * The thread for one transaction, or null when it does not exist, is not
  * the viewer's, or the messaging migration has not been applied yet. All
  * three look identical on purpose: no existence oracle for forged ids.
+ *
+ * Administrators read in a moderator role (reported messages are evidence)
+ * but cannot post: the send action admits parties only.
  */
 export const getThread = cache(async (userId: string, transactionId: string): Promise<ThreadView> => {
   const supabase = await createClient();
-  const { data: tx, error: txError } = await supabase
-    .from("transactions")
-    .select("id, auction_id, seller_id, buyer_id, status, auctions:auction_id(title)")
-    .eq("id", transactionId)
-    .maybeSingle();
+  const [{ data: tx, error: txError }, { data: self }] = await Promise.all([
+    supabase
+      .from("transactions")
+      .select("id, auction_id, seller_id, buyer_id, status, auctions:auction_id(title)")
+      .eq("id", transactionId)
+      .maybeSingle(),
+    supabase.from("profiles").select("is_admin").eq("id", userId).maybeSingle(),
+  ]);
   if (txError || !tx) return null;
   const row = tx as unknown as {
     id: string;
@@ -574,7 +581,10 @@ export const getThread = cache(async (userId: string, transactionId: string): Pr
     status: string;
     auctions: { title: string } | null;
   };
-  if (row.seller_id !== userId && row.buyer_id !== userId) return null;
+  const isParty = row.seller_id === userId || row.buyer_id === userId;
+  const isAdmin = (self as { is_admin?: boolean } | null)?.is_admin === true;
+  if (!isParty && !isAdmin) return null;
+  const role = !isParty ? "moderator" : row.seller_id === userId ? "seller" : "buyer";
 
   const counterpartyId = row.seller_id === userId ? row.buyer_id : row.seller_id;
   const [{ data: counterparty }, { data: messages }] = await Promise.all([
@@ -600,6 +610,7 @@ export const getThread = cache(async (userId: string, transactionId: string): Pr
     seller_id: row.seller_id,
     buyer_id: row.buyer_id,
     status: row.status,
+    role,
     counterparty: counterparty as unknown as ThreadCounterparty,
     messages: messages as unknown as ThreadMessage[],
   };

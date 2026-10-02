@@ -1076,7 +1076,9 @@ own abuse surface, and nothing in the launch loop needs it.
 
 **One thread per transaction, keyed by `transaction_id` itself.** There is
 nothing to create or join: the sale IS the conversation. Exactly the buyer and
-the seller read and write (RLS, parties-only); message history is immutable
+the seller read and write (RLS, parties-only); administrators read in a
+read-only moderator role so reported threads are actually reviewable, and no
+insert/update path admits them. Message history is immutable
 except the recipient's `read_at`; realtime Broadcast is a doorbell that only
 triggers a server re-read; new-message alerts reuse the existing notification
 row + `email_outbox` catalogue (one `new_message` critical template).
