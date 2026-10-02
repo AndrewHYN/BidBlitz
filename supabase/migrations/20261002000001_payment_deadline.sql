@@ -45,7 +45,7 @@ revoke update, delete on public.payment_settings from anon, authenticated;
 
 drop trigger if exists payment_settings_touch on public.payment_settings;
 create trigger payment_settings_touch before update on public.payment_settings
-  for each row execute function public.touch_updated_at();
+  for each row execute function private.touch_updated_at();
 
 -- ---- 2. due date on the transaction ------------------------------------------
 alter table public.transactions
@@ -59,7 +59,7 @@ comment on column public.transactions.payment_due_at is
 -- their own deadline, and no code path sets it directly.
 create or replace function public.transactions_protect_due_at()
 returns trigger
-language plpgsql
+language plpgsql set search_path = ''
 as $$
 declare
   v_window integer;
