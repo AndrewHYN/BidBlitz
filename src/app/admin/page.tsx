@@ -261,7 +261,7 @@ export default async function AdminPage() {
   // No shared query helper exists for moderation data, so these reads are
   // caller-scoped here (RLS: reports are admin-visible, fee_settings is
   // public, seller_payouts is admin-only).
-  const [reportsRes, feeRes, payouts] = await Promise.all([
+  const [reportsRes, feeRes, windowRes, payouts] = await Promise.all([
     supabase
       .from("reports")
       .select(
@@ -274,11 +274,19 @@ export default async function AdminPage() {
       .from("fee_settings")
       .select("id, fee_bps, min_fee_minor, currency, updated_at")
       .maybeSingle(),
+    supabase
+      .from("payment_settings")
+      .select("payment_window_seconds, updated_at")
+      .maybeSingle(),
     getAdminPayouts(),
   ]);
 
   const reports = (reportsRes.data ?? []) as ReportRow[];
   const fee = (feeRes.data ?? null) as FeeRow | null;
+  const paymentWindow = (windowRes.data ?? null) as {
+    payment_window_seconds: number;
+    updated_at: string;
+  } | null;
   const configured = isPaymentProviderConfigured();
 
   // What the reports point at, so the queue shows names instead of UUIDs.
@@ -982,6 +990,28 @@ export default async function AdminPage() {
               ? "A payment provider is configured; settled sales can move money."
               : "No payment provider is configured yet, so no money has moved. Fees here are what WOULD be charged on settlement."}
           </p>
+          <div className="mt-4 border-t border-border/70 pt-4">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">
+              Payment window
+            </p>
+            {paymentWindow ? (
+              <p className="mt-1 text-sm">
+                <span className="font-semibold" data-numeric>
+                  {Math.round(paymentWindow.payment_window_seconds / 3600)} hours
+                </span>{" "}
+                <span className="text-muted-foreground">
+                  to pay before an unpaid sale expires. Changed only by
+                  privileged SQL against payment_settings, never by the client.
+                </span>
+              </p>
+            ) : (
+              <p className="mt-1 text-sm text-muted-foreground">
+                No payment window is configured yet, so unpaid sales do not
+                expire. Apply the payment-deadline migration, then set
+                payment_settings.payment_window_seconds.
+              </p>
+            )}
+          </div>
         </div>
       </section>
     </div>

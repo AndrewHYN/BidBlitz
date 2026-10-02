@@ -494,7 +494,7 @@ export const getTransactions = cache(async (userId: string) => {
       .from("transactions")
       .select(
         `id, auction_id, seller_id, buyer_id, currency, gross_minor, fee_bps,
-         fee_minor, net_minor, status, provider, created_at,
+         fee_minor, net_minor, status, provider, payment_due_at, created_at,
          auctions:auction_id(title)`
       )
       .or(`seller_id.eq.${userId},buyer_id.eq.${userId}`)
@@ -521,6 +521,7 @@ export const getTransactions = cache(async (userId: string) => {
     net_minor: number;
     status: string;
     provider: string | null;
+    payment_due_at: string | null;
     created_at: string;
     auctions: { title: string } | null;
   }>).map((row) => ({ ...row, reviewed: reviewed.has(row.id) }));

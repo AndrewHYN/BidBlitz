@@ -20,10 +20,10 @@ import { reviewSchema } from "@/lib/validation";
 import { submitReviewAction } from "@/server/actions/social";
 
 /**
- * One review per side, per transaction — the same contract the server and RLS
- * enforce; this only gives instant feedback. The star picker is a native
- * radio group (arrow keys, one tab stop), with the stars as decoration over
- * real inputs.
+ * One review per sale — the same contract the server and RLS enforce (the
+ * second side to review finds the slot taken); this only gives instant
+ * feedback. The star picker is a native radio group (arrow keys, one tab
+ * stop), with the stars as decoration over real inputs.
  */
 export function ReviewDialog({
   transactionId,

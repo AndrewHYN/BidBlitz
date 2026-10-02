@@ -278,9 +278,10 @@ export default function TermsPage() {
         <TermsSection id="reviews" title="9. Reviews">
           <p>
             Reviews are tied to a real transaction, so only the actual buyer and
-            seller of a settled sale can write one, and each transaction gets
-            one review per side. Write honest reviews of your own experience.
-            Fake or incentivised reviews are not allowed.
+            seller of a settled sale can write one, and each sale gets one
+            review in total: whoever reviews first holds the slot. Write honest
+            reviews of your own experience. Fake or incentivised reviews are
+            not allowed.
           </p>
         </TermsSection>
 

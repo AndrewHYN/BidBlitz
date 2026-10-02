@@ -233,6 +233,20 @@ function describe(
           </>
         ),
       };
+    case "PAYMENT_EXPIRED": {
+      const transactionId = typeof p.transactionId === "string" ? p.transactionId : null;
+      return {
+        headline: `Expired unpaid: ${headline}`,
+        detail: (
+          <>
+            {p.isSeller === true
+              ? "The winner never paid, so the sale is closed and nothing is owed. You can list the item again."
+              : "The payment window lapsed with no payment, so the sale is closed. Nothing was charged."}
+          </>
+        ),
+        threadId: transactionId,
+      };
+    }
     case "NEW_MESSAGE": {
       const transactionId = typeof p.transactionId === "string" ? p.transactionId : null;
       return {

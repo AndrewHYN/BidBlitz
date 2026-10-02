@@ -73,6 +73,7 @@ const TRANSACTION_LABELS: Record<string, string> = {
   SETTLED: "Settled",
   REFUNDED: "Refunded",
   FAILED: "Failed",
+  EXPIRED: "Expired",
 };
 
 export function StatusBadge({
@@ -116,7 +117,7 @@ export function TransactionBadge({
   const tone: BadgeTone =
     status === "PAID" || status === "SETTLED"
       ? "sold"
-      : status === "FAILED"
+      : status === "FAILED" || status === "EXPIRED"
         ? "cancelled"
         : status === "AWAITING_PAYMENT"
           ? "ending"

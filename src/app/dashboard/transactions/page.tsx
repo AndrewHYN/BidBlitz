@@ -38,6 +38,17 @@ function formatDate(iso: string): string {
   });
 }
 
+/** Deadlines need a time, not just a day: "Pay by" without one is a guess. */
+function formatDeadline(iso: string): string {
+  const date = new Date(iso);
+  return date.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
 export default async function TransactionsPage() {
   const supabase = await createClient();
   const {
@@ -172,6 +183,28 @@ export default async function TransactionsPage() {
                         <CheckStatusButton transactionId={row.id} />
                       )}
                     </div>
+                    {/* The deadline is public marketplace policy: the winner
+                        pays within the window or the sale expires and the
+                        seller relists. Expired and failed sales state plainly
+                        that no money moved, and offer nothing that is not
+                        wired: checkout refuses both states server-side. */}
+                    {row.status === "AWAITING_PAYMENT" && row.payment_due_at && (
+                      <span className="mt-1 block text-xs text-muted-foreground">
+                        {row.buyer_id === user.id ? "Pay by " : "Due "}
+                        {formatDeadline(row.payment_due_at)}
+                      </span>
+                    )}
+                    {row.status === "EXPIRED" && (
+                      <span className="mt-1 block text-xs text-muted-foreground">
+                        The payment window lapsed. No money moved. The seller
+                        can list the item again.
+                      </span>
+                    )}
+                    {row.status === "FAILED" && (
+                      <span className="mt-1 block text-xs text-muted-foreground">
+                        Payment was not completed. No money moved.
+                      </span>
+                    )}
                   </TableCell>
                   <TableCell className="text-muted-foreground">{formatDate(row.created_at)}</TableCell>
                   <TableCell>

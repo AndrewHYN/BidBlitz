@@ -20,7 +20,7 @@ export type AuctionStatus =
   | "DRAFT" | "SCHEDULED" | "LIVE" | "ENDED" | "SOLD" | "UNSOLD" | "CANCELLED" | "PAUSED" | "PENDING_REVIEW";
 
 export type TransactionStatus =
-  | "AWAITING_PAYMENT" | "PAID" | "SETTLED" | "REFUNDED" | "FAILED";
+  | "AWAITING_PAYMENT" | "PAID" | "SETTLED" | "REFUNDED" | "FAILED" | "EXPIRED";
 
 /**
  * The seller fulfilment / payout operation. Deliberately NOT part of
@@ -33,7 +33,7 @@ export type SellerPayoutStatus =
 
 export type NotificationType =
   | "AUCTION_PUBLISHED" | "NEW_BID" | "OUTBID" | "ENDING_SOON"
-  | "WON" | "SOLD" | "ENDED_UNSOLD" | "REVIEW_REQUEST" | "NEW_MESSAGE";
+  | "WON" | "SOLD" | "ENDED_UNSOLD" | "REVIEW_REQUEST" | "NEW_MESSAGE" | "PAYMENT_EXPIRED";
 
 export type Condition = "new" | "like_new" | "good" | "fair" | "poor";
 

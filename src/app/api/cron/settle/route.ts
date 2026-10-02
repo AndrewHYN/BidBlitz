@@ -223,6 +223,70 @@ export async function GET(request: Request): Promise<Response> {
     console.error("[cron/settle] outcome email failed", err);
   }
 
+  // 6. Payment expiry. Same commit-then-announce shape as settlement: the RPC
+  //    moves AWAITING_PAYMENT rows past their deadline to EXPIRED (terminal,
+  //    terminal like FAILED, and just as honest about money), writes both
+  //    parties' notices itself, and returns the rows for fan-out here.
+  let expired = 0;
+  try {
+    const { data, error } = await admin.rpc("expire_overdue_transactions", {
+      p_limit: SWEEP_LIMIT,
+    });
+    if (error) {
+      console.error("[cron/settle] expiry failed", error.message);
+    } else {
+      const items = ((data as { items?: Array<{
+        transaction_id: string;
+        auction_id: string;
+        buyer_id: string;
+        seller_id: string;
+        title: string;
+      }> } | null)?.items ?? []) as Array<{
+        transaction_id: string;
+        auction_id: string;
+        buyer_id: string;
+        seller_id: string;
+        title: string;
+      }>;
+      expired = items.length;
+      const { notifyUser } = await import("@/server/email/notify");
+      const { emailKey } = await import("@/server/email/sender");
+      const rt = createServerRealtime(admin);
+      for (const item of items) {
+        await rt
+          .publishToUser(item.buyer_id, item.auction_id, {
+            type: "transaction.updated",
+            auctionId: item.auction_id,
+            transactionId: item.transaction_id,
+            status: "EXPIRED",
+          })
+          .catch(() => undefined);
+        await rt
+          .publishToUser(item.seller_id, item.auction_id, {
+            type: "transaction.updated",
+            auctionId: item.auction_id,
+            transactionId: item.transaction_id,
+            status: "EXPIRED",
+          })
+          .catch(() => undefined);
+        await notifyUser(
+          item.buyer_id,
+          "payment_expired",
+          { title: item.title, isSeller: "false" },
+          emailKey("payment_expired", item.transaction_id, "buyer")
+        ).catch(() => undefined);
+        await notifyUser(
+          item.seller_id,
+          "payment_expired",
+          { title: item.title, isSeller: "true" },
+          emailKey("payment_expired", item.transaction_id, "seller")
+        ).catch(() => undefined);
+      }
+    }
+  } catch (err) {
+    console.error("[cron/settle] expiry threw", err);
+  }
+
   return json({
     ok: true,
     scanned: candidates.length,
@@ -231,6 +295,7 @@ export async function GET(request: Request): Promise<Response> {
     unsold: settled.length - sold,
     announced,
     emailed,
+    expired,
     endingSoon,
     durationMs: Date.now() - started,
   });

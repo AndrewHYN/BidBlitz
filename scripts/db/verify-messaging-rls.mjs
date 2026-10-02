@@ -52,7 +52,11 @@ const anon = createClient(url, pub, { auth: { persistSession: false } });
 
 // 1. The table exists and is invisible to anonymous callers.
 const anonSelect = await anon.from("transaction_messages").select("id").limit(1);
-check("table exists (no relation error)", !/relation .* does not exist/i.test(anonSelect.error?.message ?? ""));
+const anonMsg = anonSelect.error?.message ?? "";
+// PostgREST reports a missing/unpublished table as a schema-cache miss, not
+// as a relation error — both mean "not usable yet".
+const tableMissing = /relation .* does not exist/i.test(anonMsg) || /could not find the table/i.test(anonMsg) || /schema cache/i.test(anonMsg);
+check("table visible in PostgREST schema cache", !tableMissing);
 check("anon select returns zero rows", (anonSelect.data ?? []).length === 0);
 
 const anonInsert = await anon

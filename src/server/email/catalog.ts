@@ -294,6 +294,28 @@ export const EMAIL_TEMPLATES: Record<string, EmailTemplate> = {
       cta: { label: "View your transaction", href: txLink(appUrl) },
     }),
   },
+  payment_expired: {
+    key: "payment_expired",
+    critical: true,
+    subject: (d) => `Sale expired unpaid: ${d.title}`,
+    content: (d, appUrl) => ({
+      subject: `Sale expired unpaid: ${d.title}`,
+      name: d.name,
+      headline:
+        d.isSeller === "true" ? "The sale expired unpaid" : "The payment window lapsed",
+      paragraphs:
+        d.isSeller === "true"
+          ? [
+              `“${d.title}” was never paid for, so the sale is closed and nothing is owed. No money moved.`,
+              "You can list the item again from your selling dashboard.",
+            ]
+          : [
+              `“${d.title}” was never paid for, so the sale is closed. No money moved and nothing was charged.`,
+              "If you still want the item, watch for it to be listed again.",
+            ],
+      cta: { label: "View your transactions", href: txLink(appUrl) },
+    }),
+  },
   team_invite: {
     key: "team_invite",
     critical: true,
