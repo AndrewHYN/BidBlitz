@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { AUTH_LIMIT, peekRateLimit, rateLimit, resetRateLimits } from "@/server/rate-limit";
 import {
   changePasswordAction,
+  resendConfirmationAction,
   signInAction,
   signUpAction,
   updatePasswordAction,
@@ -52,6 +53,7 @@ let signUpError: ProviderError = null;
 let signUpData: { session: unknown; user: unknown } = { session: null, user: { id: "u-1" } };
 let sessionUser: { id: string } | null = { id: "u-1" };
 let updateUserError: ProviderError = null;
+let resendError: ProviderError = null;
 
 function mockSupabase() {
   vi.mocked(createClient).mockResolvedValue({
@@ -65,6 +67,10 @@ function mockSupabase() {
       updateUser: vi.fn(async () => ({
         data: updateUserError ? {} : { user: sessionUser },
         error: updateUserError,
+      })),
+      resend: vi.fn(async () => ({
+        data: resendError ? {} : { user: { id: "u-1" }, session: null },
+        error: resendError,
       })),
     },
   } as unknown as Awaited<ReturnType<typeof createClient>>);
@@ -82,6 +88,7 @@ beforeEach(() => {
   signUpData = { session: null, user: { id: "u-1" } };
   sessionUser = { id: "u-1" };
   updateUserError = null;
+  resendError = null;
 
   mockSupabase();
 });
@@ -141,6 +148,40 @@ describe("signUpAction", () => {
     expect(result.rejection.message).not.toMatch(/too many|rate.?limit/i);
     // A genuine rejection still spends budget — that is what caps enumeration.
     expect(budget().remaining).toBe(AUTH_LIMIT.limit - 1);
+  });
+
+  it("never says 'Sign in failed' for a signup failure", async () => {
+    // The provider's send failure is the live case: Resend in testing mode
+    // makes signUp() fail with a generic 500 here. Whatever the provider
+    // says, the signup form must speak signup.
+    signUpError = { message: "Error sending confirmation email", status: 500 };
+
+    const result = await signUpAction({
+      email: EMAIL,
+      password: "longenough",
+      displayName: "New User",
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.rejection.code).toBe("unknown");
+    expect(result.rejection.message).toBe("Account creation failed. Please try again.");
+    expect(result.rejection.message).not.toMatch(/sign in failed/i);
+  });
+
+  it("rejects an invalid email address with an address error, not a signup error", async () => {
+    signUpError = { message: "Email address foo@bar.test is invalid" };
+
+    const result = await signUpAction({
+      email: EMAIL,
+      password: "longenough",
+      displayName: "New User",
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.rejection.message).toBe("Enter a valid email address.");
+    expect(result.rejection.message).not.toMatch(/sign in failed/i);
   });
 
   it("gives invalid password feedback without contacting the provider", async () => {
@@ -264,6 +305,62 @@ describe("signInAction", () => {
     if (result.ok) return;
     expect(result.rejection.message).toBe("Email or password is incorrect.");
     expect(budget().remaining).toBe(AUTH_LIMIT.limit - 1);
+  });
+});
+
+describe("resendConfirmationAction", () => {
+  it("answers the same generic success for a known address", async () => {
+    const result = await resendConfirmationAction({ email: EMAIL });
+    expect(result).toEqual({ ok: true });
+    // A resend is not a failed attempt: our own budget stays untouched.
+    expect(budget().remaining).toBe(AUTH_LIMIT.limit);
+  });
+
+  it("answers the identical success when the provider send fails (enumeration safety)", async () => {
+    // Unknown address, already-confirmed address, Resend testing-mode 500 —
+    // every provider answer must be observationally identical to success.
+    resendError = { message: "Error sending confirmation email", status: 500 };
+
+    const failed = await resendConfirmationAction({ email: EMAIL });
+    expect(failed).toEqual({ ok: true });
+
+    resendError = null;
+    const succeeded = await resendConfirmationAction({ email: EMAIL });
+    expect(succeeded).toEqual(failed);
+    expect(budget().remaining).toBe(AUTH_LIMIT.limit);
+  });
+
+  it("still reports our own budget honestly without contacting the provider", async () => {
+    for (let i = 0; i < AUTH_LIMIT.limit; i += 1) {
+      rateLimit(KEY, AUTH_LIMIT.limit, AUTH_LIMIT.windowMs);
+    }
+    vi.mocked(createClient).mockClear();
+
+    const result = await resendConfirmationAction({ email: EMAIL });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.rejection.code).toBe("rate_limited");
+    expect(result.rejection.message).toMatch(/too many attempts from this device/i);
+    expect(createClient).not.toHaveBeenCalled();
+  });
+
+  it("treats a provider throttle as a delayed email, not a failure or a budget hit", async () => {
+    resendError = { message: "For security purposes, please try again later", status: 429 };
+
+    const result = await resendConfirmationAction({ email: EMAIL });
+
+    expect(result).toEqual({ ok: true });
+    expect(budget().remaining).toBe(AUTH_LIMIT.limit);
+  });
+
+  it("refuses an empty address before contacting the provider", async () => {
+    const result = await resendConfirmationAction({ email: "   " });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.rejection.code).toBe("invalid_input");
+    expect(createClient).not.toHaveBeenCalled();
   });
 });
 

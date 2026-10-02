@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRef, useState, useTransition } from "react";
 import { MailCheck } from "lucide-react";
-import { signUpAction } from "@/server/actions/auth";
+import { resendConfirmationAction, signUpAction } from "@/server/actions/auth";
 import { useMounted } from "@/hooks/use-mounted";
 import { MIN_PASSWORD_LENGTH } from "@/lib/validation";
 import { Button } from "@/components/ui/button";
@@ -36,6 +36,11 @@ export function SignupForm() {
   const busyRef = useRef(false);
   // Set only when the account was created AND email confirmation is pending.
   const [sentTo, setSentTo] = useState<string | null>(null);
+  // Resend state for the confirmation panel below. The address is already
+  // known (it is `sentTo`), so this is one button, not another form.
+  const [resending, setResending] = useState(false);
+  const [resent, setResent] = useState(false);
+  const [resendError, setResendError] = useState<string | null>(null);
   // "Has React taken over this form?" — see the identical flag on login-form.
   // Exposed so an automated submit can wait for hydration, exactly as a person
   // naturally does while typing an email and choosing a password.
@@ -82,6 +87,27 @@ export function SignupForm() {
     });
   }
 
+  async function handleResend() {
+    if (!sentTo || resending) return;
+    setResending(true);
+    setResendError(null);
+    try {
+      // The action answers the same generic success for known and unknown
+      // addresses (enumeration safety lives server-side), so reaching here
+      // always means "check your inbox" — never an account-exists signal.
+      const result = await resendConfirmationAction({ email: sentTo });
+      if (!result.ok) {
+        setResendError(result.rejection.message);
+        return;
+      }
+      setResent(true);
+    } catch {
+      setResendError("We couldn't resend that email. Please try again.");
+    } finally {
+      setResending(false);
+    }
+  }
+
   if (sentTo !== null) {
     return (
       <div
@@ -100,6 +126,31 @@ export function SignupForm() {
             Confirm it, then sign in.
           </p>
         </div>
+        {resent ? (
+          <p data-testid="resend-confirmation-sent" role="status" className="text-sm text-muted-foreground">
+            If an account exists for <strong className="break-all text-foreground">{sentTo}</strong>,
+            a fresh confirmation link is on its way.
+          </p>
+        ) : (
+          <div className="space-y-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              disabled={resending}
+              aria-busy={resending}
+              onClick={handleResend}
+              data-testid="resend-confirmation-button"
+            >
+              {resending ? "Resending…" : "Didn't get the email? Resend it"}
+            </Button>
+            {resendError && (
+              <p role="alert" className="text-sm text-destructive">
+                {resendError}
+              </p>
+            )}
+          </div>
+        )}
         <Button asChild className="w-full">
           <Link href="/login">Go to sign in</Link>
         </Button>

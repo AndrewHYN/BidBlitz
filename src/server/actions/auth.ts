@@ -199,6 +199,15 @@ export async function signUpAction(input: {
     if (!failure.providerThrottled) {
       rateLimit(budgetKey, AUTH_LIMIT.limit, AUTH_LIMIT.windowMs); // record the failure
     }
+    // The shared classifier's fallback speaks sign-in ("Sign in failed").
+    // Surfacing that on this form would tell a new user their sign-in broke
+    // when account creation did — same code, honest signup wording.
+    if (failure.rejection.code === "unknown") {
+      return {
+        ok: false,
+        rejection: { code: "unknown", message: "Account creation failed. Please try again." },
+      };
+    }
     return { ok: false, rejection: failure.rejection };
   }
 
@@ -342,6 +351,61 @@ export async function requestPasswordResetAction(input: {
       // enumeration signal just as directly.
       console.warn("[auth] password reset request failed:", error.message);
     }
+    return { ok: true };
+  }
+
+  return { ok: true };
+}
+
+/**
+ * Re-send the signup confirmation email to an address that may already have
+ * an unconfirmed account.
+ *
+ * There was no resend path before this: a user whose confirmation email never
+ * arrived (provider outage, spam filter, typo'd inbox rules) had no recourse
+ * except signing up again — which GoTrue answers with "already registered",
+ * a dead end. This uses GoTrue's supported resend mechanism for signup
+ * confirmations, routed through the same canonical `/auth/callback` the
+ * original signup email uses.
+ *
+ * Enumeration safety mirrors `requestPasswordResetAction` exactly: the
+ * provider answers known and unknown addresses differently, so every provider
+ * response — success, unknown-address success, already-confirmed, send
+ * failure, throttle — is normalised to the same generic outcome. The only
+ * failure ever reported is BidBlitz's own per-IP+address budget, which is
+ * identical for every address and therefore leaks nothing.
+ */
+export async function resendConfirmationAction(input: {
+  email: string;
+}): Promise<{ ok: true } | { ok: false; rejection: BidRejection }> {
+  const email = input.email.trim().toLowerCase();
+  if (!email) {
+    return { ok: false, rejection: { code: "invalid_input", message: "Enter your email address." } };
+  }
+
+  const budgetKey = await authFailureKey(email);
+  if (!peekRateLimit(budgetKey, AUTH_LIMIT.limit, AUTH_LIMIT.windowMs).allowed) {
+    return { ok: false, rejection: { code: "rate_limited", message: AUTH_RATE_MESSAGE } };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.auth.resend({
+    type: "signup",
+    email,
+    options: {
+      // Same canonical callback as signUpAction: the confirmation link must
+      // land on the route that completes email-link sign-ins.
+      emailRedirectTo: absoluteUrl("/auth/callback"),
+    },
+  });
+
+  if (error) {
+    const failure = classifyAuthFailure(error.message, statusOf(error));
+    if (!failure.providerThrottled) {
+      console.warn("[auth] confirmation resend failed:", error.message);
+    }
+    // Swallowed on purpose (see above): known, unknown, already-confirmed
+    // and send-failed addresses all get the same answer.
     return { ok: true };
   }
 
