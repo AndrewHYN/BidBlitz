@@ -6,6 +6,7 @@ import { MailCheck } from "lucide-react";
 import { resendConfirmationAction, signUpAction } from "@/server/actions/auth";
 import { useMounted } from "@/hooks/use-mounted";
 import { MIN_PASSWORD_LENGTH } from "@/lib/validation";
+import { BrandMark } from "@/components/brand-mark";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -174,6 +175,7 @@ export function SignupForm() {
       className="space-y-5 rounded-xl border bg-card p-6 shadow-sm sm:p-8"
     >
       <div className="space-y-1.5 text-center">
+        <BrandMark size={40} alt="BidBlitz" className="mx-auto" />
         <h1 className="text-xl font-semibold tracking-tight text-balance">
           Create your account
         </h1>

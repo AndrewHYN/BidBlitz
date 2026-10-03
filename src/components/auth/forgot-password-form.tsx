@@ -4,6 +4,7 @@ import { useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { MailCheck } from "lucide-react";
 import { requestPasswordResetAction } from "@/server/actions/auth";
+import { BrandMark } from "@/components/brand-mark";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -106,6 +107,7 @@ export function ForgotPasswordForm() {
       noValidate
     >
       <div className="space-y-1.5">
+        <BrandMark size={40} alt="BidBlitz" />
         <h1 className="text-xl font-semibold tracking-tight">Reset your password</h1>
         <p className="text-sm leading-relaxed text-muted-foreground text-pretty">
           Enter the email you signed up with and we&apos;ll send you a link to

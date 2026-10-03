@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useRef, useState, useTransition } from "react";
-import { Gavel } from "lucide-react";
 import { signInAction } from "@/server/actions/auth";
+import { BrandMark } from "@/components/brand-mark";
 import { useMounted } from "@/hooks/use-mounted";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -99,9 +99,7 @@ export function LoginForm({
       className="space-y-5 rounded-xl border bg-card p-6 shadow-sm sm:p-8"
     >
       <div className="space-y-1.5 text-center">
-        <span className="mx-auto grid size-10 place-items-center rounded-lg bg-primary text-primary-foreground">
-          <Gavel className="size-5" aria-hidden />
-        </span>
+        <BrandMark size={40} alt="BidBlitz" className="mx-auto" />
         <h1 className="text-xl font-semibold tracking-tight text-balance">
           Welcome back
         </h1>

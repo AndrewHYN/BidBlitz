@@ -7,6 +7,7 @@ import { ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { updatePasswordAction } from "@/server/actions/auth";
 import { MIN_PASSWORD_LENGTH } from "@/lib/validation";
+import { BrandMark } from "@/components/brand-mark";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -132,6 +133,7 @@ export function ResetPasswordForm({
       noValidate
     >
       <div className="space-y-1.5">
+        <BrandMark size={40} alt="BidBlitz" />
         <h1 className="text-xl font-semibold tracking-tight">Choose a new password</h1>
         <p className="text-sm leading-relaxed text-muted-foreground text-pretty">
           Pick something you have not used here before.

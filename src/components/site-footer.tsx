@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { Gavel, Mail, Phone } from "lucide-react";
+import { Mail, Phone } from "lucide-react";
+import { BrandMark } from "@/components/brand-mark";
 import { isPaymentProviderConfigured } from "@/server/payments/config";
 
 const COLUMNS = [
@@ -43,11 +44,9 @@ export function SiteFooter() {
     <footer className="mt-auto border-t bg-card/50">
       <div className="page-container grid gap-10 py-12 sm:grid-cols-2 lg:grid-cols-4">
         <div className="space-y-4">
-          <Link href="/" className="flex items-center gap-2 font-semibold">
-            <span className="grid size-7 place-items-center rounded-md bg-primary text-primary-foreground">
-              <Gavel className="size-4" />
-            </span>
-            BidBlitz
+          <Link href="/" aria-label="BidBlitz" className="flex items-center gap-2 font-semibold">
+            <BrandMark size={28} />
+            <span aria-hidden>BidBlitz</span>
           </Link>
           <p className="max-w-xs text-sm text-muted-foreground">
             Live auctions with real closing times. Sellers list items, buyers

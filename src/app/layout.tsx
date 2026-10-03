@@ -42,8 +42,14 @@ const baseMetadata: Metadata = {
     description:
       "Live auctions with real closing times: list an item, bid against other buyers in real time, and win when the clock runs out.",
     url: siteUrl,
+    images: [{ url: `${siteUrl}/brand/bidblitz-logo-512.png`, width: 512, height: 512, alt: "BidBlitz" }],
   },
-  twitter: { card: "summary_large_image", title: "BidBlitz", description: "Live competitive auctions." },
+  twitter: {
+    card: "summary_large_image",
+    title: "BidBlitz",
+    description: "Live competitive auctions.",
+    images: [`${siteUrl}/brand/bidblitz-logo-512.png`],
+  },
 };
 
 /**

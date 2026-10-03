@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { safeNext } from "@/lib/safe-next";
+import { BrandMark } from "@/components/brand-mark";
 
 /**
  * Completes an email-link sign-in in the browser — the only place all three
@@ -137,6 +138,7 @@ export function CallbackRunner() {
   if (error) {
     return (
       <div className="space-y-2 text-center">
+        <BrandMark size={40} alt="BidBlitz" className="mx-auto" />
         <p role="alert" className="text-sm text-destructive">
           {error}
         </p>
@@ -144,5 +146,10 @@ export function CallbackRunner() {
     );
   }
 
-  return <p className="text-sm text-muted-foreground">Completing sign-in…</p>;
+  return (
+    <div className="space-y-2 text-center">
+      <BrandMark size={40} alt="BidBlitz" className="mx-auto" />
+      <p className="text-sm text-muted-foreground">Completing sign-in…</p>
+    </div>
+  );
 }

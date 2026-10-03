@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import Link from "next/link";
-import { Gavel, SearchX } from "lucide-react";
+import { SearchX } from "lucide-react";
+import { BrandMark } from "@/components/brand-mark";
 import { Button } from "@/components/ui/button";
 
 /**
@@ -51,9 +52,7 @@ export default function NotFound() {
     >
       <div className="grid-backdrop pointer-events-none absolute inset-x-0 top-0 h-72" aria-hidden />
       <div className="relative flex flex-col items-center gap-4">
-        <span className="grid size-14 place-items-center rounded-xl bg-primary text-primary-foreground shadow-sm">
-          <Gavel className="size-7" aria-hidden />
-        </span>
+        <BrandMark size={56} alt="BidBlitz" />
         <p className="text-sm font-semibold uppercase tracking-widest text-primary">404</p>
         <h1 className="text-2xl font-semibold tracking-tight text-balance">
           This page went unsold

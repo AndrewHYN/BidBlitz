@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { BrandMark } from "@/components/brand-mark";
 import { UserAvatar } from "@/components/profile/user-avatar";
 import {
   DropdownMenu,
@@ -215,12 +216,11 @@ export function HeaderBar({
         <Link
           href="/"
           onClick={closeMenu}
+          aria-label="BidBlitz"
           className="flex shrink-0 items-center gap-2 font-semibold tracking-tight"
         >
-          <span className="grid size-8 place-items-center rounded-lg bg-primary text-primary-foreground shadow-sm">
-            <Gavel className="size-4" />
-          </span>
-          <span className="hidden sm:inline">BidBlitz</span>
+          <BrandMark size={32} priority />
+          <span aria-hidden className="hidden sm:inline">BidBlitz</span>
         </Link>
 
         <nav aria-label="Primary" className="ml-2 hidden items-center gap-1 lg:flex">
