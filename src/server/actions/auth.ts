@@ -413,6 +413,124 @@ export async function resendConfirmationAction(input: {
 }
 
 /**
+ * Ask the provider to email a six-digit sign-in code, without creating an
+ * account.
+ *
+ * Secondary login only: password sign-in stays primary and this never
+ * registers anyone. `shouldCreateUser: false` is load-bearing, not
+ * decorative — without it a typo'd address on this screen would silently
+ * mint a second account and strand the user in an inbox they may not own.
+ * Signup stays on the explicit `/signup` path with display name + password.
+ *
+ * Enumeration safety mirrors `requestPasswordResetAction`: GoTrue answers
+ * known and unknown addresses differently (notably, with user creation off
+ * an unknown address is an error), so every provider response is normalised
+ * to the same generic outcome. Only BidBlitz's own per-IP+address budget is
+ * ever reported, and it is identical for every address.
+ */
+export async function requestEmailLoginCodeAction(input: {
+  email: string;
+}): Promise<{ ok: true } | { ok: false; rejection: BidRejection }> {
+  const email = input.email.trim().toLowerCase();
+  if (!email) {
+    return { ok: false, rejection: { code: "invalid_input", message: "Enter your email address." } };
+  }
+
+  const budgetKey = await authFailureKey(email);
+  if (!peekRateLimit(budgetKey, AUTH_LIMIT.limit, AUTH_LIMIT.windowMs).allowed) {
+    return { ok: false, rejection: { code: "rate_limited", message: AUTH_RATE_MESSAGE } };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.auth.signInWithOtp({
+    email,
+    options: {
+      // Login must never become registration. GoTrue auto-creates users on
+      // passwordless request by default; this disables exactly that.
+      shouldCreateUser: false,
+    },
+  });
+
+  if (error) {
+    const failure = classifyAuthFailure(error.message, statusOf(error));
+    if (!failure.providerThrottled) {
+      console.warn("[auth] login code request failed:", error.message);
+    }
+    // Swallowed on purpose (see above): known, unknown and throttled
+    // addresses all get the same answer. A throttle additionally means the
+    // email is merely delayed, so success is the honest outcome there too.
+    return { ok: true };
+  }
+
+  return { ok: true };
+}
+
+/**
+ * The single wrong-code message. Live GoTrue answers wrong AND expired codes
+ * with the same "Token has expired or is invalid", so one copy covers both
+ * remedies instead of lying about which happened. Shared by the malformed,
+ * incorrect and expired paths below.
+ */
+const WRONG_CODE_MESSAGE =
+  "That code didn't work. Check the email and try again, or request a new one.";
+
+/**
+ * Verify a six-digit email sign-in code and establish the session.
+ *
+ * On success this ends in `redirect()`, exactly like `signInAction`: the
+ * session cookie is set server-side and the browser lands on the same
+ * validated destination. A wrong or stale code never creates a session.
+ */
+export async function verifyEmailLoginCodeAction(input: {
+  email: string;
+  token: string;
+  redirectTo?: string;
+}): Promise<AuthResult> {
+  const email = input.email.trim().toLowerCase();
+  const token = input.token.trim();
+
+  // Malformed and wrong share the single message above on purpose:
+  // distinguishing them would give a guesser a free validity oracle.
+  if (!/^\d{6}$/.test(token)) {
+    return {
+      ok: false,
+      rejection: {
+        code: "invalid_input",
+        message: WRONG_CODE_MESSAGE,
+      },
+    };
+  }
+
+  const budgetKey = await authFailureKey(email);
+  if (!peekRateLimit(budgetKey, AUTH_LIMIT.limit, AUTH_LIMIT.windowMs).allowed) {
+    return { ok: false, rejection: { code: "rate_limited", message: AUTH_RATE_MESSAGE } };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.auth.verifyOtp({ email, token, type: "email" });
+
+  if (error) {
+    const failure = classifyAuthFailure(error.message, statusOf(error));
+    // A provider throttle is the provider's cooldown, not a failed guess:
+    // report it honestly and keep it out of our budget, like everywhere else.
+    if (failure.providerThrottled) {
+      return { ok: false, rejection: failure.rejection };
+    }
+    rateLimit(budgetKey, AUTH_LIMIT.limit, AUTH_LIMIT.windowMs); // record the failed guess
+    return {
+      ok: false,
+      rejection: {
+        code: "invalid_input",
+        message: WRONG_CODE_MESSAGE,
+      },
+    };
+  }
+
+  revalidatePath("/", "layout");
+  redirect(safeNext(input.redirectTo));
+}
+
+/**
  * Set a new password, using the recovery session the emailed link established.
  *
  * There is no email parameter and no lookup: whoever holds a valid recovery

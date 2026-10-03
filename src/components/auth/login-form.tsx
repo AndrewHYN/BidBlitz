@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRef, useState, useTransition } from "react";
-import { signInAction } from "@/server/actions/auth";
+import { signInAction, requestEmailLoginCodeAction, verifyEmailLoginCodeAction } from "@/server/actions/auth";
 import { BrandMark } from "@/components/brand-mark";
 import { useMounted } from "@/hooks/use-mounted";
 import { Button } from "@/components/ui/button";
@@ -51,9 +51,105 @@ export function LoginForm({
   const [, startTransition] = useTransition();
   const [submitting, setSubmitting] = useState(false);
   const busyRef = useRef(false);
+  const formRef = useRef<HTMLFormElement>(null);
+
+  // Passwordless mode is a view over the same form, not a second form:
+  // password login stays primary and untouched. `otpEmail` carries the typed
+  // address across the switch so nobody retypes it; `otpSent` flips the view
+  // from "send the code" to "enter the code".
+  const [mode, setMode] = useState<"password" | "otp">("password");
+  const [otpEmail, setOtpEmail] = useState("");
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpBusy, setOtpBusy] = useState(false);
+  const otpBusyRef = useRef(false);
+
+  function switchToOtp() {
+    const email = String(
+      new FormData(formRef.current ?? undefined).get("email") ?? ""
+    );
+    setOtpEmail(email);
+    setOtpSent(false);
+    setError(null);
+    setMode("otp");
+  }
+
+  function backToPassword() {
+    setMode("password");
+    setOtpSent(false);
+    setError(null);
+  }
+
+  function resendFromForm() {
+    const email = String(
+      new FormData(formRef.current ?? undefined).get("email") ?? ""
+    );
+    startTransition(() => {
+      void runOtpRequest(email);
+    });
+  }
+
+  async function runOtpRequest(email: string): Promise<boolean> {
+    if (otpBusyRef.current) return false;
+    otpBusyRef.current = true;
+    setOtpBusy(true);
+    setError(null);
+    try {
+      // The action answers the same generic success for known and unknown
+      // addresses (enumeration safety lives server-side), so reaching here
+      // always means "check your inbox" — never an account-exists signal.
+      const result = await requestEmailLoginCodeAction({ email });
+      if (!result.ok) {
+        setError(result.rejection.message);
+        return false;
+      }
+      setOtpEmail(email);
+      setOtpSent(true);
+      return true;
+    } catch {
+      setError("We couldn't send that code. Please try again.");
+      return false;
+    } finally {
+      otpBusyRef.current = false;
+      setOtpBusy(false);
+    }
+  }
+
+  async function runOtpVerify(email: string, token: string): Promise<void> {
+    if (otpBusyRef.current) return;
+    otpBusyRef.current = true;
+    setOtpBusy(true);
+    setError(null);
+    try {
+      // Success ends in `redirect()`, which throws NEXT_REDIRECT — the same
+      // contract as password sign-in below. A wrong code never creates one.
+      const result = await verifyEmailLoginCodeAction({ email, token, redirectTo });
+      if (!result.ok) setError(result.rejection.message);
+    } catch (err) {
+      if (isNextRedirect(err)) throw err; // signed in — let the router navigate
+      setError("Sign in failed. Please try again.");
+    } finally {
+      otpBusyRef.current = false;
+      setOtpBusy(false);
+    }
+  }
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (mode === "otp") {
+      const data = new FormData(event.currentTarget);
+      const email = String(data.get("email") ?? "");
+      if (!otpSent) {
+        startTransition(() => {
+          void runOtpRequest(email);
+        });
+      } else {
+        const token = String(data.get("code") ?? "");
+        startTransition(() => {
+          void runOtpVerify(email, token);
+        });
+      }
+      return;
+    }
     if (busyRef.current) return; // duplicate submit while the first is in flight
 
     const data = new FormData(event.currentTarget);
@@ -80,6 +176,7 @@ export function LoginForm({
   return (
     <form
       onSubmit={handleSubmit}
+      ref={formRef}
       /*
        * Declared POST on purpose. This form is driven by a server action
        * through onSubmit, so it is not designed to work without JavaScript —
@@ -108,7 +205,7 @@ export function LoginForm({
         </p>
       </div>
 
-      {error && (
+      {error && mode === "password" && (
         <div
           data-testid="auth-error"
           role="alert"
@@ -118,40 +215,69 @@ export function LoginForm({
         </div>
       )}
 
-      <div className="space-y-1.5">
-        <Label htmlFor="login-email">Email</Label>
-        <Input
-          id="login-email"
-          name="email"
-          type="email"
-          autoComplete="email"
-          placeholder="you@example.com"
-          required
-          data-testid="email-field"
-        />
-      </div>
+      {mode === "password" ? (
+        <>
+          <div className="space-y-1.5">
+            <Label htmlFor="login-email">Email</Label>
+            <Input
+              id="login-email"
+              name="email"
+              type="email"
+              autoComplete="email"
+              placeholder="you@example.com"
+              required
+              data-testid="email-field"
+            />
+          </div>
 
-      <div className="space-y-1.5">
-        <Label htmlFor="login-password">Password</Label>
-        <Input
-          id="login-password"
-          name="password"
-          type="password"
-          autoComplete="current-password"
-          required
-          data-testid="password-field"
-        />
-      </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="login-password">Password</Label>
+            <Input
+              id="login-password"
+              name="password"
+              type="password"
+              autoComplete="current-password"
+              required
+              data-testid="password-field"
+            />
+          </div>
 
-      <Button
-        type="submit"
-        className="w-full"
-        disabled={submitting}
-        aria-busy={submitting}
-        data-testid="sign-in-button"
-      >
-        {submitting ? "Signing in…" : "Sign in"}
-      </Button>
+          <Button
+            type="submit"
+            className="w-full"
+            disabled={submitting}
+            aria-busy={submitting}
+            data-testid="sign-in-button"
+          >
+            {submitting ? "Signing in…" : "Sign in"}
+          </Button>
+
+          <div className="flex items-center gap-3" aria-hidden="true">
+            <span className="h-px flex-1 bg-border" />
+            <span className="text-xs text-muted-foreground">OR</span>
+            <span className="h-px flex-1 bg-border" />
+          </div>
+
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full"
+            onClick={switchToOtp}
+            data-testid="otp-toggle-button"
+          >
+            Email me a sign-in code
+          </Button>
+        </>
+      ) : (
+        <OtpLoginView
+          email={otpEmail}
+          sent={otpSent}
+          busy={otpBusy}
+          error={error}
+          onBack={backToPassword}
+          onResend={resendFromForm}
+        />
+      )}
 
       <p className="text-center text-sm">
         <Link
@@ -172,5 +298,116 @@ export function LoginForm({
         </Link>
       </p>
     </form>
+  );
+}
+
+function OtpLoginView({
+  email,
+  sent,
+  busy,
+  error,
+  onBack,
+  onResend,
+}: {
+  email: string;
+  sent: boolean;
+  busy: boolean;
+  error: string | null;
+  onBack: () => void;
+  onResend: () => void;
+}) {
+  return (
+    <>
+      <div className="space-y-1.5">
+        <Label htmlFor="otp-email">Email</Label>
+        <Input
+          id="otp-email"
+          name="email"
+          type="email"
+          autoComplete="email"
+          required
+          defaultValue={email}
+          data-testid="email-field"
+        />
+      </div>
+
+      {!sent ? (
+        <Button
+          type="submit"
+          className="w-full"
+          disabled={busy}
+          aria-busy={busy}
+          data-testid="send-code-button"
+        >
+          {busy ? "Sending…" : "Send me the code"}
+        </Button>
+      ) : (
+        <>
+          <p data-testid="otp-sent-message" role="status" className="text-sm text-muted-foreground">
+            If an account exists for that email, a 6-digit code is on its way.
+          </p>
+          <div className="space-y-1.5">
+            <Label htmlFor="otp-code">6-digit code</Label>
+            <Input
+              id="otp-code"
+              name="code"
+              type="text"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              placeholder="123456"
+              required
+              minLength={6}
+              maxLength={6}
+              pattern="[0-9]{6}"
+              autoFocus
+              data-testid="otp-code-field"
+            />
+          </div>
+          <Button
+            type="submit"
+            className="w-full"
+            disabled={busy}
+            aria-busy={busy}
+            data-testid="verify-code-button"
+          >
+            {busy ? "Verifying…" : "Verify code"}
+          </Button>
+        </>
+      )}
+
+      {error && (
+        <div
+          data-testid="auth-error"
+          role="alert"
+          className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+        >
+          {error}
+        </div>
+      )}
+
+      <div className="flex flex-col gap-2">
+        {sent && (
+          <Button
+            type="button"
+            variant="ghost"
+            className="w-full"
+            disabled={busy}
+            onClick={onResend}
+            data-testid="resend-code-button"
+          >
+            Send another code
+          </Button>
+        )}
+        <Button
+          type="button"
+          variant="ghost"
+          className="w-full"
+          onClick={onBack}
+          data-testid="otp-back-button"
+        >
+          {sent ? "Use a different email" : "Back to password sign-in"}
+        </Button>
+      </div>
+    </>
   );
 }

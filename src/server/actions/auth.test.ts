@@ -4,10 +4,12 @@ import { redirect } from "next/navigation";
 import { AUTH_LIMIT, peekRateLimit, rateLimit, resetRateLimits } from "@/server/rate-limit";
 import {
   changePasswordAction,
+  requestEmailLoginCodeAction,
   resendConfirmationAction,
   signInAction,
   signUpAction,
   updatePasswordAction,
+  verifyEmailLoginCodeAction,
 } from "./auth";
 
 /**
@@ -54,6 +56,8 @@ let signUpData: { session: unknown; user: unknown } = { session: null, user: { i
 let sessionUser: { id: string } | null = { id: "u-1" };
 let updateUserError: ProviderError = null;
 let resendError: ProviderError = null;
+let otpRequestError: ProviderError = null;
+let otpVerifyError: ProviderError = null;
 
 function mockSupabase() {
   vi.mocked(createClient).mockResolvedValue({
@@ -72,6 +76,14 @@ function mockSupabase() {
         data: resendError ? {} : { user: { id: "u-1" }, session: null },
         error: resendError,
       })),
+      signInWithOtp: vi.fn(async () => ({
+        data: otpRequestError ? {} : { user: null, session: null },
+        error: otpRequestError,
+      })),
+      verifyOtp: vi.fn(async () => ({
+        data: otpVerifyError ? {} : { user: { id: "u-1" }, session: { access_token: "t" } },
+        error: otpVerifyError,
+      })),
     },
   } as unknown as Awaited<ReturnType<typeof createClient>>);
 }
@@ -89,6 +101,8 @@ beforeEach(() => {
   sessionUser = { id: "u-1" };
   updateUserError = null;
   resendError = null;
+  otpRequestError = null;
+  otpVerifyError = null;
 
   mockSupabase();
 });
@@ -361,6 +375,152 @@ describe("resendConfirmationAction", () => {
     if (result.ok) return;
     expect(result.rejection.code).toBe("invalid_input");
     expect(createClient).not.toHaveBeenCalled();
+  });
+});
+
+describe("requestEmailLoginCodeAction", () => {
+  it("sends a code without creating an account and spends no budget", async () => {
+    const result = await requestEmailLoginCodeAction({ email: EMAIL });
+
+    expect(result).toEqual({ ok: true });
+    expect(budget().remaining).toBe(AUTH_LIMIT.limit);
+  });
+
+  it("passes shouldCreateUser:false so login can never mint an account", async () => {
+    await requestEmailLoginCodeAction({ email: EMAIL });
+
+    const client = await vi.mocked(createClient).mock.results[0].value;
+    const calls = (
+      client.auth as unknown as { signInWithOtp: { mock: { calls: unknown[][] } } }
+    ).signInWithOtp.mock.calls;
+    expect(calls).toHaveLength(1);
+    expect(calls[0][0]).toMatchObject({
+      email: EMAIL.toLowerCase(),
+      options: { shouldCreateUser: false },
+    });
+  });
+
+  it("normalizes a provider send failure to the same generic success (no oracle)", async () => {
+    otpRequestError = { message: "Error sending email", status: 500 };
+
+    const failed = await requestEmailLoginCodeAction({ email: EMAIL });
+    expect(failed).toEqual({ ok: true });
+
+    otpRequestError = null;
+    const succeeded = await requestEmailLoginCodeAction({ email: EMAIL });
+    expect(succeeded).toEqual(failed);
+    expect(budget().remaining).toBe(AUTH_LIMIT.limit);
+  });
+
+  it("normalizes an unknown-address rejection to the same generic success", async () => {
+    // With user creation off, GoTrue rejects addresses it has never seen.
+    // Surfacing that would turn this screen into a registration oracle.
+    otpRequestError = { message: "User not found" };
+
+    const result = await requestEmailLoginCodeAction({ email: EMAIL });
+    expect(result).toEqual({ ok: true });
+    expect(budget().remaining).toBe(AUTH_LIMIT.limit);
+  });
+
+  it("treats a provider throttle as a delayed email, outside our budget", async () => {
+    otpRequestError = { message: "Too many requests", status: 429 };
+
+    const result = await requestEmailLoginCodeAction({ email: EMAIL });
+    expect(result).toEqual({ ok: true });
+    expect(budget().remaining).toBe(AUTH_LIMIT.limit);
+  });
+
+  it("still reports our own budget honestly without contacting the provider", async () => {
+    for (let i = 0; i < AUTH_LIMIT.limit; i += 1) {
+      rateLimit(KEY, AUTH_LIMIT.limit, AUTH_LIMIT.windowMs);
+    }
+    vi.mocked(createClient).mockClear();
+
+    const result = await requestEmailLoginCodeAction({ email: EMAIL });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.rejection.code).toBe("rate_limited");
+    expect(result.rejection.message).toMatch(/too many attempts from this device/i);
+    expect(createClient).not.toHaveBeenCalled();
+  });
+
+  it("refuses an empty address before contacting the provider", async () => {
+    const result = await requestEmailLoginCodeAction({ email: "   " });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.rejection.code).toBe("invalid_input");
+    expect(createClient).not.toHaveBeenCalled();
+  });
+});
+
+describe("verifyEmailLoginCodeAction", () => {
+  it("verifies a valid code by redirecting, like password sign-in", async () => {
+    await expect(
+      verifyEmailLoginCodeAction({ email: EMAIL, token: "123456", redirectTo: "/dashboard" })
+    ).rejects.toThrow("NEXT_REDIRECT");
+
+    expect(vi.mocked(redirect)).toHaveBeenCalledTimes(1);
+    expect(budget().remaining).toBe(AUTH_LIMIT.limit);
+  });
+
+  it("routes the redirect through the same safe destination rule", async () => {
+    await expect(
+      verifyEmailLoginCodeAction({ email: EMAIL, token: "123456", redirectTo: "https://evil.example" })
+    ).rejects.toThrow("NEXT_REDIRECT");
+
+    expect(vi.mocked(redirect)).toHaveBeenLastCalledWith("/dashboard");
+  });
+
+  it("rejects a malformed code without contacting the provider", async () => {
+    for (const token of ["12345", "1234567", "abcdef", "12 456", ""]) {
+      const result = await verifyEmailLoginCodeAction({ email: EMAIL, token });
+      expect(result.ok).toBe(false);
+      if (result.ok) continue;
+      expect(result.rejection.message).toBe(
+        "That code didn't work. Check the email and try again, or request a new one."
+      );
+    }
+    expect(createClient).not.toHaveBeenCalled();
+    expect(budget().remaining).toBe(AUTH_LIMIT.limit);
+  });
+
+  it("reports a failed guess honestly and spends one unit of budget", async () => {
+    // Live GoTrue answers wrong AND expired codes with the same
+    // "Token has expired or is invalid", so one copy covers both remedies.
+    // (Proven against the live provider, not assumed.)
+    for (const message of ["Invalid token", "Token has expired or is invalid"]) {
+      otpVerifyError = { message, status: 403 };
+      const result = await verifyEmailLoginCodeAction({ email: EMAIL, token: "000000" });
+
+      expect(result.ok).toBe(false);
+      if (result.ok) continue;
+      expect(result.rejection.message).toBe(
+        "That code didn't work. Check the email and try again, or request a new one."
+      );
+    }
+    expect(budget().remaining).toBe(AUTH_LIMIT.limit - 2);
+  });
+
+  it("reports a provider throttle honestly without spending our budget", async () => {
+    otpVerifyError = { message: "Too many requests", status: 429 };
+
+    const result = await verifyEmailLoginCodeAction({ email: EMAIL, token: "000000" });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.rejection.message).toMatch(/rate-limiting requests/i);
+    expect(budget().remaining).toBe(AUTH_LIMIT.limit);
+  });
+
+  it("creates no session when the code is wrong", async () => {
+    otpVerifyError = { message: "Invalid token", status: 403 };
+
+    const result = await verifyEmailLoginCodeAction({ email: EMAIL, token: "000000" });
+    expect(result.ok).toBe(false);
+    // Failure returns a rejection; only success reaches redirect().
+    expect(vi.mocked(redirect)).not.toHaveBeenCalled();
   });
 });
 
