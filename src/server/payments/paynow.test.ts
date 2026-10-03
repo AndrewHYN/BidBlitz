@@ -76,7 +76,7 @@ function stubLedger(): StubLedger {
     refunded,
     events,
     intents,
-    intent: { transactionId: TX, provider: "paynow", pollUrl: POLL_URL },
+    intent: { transactionId: TX, provider: "paynow", pollUrl: POLL_URL, browserUrl: null, providerReference: null },
     applied,
     async markPaid(input) {
       // Faithful to mark_transaction_paid(): the answer says whether the row
@@ -107,10 +107,16 @@ function stubLedger(): StubLedger {
         transactionId: input.transactionId,
         provider: input.provider,
         pollUrl: input.pollUrl,
+        browserUrl: input.browserUrl ?? null,
+        providerReference: input.providerReference ?? null,
       };
     },
     async readIntent(transactionId) {
       return ledger.intent?.transactionId === transactionId ? ledger.intent : null;
+    },
+    async findTransactionByProviderReference() {
+      // Paynow matches by its own reference field, never by reverse lookup.
+      return null;
     },
   };
   return ledger;
@@ -966,6 +972,8 @@ describe("PaynowPaymentProvider.reconcile", () => {
       transactionId: TX,
       provider: "paynow",
       pollUrl: "https://evil.example.com/CheckPayment/?guid=abc",
+      browserUrl: null,
+      providerReference: null,
     };
     const exploding: typeof fetch = async () => {
       throw new Error("the provider must not be contacted");

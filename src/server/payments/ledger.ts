@@ -79,6 +79,10 @@ export type PaymentIntentRecord = {
   transactionId: string;
   provider: string;
   pollUrl: string;
+  /** Checkout page recorded at initiation, if the provider returned one. */
+  browserUrl: string | null;
+  /** Provider's own reference for the session, if it sent one. */
+  providerReference: string | null;
 };
 
 export type PaymentLedger = {
@@ -90,6 +94,15 @@ export type PaymentLedger = {
   recordIntent(input: RecordIntentInput): Promise<void>;
   /** Read the stored session for a transaction, or null when none was stored. */
   readIntent(transactionId: string): Promise<PaymentIntentRecord | null>;
+  /**
+   * Reverse lookup: which of OUR transactions owns this provider session
+   * reference? Webhooks name the provider's id, never ours, so matching
+   * without this would mean trusting buyer-visible text. Null when unknown.
+   */
+  findTransactionByProviderReference(
+    provider: string,
+    providerReference: string
+  ): Promise<string | null>;
 };
 
 /**
@@ -229,7 +242,7 @@ export function supabasePaymentLedger(): PaymentLedger {
       requireCredentials();
       const { data, error } = await createAdminClient()
         .from("payment_intents")
-        .select("transaction_id, provider, poll_url")
+        .select("transaction_id, provider, poll_url, browser_url, provider_reference")
         .eq("transaction_id", transactionId)
         .maybeSingle();
       if (error) throw toError(error, "read_payment_intent");
@@ -238,7 +251,22 @@ export function supabasePaymentLedger(): PaymentLedger {
         transactionId: data.transaction_id as string,
         provider: data.provider as string,
         pollUrl: data.poll_url as string,
+        browserUrl: (data.browser_url as string | null) ?? null,
+        providerReference: (data.provider_reference as string | null) ?? null,
       };
+    },
+
+    async findTransactionByProviderReference(provider: string, providerReference: string) {
+      requireCredentials();
+      const { data, error } = await createAdminClient()
+        .from("payment_intents")
+        .select("transaction_id")
+        .eq("provider", provider)
+        .eq("provider_reference", providerReference)
+        .maybeSingle();
+      if (error) throw toError(error, "find_payment_intent");
+      if (!data) return null;
+      return data.transaction_id as string;
     },
   };
 }

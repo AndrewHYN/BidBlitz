@@ -7,27 +7,40 @@ import {
   type PaymentProvider,
 } from "./provider";
 import { PaynowPaymentProvider } from "./paynow";
+import { LinkwaPaymentProvider } from "./linkwa";
 import { supabasePaymentLedger } from "./ledger";
 
 /**
  * Credential-driven provider selection — the ONLY module allowed to know
  * which payment provider is in use.
  *
+ * Selection order (see ADR-016 for why Linkwa leads):
+ *   1. Linkwa complete  => LinkwaPaymentProvider (collect + programmatic
+ *                          payouts, the marketplace pair);
+ *   2. Paynow ready     => PaynowPaymentProvider, wired to the Supabase ledger;
+ *   3. otherwise        => NoopPaymentProvider (the honest default, and the
+ *                          state BidBlitz ships in).
+ *
  * Rules:
  *   - no credentials  => NoopPaymentProvider (the honest default, and the
  *                        state BidBlitz ships in);
- *   - both present    => PaynowPaymentProvider, wired to the Supabase ledger;
+ *   - both present    => Linkwa wins; Paynow stays configured as the
+ *                        documented fallback, never silently half-live;
  *   - half configured => stay on Noop AND record why, so the failure is
  *                        reported instead of silently ignored. A half-set
  *                        integration must never look like a working one.
  *
  * Credentials come from environment variables only and are never written to
- * the repository (placeholders live in `.env.example`). See ADR-011 for the
- * onboarding step that produces them.
+ * the repository (placeholders live in `.env.example`). See ADR-011 (Paynow)
+ * and ADR-016 (Linkwa) for the onboarding steps that produce them.
  */
 
 const INTEGRATION_ID = "PAYNOW_INTEGRATION_ID";
 const INTEGRATION_KEY = "PAYNOW_INTEGRATION_KEY";
+
+const LINKWA_API_KEY = "LINKWA_API_KEY";
+const LINKWA_BASE_URL = "LINKWA_BASE_URL";
+const LINKWA_WEBHOOK_SECRET = "LINKWA_WEBHOOK_SECRET";
 
 export type PaynowEnvironment = {
   integrationId: string;
@@ -76,6 +89,50 @@ export function readPaynowEnvironment(
   };
 }
 
+export type LinkwaEnvironment = {
+  apiKey: string;
+  baseUrl: string;
+  webhookSecret: string;
+};
+
+export type LinkwaEnvironmentState = {
+  state: "unset" | "ready" | "incomplete";
+  /** Names that are missing or still carrying the placeholder value. */
+  missing: string[];
+  config: LinkwaEnvironment | null;
+};
+
+/**
+ * Linkwa needs all three: the key alone can neither collect nor verify.
+ * The base URL has no safe default — the wrong origin would send money
+ * somewhere unobserved — so it is required explicitly, sandbox or prod.
+ */
+export function readLinkwaEnvironment(
+  env: Environment = process.env
+): LinkwaEnvironmentState {
+  const apiKey = credential(env, LINKWA_API_KEY);
+  const baseUrl = credential(env, LINKWA_BASE_URL);
+  const webhookSecret = credential(env, LINKWA_WEBHOOK_SECRET);
+
+  if (!apiKey && !baseUrl && !webhookSecret) {
+    return { state: "unset", missing: [], config: null };
+  }
+
+  const missing: string[] = [];
+  if (!apiKey) missing.push(LINKWA_API_KEY);
+  if (!baseUrl) missing.push(LINKWA_BASE_URL);
+  if (!webhookSecret) missing.push(LINKWA_WEBHOOK_SECRET);
+  if (missing.length > 0) {
+    return { state: "incomplete", missing, config: null };
+  }
+
+  return {
+    state: "ready",
+    missing: [],
+    config: { apiKey, baseUrl, webhookSecret },
+  };
+}
+
 let initialised = false;
 let bootError: string | null = null;
 
@@ -88,7 +145,41 @@ export function ensurePaymentProvider(): PaymentProvider {
   if (initialised) return getPaymentProvider();
   initialised = true;
 
-  const env = readPaynowEnvironment();
+  const linkwa = readLinkwaEnvironment();
+  const paynow = readPaynowEnvironment();
+
+  if (linkwa.state === "ready" && linkwa.config) {
+    if (!hasAdminCredentials()) {
+      bootError =
+        "Linkwa credentials are present but SUPABASE_SECRET_KEY is not, so a payment " +
+        "event could never be recorded. Leaving the provider unconfigured.";
+      return getPaymentProvider();
+    }
+
+    setPaymentProvider(
+      new LinkwaPaymentProvider({
+        apiKey: linkwa.config.apiKey,
+        baseUrl: linkwa.config.baseUrl,
+        webhookSecret: linkwa.config.webhookSecret,
+        // Callbacks must come back to the canonical origin, never to whatever
+        // host a given request happened to arrive on (see site-url.ts).
+        returnUrl: absoluteUrl("/dashboard/transactions"),
+        ledger: supabasePaymentLedger(),
+      })
+    );
+    return getPaymentProvider();
+  }
+
+  // A half-set Linkwa must be as loud as a half-set Paynow: name every
+  // missing piece instead of silently falling through to the other provider.
+  if (linkwa.state === "incomplete") {
+    bootError =
+      `Linkwa configuration incomplete: ${linkwa.missing.join(", ")} is missing or still ` +
+      "a placeholder. Leaving the honest Noop provider in place.";
+    return getPaymentProvider();
+  }
+
+  const env = paynow;
 
   if (env.state === "incomplete") {
     bootError =
@@ -137,6 +228,16 @@ export function paymentBootError(): string | null {
  */
 export function isPaymentProviderConfigured(): boolean {
   return ensurePaymentProvider().capabilities.configured;
+}
+
+/**
+ * Who the user is actually paying through, for copy that names the provider.
+ * Server components pass this into interactive controls so a message about a
+ * live provider interaction never names the wrong one. Never used for
+ * decisions — only for words.
+ */
+export function paymentProviderDisplayName(): string {
+  return ensurePaymentProvider().capabilities.displayName;
 }
 
 /** Test hook: forget the boot decision and return to the honest default. */

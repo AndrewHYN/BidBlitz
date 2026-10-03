@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readPaynowEnvironment } from "./config";
+import { readLinkwaEnvironment, readPaynowEnvironment } from "./config";
 
 /**
  * Credential reading only — no provider is constructed here.
@@ -84,6 +84,52 @@ describe("readPaynowEnvironment", () => {
       readPaynowEnvironment({
         PAYNOW_INTEGRATION_ID: "REPLACE_ME",
         PAYNOW_INTEGRATION_KEY: "REPLACE_ME",
+      }).state
+    ).toBe("unset");
+  });
+});
+
+describe("readLinkwaEnvironment", () => {
+  it("reports nothing configured when no Linkwa variable is present", () => {
+    expect(readLinkwaEnvironment({})).toEqual({
+      state: "unset",
+      missing: [],
+      config: null,
+    });
+  });
+
+  it("reports a complete configuration", () => {
+    expect(
+      readLinkwaEnvironment({
+        LINKWA_API_KEY: "sk_live_abc",
+        LINKWA_BASE_URL: "https://sandbox.linkwa.example",
+        LINKWA_WEBHOOK_SECRET: "whsec-abc",
+      })
+    ).toEqual({
+      state: "ready",
+      missing: [],
+      config: {
+        apiKey: "sk_live_abc",
+        baseUrl: "https://sandbox.linkwa.example",
+        webhookSecret: "whsec-abc",
+      },
+    });
+  });
+
+  it("names exactly which pieces are missing", () => {
+    expect(readLinkwaEnvironment({ LINKWA_API_KEY: "sk_live_abc" })).toEqual({
+      state: "incomplete",
+      missing: ["LINKWA_BASE_URL", "LINKWA_WEBHOOK_SECRET"],
+      config: null,
+    });
+  });
+
+  it("treats placeholders as unset, not as credentials", () => {
+    expect(
+      readLinkwaEnvironment({
+        LINKWA_API_KEY: "REPLACE_ME",
+        LINKWA_BASE_URL: "REPLACE_ME",
+        LINKWA_WEBHOOK_SECRET: "REPLACE_ME",
       }).state
     ).toBe("unset");
   });

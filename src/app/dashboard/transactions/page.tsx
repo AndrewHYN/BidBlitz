@@ -18,7 +18,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { isPaymentProviderConfigured } from "@/server/payments/config";
+import { isPaymentProviderConfigured, paymentProviderDisplayName } from "@/server/payments/config";
 import { PayButton } from "@/components/dashboard/pay-button";
 import { CheckStatusButton } from "@/components/dashboard/check-status-button";
 
@@ -62,6 +62,7 @@ export default async function TransactionsPage() {
     getMessageUnreadCounts(user.id),
   ]);
   const configured = isPaymentProviderConfigured();
+  const providerName = paymentProviderDisplayName();
   // Payment status and payout status are two different records on purpose:
   // "Paid" is Paynow's word about the buyer, the payout is our word about the
   // seller. Collapsing them is how a marketplace talks itself into a lie.
@@ -174,13 +175,13 @@ export default async function TransactionsPage() {
                       {configured &&
                         row.buyer_id === user.id &&
                         row.status === "AWAITING_PAYMENT" && (
-                          <PayButton transactionId={row.id} />
+                          <PayButton transactionId={row.id} providerName={providerName} />
                         )}
                       {/* Both sides may ask the server to reconcile a payment
                           that is still waiting — the answer always comes back
                           from Postgres, never from this page. */}
                       {configured && row.status === "AWAITING_PAYMENT" && (
-                        <CheckStatusButton transactionId={row.id} />
+                        <CheckStatusButton transactionId={row.id} providerName={providerName} />
                       )}
                     </div>
                     {/* The deadline is public marketplace policy: the winner

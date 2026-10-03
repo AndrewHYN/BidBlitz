@@ -17,7 +17,17 @@ import { Button } from "@/components/ui/button";
  * AWAITING_PAYMENT until the provider confirms server-to-server — a redirect
  * back here does NOT mean "paid", and this component never claims it does.
  */
-export function PayButton({ transactionId }: { transactionId: string }) {
+export function PayButton({
+  transactionId,
+  providerName,
+}: {
+  transactionId: string;
+  /**
+   * Who would settle the charge, for the one message that names a settler.
+   * Passed from the server page — never defaulted.
+   */
+  providerName: string;
+}) {
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -39,7 +49,7 @@ export function PayButton({ transactionId }: { transactionId: string }) {
       if (!response.ok || parsed.ok !== true) {
         const text =
           typeof parsed.error === "string" ? parsed.error : "checkout_failed";
-        const copy = CHECKOUT_ERRORS[text] ?? CHECKOUT_ERRORS.checkout_failed;
+        const copy = checkoutErrorCopy(text, providerName);
         setMessage(copy);
         toast.error(copy);
         setPending(false);
@@ -47,8 +57,9 @@ export function PayButton({ transactionId }: { transactionId: string }) {
       }
 
       if (typeof parsed.redirectUrl !== "string" || parsed.redirectUrl === "") {
-        setMessage(CHECKOUT_ERRORS.checkout_failed);
-        toast.error(CHECKOUT_ERRORS.checkout_failed);
+        const copy = checkoutErrorCopy("checkout_failed", providerName);
+        setMessage(copy);
+        toast.error(copy);
         setPending(false);
         return;
       }
@@ -57,8 +68,9 @@ export function PayButton({ transactionId }: { transactionId: string }) {
       // to our return URL only updates the UI after the webhook confirms.
       window.location.assign(parsed.redirectUrl);
     } catch {
-      setMessage(CHECKOUT_ERRORS.network);
-      toast.error(CHECKOUT_ERRORS.network);
+      const copy = checkoutErrorCopy("network", providerName);
+      setMessage(copy);
+      toast.error(copy);
       setPending(false);
     }
   }
@@ -87,6 +99,17 @@ export function PayButton({ transactionId }: { transactionId: string }) {
 }
 
 /** Specific where we know the cause, honest where we do not. */
+function checkoutErrorCopy(error: string, providerName: string): string {
+  if (error === "unsupported_currency") {
+    return `${providerName} settles in USD, so this sale can't be paid for yet.`;
+  }
+  return (
+    CHECKOUT_ERRORS[error] ?? "We couldn't start the payment. Nothing was charged."
+  );
+}
+
+/** The currency line lives in `checkoutErrorCopy`: it is the only entry that
+ *  names the settler. Everything else here names no provider at all. */
 const CHECKOUT_ERRORS: Record<string, string> = {
   no_payment_provider: "Payment isn't available yet, so nothing has been charged.",
   unauthenticated: "Sign in again to continue.",
@@ -94,7 +117,6 @@ const CHECKOUT_ERRORS: Record<string, string> = {
   transaction_not_found: "That sale is no longer available to pay for.",
   not_the_buyer: "Only the winning bidder can pay for this sale.",
   not_awaiting_payment: "This sale isn't waiting for payment.",
-  unsupported_currency: "Paynow settles in USD, so this sale can't be paid for yet.",
   rate_limited: "Too many attempts. Wait a moment and try again.",
   provider_error: "The payment service didn't respond. Nothing was charged.",
   checkout_failed: "We couldn't start the payment. Nothing was charged.",

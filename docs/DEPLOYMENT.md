@@ -48,6 +48,27 @@ present in Production, so checkout **and** the webhook are live in that
 deployment — ADR-011 records what that verified and what it did not (Paynow's
 status-update push never arrived in test mode).
 
+**Linkwa (selected marketplace provider, ADR-016) — NOT yet configured.**
+When all three are real, `config.ts` boots `LinkwaPaymentProvider` in
+preference to Paynow; any subset missing or placeholder keeps Noop and logs
+exactly which names are missing:
+
+| Variable | Value | Notes |
+| --- | --- | --- |
+| `LINKWA_API_KEY` | `sk_live_...` Developer key from the Linkwa dashboard | **Server only.** Never `NEXT_PUBLIC_`, never logged. |
+| `LINKWA_BASE_URL` | Account API origin from the Linkwa dashboard | **Server only.** No default is assumed; sandbox and production origins differ. |
+| `LINKWA_WEBHOOK_SECRET` | Webhook signing secret from the Linkwa dashboard | **Server only.** Verifies `X-Linkwa-Signature` on every event. |
+
+Linkwa go-live checklist (all owner-gated, in order): free-sandbox proof of
+collect → webhook → payout → statement for a controlled sale; establish the
+undocumented behaviors (refunds, payout status, idempotency) from sandbox
+evidence, not assumptions; rewrite the Paynow-specific static copy
+(terms/help/fees/footer/sell-form) to name Linkwa; only then set the three
+production variables. Paynow credentials stay in place throughout as the
+configured fallback. The written Paynow-to-Linkwa approval question (marketplace
+collection, fee, disbursement, KYC, refunds, settlement) is still open and
+still required regardless of provider.
+
 **Not** set in Vercel, because they are development-machine only:
 
 | Variable | Why it stays off the deployment |

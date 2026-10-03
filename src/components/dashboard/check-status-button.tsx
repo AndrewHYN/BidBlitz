@@ -19,7 +19,19 @@ import { Button } from "@/components/ui/button";
  * observed arriving; a buyer who has paid must still be able to find out, and
  * a seller must be able to see the same thing, without anyone guessing.
  */
-export function CheckStatusButton({ transactionId }: { transactionId: string }) {
+export function CheckStatusButton({
+  transactionId,
+  providerName,
+}: {
+  transactionId: string;
+  /**
+   * Who actually answered, for copy that names a live interaction ("Linkwa
+   * confirmed…"). Passed from the server page, which knows the configured
+   * provider — never defaulted, because a default would name the wrong
+   * party the day the provider changes.
+   */
+  providerName: string;
+}) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -43,20 +55,20 @@ export function CheckStatusButton({ transactionId }: { transactionId: string }) 
       if (!response.ok || parsed.ok !== true) {
         const text =
           typeof parsed.error === "string" ? parsed.error : "reconcile_failed";
-        const copy = CHECK_ERRORS[text] ?? CHECK_ERRORS.reconcile_failed;
+        const copy = checkErrorCopy(text, providerName);
         setMessage(copy);
         toast.error(copy);
         setPending(false);
         return;
       }
 
-      const copy = describe(parsed);
+      const copy = describe(parsed, providerName);
       setMessage(null);
       toast.success(copy);
       // The row is whatever the database says it is now.
       router.refresh();
     } catch {
-      const copy = CHECK_ERRORS.network;
+      const copy = checkErrorCopy("network", providerName);
       setMessage(copy);
       toast.error(copy);
     } finally {
@@ -79,7 +91,7 @@ export function CheckStatusButton({ transactionId }: { transactionId: string }) 
         ) : (
           <RefreshCw aria-hidden />
         )}
-        {pending ? "Checking with Paynow" : "Check payment status"}
+        {pending ? `Checking with ${providerName}` : "Check payment status"}
       </Button>
       <span role="status" aria-live="polite" className="text-xs text-destructive">
         {message ?? ""}
@@ -89,55 +101,77 @@ export function CheckStatusButton({ transactionId }: { transactionId: string }) 
 }
 
 /** Report what the SERVER concluded, in the words the row will now show. */
-function describe(parsed: Record<string, unknown>): string {
+function describe(parsed: Record<string, unknown>, providerName: string): string {
   const status = typeof parsed.status === "string" ? parsed.status : "";
   const changed = parsed.changed === true;
 
   // This row is visible to the buyer AND the seller, so "paid" is ambiguous
   // unless the sentence says whose money was confirmed. `PAID` means one
-  // specific thing: Paynow confirmed the BUYER's payment. The seller's payout
-  // is a separate state that this button does not touch, and saying so is the
-  // difference between a seller believing they have been paid and being wrong.
+  // specific thing: the provider confirmed the BUYER's payment. The seller's
+  // payout is a separate state that this button does not touch, and saying so
+  // is the difference between a seller believing they have been paid and
+  // being wrong.
   if (status === "PAID") {
     return changed
-      ? "Paynow confirmed the buyer's payment, so this sale is marked paid. The seller's payout is recorded separately."
-      : "Paynow had already confirmed the buyer's payment. The seller's payout is recorded separately.";
+      ? `${providerName} confirmed the buyer's payment, so this sale is marked paid. The seller's payout is recorded separately.`
+      : `${providerName} had already confirmed the buyer's payment. The seller's payout is recorded separately.`;
   }
   if (status === "FAILED") {
     return changed
-      ? "Paynow reports the payment did not complete. Nothing was paid."
-      : "Paynow has this payment as not completed.";
+      ? `${providerName} reports the payment did not complete. Nothing was paid.`
+      : `${providerName} has this payment as not completed.`;
   }
   if (status === "REFUNDED") {
-    return "Paynow reports this payment was refunded.";
+    return `${providerName} reports this payment was refunded.`;
   }
   if (parsed.reconciled === false) {
     return "Nothing to check: this sale is no longer waiting for payment.";
   }
-  return "Paynow has not confirmed this payment yet. Nothing has changed.";
+  return `${providerName} has not confirmed this payment yet. Nothing has changed.`;
 }
 
 /** Specific where we know the cause, honest where we do not. */
-const CHECK_ERRORS: Record<string, string> = {
-  no_payment_provider: "Payment status checks aren't available on this deployment.",
-  reconciliation_unsupported: "This deployment can't check payment status yet.",
-  unauthenticated: "Sign in again to continue.",
-  invalid_request: "We couldn't check that payment. Reload and try again.",
-  transaction_not_found: "That sale is no longer available.",
-  not_a_party: "Only the buyer and seller of this sale can check it.",
-  rate_limited: "Too many checks in a row. Wait a minute and try again.",
-  invalid_signature: "Paynow's reply could not be verified, so nothing changed.",
-  unrecognized_payload: "Paynow sent a status we don't recognise, so nothing changed.",
-  malformed_payload: "Paynow's reply could not be read, so nothing changed.",
-  amount_mismatch: "Paynow's amount doesn't match this sale, so nothing changed.",
-  reference_mismatch: "Paynow answered about a different sale, so nothing changed.",
-  currency_mismatch: "This sale isn't in a currency Paynow settles, so nothing changed.",
-  no_poll_url:
-    "No payment session was recorded for this sale. Start the payment again.",
-  invalid_poll_url: "This sale has no usable Paynow session. Start the payment again.",
-  provider_unreachable:
-    "Paynow couldn't be reached, so nothing changed. Try again shortly.",
-  provider_error: "The payment service didn't respond. Nothing changed.",
-  reconcile_failed: "We couldn't confirm the payment status. Nothing changed.",
-  network: "We couldn't reach the server, so nothing changed.",
-};
+function checkErrorCopy(error: string, providerName: string): string {
+  switch (error) {
+    case "no_payment_provider":
+      return "Payment status checks aren't available on this deployment.";
+    case "reconciliation_unsupported":
+      return "This deployment can't check payment status yet.";
+    case "unauthenticated":
+      return "Sign in again to continue.";
+    case "invalid_request":
+      return "We couldn't check that payment. Reload and try again.";
+    case "transaction_not_found":
+      return "That sale is no longer available.";
+    case "not_a_party":
+      return "Only the buyer and seller of this sale can check it.";
+    case "rate_limited":
+      return "Too many checks in a row. Wait a minute and try again.";
+    case "invalid_signature":
+      return `${providerName}'s reply could not be verified, so nothing changed.`;
+    case "unrecognized_payload":
+      return `${providerName} sent a status we don't recognise, so nothing changed.`;
+    case "malformed_payload":
+      return `${providerName}'s reply could not be read, so nothing changed.`;
+    case "amount_mismatch":
+      return `${providerName}'s amount doesn't match this sale, so nothing changed.`;
+    case "reference_mismatch":
+      return `${providerName} answered about a different sale, so nothing changed.`;
+    case "currency_mismatch":
+      return `This sale isn't in a currency ${providerName} settles, so nothing changed.`;
+    case "no_poll_url":
+      return "No payment session was recorded for this sale. Start the payment again.";
+    case "invalid_poll_url":
+      return `This sale has no usable ${providerName} session. Start the payment again.`;
+    case "provider_unreachable":
+      return `${providerName} couldn't be reached, so nothing changed. Try again shortly.`;
+    case "provider_error":
+      return "The payment service didn't respond. Nothing changed.";
+    case "reconcile_failed":
+      return "We couldn't confirm the payment status. Nothing changed.";
+    case "network":
+      return "We couldn't reach the server, so nothing changed.";
+    default:
+      return "We couldn't confirm the payment status. Nothing changed.";
+  }
+}

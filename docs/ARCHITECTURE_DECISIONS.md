@@ -1102,3 +1102,62 @@ non-payment expiry, and the dead `PAID → SETTLED` edge.
   the identical "not available" state: no existence oracle.
 - RLS proof procedure lives in `scripts/db/verify-messaging-rls.mjs` and runs
   post-migration; action-level contract in `src/server/actions/messages.test.ts`.
+
+## ADR-016: Linkwa selected as the marketplace provider; Paynow stays as fallback
+
+Date: 2026-10-04
+
+Status: Accepted (code) / pending sandbox proof (money movement)
+
+### Context
+
+Paynow cannot disburse to sellers — it settles to the merchant's own bank on
+its own schedule and documents no payout API — so the seller-payout half of a
+marketplace has no provider path under Paynow. Linkwa's public developer docs
+(linkwa.co.zw/developer-apps/docs, /webhooks/docs, verified 2026-10-04) document
+the missing half: payment links, per-attempt status checks, HMAC-signed
+`payment.completed` webhooks with retries, programmatic payouts to verified
+mobile wallets, and balances/statements. Its FAQ explicitly positions the API
+for marketplaces that pay sellers.
+
+### Decision
+
+- Implement `LinkwaPaymentProvider` behind the existing seam
+  (`src/server/payments/linkwa.ts`): payment-link creation, HMAC webhook
+  verification, per-attempt status reconciliation is deliberately omitted (the
+  documented status check needs identifiers the server only learns from the
+  webhook itself), cancellation/refund paths honestly refuse (undocumented).
+- Selection order in `config.ts`: Linkwa when fully configured, else Paynow,
+  else the honest Noop. A half-set Linkwa fails loud instead of falling
+  through silently.
+- Payout helpers (`linkwa-payouts.ts`: link user, register wallet, instruct
+  payout) are implemented and unit-tested but NOT wired to any UI or route:
+  moving seller money waits for the payout milestone's sandbox proof.
+- The webhook matches events to our rows through the stored intent
+  (`external_payment_link_id` -> transaction via a new ledger reverse
+  lookup), never through buyer-visible text; checkout resumes a recorded
+  link instead of minting an untraceable sibling.
+- Interactive result copy (`CheckStatusButton`, `PayButton`) takes the
+  configured provider's display name as a prop. Static marketing/help/terms
+  copy still names Paynow and must be rewritten as part of Linkwa go-live.
+
+### Open items (owner-gated, sandbox required)
+
+- Sandbox proof of collect -> webhook -> status -> payout -> statement for a
+  controlled sale; Linkwa refund behavior and payout-status visibility are
+  undocumented and must be established there, not assumed here.
+- Paynow marketplace-approval answer still outstanding; either outcome is now
+  non-blocking (approved => Paynow remains a configured fallback).
+- Fee truth: Linkwa charges the buyer 1% + 2% on top and settles 100% of the
+  listed price to the app wallet; BidBlitz's 5% stays a seller-proceeds split
+  (payout = net). No fee-display code changed: gross/fee/net columns already
+  model exactly that.
+
+### Consequences
+
+- No money moves until `LINKWA_API_KEY`, `LINKWA_BASE_URL` and
+  `LINKWA_WEBHOOK_SECRET` are all real (see `.env.example`); without them the
+  boot diagnostics say so and Noop stays in place.
+- `findTransactionByProviderReference` added to the ledger seam (used only by
+  the Linkwa webhook path); `PaymentIntentRecord` gains the already-stored
+  `browserUrl`/`providerReference` fields it previously dropped.
