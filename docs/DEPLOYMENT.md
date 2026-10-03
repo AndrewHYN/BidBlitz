@@ -123,6 +123,37 @@ project ships with **email confirmation ON**, which means `signUpAction` returns
 success *without* a session and the UI shows a truthful "check your email"
 panel rather than pretending the user is signed in.
 
+## 2b. Supabase: enable the Google provider
+
+Password and OTP stay as fallbacks, but Google is the primary sign-in. All of
+this lives in dashboards, never in source:
+
+1. Google Cloud Console → create an OAuth client (Web application) and add the
+   Supabase Auth callback as an authorized redirect URI:
+   `https://zteakuiuvcikwpnkgxsn.supabase.co/auth/v1/callback`
+   (the provider is configured against Supabase's callback, never directly
+   against a BidBlitz route).
+2. Supabase Dashboard → **Authentication → Providers → Google** → enable with
+   that client ID + secret.
+3. Supabase Dashboard → **Authentication → URL Configuration**: the app hands
+   `redirectTo = ${NEXT_PUBLIC_SITE_URL}/auth/callback?next=<validated>` (see
+   `src/lib/oauth-redirect.ts`), so the allow-list must contain the callback
+   on every origin the app is served from:
+   - `https://bidblitz.co.zw/auth/callback` (custom production domain)
+   - `https://bid-blitz-ten.vercel.app/auth/callback` (Vercel origin)
+   - `http://localhost:3000/auth/callback` (local development)
+4. `NEXT_PUBLIC_SITE_URL` must be the origin users actually use
+   (`https://bidblitz.co.zw` in production): it is inlined at build time and
+   becomes the OAuth `redirectTo`, so a stale value sends Google logins to
+   the wrong host. Same per-deployment snapshot rule as §1.
+
+The app exchanges the returned `?code=` in the browser through the one
+existing `/auth/callback` handler (`src/components/auth/callback-runner.tsx`);
+no second callback architecture exists. Profile provisioning for Google users
+needs no code change: the `auth.users` trigger already prefers
+`display_name`, then Google's `full_name`, then a unique handle, and
+`on conflict (id) do nothing` keeps re-sign-ins from duplicating rows.
+
 ## 3. Cron
 
 `vercel.json` schedules:

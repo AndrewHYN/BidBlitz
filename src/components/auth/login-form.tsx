@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRef, useState, useTransition } from "react";
 import { signInAction, requestEmailLoginCodeAction, verifyEmailLoginCodeAction } from "@/server/actions/auth";
+import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
 import { BrandMark } from "@/components/brand-mark";
 import { useMounted } from "@/hooks/use-mounted";
 import { Button } from "@/components/ui/button";
@@ -217,6 +218,14 @@ export function LoginForm({
 
       {mode === "password" ? (
         <>
+          <GoogleSignInButton next={redirectTo} />
+
+          <div className="flex items-center gap-3" aria-hidden="true">
+            <span className="h-px flex-1 bg-border" />
+            <span className="text-xs text-muted-foreground">OR</span>
+            <span className="h-px flex-1 bg-border" />
+          </div>
+
           <div className="space-y-1.5">
             <Label htmlFor="login-email">Email</Label>
             <Input

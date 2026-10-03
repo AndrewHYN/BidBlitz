@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRef, useState, useTransition } from "react";
 import { MailCheck } from "lucide-react";
 import { resendConfirmationAction, signUpAction } from "@/server/actions/auth";
+import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
 import { useMounted } from "@/hooks/use-mounted";
 import { MIN_PASSWORD_LENGTH } from "@/lib/validation";
 import { BrandMark } from "@/components/brand-mark";
@@ -193,6 +194,14 @@ export function SignupForm() {
           {error}
         </div>
       )}
+
+      <GoogleSignInButton />
+
+      <div className="flex items-center gap-3" aria-hidden="true">
+        <span className="h-px flex-1 bg-border" />
+        <span className="text-xs text-muted-foreground">OR</span>
+        <span className="h-px flex-1 bg-border" />
+      </div>
 
       <div className="space-y-1.5">
         <Label htmlFor="signup-name">Display name</Label>
