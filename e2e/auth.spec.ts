@@ -149,4 +149,56 @@ test.describe("authentication", () => {
     // message and must NOT land the user in an authenticated area.
     await expect(page).not.toHaveURL(/\/dashboard/);
   });
+
+  test("a signed-out header shows Sign in and Join, never the account menu", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    const header = page.locator("header");
+    await expect(header.getByRole("link", { name: "Sign in" })).toBeVisible({
+      timeout: 30_000,
+    });
+    await expect(header.getByRole("link", { name: "Join" })).toBeVisible();
+    await expect(
+      header.getByRole("button", { name: "Account menu" })
+    ).toHaveCount(0);
+  });
+
+  test("signing in swaps the header to the account menu with no refresh", async ({
+    page,
+  }) => {
+    // Regression for the OAuth header bug (server snapshot showed
+    // "Sign in / Join" for a live session until a manual reload): whatever
+    // establishes the session, the header must follow it on its own. The
+    // password path is the one E2E can drive without a Google account; the
+    // shared subscription code serves both.
+    await signIn(page, ACCOUNTS.buyer2.email);
+
+    const header = page.locator("header");
+    await expect(
+      header.getByRole("button", { name: "Account menu" })
+    ).toBeVisible({ timeout: 30_000 });
+    await expect(header.getByRole("link", { name: "Sign in" })).toHaveCount(0);
+    await expect(header.getByRole("link", { name: "Join" })).toHaveCount(0);
+  });
+
+  test("signing out swaps the header back with no refresh", async ({
+    page,
+  }) => {
+    test.setTimeout(240_000);
+
+    await signIn(page, ACCOUNTS.buyer3.email);
+    await page.goto("/settings");
+    await expect(page.getByTestId("settings-form")).toBeVisible({ timeout: 30_000 });
+    await page.getByTestId("sign-out-button").click();
+
+    const header = page.locator("header");
+    await expect(header.getByRole("link", { name: "Sign in" })).toBeVisible({
+      timeout: 30_000,
+    });
+    await expect(header.getByRole("link", { name: "Join" })).toBeVisible();
+    await expect(
+      header.getByRole("button", { name: "Account menu" })
+    ).toHaveCount(0);
+  });
 });

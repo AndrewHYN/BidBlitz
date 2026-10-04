@@ -31,6 +31,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { signOutAction } from "@/server/actions/auth";
+import { createClient } from "@/lib/supabase/client";
+import { shouldRefreshHeaderOnAuthEvent } from "@/lib/auth-events";
 import { cn } from "@/lib/utils";
 
 export type HeaderUser = {
@@ -128,6 +130,42 @@ export function HeaderBar({
       window.removeEventListener("popstate", onPopState);
     };
   }, [open]);
+
+  // The `user` prop above is a server snapshot: after OAuth completes IN THE
+  // BROWSER, the session exists but this render still shows "Sign in / Join"
+  // until something re-reads the server. So this one subscription watches
+  // Supabase auth events and asks Next to re-render the server tree — which
+  // re-runs SiteHeader with live cookies — exactly when the snapshot is
+  // known-stale, and never otherwise.
+  //
+  // One subscription, created once: the effect depends only on the stable
+  // router, and `router.refresh()` re-renders without remounting, so the
+  // effect never re-runs itself into a loop. Cleanup unsubscribes, so
+  // StrictMode remounts and unmounts cannot leak or double-handle. No
+  // tokens enter React state — the decision reads the event only.
+  useEffect(() => {
+    // What the server believed at mount. The effect runs once (stable
+    // `router` dep below), so this closure value stays the mount snapshot
+    // for the subscription's whole life; `known` tracks it forward as events
+    // are acted on, so a duplicate delivery of the same event cannot queue a
+    // second refresh for the same header.
+    let known = user !== null;
+    const supabase = createClient();
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (shouldRefreshHeaderOnAuthEvent(event, session !== null, known)) {
+        known = session !== null;
+        router.refresh();
+      }
+    });
+    return () => {
+      subscription.unsubscribe();
+    };
+  // Mount-only by design (see above): `user` must NOT retrigger, or every
+  // prop change would resubscribe.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router]);
 
   function submitSearch(e: React.FormEvent) {
     e.preventDefault();
