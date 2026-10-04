@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createSignupClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { AUTH_LIMIT, peekRateLimit, rateLimit, resetRateLimits } from "@/server/rate-limit";
 import {
@@ -28,7 +28,7 @@ import {
  * our own block says so in its own words, and the window really does clear.
  */
 
-vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }));
+vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn(), createSignupClient: vi.fn() }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("next/navigation", () => ({
   redirect: vi.fn(() => {
@@ -86,6 +86,12 @@ function mockSupabase() {
       })),
     },
   } as unknown as Awaited<ReturnType<typeof createClient>>);
+  // The signup client is sessionless: same signUp shape, no session binding.
+  vi.mocked(createSignupClient).mockReturnValue({
+    auth: {
+      signUp: vi.fn(async () => ({ data: signUpData, error: signUpError })),
+    },
+  } as unknown as ReturnType<typeof createSignupClient>);
 }
 
 function budget() {
@@ -122,6 +128,37 @@ describe("signUpAction", () => {
     expect(result).toEqual({ ok: true });
     // Full budget after success: nothing failed, so nothing was recorded.
     expect(budget().remaining).toBe(AUTH_LIMIT.limit);
+  });
+
+  it("signs up through the sessionless implicit client, not the session client", async () => {
+    // Regression test for the 2026-10-04 production incident: the signup
+    // Server Action used the session-bound (PKCE) client, so GoTrue answered
+    // the confirmation click with `?code=` — exchangeable only with a
+    // verifier cookie that is host-bound to the signup page's origin, while
+    // production signup emails pointed at a different host. Every click
+    // failed with "We couldn't complete sign-in from your email link."
+    // The implicit client needs no verifier, so the fragment callback
+    // completes on any device or browser.
+    const result = await signUpAction({
+      email: EMAIL,
+      password: "longenough",
+      displayName: "New User",
+    });
+
+    expect(result).toEqual({ ok: true });
+    const signupClient = vi.mocked(createSignupClient).mock.results[0].value as {
+      auth: { signUp: { mock: { calls: unknown[][] } } };
+    };
+    expect(signupClient.auth.signUp.mock.calls).toHaveLength(1);
+    const [args] = signupClient.auth.signUp.mock.calls[0] as [
+      { email: string; options: { emailRedirectTo: string } },
+    ];
+    expect(args.email).toBe(EMAIL.trim());
+    expect(args.options.emailRedirectTo).toMatch(/\/auth\/callback$/);
+    // The session-bound client is never even constructed on the signup path:
+    // no session exists yet, and touching it would reintroduce the cookie
+    // coupling this regression removes.
+    expect(vi.mocked(createClient).mock.calls).toHaveLength(0);
   });
 
   it("reports a provider rate limit in its own words and never spends our budget", async () => {

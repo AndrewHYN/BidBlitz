@@ -9,7 +9,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createSignupClient } from "@/lib/supabase/server";
 import { absoluteUrl } from "@/lib/site-url";
 import { safeNext } from "@/lib/safe-next";
 import { AUTH_LIMIT, peekRateLimit, rateLimit } from "@/server/rate-limit";
@@ -179,7 +179,11 @@ export async function signUpAction(input: {
     return { ok: false, rejection: { code: "rate_limited", message: AUTH_RATE_MESSAGE } };
   }
 
-  const supabase = await createClient();
+  // Sessionless implicit-flow client, NOT the session-bound one: the
+  // confirmation email must complete on any device/browser via the URL
+  // fragment, without depending on a PKCE verifier cookie written here
+  // (see createSignupClient).
+  const supabase = createSignupClient();
 
   const { data, error } = await supabase.auth.signUp({
     email: input.email.trim(),

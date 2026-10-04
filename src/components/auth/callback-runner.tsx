@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { safeNext } from "@/lib/safe-next";
+import { parseCallbackCredentials } from "@/lib/auth-callback";
 import { BrandMark } from "@/components/brand-mark";
 
 /**
@@ -59,9 +60,15 @@ export function CallbackRunner() {
           return;
         }
 
-        const code = params.get("code");
-        if (code) {
-          const { error } = await supabase.auth.exchangeCodeForSession(code);
+        const credentials = parseCallbackCredentials(
+          params,
+          window.location.hash.slice(1)
+        );
+
+        if (credentials.kind === "code") {
+          const { error } = await supabase.auth.exchangeCodeForSession(
+            credentials.code
+          );
           if (!cancelled) {
             if (error) {
               if (await sessionExists(supabase)) router.replace(next);
@@ -71,15 +78,10 @@ export function CallbackRunner() {
           return;
         }
 
-        const tokenHash = params.get("token_hash");
-        const type = params.get("type");
-        if (
-          tokenHash &&
-          (type === "recovery" || type === "signup" || type === "email_change")
-        ) {
+        if (credentials.kind === "token") {
           const { error } = await supabase.auth.verifyOtp({
-            token_hash: tokenHash,
-            type,
+            token_hash: credentials.tokenHash,
+            type: credentials.type,
           });
           if (!cancelled) {
             if (error) {
@@ -90,13 +92,10 @@ export function CallbackRunner() {
           return;
         }
 
-        const hash = new URLSearchParams(window.location.hash.slice(1));
-        const accessToken = hash.get("access_token");
-        const refreshToken = hash.get("refresh_token");
-        if (accessToken && refreshToken) {
+        if (credentials.kind === "fragment") {
           const { error } = await supabase.auth.setSession({
-            access_token: accessToken,
-            refresh_token: refreshToken,
+            access_token: credentials.accessToken,
+            refresh_token: credentials.refreshToken,
           });
           if (!cancelled) {
             if (error) {
