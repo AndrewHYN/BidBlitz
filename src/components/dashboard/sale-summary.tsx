@@ -1,4 +1,4 @@
-import { isPaymentProviderConfigured } from "@/server/payments/config";
+import { isPaymentProviderConfigured, paymentProviderDisplayName } from "@/server/payments/config";
 import { feePercentLabel } from "@/lib/money";
 import { Money } from "@/components/auction/money";
 import { SellerPayoutBadge, TransactionBadge } from "@/components/auction/status-badge";
@@ -9,7 +9,7 @@ import { SellerPayoutBadge, TransactionBadge } from "@/components/auction/status
  * Two different things live on a sale and must never be collapsed into one
  * badge:
  *
- *   transaction.status — the BUYER's payment, as Paynow reports it.
+ *   transaction.status — the BUYER's payment, as the provider reports it.
  *   payout.status      — the SELLER's money: waiting for fulfilment, delivery
  *                        confirmed, payout pending/due, paid out, held, or
  *                        disputed.
@@ -40,6 +40,7 @@ export function SaleSummary({
   } | null;
 }) {
   const configured = isPaymentProviderConfigured();
+  const providerName = paymentProviderDisplayName();
 
   return (
     <div className="rounded-xl border bg-card p-4 text-sm shadow-sm">
@@ -85,7 +86,7 @@ export function SaleSummary({
       ) : (
         <p className="mt-3 border-t pt-3 text-xs text-muted-foreground">
           {configured
-            ? "Your payout record appears here once Paynow confirms the buyer's payment. Until then these proceeds are recorded, not sent."
+            ? `Your payout record appears here once ${providerName} confirms the buyer's payment. Until then these proceeds are recorded, not sent.`
             : "No payment provider is configured yet, so no money has moved. These proceeds are recorded, not sent."}
         </p>
       )}

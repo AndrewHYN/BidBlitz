@@ -8,7 +8,7 @@ import {
   DocumentSection,
 } from "@/components/document-page";
 import { PageHeader } from "@/components/auction/page-header";
-import { isPaymentProviderConfigured } from "@/server/payments/config";
+import { isPaymentProviderConfigured, paymentProviderDisplayName } from "@/server/payments/config";
 
 export const metadata: Metadata = {
   title: "Terms of Use",
@@ -62,6 +62,7 @@ export default function TermsPage() {
   // Whether payments are wired up is a deployment fact, not a fixed promise:
   // the section below must describe the state the site is actually in.
   const paymentConfigured = isPaymentProviderConfigured();
+  const providerName = paymentProviderDisplayName();
 
   return (
     <div data-testid="terms-page">
@@ -175,8 +176,8 @@ export default function TermsPage() {
           </p>
           <p>
             Buyers pay the winning price <strong>plus</strong> the applicable
-            Paynow payment charge. That charge is Paynow&apos;s own cost for the
-            payment method, is calculated and displayed by Paynow before the
+            payment charge. That charge is the provider&apos;s own cost for the
+            payment method, is calculated and displayed before the
             buyer authorises the payment, and is not revenue received by
             BidBlitz. The current rate and a worked example are on the{" "}
             <Link href="/help/fees" className="inline-flex min-h-6 items-center font-medium text-primary underline-offset-2 hover:underline">
@@ -197,17 +198,17 @@ export default function TermsPage() {
           {paymentConfigured ? (
             <>
               <p>
-                <strong>Payments are processed by Paynow.</strong> When an
+                <strong>Payments are processed by {providerName}.</strong> When an
                 auction settles, BidBlitz records the gross winning price, the
                 platform fee and the seller&apos;s proceeds, and the buyer
-                completes payment through Paynow&apos;s checkout.
+                completes payment through {providerName}&apos;s checkout.
               </p>
               <p>
                 The transaction starts as &ldquo;Awaiting payment&rdquo; and
-                becomes &ldquo;Paid&rdquo; only when Paynow&apos;s own
+                becomes &ldquo;Paid&rdquo; only when {providerName}&apos;s own
                 confirmation reaches BidBlitz and passes signature and amount
                 checks. A payment that fails or is cancelled leaves it
-                &ldquo;Failed&rdquo;. Being sent back to this site from Paynow
+                &ldquo;Failed&rdquo;. Being sent back to this site from {providerName}
                 never marks a sale paid by itself.
               </p>
             </>
@@ -243,17 +244,17 @@ export default function TermsPage() {
           {paymentConfigured ? (
             <>
               <p>
-                A sale being <strong>Paid</strong> means Paynow confirmed the
+                A sale being <strong>Paid</strong> means {providerName} confirmed the
                 buyer&apos;s payment. It does not mean the seller has been paid.
                 The two are recorded separately, and they are separate steps.
               </p>
               <p>
                 BidBlitz pays the seller&apos;s proceeds (the winning price less
                 the 5% platform fee) after the seller has fulfilled the sale
-                and the buyer&apos;s window to raise a dispute has passed. That
-                payment is made outside the site and its reference is recorded
-                against the sale. BidBlitz does not split a buyer&apos;s payment
-                between sellers automatically.
+                and the buyer&apos;s window to raise a dispute has passed. The
+                payout is sent to the seller through Linkwa, or recorded against
+                the sale when made outside BidBlitz. BidBlitz does not split a
+                buyer&apos;s payment between sellers automatically.
               </p>
               <p>
                 A payout is held while a dispute about the sale is open, and is

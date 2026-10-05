@@ -19,6 +19,10 @@ import {
   WithdrawCancellationButton,
   WithdrawReviewButton,
 } from "@/components/sell/cancellation-request-button";
+import {
+  isPaymentProviderConfigured,
+  paymentProviderDisplayName,
+} from "@/server/payments/config";
 import { DeleteDraftButton } from "@/components/sell/delete-draft-button";
 
 export const metadata: Metadata = {
@@ -50,6 +54,11 @@ export default async function SellDraftPage({
   const { auction } = detail;
   if (auction.seller_id !== user.id) notFound();
   const feeBps = await getFeeBps();
+  // Name the configured provider, or nothing: this page must not claim a
+  // payment rail the deployment does not have.
+  const providerName = isPaymentProviderConfigured()
+    ? paymentProviderDisplayName()
+    : null;
 
   const images = [...auction.auction_images]
     .sort((a, b) => a.position - b.position)
@@ -275,11 +284,23 @@ export default async function SellDraftPage({
                 ) : (
                   "a platform fee"
                 )}{" "}
-                of the winning price from your proceeds. The buyer pays your
-                winning bid plus Paynow&apos;s own payment charge, which is not
-                money you receive. Your proceeds are paid after the sale is
-                fulfilled and the buyer&apos;s window to dispute has passed, and
-                they are held while any dispute is open.
+                of the winning price from your proceeds.{" "}
+                {providerName !== null ? (
+                  <>
+                    The buyer pays your winning bid plus {providerName}&apos;s
+                    own payment charge, which is not money you receive.
+                  </>
+                ) : (
+                  <>
+                    No payment provider is connected yet, so no money moves: when
+                    one is, the buyer will pay your winning bid plus that
+                    provider&apos;s own payment charge, which is not money you
+                    receive.
+                  </>
+                )}{" "}
+                Your proceeds are paid after the sale is fulfilled and the
+                buyer&apos;s window to dispute has passed, and they are held
+                while any dispute is open.
               </p>
             </div>
           </section>

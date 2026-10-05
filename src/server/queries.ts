@@ -731,6 +731,11 @@ export type AdminPayoutRow = {
   sellerName: string;
   buyerId: string;
   buyerName: string;
+  /**
+   * Whether a Linkwa payout recipient is on file for this seller. Boolean
+   * only: the external ids themselves never leave the server.
+   */
+  recipientOnFile: boolean;
 };
 
 /**
@@ -780,13 +785,21 @@ export const getAdminPayouts = cache(async (): Promise<AdminPayoutRow[]> => {
     ...new Set(payouts.flatMap((p) => [p.seller_id, tx(p).buyer_id])),
   ];
 
-  const [auctionsRes, profilesRes] = await Promise.all([
+  const [auctionsRes, profilesRes, recipientsRes] = await Promise.all([
     supabase.from("auctions").select("id, title").in("id", auctionIds),
     supabase
       .from("profiles")
       .select("id, username, display_name")
       .in("id", profileIds),
+    // Boolean flag only: the ids stay server-side and are never rendered.
+    supabase
+      .from("seller_payout_recipients")
+      .select("seller_id")
+      .in("seller_id", [...new Set(payouts.map((p) => p.seller_id))]),
   ]);
+  const recipientsOnFile = new Set(
+    (recipientsRes.data ?? []).map((r) => r.seller_id as string)
+  );
 
   const titleById = new Map(
     (auctionsRes.data ?? []).map((a) => [a.id as string, a.title as string])
@@ -824,6 +837,7 @@ export const getAdminPayouts = cache(async (): Promise<AdminPayoutRow[]> => {
       sellerName: nameById.get(p.seller_id) ?? "Seller",
       buyerId: t.buyer_id,
       buyerName: nameById.get(t.buyer_id) ?? "Buyer",
+      recipientOnFile: recipientsOnFile.has(p.seller_id),
     };
   });
 });

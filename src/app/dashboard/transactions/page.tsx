@@ -62,17 +62,22 @@ export default async function TransactionsPage() {
     getMessageUnreadCounts(user.id),
   ]);
   const configured = isPaymentProviderConfigured();
-  const providerName = paymentProviderDisplayName();
+  // When no provider is connected the copy names the role, never a provider
+  // this deployment does not actually use.
+  const providerName = configured
+    ? paymentProviderDisplayName()
+    : "the payment provider";
   // Payment status and payout status are two different records on purpose:
-  // "Paid" is Paynow's word about the buyer, the payout is our word about the
-  // seller. Collapsing them is how a marketplace talks itself into a lie.
+  // "Paid" is the payment provider's word about the buyer, the payout is our
+  // word about the seller. Collapsing them is how a marketplace talks itself
+  // into a lie.
   const payoutByTx = new Map(payouts.map((p) => [p.transaction_id, p]));
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Transactions"
-        description="Every sale you were part of. Buyers pay the winning bid plus Paynow's payment charge; sellers receive the winning bid less BidBlitz's 5% fee, paid out separately."
+        description={`Every sale you were part of. Buyers pay the winning bid plus ${providerName}'s payment charge; sellers receive the winning bid less BidBlitz's 5% fee, paid out separately.`}
       />
 
       <div>
@@ -118,13 +123,13 @@ export default async function TransactionsPage() {
                   <TableCell>{row.seller_id === user.id ? "Seller" : "Buyer"}</TableCell>
                   <TableCell data-numeric>
                     <Money minor={row.gross_minor} currency={row.currency} />
-                    {/* A buyer paid this PLUS Paynow's own payment charge, which
-                        Paynow calculates and shows on its checkout page — we do
-                        not store it, so it must never be implied to be included
-                        in the number above. */}
+                    {/* A buyer paid this PLUS the payment provider's own payment
+                        charge, which the provider calculates and shows on its
+                        checkout page — we do not store it, so it must never be
+                        implied to be included in the number above. */}
                     {row.buyer_id === user.id && (
                       <span className="mt-1 block text-xs text-muted-foreground">
-                        plus Paynow&apos;s charge
+                        plus {providerName}&apos;s charge
                       </span>
                     )}
                   </TableCell>
@@ -262,10 +267,11 @@ export default async function TransactionsPage() {
       {configured && rows.length > 0 && (
         <p className="text-xs text-muted-foreground">
           <strong className="text-foreground">Payment status</strong> is the
-          buyer&apos;s payment, as Paynow reports it. <strong className="text-foreground">Payout status</strong>{" "}
+          buyer&apos;s payment, as {providerName} reports it. <strong className="text-foreground">Payout status</strong>{" "}
           is the seller&apos;s proceeds, tracked separately: it appears only on
           sales you sold, and reaching &ldquo;Paid out&rdquo; means an
-          administrator has recorded a payment made outside BidBlitz.
+          administrator has sent the payout with Linkwa or recorded a payout
+          made outside BidBlitz.
         </p>
       )}
     </div>

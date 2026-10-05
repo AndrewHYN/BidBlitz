@@ -5,7 +5,7 @@ import { PageHeader, SectionHeading } from "@/components/auction/page-header";
 import { DocumentPage } from "@/components/document-page";
 import { Money } from "@/components/auction/money";
 import { previewFeeMinor } from "@/lib/money";
-import { isPaymentProviderConfigured } from "@/server/payments/config";
+import { isPaymentProviderConfigured, paymentProviderDisplayName } from "@/server/payments/config";
 
 export const metadata: Metadata = {
   title: "Fees",
@@ -22,10 +22,11 @@ const GROSS_MINOR = 2500n; // $25.00 winning bid
 const FEE_MINOR = previewFeeMinor(GROSS_MINOR, FEE_BPS); // $1.25
 const NET_MINOR = GROSS_MINOR - FEE_MINOR; // $23.75
 /**
- * A made-up Paynow charge, used ONLY to show the shape of the buyer's total.
- * BidBlitz does not set, know or quote Paynow's rates — Paynow calculates the
- * real charge and displays it on its own payment page. Publishing a specific
- * figure here as though it were Paynow's would be a fabricated rate.
+ * A made-up payment-provider charge, used ONLY to show the shape of the
+ * buyer's total. BidBlitz does not set, know or quote the provider's rates —
+ * the provider calculates the real charge and displays it on its own payment
+ * page. Publishing a specific figure here as though it were the provider's
+ * would be a fabricated rate.
  */
 const PAYNOW_CHARGE_MINOR = 150n; // illustrative only
 
@@ -99,15 +100,20 @@ function ExampleRow({
 
 export default function HelpFeesPage() {
   // The badge and the note below must track the deployment, not a fixed
-  // claim: with Paynow configured, "No provider connected" would be false.
+  // claim: with a provider configured, "No provider connected" would be false.
+  // When nothing is connected, name the role generically rather than claiming
+  // a provider that does not exist.
   const paymentConfigured = isPaymentProviderConfigured();
+  const providerName = paymentConfigured
+    ? paymentProviderDisplayName()
+    : "the payment provider";
 
   return (
     <div data-testid="help-fees-page" >
       <DocumentPage>
         <PageHeader
           title="Fees"
-          description="What the seller pays BidBlitz, and what the buyer pays Paynow. Two separate amounts."
+          description={`What the seller pays BidBlitz, and what the buyer pays ${providerName}. Two separate amounts.`}
         />
 
         <Explain title="The BidBlitz platform fee">
@@ -128,22 +134,23 @@ export default function HelpFeesPage() {
           action={
             <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <CreditCard className="size-3.5" aria-hidden />
-              Processed by Paynow
+              Processed by {providerName}
             </span>
           }
         >
           <p>
             The buyer is charged the <strong>winning bid</strong> plus the{" "}
-            <strong>applicable Paynow payment charge</strong>. That charge is
-            Paynow&apos;s own cost for the payment method: it is calculated
-            and displayed by Paynow on its own payment page before the buyer
-            authorises anything, and it is <strong>not</strong> money BidBlitz
-            receives.
+            <strong>applicable payment charge</strong>. That charge is the
+            provider&apos;s own cost for the payment method: it is calculated
+            and displayed on the provider&apos;s own payment page before the
+            buyer authorises anything, and it is <strong>not</strong> money
+            BidBlitz receives.
           </p>
           <p>
             The two amounts therefore move in opposite directions: the buyer
-            pays the winning bid <em>plus</em> Paynow&apos;s charge, and the
-            seller receives the winning bid <em>minus</em> BidBlitz&apos;s 5%.
+            pays the winning bid <em>plus</em> the provider&apos;s charge, and
+            the seller receives the winning bid <em>minus</em>{" "}
+            BidBlitz&apos;s 5%.
           </p>
         </Explain>
 
@@ -190,8 +197,8 @@ export default function HelpFeesPage() {
           </p>
 
           <p className="text-sm text-muted-foreground">
-            For the buyer, <em>illustration only</em>: the Paynow charge below
-            is an example amount, not a published Paynow rate. Paynow calculates
+            For the buyer, <em>illustration only</em>: the provider charge below
+            is an example amount, not a published rate. The provider calculates
             the real charge and shows it on its own payment page before the
             buyer authorises anything.
           </p>
@@ -202,8 +209,8 @@ export default function HelpFeesPage() {
               value={<Money minor={GROSS_MINOR} currency="USD" />}
             />
             <ExampleRow
-              label="Paynow payment charge"
-              note="Paynow's own charge for the payment method (example amount)"
+              label="Provider payment charge"
+              note="The provider's own charge for the payment method (example amount)"
               value={
                 <span>
                   +<Money minor={PAYNOW_CHARGE_MINOR} currency="USD" />
@@ -211,7 +218,7 @@ export default function HelpFeesPage() {
               }
             />
             <ExampleRow
-              label="Total authorised with Paynow"
+              label={`Total authorised with ${providerName}`}
               note="The amount the buyer actually pays"
               value={<Money minor={GROSS_MINOR + PAYNOW_CHARGE_MINOR} currency="USD" />}
               emphasis
@@ -224,7 +231,7 @@ export default function HelpFeesPage() {
           action={
             <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <CreditCard className="size-3.5" aria-hidden />
-              {paymentConfigured ? "Paynow connected" : "No provider connected"}
+              {paymentConfigured ? `${providerName} connected` : "No provider connected"}
             </span>
           }
         >
@@ -234,8 +241,8 @@ export default function HelpFeesPage() {
               <strong>Awaiting payment</strong>{" "}
               {paymentConfigured ? (
                 <>
-                  and becomes <strong>Paid</strong> only when Paynow confirms
-                  the payment.
+                  and becomes <strong>Paid</strong> only when {providerName}{" "}
+                  confirms the payment.
                 </>
               ) : (
                 <>and stays in that state until a payment provider is connected.</>
@@ -244,9 +251,9 @@ export default function HelpFeesPage() {
             <p>
               {paymentConfigured ? (
                 <>
-                  <strong>The payment is handled by Paynow.</strong> The
-                  transaction records what is owed until Paynow confirms the
-                  payment; a failed or cancelled payment leaves it{" "}
+                  <strong>The payment is handled by {providerName}.</strong> The
+                  transaction records what is owed until {providerName} confirms
+                  the payment; a failed or cancelled payment leaves it{" "}
                   <strong>Failed</strong>.
                 </>
               ) : (
@@ -263,7 +270,7 @@ export default function HelpFeesPage() {
                 &ldquo;Paid&rdquo; describes the buyer&apos;s payment, not the
                 seller&apos;s money.
               </strong>{" "}
-              It means Paynow has confirmed that the buyer paid the winning
+              It means {providerName} has confirmed that the buyer paid the winning
               bid. It is not a statement that the seller has been paid. Paying
               the seller is a separate step: we pay the proceeds once the sale
               has been fulfilled and the dispute window has passed, and the

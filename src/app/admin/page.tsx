@@ -21,6 +21,7 @@ import {
 } from "@/components/dashboard/review-decisions";
 import { cancellationReasonLabel } from "@/lib/validation";
 import { PayoutControls } from "@/components/dashboard/payout-controls";
+import { LinkwaPayoutControls } from "@/components/dashboard/linkwa-payout-controls";
 import { getAdminPayouts, type AdminPayoutRow } from "@/server/queries";
 import { isPaymentProviderConfigured } from "@/server/payments/config";
 
@@ -179,6 +180,13 @@ function PayoutRow({ row }: { row: AdminPayoutRow }) {
         <PayoutField label="Payout status">
           <SellerPayoutBadge status={row.status} />
         </PayoutField>
+        <PayoutField label="Linkwa recipient">
+          {row.recipientOnFile ? (
+            "On file"
+          ) : (
+            <span className="text-muted-foreground">Not on file</span>
+          )}
+        </PayoutField>
         <PayoutField label="Delivery">{delivery}</PayoutField>
         <PayoutField label="Payout record opened">{formatDate(row.payoutCreatedAt)}</PayoutField>
         <PayoutField label="Payout reference">
@@ -207,6 +215,21 @@ function PayoutRow({ row }: { row: AdminPayoutRow }) {
         amountMinor={row.amountMinor}
         currency={row.currency}
       />
+
+      {/*
+        Money moves only from this button, only by an admin, only after the
+        explicit confirmation step, and only once the row has been walked to
+        PAYOUT_PENDING. Nothing here auto-pays when a sale becomes paid.
+      */}
+      {row.status === "PAYOUT_PENDING" && (
+        <LinkwaPayoutControls
+          payoutId={row.payoutId}
+          amountMinor={row.amountMinor}
+          currency={row.currency}
+          sellerName={row.sellerName}
+          recipientOnFile={row.recipientOnFile}
+        />
+      )}
     </div>
   );
 }
@@ -440,12 +463,13 @@ export default async function AdminPage() {
 
         <div className="space-y-3 rounded-xl border bg-card p-4 text-sm leading-relaxed shadow-sm sm:p-5">
           <p className="text-xs text-muted-foreground">
-            A payout record appears here the moment Paynow confirms a buyer&apos;s
+            A payout record appears here the moment the payment provider confirms a buyer&apos;s
             payment. It freezes the seller&apos;s proceeds and then follows its own
-            workflow. it is <strong className="text-foreground">not</strong> the payment
-            status. Nothing on this page sends money: <em>Record seller payout</em> means
-            the transfer has already been made outside BidBlitz and you are recording its
-            reference.
+            workflow. It is <strong className="text-foreground">not</strong> the payment
+            status. <em>Record seller payout</em> means the transfer was already made
+            outside BidBlitz and you are recording its reference; <em>Pay seller with
+            Linkwa</em> is the explicit in-app payout path, and it only appears once a
+            payout is pending.
           </p>
 
           <div data-testid="admin-payouts">
@@ -470,7 +494,7 @@ export default async function AdminPage() {
                 compact
                 icon={Banknote}
                 title="No payouts yet"
-                description="A row appears once a buyer's payment has been confirmed by Paynow."
+                description="A row appears once a buyer's payment has been confirmed."
               />
             ) : (
               <ul className="space-y-2">

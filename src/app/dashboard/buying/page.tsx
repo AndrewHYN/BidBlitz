@@ -10,7 +10,7 @@ import { Money } from "@/components/auction/money";
 import { TransactionBadge } from "@/components/auction/status-badge";
 import { Button } from "@/components/ui/button";
 import { isClosed } from "@/lib/auction-status";
-import { isPaymentProviderConfigured } from "@/server/payments/config";
+import { isPaymentProviderConfigured, paymentProviderDisplayName } from "@/server/payments/config";
 import type { AuctionCardData } from "@/server/queries";
 
 export const metadata: Metadata = {
@@ -71,6 +71,7 @@ export default async function BuyingPage() {
   const transactions = await getTransactions(user.id);
   const txByAuction = new Map(transactions.map((row) => [row.auction_id, row]));
   const configured = isPaymentProviderConfigured();
+  const providerName = paymentProviderDisplayName();
 
   return (
     <div className="space-y-6">
@@ -147,13 +148,13 @@ export default async function BuyingPage() {
                     {configured && tx.status === "AWAITING_PAYMENT" && (
                       <p className="text-xs text-muted-foreground">
                         Not paid yet. Your total is your winning bid plus
-                        Paynow&apos;s payment charge, which Paynow shows you
-                        before you confirm.
+                        {providerName}&apos;s payment charge, which {providerName}{" "}
+                        shows you before you confirm.
                       </p>
                     )}
                     {configured && tx.status === "PAID" && (
                       <p className="text-xs text-muted-foreground">
-                        Paynow has confirmed your payment. That is separate from
+                        {providerName} has confirmed your payment. That is separate from
                         when the seller is paid.
                       </p>
                     )}

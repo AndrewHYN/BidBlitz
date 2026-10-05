@@ -1131,8 +1131,11 @@ for marketplaces that pay sellers.
   else the honest Noop. A half-set Linkwa fails loud instead of falling
   through silently.
 - Payout helpers (`linkwa-payouts.ts`: link user, register wallet, instruct
-  payout) are implemented and unit-tested but NOT wired to any UI or route:
-  moving seller money waits for the payout milestone's sandbox proof.
+  payout) are implemented and unit-tested. They are wired only to the
+  admin-only payout console (`initiateLinkwaPayoutAction`), never to an
+  automatic trigger: a payout sends only when an authorized admin presses
+  *Pay seller with Linkwa* and confirms, and only for a payout row the
+  operator has already walked to `PAYOUT_PENDING`.
 - The webhook matches events to our rows through the stored intent
   (`external_payment_link_id` -> transaction via a new ledger reverse
   lookup), never through buyer-visible text; checkout resumes a recorded
@@ -1159,6 +1162,17 @@ for marketplaces that pay sellers.
     on payment_events). Recipient identity lives only in Linkwa
     (external_user_id/external_wallet_id); nothing payout-related exposes
     seller phone numbers in product UI or public tables.
+  - 2026-10-05 admin console (sandbox/linkwa-preview): the payout helpers are
+    now reachable only through `src/server/actions/linkwa-payouts.ts`, an
+    admin-gated server action that derives amount, currency and recipient
+    from the frozen `seller_payouts` row plus the server-side
+    `seller_payout_recipients` table (service-role writes, admin-only RLS
+    read, never rendered to a browser). It claims the row with the atomic
+    `PAYOUT_PENDING -> PAYOUT_DUE` transition before instructing, records
+    `PAID_OUT` with Linkwa's `payout_id` as the reference on success, and
+    moves the row to `HELD` with the failure note when Linkwa refuses.
+    Nothing pays out when a transaction becomes PAID — the first release is
+    an explicit, confirmed admin action only.
 - Paynow marketplace-approval answer still outstanding; either outcome is now
   non-blocking (approved => Paynow remains a configured fallback).
 - Fee truth: Linkwa charges the buyer 1% + 2% on top and settles 100% of the

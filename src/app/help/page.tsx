@@ -7,7 +7,7 @@ import {
   DocumentPage,
   DocumentSection,
 } from "@/components/document-page";
-import { isPaymentProviderConfigured } from "@/server/payments/config";
+import { isPaymentProviderConfigured, paymentProviderDisplayName } from "@/server/payments/config";
 
 export const metadata: Metadata = {
   title: "Help",
@@ -108,8 +108,8 @@ export default function HelpPage() {
                 <strong>The transaction starts as “Awaiting payment”.</strong>{" "}
                 {isPaymentProviderConfigured() ? (
                   <>
-                    The buyer completes payment through Paynow, and BidBlitz
-                    marks the sale paid only when Paynow&apos;s own confirmation
+                    The buyer completes payment through {paymentProviderDisplayName()}, and BidBlitz
+                    marks the sale paid only when {paymentProviderDisplayName()}&apos;s own confirmation
                     arrives and passes its signature and amount checks. Being
                     sent back to the site never marks a sale paid on its own. If
                     the payment fails or is cancelled, the transaction becomes
