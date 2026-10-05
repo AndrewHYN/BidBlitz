@@ -1146,6 +1146,19 @@ for marketplaces that pay sellers.
 - Sandbox proof of collect -> webhook -> status -> payout -> statement for a
   controlled sale; Linkwa refund behavior and payout-status visibility are
   undocumented and must be established there, not assumed here.
+  - 2026-10-05 progress (sandbox/linkwa-preview): a controlled $10.00 sale
+    (transaction b44c3c45, link 01m45hzcdmyx32fbemvem4c1t2, receipt ZETE86CA)
+    collected via a verified webhook, and a $9.50 payout (net = gross $10.00
+    minus $0.50 fee) was instructed to a registered SmileCash sandbox wallet:
+    payout_id 01m463ry96b1v2tbk1w42qfhjs, statement debit entry and balance
+    drop $11.00 -> $1.50 confirm it. Linkwa documents NO payout webhook
+    event (payment.completed only), NO payout status endpoint, and NO payout
+    idempotency key — the documented webhook/status/idempotency gaps were
+    confirmed in the sandbox, not assumed. Our idempotency boundary remains
+    the ledger (unique transaction_id on seller_payouts, (provider, event_id)
+    on payment_events). Recipient identity lives only in Linkwa
+    (external_user_id/external_wallet_id); nothing payout-related exposes
+    seller phone numbers in product UI or public tables.
 - Paynow marketplace-approval answer still outstanding; either outcome is now
   non-blocking (approved => Paynow remains a configured fallback).
 - Fee truth: Linkwa charges the buyer 1% + 2% on top and settles 100% of the
