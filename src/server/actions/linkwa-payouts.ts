@@ -25,6 +25,11 @@
  *     read before any claim, and a trail that already records a provider
  *     payout refuses the instruction (fail-closed) - Linkwa documents no
  *     payout status endpoint, so no other duplicate check exists.
+ *   - Delivery is an explicit fulfilment fact (ADR-016). The database refuses
+ *     any move into PAYOUT_DUE while `delivery_confirmed_at` is NULL; this
+ *     action checks the same fact first so the operator gets the real reason
+ *     instead of a generic refusal. Both layers are fail-closed and neither
+ *     can be reached from the browser.
  */
 
 import { revalidatePath } from "next/cache";
@@ -71,7 +76,9 @@ export async function initiateLinkwaPayoutAction(input: unknown): Promise<Initia
   // The frozen ledger row is the ONLY source of amount/currency/recipient.
   const { data: payout } = await supabase
     .from("seller_payouts")
-    .select("id, transaction_id, seller_id, amount_minor, currency, status, payout_reference")
+    .select(
+      "id, transaction_id, seller_id, amount_minor, currency, status, payout_reference, delivery_confirmed_at"
+    )
     .eq("id", parsed.data.payoutId)
     .maybeSingle();
   if (!payout) return { ok: false, message: "That payout no longer exists." };
@@ -117,6 +124,19 @@ export async function initiateLinkwaPayoutAction(input: unknown): Promise<Initia
       message:
         "This payout already has a provider payout recorded in its audit trail. " +
         "Reconcile the ledger instead of sending another payout.",
+    };
+  }
+
+  // Delivery must be an explicit fulfilment fact before money can move. The
+  // database enforces the same rule on the claim below (it raises
+  // `payout_delivery_not_confirmed`), so this check is the honest message and
+  // the claim stays the authority.
+  if (!payout.delivery_confirmed_at) {
+    return {
+      ok: false,
+      message:
+        "Delivery has not been confirmed for this sale, so this payout cannot " +
+        "be sent to Linkwa. Confirm delivery first.",
     };
   }
 
@@ -175,6 +195,16 @@ export async function initiateLinkwaPayoutAction(input: unknown): Promise<Initia
       return {
         ok: false,
         message: "This payout changed state while you were confirming. Reload and try again.",
+      };
+    }
+    if (m.includes("payout_delivery_not_confirmed")) {
+      // The database refused the claim: no delivery fact, so no provider call
+      // was ever made.
+      return {
+        ok: false,
+        message:
+          "Delivery has not been confirmed for this sale, so this payout was " +
+          "not sent. Confirm delivery first.",
       };
     }
     return { ok: false, message: "That payout update was refused. Reload and try again." };

@@ -1214,11 +1214,45 @@ for marketplaces that pay sellers.
     `delivery_confirmed_at IS NULL`, its four audit events unchanged and still
     holding no `DELIVERY_CONFIRMED`, and a rejected `amount_minor` write comes
     back `payout_money_immutable`, which proves the protect trigger is live
-    again. Residual (backlog, not a blocker): `PAYOUT_PENDING`/`PAYOUT_DUE`
-    still stamp the fact — the console never offers
-    `WAITING_FOR_FULFILMENT -> PAYOUT_PENDING`, so it normally follows "Mark
-    delivery confirmed", but the `HELD -> PAYOUT_DUE` shortcut can still stamp
-    delivery without an explicit confirmation.
+    again. Residual noted at the time (`PAYOUT_PENDING`/`PAYOUT_DUE` still
+    stamping the fact, and `HELD -> PAYOUT_DUE` reaching it without an explicit
+    confirmation) is closed by the invariant below.
+  - 2026-10-05 delivery invariant (migration
+    `20261005215001_payout_delivery_explicit_only.sql`) — **the state machine,
+    stated precisely and enforced in the database, not in the console**:
+
+    `delivery_confirmed_at` is created by exactly one event — an explicit
+    transition into `DELIVERY_CONFIRMED` — and is immutable otherwise. The only
+    other permitted change is clearing it when fulfilment restarts
+    (`-> WAITING_FOR_FULFILMENT`); any other write to that column, from any
+    role, raises `payout_delivery_immutable`.
+
+    The transition map is
+    `WAITING_FOR_FULFILMENT -> DELIVERY_CONFIRMED -> PAYOUT_PENDING ->
+    PAYOUT_DUE -> PAID_OUT`, with `HELD` and `DISPUTED` as side states that
+    re-enter the chain. `WAITING_FOR_FULFILMENT -> PAYOUT_PENDING` was removed
+    from the map, so a payout state is unreachable before delivery is confirmed
+    (`payout_invalid_transition`). `PAID_OUT` has no outgoing branch and stays
+    frozen.
+
+    Every move into `PAYOUT_DUE` requires an existing delivery fact, so the
+    `HELD -> PAYOUT_DUE` retry (a hold left by a provider failure after a
+    legitimate delivery) stays legal when delivery was confirmed and raises
+    `payout_delivery_not_confirmed` when it was not. `PAYOUT_PENDING`,
+    `PAYOUT_DUE` and `PAID_OUT` are absent from the stamp condition: money
+    moving never counts as the seller handing the item over.
+
+    Nothing is backfilled. The historical reconciled row `d6754669…` keeps
+    `PAID_OUT` with `delivery_confirmed_at IS NULL` and stays terminal — the
+    migration contains no DML at all, and `initiateLinkwaPayoutAction` refuses
+    the same fact before claiming (`delivery_confirmed_at` is read server-side;
+    the browser cannot supply it). Migration history stays dual-ledger clean.
+
+    Not yet verified live: this environment has no `SUPABASE_ACCESS_TOKEN` /
+    `SUPABASE_DB_URL`, so the migration is **pending application**. Verify with
+    the queries in the migration header once SQL access exists; the contract
+    test `src/server/payout-delivery-invariant.test.ts` pins the invariants on
+    every push.
 - Paynow marketplace-approval answer still outstanding; either outcome is now
   non-blocking (approved => Paynow remains a configured fallback).
 - Fee truth: Linkwa charges the buyer 1% + 2% on top and settles 100% of the

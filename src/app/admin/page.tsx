@@ -214,6 +214,7 @@ function PayoutRow({ row }: { row: AdminPayoutRow }) {
         status={row.status}
         amountMinor={row.amountMinor}
         currency={row.currency}
+        deliveryConfirmedAt={row.deliveryConfirmedAt}
       />
 
       {/*

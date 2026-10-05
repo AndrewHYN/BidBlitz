@@ -42,6 +42,8 @@ type PayoutRow = {
   currency: string;
   status: string;
   payout_reference: string | null;
+  /** Explicit fulfilment fact; the DB refuses PAYOUT_DUE while this is NULL. */
+  delivery_confirmed_at: string | null;
 };
 
 let sessionUserId: string | null = "admin-user";
@@ -66,6 +68,7 @@ function defaultPayout(): PayoutRow {
     currency: "USD",
     status: "PAYOUT_PENDING",
     payout_reference: null,
+    delivery_confirmed_at: "2026-10-05T12:00:00.000Z",
   };
 }
 
@@ -314,6 +317,25 @@ describe("initiateLinkwaPayoutAction - exactly one instruction", () => {
     rpcResults = [{ data: null, error: { message: "payout_invalid_transition" } }];
     const result = await initiateLinkwaPayoutAction({ payoutId: PAYOUT_ID });
     expect(result.ok).toBe(false);
+    expect(instructLinkwaPayout).not.toHaveBeenCalled();
+  });
+
+  it("j) cannot bypass delivery: refuses before any claim when delivery is NULL", async () => {
+    payoutRow = { ...defaultPayout(), delivery_confirmed_at: null };
+    const result = await initiateLinkwaPayoutAction({ payoutId: PAYOUT_ID });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.message).toContain("Delivery has not been confirmed");
+    expect(rpcCalls).toHaveLength(0);
+    expect(instructLinkwaPayout).not.toHaveBeenCalled();
+  });
+
+  it("j) surfaces the database's delivery refusal and never calls the provider", async () => {
+    rpcResults = [{ data: null, error: { message: "payout_delivery_not_confirmed" } }];
+    const result = await initiateLinkwaPayoutAction({ payoutId: PAYOUT_ID });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.message).toContain("Delivery has not been confirmed");
+    expect(rpcCalls).toHaveLength(1);
+    expect(rpcCalls[0].args.p_to_status).toBe("PAYOUT_DUE");
     expect(instructLinkwaPayout).not.toHaveBeenCalled();
   });
 });

@@ -586,6 +586,12 @@ function payoutErrorMessage(raw: string): string {
   if (m.includes("payout_invalid_transition")) {
     return "That step isn't available from the payout's current status.";
   }
+  if (m.includes("payout_delivery_not_confirmed")) {
+    return "Confirm delivery first. A payout can't be marked due before the sale is confirmed delivered.";
+  }
+  if (m.includes("payout_delivery_immutable")) {
+    return "Delivery is recorded by confirming delivery (or restarting fulfilment), not by editing this field.";
+  }
   if (m.includes("payout_paid_out_immutable")) {
     return "This payout is already recorded as paid out and can't be changed.";
   }
