@@ -21,6 +21,10 @@
  *   - A provider failure never marks the payout successful: the row moves to
  *     HELD with the failure recorded, and a retry requires an explicit
  *     HELD -> PAYOUT_PENDING release.
+ *   - Provider/ledger mismatch: the append-only seller_payout_events trail is
+ *     read before any claim, and a trail that already records a provider
+ *     payout refuses the instruction (fail-closed) - Linkwa documents no
+ *     payout status endpoint, so no other duplicate check exists.
  */
 
 import { revalidatePath } from "next/cache";
@@ -84,6 +88,38 @@ export async function initiateLinkwaPayoutAction(input: unknown): Promise<Initia
   if (payout.payout_reference) {
     return { ok: false, message: "A payout reference is already recorded for this payout." };
   }
+
+  // Provider/ledger mismatch guard. `seller_payout_events` is append-only, so
+  // if it already records a provider payout for this row then the money has
+  // left the platform even when the status column still lags behind it (the
+  // exact mismatch found on 2026-10-05: an executed Linkwa payout with a row
+  // left in WAITING_FOR_FULFILMENT). Linkwa documents no payout status
+  // endpoint and no payout webhook, so this audit trail plus the frozen
+  // `payout_reference` is the ONLY duplicate protection that exists - it is
+  // read here, fail-closed, before any claim or provider call.
+  const { data: priorPayoutEvents, error: payoutEventsError } = await supabase
+    .from("seller_payout_events")
+    .select("to_status, payout_reference")
+    .eq("payout_id", payout.id);
+  if (payoutEventsError) {
+    return {
+      ok: false,
+      message:
+        "Could not verify this payout's audit trail, so no payout was sent. Try again.",
+    };
+  }
+  const alreadyInstructed = (priorPayoutEvents ?? []).some(
+    (event) => event.to_status === "PAID_OUT" || Boolean(event.payout_reference?.trim())
+  );
+  if (alreadyInstructed) {
+    return {
+      ok: false,
+      message:
+        "This payout already has a provider payout recorded in its audit trail. " +
+        "Reconcile the ledger instead of sending another payout.",
+    };
+  }
+
   if (payout.currency !== "USD") {
     return { ok: false, message: "Only USD payouts can be sent through Linkwa." };
   }

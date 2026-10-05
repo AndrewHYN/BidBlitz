@@ -10,6 +10,8 @@ import { initiateLinkwaPayoutAction } from "./linkwa-payouts";
  * These tests pin the controls that matter when money moves:
  *   - authorization (no session, non-admin);
  *   - exactly one instruction per payout (duplicate refusal + atomic claim);
+ *   - a provider payout already recorded in the audit trail is never sent
+ *     again (the 2026-10-05 provider/ledger mismatch class);
  *   - the amount comes from the frozen ledger, never from the browser;
  *   - the recipient comes from the server-side recipient table, never the body;
  *   - a wrong/foreign transaction is refused before any network call;
@@ -47,6 +49,9 @@ let isAdmin = true;
 let payoutRow: PayoutRow | null;
 let txRow: { id: string; status: string } | null;
 let recipientRow: { provider: string; external_user_id: string; external_wallet_id: string } | null;
+/** Append-only seller_payout_events rows for the payout under test. */
+let auditEvents: Array<{ to_status: string | null; payout_reference: string | null }>;
+let auditEventsError: { message: string } | null;
 /** RPC answers, keyed by target status in call order. */
 let rpcResults: Array<{ data: unknown; error: { message: string } | null }>;
 const rpcCalls: Array<{ fn: string; args: Record<string, unknown> }> = [];
@@ -64,19 +69,43 @@ function defaultPayout(): PayoutRow {
   };
 }
 
+type MockQueryResult = { data: unknown; error: { message: string } | null };
+type MockBuilder = {
+  in: () => MockBuilder;
+  eq: () => MockBuilder;
+  maybeSingle: () => Promise<MockQueryResult>;
+  then: (
+    onfulfilled: ((value: MockQueryResult) => unknown) | null,
+    onrejected: ((reason: unknown) => unknown) | null
+  ) => Promise<unknown>;
+};
+
 function chainFor(table: string) {
-  const maybe = async () => {
-    if (table === "profiles") return { data: { is_admin: isAdmin }, error: null };
-    if (table === "seller_payouts") return { data: payoutRow, error: null };
-    if (table === "transactions") return { data: txRow, error: null };
-    if (table === "seller_payout_recipients") return { data: recipientRow, error: null };
-    return { data: null, error: null };
+  const rows = (): unknown[] => {
+    if (table === "profiles") return [{ is_admin: isAdmin }];
+    if (table === "seller_payouts") return payoutRow ? [payoutRow] : [];
+    if (table === "transactions") return txRow ? [txRow] : [];
+    if (table === "seller_payout_recipients") return recipientRow ? [recipientRow] : [];
+    if (table === "seller_payout_events") return auditEvents;
+    return [];
   };
-  return {
-    select: vi.fn(() => ({
-      eq: vi.fn(() => ({ maybeSingle: vi.fn(maybe) })),
-    })),
-  };
+  const error = (): { message: string } | null =>
+    table === "seller_payout_events" ? auditEventsError : null;
+
+  // A PostgREST builder is thenable and also exposes maybeSingle(), so the
+  // same object serves `.eq(...).maybeSingle()` and an awaited list read.
+  const build = (): MockBuilder => ({
+    in: () => build(),
+    eq: () => build(),
+    maybeSingle: async () => ({ data: rows()[0] ?? null, error: error() }),
+    then: (onfulfilled, onrejected) =>
+      Promise.resolve<MockQueryResult>({ data: rows(), error: error() }).then(
+        onfulfilled,
+        onrejected
+      ),
+  });
+
+  return { select: vi.fn(() => build()) };
 }
 
 function mockClient() {
@@ -102,6 +131,8 @@ beforeEach(() => {
     external_user_id: "01krecipientuser",
     external_wallet_id: "01krecipientwallet",
   };
+  auditEvents = [];
+  auditEventsError = null;
   rpcResults = [];
   rpcCalls.length = 0;
   mockClient();
@@ -318,5 +349,85 @@ describe("initiateLinkwaPayoutAction - provider failure", () => {
     }
     // The second RPC was the record attempt; no third retry was attempted.
     expect(rpcCalls).toHaveLength(2);
+  });
+});
+
+/**
+ * Regression: the 2026-10-05 provider/ledger mismatch.
+ *
+ * Linkwa executed payout 01m463ry96b1v2tbk1w42qfhjs for the $9.50 net of
+ * transaction b44c3c45-8186-4eb1-98c8-db4b9a6d7c58 while its seller_payout
+ * row sat in WAITING_FOR_FULFILMENT, so provider and ledger disagreed. Linkwa
+ * documents NO payout status endpoint and NO payout webhook, so nothing
+ * outside our own ledger can ever tell us that a payout already went out.
+ * These tests pin every way the console must refuse to send that money twice.
+ *
+ * The row has since been reconciled to PAID_OUT with that reference (ADR-016),
+ * which makes it a historical sandbox fixture: it may be read as history, and
+ * it can never become actionable again.
+ */
+describe("initiateLinkwaPayoutAction - provider/ledger mismatch (regression)", () => {
+  const RECONCILED_REF = "01m463ry96b1v2tbk1w42qfhjs";
+
+  it("refuses the pre-reconciliation ledger state (WAITING_FOR_FULFILMENT)", async () => {
+    payoutRow = { ...defaultPayout(), status: "WAITING_FOR_FULFILMENT" };
+
+    const result = await initiateLinkwaPayoutAction({ payoutId: PAYOUT_ID });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.message).toContain("Payout pending");
+    expect(instructLinkwaPayout).not.toHaveBeenCalled();
+    expect(rpcCalls).toHaveLength(0);
+  });
+
+  it("never re-instructs the reconciled row (PAID_OUT carrying the provider reference)", async () => {
+    payoutRow = {
+      ...defaultPayout(),
+      status: "PAID_OUT",
+      payout_reference: RECONCILED_REF,
+    };
+
+    const result = await initiateLinkwaPayoutAction({ payoutId: PAYOUT_ID });
+
+    expect(result).toEqual({
+      ok: false,
+      message: "This payout is already recorded as paid out.",
+    });
+    expect(instructLinkwaPayout).not.toHaveBeenCalled();
+    expect(rpcCalls).toHaveLength(0);
+  });
+
+  it("refuses a payout whose append-only audit trail already records a provider payout", async () => {
+    // Defence in depth: the status column still says PAYOUT_PENDING and the
+    // reference column is still empty, but the audit trail - which nobody can
+    // edit - proves the money already left.
+    auditEvents = [{ to_status: "PAID_OUT", payout_reference: RECONCILED_REF }];
+
+    const result = await initiateLinkwaPayoutAction({ payoutId: PAYOUT_ID });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.message).toContain("audit trail");
+    expect(instructLinkwaPayout).not.toHaveBeenCalled();
+    expect(rpcCalls).toHaveLength(0);
+  });
+
+  it("fails closed when the audit trail cannot be read", async () => {
+    auditEventsError = { message: "connection lost" };
+
+    const result = await initiateLinkwaPayoutAction({ payoutId: PAYOUT_ID });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.message).toContain("no payout was sent");
+    expect(instructLinkwaPayout).not.toHaveBeenCalled();
+    expect(rpcCalls).toHaveLength(0);
+  });
+
+  it("still pays a clean payout: an audit trail with only creation events passes", async () => {
+    auditEvents = [{ to_status: "WAITING_FOR_FULFILMENT", payout_reference: null }];
+
+    const result = await initiateLinkwaPayoutAction({ payoutId: PAYOUT_ID });
+
+    expect(result).toEqual({ ok: true, payoutReference: RECONCILED_REF });
+    expect(rpcCalls.map((c) => c.args.p_to_status)).toEqual(["PAYOUT_DUE", "PAID_OUT"]);
   });
 });

@@ -31,6 +31,24 @@ npm run db:migrate
 (`POST /v1/projects/{ref}/database/query`) and records the filename in a
 `public.schema_migrations` table so re-runs are idempotent.
 
+## Two migration ledgers
+
+Applying SQL through the Supabase dashboard or the Supabase CLI writes to
+**`supabase_migrations.schema_migrations`**, which is keyed by
+`version` + `name` (for example `20261005175832` /
+`seller_payout_recipients_20261005`) and is *not* readable through PostgREST.
+`npm run db:migrate` writes to **`public.schema_migrations`**, keyed by
+filename. A file applied through the dashboard/CLI therefore lands in the live
+database while the repo ledger still lists it as pending, and the two histories
+disagree about the name of the same change.
+
+Reconcile by **renaming the repo file to `<version>_<name>.sql`** —
+`20261005000001_seller_payout_recipients.sql` became
+`20261005175832_seller_payout_recipients_20261005.sql` — then verifying the
+live schema and recording that filename in `public.schema_migrations`. Never
+add a second file for a change that is already applied, and never delete a
+migration to make the histories match.
+
 ## Key invariants enforced by the database
 
 - Money is `bigint` minor units + `text currency`. No floats anywhere.

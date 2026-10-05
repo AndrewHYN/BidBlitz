@@ -1173,6 +1173,30 @@ for marketplaces that pay sellers.
     moves the row to `HELD` with the failure note when Linkwa refuses.
     Nothing pays out when a transaction becomes PAID — the first release is
     an explicit, confirmed admin action only.
+  - 2026-10-05 reconciliation (sandbox/linkwa-preview): the ledger disagreed
+    with the provider. The $9.50 payout above had been executed by Linkwa, yet
+    the `seller_payouts` row for transaction b44c3c45 still said
+    WAITING_FOR_FULFILMENT with no reference, so the console could have offered
+    the same money a second time. Reconciled through the database's own state
+    machine and audit trigger, without inventing fulfilment: WAITING_FOR_FULFILMENT
+    -> PAYOUT_PENDING -> PAYOUT_DUE -> PAID_OUT (DELIVERY_CONFIRMED deliberately
+    skipped — delivery was never confirmed), payout_reference set to Linkwa's
+    01m463ry96b1v2tbk1w42qfhjs, paid_at = recording time, three append-only
+    seller_payout_events rows documenting the walk with actor_id null (no
+    interactive admin session exists in this environment;
+    `admin_transition_seller_payout()` refuses any caller without auth.uid()).
+    No new payout was sent. The row is now terminal PAID_OUT: a historical
+    sandbox fixture that renders only as history, must stay out of any admin
+    E2E queue expectations, and can never become actionable — the console
+    additionally refuses any payout whose audit trail already records a
+    provider payout.
+  - 2026-10-05 migration history: the recipients table had been applied under
+    Supabase's version/name (`20261005175832` /
+    `seller_payout_recipients_20261005`) while the repo file was
+    `20261005000001_seller_payout_recipients.sql`. The file was renamed to the
+    applied version (identical content, no second migration) and recorded in
+    `public.schema_migrations`; the live table and its anon revokes were
+    verified before recording.
 - Paynow marketplace-approval answer still outstanding; either outcome is now
   non-blocking (approved => Paynow remains a configured fallback).
 - Fee truth: Linkwa charges the buyer 1% + 2% on top and settles 100% of the
