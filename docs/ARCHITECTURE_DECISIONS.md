@@ -1197,32 +1197,28 @@ for marketplaces that pay sellers.
     applied version (identical content, no second migration) and recorded in
     `public.schema_migrations`; the live table and its anon revokes were
     verified before recording.
-  - 2026-10-05 delivery-stamp defect (**owner-gated, NOT applied — this
-    environment has no SQL access**): the state machine cannot reach PAID_OUT
-    from WAITING_FOR_FULFILMENT without also claiming delivery.
-    `private.seller_payouts_protect_state()` (migration
-    `20260928000002_seller_payout_delivery.sql`, "first move into a state past
-    delivery -> stamped") stamps `delivery_confirmed_at` on the first move into
-    `DELIVERY_CONFIRMED`, `PAYOUT_PENDING`, `PAYOUT_DUE` or `PAID_OUT`, and the
-    transition map offers no route to PAID_OUT that avoids them. The
-    reconciliation above therefore left the fixture row with a delivery
-    timestamp nobody confirmed — its audit trail holds no `DELIVERY_CONFIRMED`
-    event, and its `internal_note` now says so in words — and once `PAID_OUT`
-    the same trigger freezes that column for every role, so it cannot be
-    cleared with the access available here. Exact change required, in a
-    dedicated migration applied and verified by an operator with SQL access:
-    1. stamp `delivery_confirmed_at` **only** on an explicit transition *into*
-       `DELIVERY_CONFIRMED`; a payout-state jump must never imply delivery;
-    2. allow a `PAID_OUT` row's stamp to move to `NULL` **only** when
-       `seller_payout_events` holds no `DELIVERY_CONFIRMED` row for that
-       payout, then run:
-       ```sql
-       update public.seller_payouts
-          set delivery_confirmed_at = null
-        where id = 'd6754669-f703-494b-bd64-454e57761f23'
-          and delivery_confirmed_at is not null;
-       ```
-       The four audit events are never rewritten.
+  - 2026-10-05 delivery-stamp defect — **RESOLVED** by
+    `20261005210001_fix_payout_delivery_reconciliation.sql` (applied
+    2026-10-05T18:48:20Z, recorded in `public.schema_migrations`). The previous
+    trigger (`20260928000002`) stamped `delivery_confirmed_at` on the first
+    move into `DELIVERY_CONFIRMED`, `PAYOUT_PENDING`, `PAYOUT_DUE` **or
+    `PAID_OUT`**, so reaching `PAID_OUT` from `WAITING_FOR_FULFILMENT`
+    necessarily claimed a delivery nobody confirmed — exactly what the sandbox
+    reconciliation above hit. The fix drops `PAID_OUT` from that list (payout
+    movement is not delivery proof) and documents it in the function comment,
+    then clears the one fixture row in the same `begin`/`commit`, by disabling
+    only `seller_payouts_protect_state` for that single guarded UPDATE and
+    re-enabling it before commit — a scoped repair instead of the general
+    clearing rule originally proposed here. Live verification: row
+    `d6754669…` is `PAID_OUT` with reference `01m463ry96b1v2tbk1w42qfhjs`,
+    `delivery_confirmed_at IS NULL`, its four audit events unchanged and still
+    holding no `DELIVERY_CONFIRMED`, and a rejected `amount_minor` write comes
+    back `payout_money_immutable`, which proves the protect trigger is live
+    again. Residual (backlog, not a blocker): `PAYOUT_PENDING`/`PAYOUT_DUE`
+    still stamp the fact — the console never offers
+    `WAITING_FOR_FULFILMENT -> PAYOUT_PENDING`, so it normally follows "Mark
+    delivery confirmed", but the `HELD -> PAYOUT_DUE` shortcut can still stamp
+    delivery without an explicit confirmation.
 - Paynow marketplace-approval answer still outstanding; either outcome is now
   non-blocking (approved => Paynow remains a configured fallback).
 - Fee truth: Linkwa charges the buyer 1% + 2% on top and settles 100% of the
