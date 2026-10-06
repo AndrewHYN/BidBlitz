@@ -25,6 +25,71 @@ alter table public.auctions
   add constraint auctions_fulfilment_notes_check
   check (fulfilment_notes is null or char_length(fulfilment_notes) <= 500);
 
+
+create or replace function public.set_auction_fulfilment(
+  p_auction_id uuid,
+  p_method text,
+  p_notes text default null
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $
+declare
+  v_uid uuid := auth.uid();
+begin
+  if v_uid is null then
+    raise exception 'not_authenticated' using errcode = '42501';
+  end if;
+
+  if p_method not in ('COLLECTION','DELIVERY','BOTH') then
+    raise exception 'invalid_input' using errcode = '22023';
+  end if;
+
+  if p_notes is not null and char_length(p_notes) > 500 then
+    raise exception 'invalid_input' using errcode = '22023';
+  end if;
+
+  update public.auctions
+     set fulfilment_method = p_method,
+         fulfilment_notes = nullif(trim(coalesce(p_notes, '')), ''),
+         updated_at = clock_timestamp()
+   where id = p_auction_id
+     and seller_id = v_uid
+     and status = 'DRAFT';
+
+  if not found then
+    raise exception 'invalid_state' using errcode = 'P0001';
+  end if;
+
+  return jsonb_build_object('ok', true);
+end;
+$;
+
+revoke all on function public.set_auction_fulfilment(uuid, text, text) from public, anon;
+grant execute on function public.set_auction_fulfilment(uuid, text, text) to authenticated, service_role;
+
+create or replace function public.auctions_require_fulfilment_before_publish()
+returns trigger
+language plpgsql
+set search_path = ''
+as $
+begin
+  if new.status in ('LIVE','SCHEDULED','PENDING_REVIEW')
+     and old.status is distinct from new.status
+     and new.fulfilment_method is null then
+    raise exception 'fulfilment_required' using errcode = 'P0001';
+  end if;
+  return new;
+end;
+$;
+
+drop trigger if exists auctions_require_fulfilment_before_publish on public.auctions;
+create trigger auctions_require_fulfilment_before_publish
+before update on public.auctions
+for each row execute function public.auctions_require_fulfilment_before_publish();
+
 create or replace function public.cancel_auction(
   p_auction_id  uuid,
   p_reason_code text default null,
