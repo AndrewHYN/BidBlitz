@@ -76,8 +76,8 @@ language plpgsql
 set search_path = ''
 as $
 begin
-  if new.status in ('LIVE','SCHEDULED','PENDING_REVIEW')
-     and old.status is distinct from new.status
+  if old.status = 'DRAFT'
+     and new.status in ('LIVE','SCHEDULED','PENDING_REVIEW')
      and new.fulfilment_method is null then
     raise exception 'fulfilment_required' using errcode = 'P0001';
   end if;
