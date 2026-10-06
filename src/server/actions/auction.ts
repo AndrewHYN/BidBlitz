@@ -105,6 +105,8 @@ export async function createAuctionAction(input: unknown): Promise<
       category_id: d.categoryId,
       condition: d.condition,
       location: d.location,
+      fulfilment_method: d.fulfilmentMethod,
+      fulfilment_notes: d.fulfilmentNotes || null,
       currency: d.currency,
       starting_bid_minor: Number(d.startingBidMinor),
       bid_increment_minor: Number(d.bidIncrementMinor),
@@ -197,7 +199,7 @@ export async function duplicateAuctionAction(input: {
   const { data: source, error: readError } = await supabase
     .from("auctions")
     .select(
-      `title, description, category_id, condition, location, currency,
+      `title, description, category_id, condition, location, fulfilment_method, fulfilment_notes, currency,
        starting_bid_minor, bid_increment_minor, duration_seconds,
        anti_snipe_window_seconds, anti_snipe_extension_seconds, status`
     )
@@ -227,6 +229,8 @@ export async function duplicateAuctionAction(input: {
     categoryId: source.category_id,
     condition: source.condition,
     location: source.location,
+    fulfilmentMethod: source.fulfilment_method,
+    fulfilmentNotes: source.fulfilment_notes ?? "",
     startingBidMinor: String(source.starting_bid_minor),
     bidIncrementMinor: String(source.bid_increment_minor),
     durationSeconds: source.duration_seconds,
@@ -260,6 +264,8 @@ export async function duplicateAuctionAction(input: {
       category_id: d.categoryId,
       condition: d.condition,
       location: d.location,
+      fulfilment_method: d.fulfilmentMethod,
+      fulfilment_notes: d.fulfilmentNotes || null,
       currency: d.currency,
       starting_bid_minor: Number(d.startingBidMinor),
       bid_increment_minor: Number(d.bidIncrementMinor),
