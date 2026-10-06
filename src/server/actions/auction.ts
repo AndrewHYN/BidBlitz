@@ -14,6 +14,7 @@ import { createServerRealtime } from "@/lib/realtime/supabase";
 import {
   CANCELLATION_REASONS,
   createAuctionSchema,
+  fulfilmentMethodSchema,
   publishAuctionSchema,
 } from "@/lib/validation";
 import { normalizeEngineError, type BidRejection } from "@/server/errors";
@@ -354,6 +355,48 @@ export async function attachImagesAction(input: {
   // so any attempt would raise auction_state_immutable and be swallowed.
   revalidatePath(`/sell/${input.auctionId}`);
   return { ok: true, count: count ?? rows.length };
+}
+
+export async function updateAuctionFulfilmentAction(input: {
+  auctionId: string;
+  fulfilmentMethod: string;
+  fulfilmentNotes?: string;
+}): Promise<ActionResult> {
+  const method = fulfilmentMethodSchema.safeParse(input.fulfilmentMethod);
+  const notes = input.fulfilmentNotes?.trim() ?? "";
+  if (!method.success || notes.length > 500) {
+    return {
+      ok: false,
+      rejection: {
+        code: "invalid_input",
+        message: "Choose a fulfilment option and keep the notes under 500 characters.",
+      },
+    };
+  }
+
+  const { supabase, user } = await requireUser();
+  if (!user) {
+    return {
+      ok: false,
+      rejection: { code: "not_authenticated", message: "Sign in." },
+    };
+  }
+
+  const { error } = await supabase.rpc("set_auction_fulfilment", {
+    p_auction_id: input.auctionId,
+    p_method: method.data,
+    p_notes: notes || null,
+  });
+  if (error) {
+    return {
+      ok: false,
+      rejection: normalizeEngineError({ message: error.message, hint: error.hint }),
+    };
+  }
+
+  revalidatePath(`/sell/${input.auctionId}`);
+  revalidatePath(`/auction/${input.auctionId}`);
+  return { ok: true };
 }
 
 export async function publishAuctionAction(input: unknown): Promise<
