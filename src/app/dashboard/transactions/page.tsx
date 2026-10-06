@@ -212,7 +212,6 @@ export default async function TransactionsPage() {
                       </span>
                     )}
                   </TableCell>
-                  <TableCell className="text-muted-foreground">{formatDate(row.created_at)}</TableCell>
                   <TableCell>
                     <Link
                       href={`/dashboard/transactions/${row.id}`}
@@ -230,6 +229,7 @@ export default async function TransactionsPage() {
                       )}
                     </Link>
                   </TableCell>
+                  <TableCell className="text-muted-foreground">{formatDate(row.created_at)}</TableCell>
                   <TableCell>
                     {row.reviewed ? (
                       <span
