@@ -35,7 +35,7 @@ returns jsonb
 language plpgsql
 security definer
 set search_path = ''
-as $
+as $fulfilment$
 declare
   v_uid uuid := auth.uid();
 begin
@@ -65,7 +65,7 @@ begin
 
   return jsonb_build_object('ok', true);
 end;
-$;
+$fulfilment$;
 
 revoke all on function public.set_auction_fulfilment(uuid, text, text) from public, anon;
 grant execute on function public.set_auction_fulfilment(uuid, text, text) to authenticated, service_role;
@@ -74,7 +74,7 @@ create or replace function public.auctions_require_fulfilment_before_publish()
 returns trigger
 language plpgsql
 set search_path = ''
-as $
+as $gate$
 begin
   if old.status = 'DRAFT'
      and new.status in ('LIVE','SCHEDULED','PENDING_REVIEW')
@@ -83,7 +83,7 @@ begin
   end if;
   return new;
 end;
-$;
+$gate$;
 
 drop trigger if exists auctions_require_fulfilment_before_publish on public.auctions;
 create trigger auctions_require_fulfilment_before_publish
