@@ -82,6 +82,8 @@ export interface Database {
           category_id: number | null;
           condition: Condition;
           location: string;
+          fulfilment_method: "COLLECTION" | "DELIVERY" | "BOTH" | null;
+          fulfilment_notes: string | null;
           currency: string;
           starting_bid_minor: number;
           bid_increment_minor: number;
@@ -111,6 +113,8 @@ export interface Database {
           category_id?: number | null;
           condition: Condition;
           location: string;
+          fulfilment_method?: "COLLECTION" | "DELIVERY" | "BOTH" | null;
+          fulfilment_notes?: string | null;
           currency?: string;
           starting_bid_minor: number;
           bid_increment_minor: number;
