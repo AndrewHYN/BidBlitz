@@ -9,7 +9,16 @@ import { HomeHero } from "@/components/home/home-hero";
 import { CategoryChips } from "@/components/home/category-chips";
 import { AuctionRail } from "@/components/home/auction-rail";
 
+/**
+ * The homepage carries the site's search positioning explicitly: the title is
+ * absolute so the "%s · BidBlitz" template cannot append the brand twice, and
+ * the description says what a searcher typed (online auctions, Zimbabwe)
+ * without the visible hero having to read like a keyword list.
+ */
 export const metadata: Metadata = {
+  title: { absolute: "Online Auctions in Zimbabwe | BidBlitz" },
+  description:
+    "Buy and sell through live online auctions in Zimbabwe on BidBlitz. List an item, bid in real time, and win when the clock runs out. One clear 5% seller fee on auctions that sell.",
   alternates: { canonical: "/" },
 };
 

@@ -31,7 +31,7 @@ const siteUrl = SITE_URL;
 const baseMetadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: "BidBlitz: live auctions, honest settlement",
+    default: "Online Auctions in Zimbabwe | BidBlitz",
     template: "%s · BidBlitz",
   },
   description:
@@ -39,16 +39,16 @@ const baseMetadata: Metadata = {
   openGraph: {
     type: "website",
     siteName: "BidBlitz",
-    title: "BidBlitz: live auctions, honest settlement",
+    title: "Online Auctions in Zimbabwe | BidBlitz",
     description:
-      "Live auctions with real closing times: list an item, bid against other buyers in real time, and win when the clock runs out.",
+      "Live online auctions in Zimbabwe with real closing times: list an item, bid against other buyers in real time, and win when the clock runs out.",
     url: siteUrl,
     images: [{ url: `${siteUrl}/brand/bidblitz-logo-512.png`, width: 512, height: 512, alt: "BidBlitz" }],
   },
   twitter: {
     card: "summary_large_image",
-    title: "BidBlitz",
-    description: "Live competitive auctions on BidBlitz.",
+    title: "Online Auctions in Zimbabwe | BidBlitz",
+    description: "Live competitive online auctions in Zimbabwe: bid in real time and win when the clock runs out.",
     images: [`${siteUrl}/brand/bidblitz-logo-512.png`],
   },
 };

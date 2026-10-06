@@ -1,7 +1,13 @@
 import { redirect } from "next/navigation";
+import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/auction/page-header";
 import { AcceptInviteForm } from "@/components/dashboard/accept-invite-form";
+
+export const metadata: Metadata = {
+  title: "Team invitation",
+  robots: { index: false, follow: false },
+};
 
 /**
  * Team invitation landing. The token proves nothing by itself: acceptance

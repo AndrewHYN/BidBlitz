@@ -7,6 +7,7 @@ import { LoginForm } from "@/components/auth/login-form";
 export const metadata: Metadata = {
   title: "Sign in",
   description: "Sign in to BidBlitz to bid, sell and track your auctions.",
+  robots: { index: false, follow: false },
 };
 
 /** Open-redirect guard lives in `@/lib/safe-next` (shared with /auth/callback

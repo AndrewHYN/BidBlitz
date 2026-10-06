@@ -64,7 +64,7 @@ export function HomeHero() {
         >
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-primary">
             <span className="h-px w-6 bg-primary" aria-hidden />
-            Live competitive auctions
+            Live online auctions in Zimbabwe
           </div>
 
           <h1 className="mt-4 max-w-3xl text-4xl font-semibold leading-[1.05] tracking-[-0.03em] text-balance sm:text-6xl">
@@ -74,8 +74,8 @@ export function HomeHero() {
           </h1>
 
           <p className="mt-5 max-w-2xl text-base leading-7 text-muted-foreground sm:text-lg">
-            List an item, set the closing time and let buyers compete. The
-            highest valid bid when the clock runs out wins.
+            List an item, set the closing time and let buyers across Zimbabwe
+            compete. The highest valid bid when the clock runs out wins.
           </p>
 
           <form
