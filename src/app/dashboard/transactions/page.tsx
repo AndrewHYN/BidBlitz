@@ -270,8 +270,8 @@ export default async function TransactionsPage() {
           buyer&apos;s payment, as {providerName} reports it. <strong className="text-foreground">Payout status</strong>{" "}
           is the seller&apos;s proceeds, tracked separately: it appears only on
           sales you sold, and reaching &ldquo;Paid out&rdquo; means an
-          administrator has sent the payout with Linkwa or recorded a payout
-          made outside BidBlitz.
+          administrator sent the payout or recorded a transfer made outside
+          BidBlitz. {providerName} reports the buyer&apos;s payment, not the payout.
         </p>
       )}
     </div>

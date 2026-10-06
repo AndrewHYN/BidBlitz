@@ -102,6 +102,11 @@ function checkoutErrorCopy(error: string, providerName: string): string {
   if (error === "unsupported_currency") {
     return `${providerName} settles in USD, so this sale can't be paid for yet.`;
   }
+  if (error === "provider_minimum_amount") {
+    // Named from configuration, never hard-coded: the connected provider is
+    // the one enforcing its own minimum.
+    return `${providerName} requires a minimum payment of $1.00 for this sale.`;
+  }
   return (
     CHECKOUT_ERRORS[error] ?? "We couldn't start the payment. Nothing was charged."
   );
@@ -118,8 +123,6 @@ const CHECKOUT_ERRORS: Record<string, string> = {
   not_awaiting_payment: "This sale isn't waiting for payment.",
   rate_limited: "Too many attempts. Wait a moment and try again.",
   provider_error: "The payment service didn't respond. Nothing was charged.",
-  provider_minimum_amount:
-    "Linkwa requires a minimum payment of $1.00 for this sale.",
   checkout_failed: "We couldn't start the payment. Nothing was charged.",
   network: "We couldn't reach the server. Nothing was charged.",
 };

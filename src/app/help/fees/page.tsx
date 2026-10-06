@@ -28,7 +28,7 @@ const NET_MINOR = GROSS_MINOR - FEE_MINOR; // $23.75
  * page. Publishing a specific figure here as though it were the provider's
  * would be a fabricated rate.
  */
-const PAYNOW_CHARGE_MINOR = 150n; // illustrative only
+const EXAMPLE_PROVIDER_CHARGE_MINOR = 150n; // illustrative only
 
 /**
  * A prose block on an explanation page.
@@ -213,14 +213,14 @@ export default function HelpFeesPage() {
               note="The provider's own charge for the payment method (example amount)"
               value={
                 <span>
-                  +<Money minor={PAYNOW_CHARGE_MINOR} currency="USD" />
+                  +<Money minor={EXAMPLE_PROVIDER_CHARGE_MINOR} currency="USD" />
                 </span>
               }
             />
             <ExampleRow
               label={`Total authorised with ${providerName}`}
               note="The amount the buyer actually pays"
-              value={<Money minor={GROSS_MINOR + PAYNOW_CHARGE_MINOR} currency="USD" />}
+              value={<Money minor={GROSS_MINOR + EXAMPLE_PROVIDER_CHARGE_MINOR} currency="USD" />}
               emphasis
             />
           </div>
