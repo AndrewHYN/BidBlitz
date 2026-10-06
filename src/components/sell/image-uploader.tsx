@@ -206,7 +206,7 @@ export function ImageUploader({
                 aria-label={`Remove photo ${index + 1}`}
                 title={`Remove photo ${index + 1}`}
                 className={cn(
-                  "absolute top-1.5 right-1.5 grid size-6 place-items-center rounded-md",
+                  "absolute top-1.5 right-1.5 grid size-8 place-items-center rounded-md md:size-6",
                   "bg-background/85 text-foreground shadow-sm backdrop-blur-sm transition-colors",
                   "hover:bg-destructive/15 hover:text-destructive",
                   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
@@ -232,7 +232,7 @@ export function ImageUploader({
           disabled={pending || full}
           data-testid="upload-input"
           className={cn(
-            "block w-full cursor-pointer rounded-lg border border-dashed bg-background px-3 py-2 text-sm",
+            "block w-full cursor-pointer rounded-lg border border-dashed bg-background px-3 py-2.5 text-sm",
             "text-muted-foreground file:mr-3 file:cursor-pointer file:rounded-md file:border file:bg-background",
             "file:px-3 file:py-1.5 file:text-sm file:font-medium hover:file:bg-muted",
             "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
@@ -270,7 +270,7 @@ export function ImageUploader({
         <span>The first photo becomes the listing thumbnail.</span>
       </div>
 
-      <Button type="button" variant="outline" size="sm" disabled={pending || full} className="sm:hidden"
+      <Button type="button" variant="outline" disabled={pending || full} className="sm:hidden"
         onClick={() => document.getElementById("auction-photo-input")?.click()}>
         {pending ? "Uploading…" : "Choose photos"}
       </Button>

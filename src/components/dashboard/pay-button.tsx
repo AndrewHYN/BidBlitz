@@ -79,7 +79,6 @@ export function PayButton({
     <span className="flex flex-wrap items-center gap-2">
       <Button
         type="button"
-        size="sm"
         onClick={startPayment}
         disabled={pending}
         data-testid="pay-transaction"

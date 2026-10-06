@@ -194,7 +194,7 @@ export function BrowseFilters({
               autoComplete="off"
             />
           </div>
-          <Button type="submit" variant="secondary" className="h-8">
+          <Button type="submit" variant="secondary">
             <Search aria-hidden />
             Search
           </Button>
@@ -208,7 +208,7 @@ export function BrowseFilters({
             aria-expanded={filtersOpen}
             aria-controls="browse-advanced-filters"
             data-testid="browse-filters-toggle"
-            className="flex w-full items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors hover:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+            className="flex w-full items-center justify-between gap-2 rounded-lg border px-3 py-2.5 text-sm font-medium transition-colors hover:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
           >
             <span>
               Filters
@@ -255,7 +255,7 @@ export function BrowseFilters({
                 id="browse-category"
                 type="button"
                 data-testid="browse-category"
-                className="h-8 w-full"
+                className="w-full"
               >
                 <SelectValue placeholder="All categories" />
               </SelectTrigger>
@@ -286,7 +286,7 @@ export function BrowseFilters({
                 id="browse-condition"
                 type="button"
                 data-testid="browse-condition"
-                className="h-8 w-full"
+                className="w-full"
               >
                 <SelectValue placeholder="Any condition" />
               </SelectTrigger>
@@ -308,7 +308,7 @@ export function BrowseFilters({
                 id="browse-sort"
                 type="button"
                 data-testid="browse-sort"
-                className="h-8 w-full"
+                className="w-full"
               >
                 <SelectValue placeholder="Sort by" />
               </SelectTrigger>
