@@ -18,7 +18,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { isPaymentProviderConfigured, paymentProviderDisplayName } from "@/server/payments/config";
+import {
+  isPaymentProviderConfigured,
+  paymentProviderDisplayName,
+  paymentProviderSupportsReconciliation,
+} from "@/server/payments/config";
 import { PayButton } from "@/components/dashboard/pay-button";
 import { CheckStatusButton } from "@/components/dashboard/check-status-button";
 
@@ -62,6 +66,7 @@ export default async function TransactionsPage() {
     getMessageUnreadCounts(user.id),
   ]);
   const configured = isPaymentProviderConfigured();
+  const canReconcile = paymentProviderSupportsReconciliation();
   // When no provider is connected the copy names the role, never a provider
   // this deployment does not actually use.
   const providerName = configured
@@ -185,7 +190,7 @@ export default async function TransactionsPage() {
                       {/* Both sides may ask the server to reconcile a payment
                           that is still waiting — the answer always comes back
                           from Postgres, never from this page. */}
-                      {configured && row.status === "AWAITING_PAYMENT" && (
+                      {configured && canReconcile && row.status === "AWAITING_PAYMENT" && (
                         <CheckStatusButton transactionId={row.id} providerName={providerName} />
                       )}
                     </div>
