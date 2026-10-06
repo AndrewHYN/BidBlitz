@@ -8,8 +8,12 @@
  * and client components alike. Trailing slashes are stripped once here — the
  * deployed env value carries one, and every consumer appends "/" itself.
  */
+// Production fallback = the canonical origin (`https://bidblitz.co.zw`). The
+// deployed `NEXT_PUBLIC_SITE_URL` still wins; this only applies when it is
+// absent, and it must never silently fall back to the legacy
+// `bid-blitz-ten.vercel.app` deployment, which is historical, not canonical.
 const fallback = process.env.NODE_ENV === "production"
-  ? "https://bid-blitz-ten.vercel.app"
+  ? "https://bidblitz.co.zw"
   : "http://localhost:3000";
 
 export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? fallback).replace(/\/+$/, "");

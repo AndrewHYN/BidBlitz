@@ -31,8 +31,12 @@ Each item below is a **blank to fill**, not a value. Owner action required.
 | A9 | Any trading or sector licence the activity requires | *(not supplied — unknown whether one is required)* | |
 | A10 | Who is authorised to bind the entity in a Paynow or banking relationship | *(not supplied)* | |
 
-**Blocks:** Paynow marketplace approval, any tax registration, any statement on
-a public page naming a legal entity, and any merchant agreement.
+**Blocks:** merchant agreements of any kind, any tax registration, and any
+statement on a public page naming a legal entity. It also blocks a Paynow
+*merchant application* in the owner's own name — but note that Paynow
+marketplace approval itself is **non-blocking for launch** (ADR-016: Linkwa is
+the intended launch provider, Paynow the fallback), so this row is not a launch
+gate. It becomes one again the moment anyone needs a signed agreement.
 
 ---
 

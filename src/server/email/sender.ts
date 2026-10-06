@@ -40,7 +40,9 @@ function appUrl(): string {
   return (
     process.env.APP_URL ??
     process.env.NEXT_PUBLIC_APP_URL ??
-    "https://bid-blitz-ten.vercel.app"
+    // Canonical production origin; `bid-blitz-ten.vercel.app` is the legacy
+    // deployment and is never a fallback (see src/lib/site-url.ts).
+    "https://bidblitz.co.zw"
   );
 }
 
@@ -68,9 +70,21 @@ export async function queueEmail(input: QueueEmailInput): Promise<string | null>
       )
       .select("id")
       .single();
-    if (error) return null;
+    if (error) {
+      // The row never existed, so `last_error` cannot record this — and the
+      // callers in notify.ts are best-effort by design. Without a log line a
+      // critical mail (a win, a suspension, a cancellation) would vanish with
+      // no trace at all, which is exactly what the header above promises will
+      // not happen. Only the message: never the payload or any credential.
+      console.warn("[email] enqueue failed:", error.message);
+      return null;
+    }
     return (data as { id?: string } | null)?.id ?? null;
-  } catch {
+  } catch (error) {
+    console.warn(
+      "[email] enqueue threw:",
+      error instanceof Error ? error.message : "unknown error"
+    );
     return null;
   }
 }

@@ -70,10 +70,13 @@ function FieldError({ id, messages }: { id?: string; messages?: string[] }) {
 export function SellForm({
   categories,
   feeBps,
+  providerName,
 }: {
   categories: CategoryOption[];
   /** Live rate from fee_settings; null = omit the percent rather than guess. */
   feeBps: number | null;
+  /** Configured payment provider's display name, read server-side and passed in. */
+  providerName: string | null;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -319,9 +322,20 @@ export function SellForm({
         <p className="rounded-lg border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
           If this auction sells, BidBlitz takes{" "}
           {feeBps !== null ? <strong>{feePercentLabel(feeBps)}</strong> : "a platform fee"}{" "}
-          of the winning price out of your proceeds. The buyer pays your winning
-          bid plus Paynow&apos;s own payment charge, which is not money you
-          receive. You keep the rest, and it is paid to you after the sale is
+          of the winning price out of your proceeds.{" "}
+          {providerName !== null ? (
+            <>
+              The buyer pays your winning bid plus {providerName}&apos;s own
+              payment charge, which is not money you receive.
+            </>
+          ) : (
+            <>
+              No payment provider is connected yet, so no money moves: when one
+              is, the buyer will pay your winning bid plus that provider&apos;s
+              own payment charge, which is not money you receive.
+            </>
+          )}{" "}
+          You keep the rest, and it is paid to you after the sale is
           fulfilled and the buyer&apos;s window to dispute has passed.
         </p>
       </section>

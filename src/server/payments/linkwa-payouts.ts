@@ -4,7 +4,7 @@ import {
   PaymentProviderError,
   PaymentProviderRequestError,
 } from "./provider";
-import { isLinkwaBaseUrl, type LinkwaConfig } from "./linkwa";
+import { isLinkwaBaseUrl, linkwaAmountToMinor, type LinkwaConfig } from "./linkwa";
 
 /**
  * Linkwa payouts — deliberately NOT part of `PaymentProvider` and NOT wired
@@ -26,7 +26,11 @@ import { isLinkwaBaseUrl, type LinkwaConfig } from "./linkwa";
  * answers a payout_id plus balances. What they do NOT verify: a payout
  * STATUS endpoint, an idempotency mechanism, or a refund API — so this module
  * offers no status check, no retry wrapper and no refund, and says so loudly
- * where each would go.
+ * where each would go. Sandbox proof 2026-10-05 (ADR-016): payout instructed
+ * against the sandbox, GET /balance and GET /statement show the debit, the
+ * documented webhook event set contains payment.completed only (no payout
+ * event), and no payout status endpoint is documented. Balance/statement
+ * reads ARE documented and implemented below.
  */
 
 export type LinkwaUserLink = {
@@ -57,6 +61,25 @@ export type LinkwaPayoutResult = {
   payoutId: string;
   amountMinor: bigint;
   currency: string;
+  /** Present only when Linkwa answered `include_balance_after` with it. */
+  balanceAfter?: { availableMinor: bigint; pendingMinor: bigint; currency: string };
+};
+
+export type LinkwaBalance = {
+  currency: string;
+  availableMinor: bigint;
+  pendingMinor: bigint;
+};
+
+export type LinkwaStatementEntry = {
+  id: string;
+  type: string;
+  currency: string;
+  description: string;
+  amountMinor: bigint;
+  balanceAfterMinor: bigint | null;
+  createdAt: string;
+  recipientType: string | null;
 };
 
 function headers(apiKey: string): Record<string, string> {
@@ -211,5 +234,110 @@ export async function instructLinkwaPayout(
   if (!payoutId) {
     throw new PaymentProviderRequestError("Linkwa did not confirm the payout with an id.");
   }
-  return { payoutId, amountMinor: input.amountMinor, currency: "USD" };
+  const balanceAfter = parseBalanceAfter((reply as { balance_after?: unknown }).balance_after);
+  return { payoutId, amountMinor: input.amountMinor, currency: "USD", ...(balanceAfter ? { balanceAfter } : {}) };
+}
+
+async function get<T>(
+  config: Pick<LinkwaConfig, "apiKey" | "baseUrl"> & { fetchImpl?: typeof fetch },
+  path: string
+): Promise<T> {
+  requireLinkwaConfig(config);
+  let response: Response;
+  try {
+    response = await (config.fetchImpl ?? fetch)(
+      `${config.baseUrl.trim().replace(/\/+$/, "")}${path}`,
+      { method: "GET", headers: headers(config.apiKey) }
+    );
+  } catch (err) {
+    throw new PaymentProviderRequestError(
+      `Could not reach Linkwa: ${err instanceof Error ? err.message : String(err)}`
+    );
+  }
+  if (!response.ok) {
+    throw new PaymentProviderRequestError(
+      `Linkwa answered HTTP ${response.status} for the balance/statement request.`
+    );
+  }
+  try {
+    return (await response.json()) as T;
+  } catch {
+    throw new PaymentProviderRequestError("Linkwa returned a reply we cannot read.");
+  }
+}
+
+function parseBalanceAfter(value: unknown): LinkwaPayoutResult["balanceAfter"] {
+  if (!value || typeof value !== "object") return undefined;
+  const raw = value as Record<string, unknown>;
+  try {
+    return {
+      availableMinor: linkwaAmountToMinor(raw.available_balance),
+      pendingMinor: linkwaAmountToMinor(raw.pending_balance ?? 0),
+      currency: typeof raw.currency === "string" ? raw.currency : "USD",
+    };
+  } catch {
+    return undefined;
+  }
+}
+
+/** Available/pending funds across all currencies, in exact minor units. */
+export async function fetchLinkwaBalance(
+  config: Pick<LinkwaConfig, "apiKey" | "baseUrl"> & { fetchImpl?: typeof fetch }
+): Promise<LinkwaBalance[]> {
+  const reply = await get<{
+    balances?: Array<{ currency?: string; available_balance?: unknown; pending_balance?: unknown }>;
+  }>(config, "/api/v1/third-party/balance");
+  if (!Array.isArray(reply.balances)) {
+    throw new PaymentProviderRequestError("Linkwa did not return a balance list.");
+  }
+  return reply.balances.map((b) => ({
+    currency: typeof b.currency === "string" ? b.currency : "USD",
+    availableMinor: linkwaAmountToMinor(b.available_balance),
+    pendingMinor: linkwaAmountToMinor(b.pending_balance ?? 0),
+  }));
+}
+
+/** One page of the documented ledger statement, exact minor units. */
+export async function fetchLinkwaStatement(
+  config: Pick<LinkwaConfig, "apiKey" | "baseUrl"> & { fetchImpl?: typeof fetch },
+  options?: { currencyCode?: string; perPage?: number }
+): Promise<LinkwaStatementEntry[]> {
+  const params = new URLSearchParams();
+  params.set("currency_code", options?.currencyCode ?? "USD");
+  params.set("per_page", String(options?.perPage ?? 25));
+  const reply = await get<{
+    data?: Array<{
+      id?: string;
+      type?: string;
+      currency?: string;
+      description?: string;
+      amount?: unknown;
+      balance_after?: unknown;
+      created_date?: string;
+      recipient?: { type?: string };
+    }>;
+  }>(config, `/api/v1/third-party/statement?${params.toString()}`);
+  if (!Array.isArray(reply.data)) {
+    throw new PaymentProviderRequestError("Linkwa did not return a statement.");
+  }
+  return reply.data.map((d) => {
+    let balanceAfterMinor: bigint | null = null;
+    try {
+      balanceAfterMinor = d.balance_after === undefined || d.balance_after === null
+        ? null
+        : linkwaAmountToMinor(d.balance_after);
+    } catch {
+      balanceAfterMinor = null;
+    }
+    return {
+      id: typeof d.id === "string" ? d.id : "",
+      type: typeof d.type === "string" ? d.type : "",
+      currency: typeof d.currency === "string" ? d.currency : "USD",
+      description: typeof d.description === "string" ? d.description : "",
+      amountMinor: linkwaAmountToMinor(d.amount),
+      balanceAfterMinor,
+      createdAt: typeof d.created_date === "string" ? d.created_date : "",
+      recipientType: typeof d.recipient?.type === "string" ? d.recipient.type : null,
+    };
+  });
 }

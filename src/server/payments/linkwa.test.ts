@@ -12,6 +12,8 @@ import {
 } from "./linkwa";
 import {
   instructLinkwaPayout,
+  fetchLinkwaBalance,
+  fetchLinkwaStatement,
   linkLinkwaUser,
   registerLinkwaWallet,
 } from "./linkwa-payouts";
@@ -518,5 +520,37 @@ describe("Linkwa payouts (unwired helpers)", () => {
     await expect(
       instructLinkwaPayout({ ...config }, { externalUserId: "", externalWalletId: "w", amountMinor: 100n })
     ).rejects.toThrow(/linked user and wallet/);
+  });
+
+  it("reads balance and statement as exact minor units", async () => {
+    const fetchImpl = (async (url: unknown) => {
+      const text = String(url);
+      if (text.includes("/balance")) {
+        return jsonResponse({ balances: [{ currency: "USD", available_balance: 1.5, pending_balance: 0 }] });
+      }
+      return jsonResponse({
+        data: [
+          {
+            id: "sb1",
+            type: "debit",
+            currency: "USD",
+            description: "Third-party payout 01JXYZ instructed.",
+            amount: 9.5,
+            balance_after: 1.5,
+            created_date: "2026-10-05T10:00:00+00:00",
+            recipient: { type: "payout" },
+          },
+        ],
+      });
+    }) as typeof fetch;
+    const balances = await fetchLinkwaBalance({ ...config, fetchImpl });
+    expect(balances).toEqual([{ currency: "USD", availableMinor: 150n, pendingMinor: 0n }]);
+    const statement = await fetchLinkwaStatement({ ...config, fetchImpl });
+    expect(statement[0]).toMatchObject({
+      type: "debit",
+      amountMinor: 950n,
+      balanceAfterMinor: 150n,
+      recipientType: "payout",
+    });
   });
 });

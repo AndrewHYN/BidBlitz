@@ -592,11 +592,16 @@ installed.
 5. **Disputes.** `Disputed` is recorded in the audit log and changes no state;
    no dispute-resolution flow exists.
 
-### Test-mode verification — 2026-09-26
+### Test-mode verification — 2026-09-26 (HISTORICAL)
 
-Run against production (`https://bid-blitz-ten.vercel.app`) with a real Paynow
-merchant account in test mode. Credentials are Vercel **Production secrets**,
-never in git or `.env.example`.
+> **Historical evidence, preserved as observed.** This ran against production
+> as it was on that date — `https://bid-blitz-ten.vercel.app`, which was then
+> the production origin and is now the **legacy** origin. The canonical
+> production origin is `https://bidblitz.co.zw`.
+
+Run against production (`https://bid-blitz-ten.vercel.app`, historical origin)
+with a real Paynow merchant account in test mode. Credentials are Vercel
+**Production secrets**, never in git or `.env.example`.
 
 | Proof-list check | Result | Evidence |
 | --- | --- | --- |
@@ -629,11 +634,12 @@ Two behaviours worth naming explicitly:
   for any of the five test transactions. `pollurl` did answer, and polling it is
   how the genuine `Paid` and `Cancelled` messages above were obtained.
 
-### Reconciliation proof — 2026-09-27
+### Reconciliation proof — 2026-09-27 (HISTORICAL)
 
 A second production run closed the loop the 2026-09-26 run left open: the
 fallback built that same day was exercised against a genuinely completed hosted
-payment, end to end, on `https://bid-blitz-ten.vercel.app`.
+payment, end to end, on `https://bid-blitz-ten.vercel.app` (the production
+origin on that date; the canonical origin is now `https://bidblitz.co.zw`).
 
 | Proof-list check | Result | Evidence |
 | --- | --- | --- |
@@ -667,13 +673,20 @@ table above). A repeat attempt through the hosted flow on 2026-09-27 could not
 reach a cancel control: the hosted page gates every action behind the merchant
 login screen, which stops automation by design.
 
-### Information prepared for Paynow support (2026-09-27 — not yet sent)
+### Information prepared for Paynow support (2026-09-27 — DRAFT, never sent)
+
+> **DRAFT / HISTORICAL.** Keep as evidence of what was prepared. If this packet
+> is ever sent, replace the legacy origin below with the canonical one first —
+> `https://bidblitz.co.zw/api/payments/webhook`.
 
 - **Integration ID:** `27042` (test mode; the integration key is a secret and
   is never included in any message, ticket or repository).
-- **Production result URL:** `https://bid-blitz-ten.vercel.app/api/payments/webhook`
+- **Result URL as drafted (legacy origin):**
+  `https://bid-blitz-ten.vercel.app/api/payments/webhook`
   — answers `200` to the GET reachability probe (observed: Paynow GETs it at
   initiation) and is ready to accept signed POSTs.
+- **Result URL to use if sent:**
+  `https://bidblitz.co.zw/api/payments/webhook`
 - **Test initiations:** eight in total across seven test transactions —
   2026-09-26: six initiations (four hosted, two express); 2026-09-27: two
   hosted (one completed at ~10:11 UTC, one abandoned at the merchant-login
@@ -1107,7 +1120,9 @@ non-payment expiry, and the dead `PAID → SETTLED` edge.
 
 Date: 2026-10-04
 
-Status: Accepted (code) / pending sandbox proof (money movement)
+Status: Accepted (code) / sandbox proof complete 2026-10-05 (money movement
+proven in the Linkwa **sandbox**; production credentials are NOT configured, so
+production payments are not live)
 
 ### Context
 
@@ -1131,21 +1146,136 @@ for marketplaces that pay sellers.
   else the honest Noop. A half-set Linkwa fails loud instead of falling
   through silently.
 - Payout helpers (`linkwa-payouts.ts`: link user, register wallet, instruct
-  payout) are implemented and unit-tested but NOT wired to any UI or route:
-  moving seller money waits for the payout milestone's sandbox proof.
+  payout) are implemented and unit-tested. They are wired only to the
+  admin-only payout console (`initiateLinkwaPayoutAction`), never to an
+  automatic trigger: a payout sends only when an authorized admin presses
+  *Pay seller with Linkwa* and confirms, and only for a payout row the
+  operator has already walked to `PAYOUT_PENDING`.
 - The webhook matches events to our rows through the stored intent
   (`external_payment_link_id` -> transaction via a new ledger reverse
   lookup), never through buyer-visible text; checkout resumes a recorded
   link instead of minting an untraceable sibling.
 - Interactive result copy (`CheckStatusButton`, `PayButton`) takes the
-  configured provider's display name as a prop. Static marketing/help/terms
-  copy still names Paynow and must be rewritten as part of Linkwa go-live.
+  configured provider's display name as a prop, and so does the footer, help
+  and fees copy — the user-facing wording is provider-dynamic. The one
+  hard-coded claim, the terms payout section saying proceeds are sent
+  "through Linkwa", was made provider-neutral during the final launch pass
+  because Linkwa is not configured in production.
 
-### Open items (owner-gated, sandbox required)
+### Open items (owner-gated)
 
-- Sandbox proof of collect -> webhook -> status -> payout -> statement for a
-  controlled sale; Linkwa refund behavior and payout-status visibility are
-  undocumented and must be established there, not assumed here.
+- ~~Sandbox proof of collect -> webhook -> status -> payout -> statement for a
+  controlled sale~~ — **closed 2026-10-05** (evidence nested below). Linkwa
+  refund behavior and payout-status visibility remain undocumented and are
+  therefore **unsupported in code**, not assumed: they still have to be
+  established from evidence before anyone relies on them in production.
+  - 2026-10-05 progress (sandbox/linkwa-preview): a controlled $10.00 sale
+    (transaction b44c3c45, link 01m45hzcdmyx32fbemvem4c1t2, receipt ZETE86CA)
+    collected via a verified webhook, and a $9.50 payout (net = gross $10.00
+    minus $0.50 fee) was instructed to a registered SmileCash sandbox wallet:
+    payout_id 01m463ry96b1v2tbk1w42qfhjs, statement debit entry and balance
+    drop $11.00 -> $1.50 confirm it. Linkwa documents NO payout webhook
+    event (payment.completed only), NO payout status endpoint, and NO payout
+    idempotency key — the documented webhook/status/idempotency gaps were
+    confirmed in the sandbox, not assumed. Our idempotency boundary remains
+    the ledger (unique transaction_id on seller_payouts, (provider, event_id)
+    on payment_events). Recipient identity lives only in Linkwa
+    (external_user_id/external_wallet_id); nothing payout-related exposes
+    seller phone numbers in product UI or public tables.
+  - 2026-10-05 admin console (sandbox/linkwa-preview): the payout helpers are
+    now reachable only through `src/server/actions/linkwa-payouts.ts`, an
+    admin-gated server action that derives amount, currency and recipient
+    from the frozen `seller_payouts` row plus the server-side
+    `seller_payout_recipients` table (service-role writes, admin-only RLS
+    read, never rendered to a browser). It claims the row with the atomic
+    `PAYOUT_PENDING -> PAYOUT_DUE` transition before instructing, records
+    `PAID_OUT` with Linkwa's `payout_id` as the reference on success, and
+    moves the row to `HELD` with the failure note when Linkwa refuses.
+    Nothing pays out when a transaction becomes PAID — the first release is
+    an explicit, confirmed admin action only.
+  - 2026-10-05 reconciliation (sandbox/linkwa-preview): the ledger disagreed
+    with the provider. The $9.50 payout above had been executed by Linkwa, yet
+    the `seller_payouts` row for transaction b44c3c45 still said
+    WAITING_FOR_FULFILMENT with no reference, so the console could have offered
+    the same money a second time. Reconciled through the database's own state
+    machine and audit trigger, without inventing fulfilment: WAITING_FOR_FULFILMENT
+    -> PAYOUT_PENDING -> PAYOUT_DUE -> PAID_OUT (DELIVERY_CONFIRMED deliberately
+    skipped — delivery was never confirmed), payout_reference set to Linkwa's
+    01m463ry96b1v2tbk1w42qfhjs, paid_at = recording time, three append-only
+    seller_payout_events rows documenting the walk with actor_id null (no
+    interactive admin session exists in this environment;
+    `admin_transition_seller_payout()` refuses any caller without auth.uid()).
+    No new payout was sent. The row is now terminal PAID_OUT: a historical
+    sandbox fixture that renders only as history, must stay out of any admin
+    E2E queue expectations, and can never become actionable — the console
+    additionally refuses any payout whose audit trail already records a
+    provider payout.
+  - 2026-10-05 migration history: the recipients table had been applied under
+    Supabase's version/name (`20261005175832` /
+    `seller_payout_recipients_20261005`) while the repo file was
+    `20261005000001_seller_payout_recipients.sql`. The file was renamed to the
+    applied version (identical content, no second migration) and recorded in
+    `public.schema_migrations`; the live table and its anon revokes were
+    verified before recording.
+  - 2026-10-05 delivery-stamp defect — **RESOLVED** by
+    `20261005210001_fix_payout_delivery_reconciliation.sql` (applied
+    2026-10-05T18:48:20Z, recorded in `public.schema_migrations`). The previous
+    trigger (`20260928000002`) stamped `delivery_confirmed_at` on the first
+    move into `DELIVERY_CONFIRMED`, `PAYOUT_PENDING`, `PAYOUT_DUE` **or
+    `PAID_OUT`**, so reaching `PAID_OUT` from `WAITING_FOR_FULFILMENT`
+    necessarily claimed a delivery nobody confirmed — exactly what the sandbox
+    reconciliation above hit. The fix drops `PAID_OUT` from that list (payout
+    movement is not delivery proof) and documents it in the function comment,
+    then clears the one fixture row in the same `begin`/`commit`, by disabling
+    only `seller_payouts_protect_state` for that single guarded UPDATE and
+    re-enabling it before commit — a scoped repair instead of the general
+    clearing rule originally proposed here. Live verification: row
+    `d6754669…` is `PAID_OUT` with reference `01m463ry96b1v2tbk1w42qfhjs`,
+    `delivery_confirmed_at IS NULL`, its four audit events unchanged and still
+    holding no `DELIVERY_CONFIRMED`, and a rejected `amount_minor` write comes
+    back `payout_money_immutable`, which proves the protect trigger is live
+    again. Residual noted at the time (`PAYOUT_PENDING`/`PAYOUT_DUE` still
+    stamping the fact, and `HELD -> PAYOUT_DUE` reaching it without an explicit
+    confirmation) is closed by the invariant below.
+  - 2026-10-05 delivery invariant (migration
+    `20261005215001_payout_delivery_explicit_only.sql`) — **the state machine,
+    stated precisely and enforced in the database, not in the console**:
+
+    `delivery_confirmed_at` is created by exactly one event — an explicit
+    transition into `DELIVERY_CONFIRMED` — and is immutable otherwise. The only
+    other permitted change is clearing it when fulfilment restarts
+    (`-> WAITING_FOR_FULFILMENT`); any other write to that column, from any
+    role, raises `payout_delivery_immutable`.
+
+    The transition map is
+    `WAITING_FOR_FULFILMENT -> DELIVERY_CONFIRMED -> PAYOUT_PENDING ->
+    PAYOUT_DUE -> PAID_OUT`, with `HELD` and `DISPUTED` as side states that
+    re-enter the chain. `WAITING_FOR_FULFILMENT -> PAYOUT_PENDING` was removed
+    from the map, so a payout state is unreachable before delivery is confirmed
+    (`payout_invalid_transition`). `PAID_OUT` has no outgoing branch and stays
+    frozen.
+
+    Every move into `PAYOUT_DUE` requires an existing delivery fact, so the
+    `HELD -> PAYOUT_DUE` retry (a hold left by a provider failure after a
+    legitimate delivery) stays legal when delivery was confirmed and raises
+    `payout_delivery_not_confirmed` when it was not. `PAYOUT_PENDING`,
+    `PAYOUT_DUE` and `PAID_OUT` are absent from the stamp condition: money
+    moving never counts as the seller handing the item over.
+
+    Nothing is backfilled. The historical reconciled row `d6754669…` keeps
+    `PAID_OUT` with `delivery_confirmed_at IS NULL` and stays terminal — the
+    migration contains no DML at all, and `initiateLinkwaPayoutAction` refuses
+    the same fact before claiming (`delivery_confirmed_at` is read server-side;
+    the browser cannot supply it). Migration history stays dual-ledger clean.
+
+    Verified live: the migration **is applied** — `20261005215001_…` is
+    recorded in the live migration ledger (33/33) and
+    `private.seller_payouts_protect_state()` enforces the delivery guard. The
+    header queries were run read-only at application time; this environment
+    still has no `SUPABASE_ACCESS_TOKEN` / `SUPABASE_DB_URL`, so a fresh
+    re-run here is not possible and is not claimed. The contract test
+    `src/server/payout-delivery-invariant.test.ts` pins the invariants on
+    every push.
 - Paynow marketplace-approval answer still outstanding; either outcome is now
   non-blocking (approved => Paynow remains a configured fallback).
 - Fee truth: Linkwa charges the buyer 1% + 2% on top and settles 100% of the

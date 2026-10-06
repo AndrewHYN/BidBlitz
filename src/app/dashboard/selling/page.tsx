@@ -78,8 +78,9 @@ export default async function SellingPage() {
   // `fee_bps` lives on the transaction row (getSelling projects only amounts),
   // so join it here rather than recomputing a fee the engine already recorded.
   const feeBpsById = new Map(transactions.map((row) => [row.id, row.fee_bps]));
-  // The payout is a SEPARATE record from the sale: "Paid" says Paynow collected
-  // from the buyer, the payout says whether this seller has been paid yet.
+  // The payout is a SEPARATE record from the sale: "Paid" says the payment
+  // provider collected from the buyer, the payout says whether this seller has
+  // been paid yet.
   const payoutByTx = new Map(payouts.map((p) => [p.transaction_id, p]));
 
   // eslint-disable-next-line react-hooks/purity -- server component: one render per request

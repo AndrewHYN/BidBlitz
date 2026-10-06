@@ -1,10 +1,15 @@
 import { dispatchEmailOutbox } from "@/server/email/sender";
 
 /**
- * Retry sweep for queued email. The daily Hobby cron calls this path; primary
- * delivery happens inline in the actions that enqueue (a viewer-triggered
- * settle, an admin decision), so this route only catches what a failed send
- * left behind. It never creates mail, only delivers what the outbox holds.
+ * Retry sweep for queued email — and, today, the ONLY delivery path.
+ *
+ * The daily Hobby cron calls this route (`vercel.json`, 05:00). Nothing
+ * dispatches inline: enqueueing happens in the actions that need mail, and
+ * every row waits here until the next tick, so a "you won" notification can sit
+ * for up to ~24h. That latency is a known, documented limitation (docs/EMAIL.md
+ * and docs/POST_LAUNCH_BACKLOG.md), not a design goal — an inline dispatch in
+ * the actions that can afford it is the deferred fix. This route never creates
+ * mail, only delivers what the outbox holds.
  *
  * Auth mirrors /api/cron/settle: Vercel cron sends the shared secret, and an
  * unset secret denies rather than defaulting.

@@ -1,13 +1,20 @@
 # Paynow — marketplace model and status-delivery query
 
-**Status: PREPARED, NOT SENT.**
+**Status: PREPARED 2026-09-27, NOT SENT.** Per ADR-016 this question is now
+**non-blocking for launch** — Linkwa is the intended launch provider and Paynow
+is the fallback — so the message below is preserved as evidence of what was
+prepared rather than as a live to-do.
 
 Nothing in this document paraphrases a reply from Paynow, because none has been
 received. Every statement about BidBlitz's own behaviour below was observed
 against the live site and is reproducible; every statement about Paynow's rules
 is attributed to Paynow's published documentation.
 
-The message body is written to be pasted as-is.
+**Before pasting, update the origin.** The message body was written when
+`https://bid-blitz-ten.vercel.app` was the production origin. The canonical
+production origin is now `https://bidblitz.co.zw`. Replace all three occurrences
+inside the message with it — the site link, the `resulturl`, and the signature —
+then read the whole thing through once before sending.
 
 **Never include in any message, ticket, screenshot or commit:** the Paynow
 Integration Key, the merchant password, or any other credential. The Integration

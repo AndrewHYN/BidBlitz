@@ -57,9 +57,16 @@ provider account and credentials.
 password, and an explained state for an expired or already-used link. But it
 sends email, so it is subject to the same 2-per-hour quota. Until SMTP is
 configured, **a user who forgets their password cannot recover their account** —
-the flow will accept the request and no email will arrive. The UI does not lie
-about this: it shows the provider throttle honestly rather than claiming an
-email was sent.
+the flow will accept the request and no email will arrive.
+
+**What the UI does and does not say.** It never claims "no such account", and it
+never forwards a provider error: every provider response is normalised to one
+identical confirmation (§J12), because surfacing the provider's throttle here
+would be an account-enumeration oracle. So the confirmation is deliberately the
+same whether or not mail was queued, with a "check spam, then try again" line
+for the case where nothing arrives. Signup is different: there the provider
+throttle *is* reported in its own words (see above), because signup has no
+enumeration trap to protect.
 
 That quota is also what made an account-enumeration oracle possible, and it is
 why the reset action normalises every provider response rather than forwarding
@@ -304,11 +311,14 @@ BidBlitz, and none will be until H1–H3 and H7 are answered.**
 These are **not** compliance items BidBlitz can close by writing code. They are
 dependencies on third parties.
 
-☐ **I1. Paynow marketplace approval — BLOCKER.**
+☐ **I1. Paynow marketplace approval — non-blocking (Paynow is the fallback).**
 Has Paynow confirmed **in writing** that a merchant may collect buyer funds for
 third-party sellers and make onward payments to those sellers in a manual
 model? The query is drafted in `docs/PAYNOW_MARKETPLACE_SUPPORT_REQUEST.md`,
-point 5. **No response has been received. This is not approved.**
+point 5. **No response has been received. This is not approved and no approval
+is claimed.** Per ADR-016 the question no longer gates launch: Linkwa is the
+intended launch provider and documents marketplace payouts; an answer would
+only confirm Paynow's continued role as the configured fallback.
 
 ☐ **I2. `resulturl` status delivery — BLOCKER.**
 Across eight test-mode initiations Paynow recorded the final status every time
@@ -326,6 +336,17 @@ timing. Non-verified accounts settle weekly. **Status unknown.**
 
 ☐ **I5. "Set Live" requirements.** Unknown. Do not request it before I1 and I2
 are answered.
+
+☐ **I6. Linkwa production account and credentials.** The intended launch
+provider. Linkwa **sandbox** collection and payout were proven on 2026-10-05
+(ADR-016); **production credentials are not configured**, and the free sandbox
+is what has been proven — production API access is behind Linkwa's paid
+Developer plan. Refund behaviour and payout-status visibility are still
+undocumented, so the code deliberately refuses both rather than guessing.
+Owner/provider action: subscribe, issue `LINKWA_API_KEY` / `LINKWA_BASE_URL` /
+`LINKWA_WEBHOOK_SECRET` as Vercel Production variables (all three or none),
+then complete one controlled real transaction before anyone calls payments
+live.
 
 ☐ **I6. Integration Key rotation at the move to live.** A fresh key must be
 generated when leaving test mode, which invalidates any other key held. Handle
@@ -484,7 +505,10 @@ longer existed, and the remaining tests "passed" against a stale build.
 
 The rules now are:
 
-- `baseURL` defaults to `https://bid-blitz-ten.vercel.app`.
+- `baseURL` defaults to `https://bidblitz.co.zw` (the canonical production
+  origin). Override it with `PLAYWRIGHT_BASE_URL` — a preview deployment for
+  pre-cutover runs, or `http://localhost:3000` for a local server — and check
+  which target a run used before believing its result.
 - A local server is booted **only** when `PLAYWRIGHT_BASE_URL` points at
   localhost, and when it is booted it is **never reused** — a reused server may
   predate the code under test, which is the entire bug.
@@ -520,15 +544,25 @@ Launch is gated on the following being **closed**, not merely attempted:
 | K2 | Controller determined, contact published | Owner action | ☐ |
 | K3 | Privacy policy reviewed against actual behaviour, **including the avatar CDN window (§J11)** | Owner action | ☐ |
 | K4 | Tax position confirmed, records plan agreed | Owner action | ☐ |
-| K5 | **Paynow marketplace model approved in writing** | External — Paynow | ☐ |
+| K5 | Paynow marketplace model answered in writing (**non-blocking** — Paynow is the fallback, Linkwa the launch provider; ADR-016) | External — Paynow | ☐ |
 | K6 | **`resulturl` delivery understood, or push-to-live accepted as unreliable** | External — Paynow | ☐ |
 | K7 | Refund mechanism confirmed or manual refunds accepted | External — Paynow | ☐ |
 | K8 | Payout operator and reconciliation owner named | Owner action | ☐ |
 | K9 | Incident runbook written and rehearsed | Owner action | ☐ |
-| K10 | Paynow moved from test mode to live | External — Paynow | ☐ |
+| K10 | **Launch provider live: Linkwa production credentials installed (all three) and one controlled real transaction completed end to end** — until then real production payments are *not* live | Owner + provider | ☐ |
 | K11 | **An account actually has `is_admin`** | Owner action | ☑ set 2026-09-28; see §J6 |
 | K12 | **A transactional email provider is configured AND a signup is proven end to end** | Owner action | ☐ |
 | K13 | Real listings exist, so the marketplace is not empty on arrival | Owner action | ☐ |
+| K14 | **Canonical production URL** — `NEXT_PUBLIC_SITE_URL` = `https://bidblitz.co.zw` in Vercel Production *and* the running build was created after the change; canonical/og/sitemap/email links verified from the deployed origin | Owner action | ☐ |
+| K15 | **Supabase configuration** — Site URL and the redirect allow-list both cover `https://bidblitz.co.zw/**` (legacy origin and localhost preserved) | Owner action | ☐ |
+| K16 | **Auth redirect URL proven by a real confirmation email** — the link must land on `https://bidblitz.co.zw/auth/callback`, not the site root | Owner action | ☐ |
+| K17 | **`CRON_SECRET`** set to 32+ random bytes; `/api/cron/settle` and `/api/email/dispatch` answer 401 without it and 200 with it | Owner action | ☐ |
+| K18 | **Webhook endpoint** — `POST /api/payments/webhook` refuses an empty/unsigned body with 400, `GET` answers the probe that writes nothing | Verification | ☐ |
+| K19 | **Admin payout operation rehearsed non-destructively** — `/admin` gated by `admin.access`, recipient on file, a payout inspected and refused before any provider call, no real money moved | Owner action | ☐ |
+| K20 | **Final smoke tests** — DEPLOYMENT §4 against the deployed URL, plus `npm run db:verify` where a management token is available | Verification | ☐ |
+
+Implementation detail for K14–K20 (exact steps, and the one configuration
+diagnostic the server exposes) is in `docs/DEPLOYMENT.md` §7.
 
 **K0 is the first gate chronologically.** It is also the cheapest: one SMTP
 configuration. Leaving it open means the marketplace has no way to admit a new
@@ -543,7 +577,7 @@ operator is trusted with a live payout.
 **K13 is the gate a customer notices first.** With no listings, a visitor lands
 on an empty marketplace and concludes it is not a real business.
 
-**BidBlitz is not commercially live until K0–K13 are closed.** A complete
+**BidBlitz is not commercially live until K0–K20 are closed.** A complete
 codebase, a passing test suite and a deployed site do not make it live; they
 make the software ready for a business that is ready to trade.
 
@@ -576,5 +610,7 @@ provider error again.
 
 **Still blocked by the owner:** reset sends email, so it inherits the §0 mailer
 limit. Until SMTP is configured, a user who forgets their password cannot
-recover their account. The UI says so honestly rather than claiming a message
-was sent.
+recover their account. The UI does not announce that specific failure — doing so
+would re-open the oracle above — it gives the same neutral confirmation and
+tells the user to check spam and try again. The absence of mail is therefore an
+owner-side condition to fix (§0), not something the page can safely state.

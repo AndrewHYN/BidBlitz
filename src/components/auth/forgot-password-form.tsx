@@ -18,11 +18,18 @@ import { Label } from "@/components/ui/label";
  * phishers decide who to target. The action returns success for an unknown
  * address, and this page says the same thing either way.
  *
- * The failure copy is where honesty lives instead. If the provider is throttled
- * — which it currently is, at 2 emails per hour project-wide — the user is told
- * that no email was sent, rather than being sent to an inbox that will stay
- * empty. Telling someone to wait for an email we know we did not send is the
- * kindest-looking lie that costs an hour of someone's afternoon.
+ * The failure copy is where honesty lives instead — for OUR budget. BidBlitz's
+ * own per-IP+address limit is reported truthfully ("too many attempts from this
+ * device"), because that answer is identical for every address.
+ *
+ * The PROVIDER's throttle is deliberately NOT surfaced, and that is a real
+ * trade, not an oversight. Measured against the live provider (2026-09-28), an
+ * unknown address answers HTTP 200 while a real account answers HTTP 429
+ * `over_email_send_rate_limit` — so showing that error would turn this form
+ * into an account-enumeration oracle, which is the exact problem the copy above
+ * exists to prevent. See the reasoning in requestPasswordResetAction. The user
+ * therefore gets the same hedged confirmation either way, plus the "check spam,
+ * then try again" line for the case where nothing arrives.
  */
 export function ForgotPasswordForm() {
   const [pending, startTransition] = useTransition();

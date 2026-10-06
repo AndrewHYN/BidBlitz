@@ -78,11 +78,14 @@ export function PayoutControls({
   status,
   amountMinor,
   currency,
+  deliveryConfirmedAt,
 }: {
   payoutId: string;
   status: SellerPayoutStatus;
   amountMinor: number;
   currency: string;
+  /** The database refuses any move into PAYOUT_DUE until this is set. */
+  deliveryConfirmedAt: string | null;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -91,7 +94,14 @@ export function PayoutControls({
   const [reference, setReference] = useState("");
   const [note, setNote] = useState("");
 
-  const actions = NEXT_ACTIONS[status] ?? [];
+  // Mirrors the SQL transition map, minus the one option the delivery
+  // invariant can refuse: "Mark payout due" is only offered once delivery is
+  // an explicit fact, so the console never offers an action the database
+  // rejects with `payout_delivery_not_confirmed`. The database stays the
+  // authority either way.
+  const actions = (NEXT_ACTIONS[status] ?? []).filter(
+    (to) => to !== "PAYOUT_DUE" || Boolean(deliveryConfirmedAt)
+  );
 
   function run(to: SellerPayoutStatus) {
     setError(null);

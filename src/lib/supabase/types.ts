@@ -213,6 +213,20 @@ export interface Database {
         Insert: never;
         Update: never;
       };
+      seller_payout_recipients: {
+        Row: {
+          seller_id: string;
+          provider: string;
+          external_user_id: string;
+          external_wallet_id: string;
+          created_at: string;
+          updated_at: string;
+        };
+        // Server-side only: service role writes, admins read via RLS, the
+        // browser never does either. The ids stay on the server by design.
+        Insert: never;
+        Update: never;
+      };
       seller_payout_events: {
         Row: {
           id: string;
