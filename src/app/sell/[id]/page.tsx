@@ -13,6 +13,7 @@ import { DURATIONS, conditionLabels } from "@/lib/validation";
 import { isClosed } from "@/lib/auction-status";
 import { ImageUploader } from "@/components/sell/image-uploader";
 import { PublishButton } from "@/components/sell/publish-button";
+import { FulfilmentEditor } from "@/components/sell/fulfilment-editor";
 import { CancelAuctionButton } from "@/components/sell/cancel-auction-button";
 import {
   RequestCancellationButton,
@@ -246,6 +247,27 @@ export default async function SellDraftPage({
         </div>
 
         <div className="space-y-6">
+          {auction.status === "DRAFT" && (
+            <section
+              className="rounded-xl border bg-card p-6 shadow-sm"
+              aria-labelledby="draft-fulfilment-heading"
+            >
+              <SectionHeading
+                title={<span id="draft-fulfilment-heading">Fulfilment</span>}
+              />
+              <p className="mt-1 text-sm text-muted-foreground">
+                Tell bidders how the winner can receive the item. This must be set before publishing.
+              </p>
+              <div className="mt-4">
+                <FulfilmentEditor
+                  auctionId={auction.id}
+                  initialMethod={auction.fulfilment_method}
+                  initialNotes={auction.fulfilment_notes}
+                />
+              </div>
+            </section>
+          )}
+
           <section className="rounded-xl border bg-card p-6 shadow-sm" aria-labelledby="draft-publish-heading">
             <SectionHeading
               title={
@@ -260,6 +282,7 @@ export default async function SellDraftPage({
                 auctionId={auction.id}
                 title={auction.title}
                 imageCount={auction.image_count}
+                hasFulfilment={auction.fulfilment_method !== null}
                 status={auction.status}
                 endsAt={auction.ends_at}
               />
