@@ -24,12 +24,14 @@
 -- No data backfill, no updates/deletes of auctions, no payment, payout,
 -- settlement, cancellation or messaging semantics touched. Historical
 -- PENDING_REVIEW rows keep their recorded risk_flags; new publishes only.
---create or replace function public.publish_auction(
+create or replace function public.publish_auction(
   p_auction_id uuid,
   p_starts_at  timestamptz default null
 )
 returns jsonb
-language plpgsql security definer set search_path = ''
+language plpgsql
+security definer
+set search_path = ''
 as $$
 declare
   a       public.auctions%rowtype;
