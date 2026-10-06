@@ -71,6 +71,44 @@ const AUTH_NAV = [
 ] as const;
 
 /**
+ * Badge-refresh pacing (see the subscription in `HeaderBar`).
+ *
+ * COALESCE absorbs a burst: a settlement writes several notification rows in
+ * one transaction, and one refresh reads all of them. MIN_GAP is the floor
+ * between two refreshes regardless of event rate, so a noisy table can never
+ * turn into server churn. Both are event-driven delays, not a schedule: with
+ * no events and no visibility change, no timer exists at all.
+ */
+const NOTIFICATION_COALESCE_MS = 300;
+const NOTIFICATION_MIN_GAP_MS = 2_000;
+
+/**
+ * Topic of the badge subscription, and why it must never be reused.
+ *
+ * The browser Supabase client is a singleton, and `RealtimeClient.channel()`
+ * returns an ALREADY-REGISTERED channel when the topic matches instead of
+ * creating one, while `removeChannel()` only completes once the server
+ * acknowledges the leave. So a remount can find the previous mount's channel
+ * still registered and still mid-leave, and binding to that object is a
+ * silent no-op: `.on()` refuses to attach postgres_changes callbacks to a
+ * joined channel (or lands on one that never rejoins), and `subscribe()`
+ * only joins a channel that is closed. The badge would then simply stop
+ * updating after the first sign-in churn or StrictMode remount, with nothing
+ * thrown and nothing logged.
+ *
+ * Every run therefore takes a fresh sequence number, so `channel()` can only
+ * ever hand back a brand-new object, and supersedes anything an earlier run
+ * left behind under this prefix.
+ */
+const NOTIFICATION_TOPIC_BASE = "header-notifications";
+/** A registered `.topic` carries supabase's `realtime:` prefix, so match both. */
+const NOTIFICATION_TOPIC_PREFIXES = [
+  `${NOTIFICATION_TOPIC_BASE}:`,
+  `realtime:${NOTIFICATION_TOPIC_BASE}:`,
+] as const;
+let notificationTopicSeq = 0;
+
+/**
  * Active state: sections match their subtree (/help covers /help/fees), the
  * dashboard tabs are exact so only the tab you are on lights up.
  */
@@ -167,6 +205,105 @@ export function HeaderBar({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
+  // Unread-badge freshness: event-driven, never polled.
+  //
+  // The badge is a server-rendered count, so without this a new notification
+  // would surface only on the next navigation. This subscribes to Postgres
+  // Changes on `public.notifications` for THIS user's rows and asks Next to
+  // re-read the server tree when one changes. Two guards keep it honest:
+  //
+  //   - a settlement can insert several rows at once, so bursts coalesce into
+  //     ONE refresh, and no two refreshes run closer together than
+  //     NOTIFICATION_MIN_GAP_MS no matter how chatty the table is;
+  //   - a hidden tab cannot show a badge, so it does no work while hidden and
+  //     `visibilitychange` catches it up when the tab returns - which also
+  //     repairs anything the socket dropped in the background.
+  //
+  // There is deliberately no interval anywhere in here, `router.refresh()`
+  // re-renders in place (no full reload, no lost client state), and the
+  // cleanup below cancels the queued refresh, drops the listener and removes
+  // the channel - so remounts, StrictMode double-runs and sign-out cannot
+  // leave a duplicate subscription behind. `public.notifications` is already
+  // in the `supabase_realtime` publication, and RLS only ever delivers rows
+  // the subscriber can select, so this can never hear another user's rows.
+  const userId = user?.id ?? null;
+
+  useEffect(() => {
+    if (!userId) return;
+
+    const supabase = createClient();
+
+    // Supersede first: `createClient()` is the ssr singleton, so its channel
+    // list survives this effect and an earlier run's channel can still be in
+    // it (its leave ack is in flight, or never arrived). Then take a fresh
+    // sequence number so `channel()` below can only return a new object -
+    // see NOTIFICATION_TOPIC_BASE for what goes wrong if it returns the old
+    // one.
+    for (const existing of supabase.getChannels()) {
+      if (NOTIFICATION_TOPIC_PREFIXES.some((prefix) => existing.topic.startsWith(prefix))) {
+        void supabase.removeChannel(existing);
+      }
+    }
+    notificationTopicSeq += 1;
+    const topic = `${NOTIFICATION_TOPIC_BASE}:${userId}:${notificationTopicSeq}`;
+
+    let disposed = false;
+    let queued: number | null = null;
+    let lastRefreshAt = 0;
+
+    function queueRefresh() {
+      if (disposed || queued !== null) return;
+      // Background tab: the visibility handler repairs this on return.
+      if (document.visibilityState !== "visible") return;
+      const wait = Math.max(
+        NOTIFICATION_COALESCE_MS,
+        NOTIFICATION_MIN_GAP_MS - (Date.now() - lastRefreshAt)
+      );
+      queued = window.setTimeout(() => {
+        queued = null;
+        if (disposed) return;
+        lastRefreshAt = Date.now();
+        router.refresh();
+      }, wait);
+    }
+
+    let hadSubscribed = false;
+    const channel = supabase
+      .channel(topic)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "notifications",
+          filter: `user_id=eq.${userId}`,
+        },
+        queueRefresh
+      )
+      .subscribe((status) => {
+        // Reconnect repair: anything committed while the socket was down is
+        // gone for good (Postgres Changes is not replayed), so the first
+        // join refreshes nothing - the server render is already current -
+        // and every rejoin after it re-reads the count.
+        if (status === "SUBSCRIBED") {
+          if (hadSubscribed) queueRefresh();
+          hadSubscribed = true;
+        }
+      });
+
+    function onVisibility() {
+      if (document.visibilityState === "visible") queueRefresh();
+    }
+    document.addEventListener("visibilitychange", onVisibility);
+
+    return () => {
+      disposed = true;
+      document.removeEventListener("visibilitychange", onVisibility);
+      if (queued !== null) window.clearTimeout(queued);
+      void supabase.removeChannel(channel);
+    };
+  }, [router, userId]);
+
   function submitSearch(e: React.FormEvent) {
     e.preventDefault();
     const q = term.trim();
@@ -215,7 +352,7 @@ export function HeaderBar({
             onClick={() => setOpen(false)}
             aria-current={isActive(pathname, l.href, "exact" in l && l.exact) ? "page" : undefined}
             className={cn(
-              "rounded-md px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+              "rounded-md px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground",
               isActive(pathname, l.href, "exact" in l && l.exact) &&
                 "bg-accent text-accent-foreground"
             )}
@@ -226,7 +363,7 @@ export function HeaderBar({
       </nav>
 
       {user && (
-        <Button asChild size="sm" className="w-full">
+        <Button asChild className="w-full">
           <Link href="/sell" onClick={() => setOpen(false)}>
             <Plus className="size-4" /> List an item
           </Link>
@@ -320,7 +457,7 @@ export function HeaderBar({
                 </Link>
               </Button>
 
-              <Button asChild size="sm" className="hidden gap-1.5 sm:inline-flex">
+              <Button asChild className="hidden gap-1.5 sm:inline-flex">
                 <Link href="/sell" onClick={closeMenu}>
                   <Plus className="size-4" /> Sell
                 </Link>
@@ -388,12 +525,12 @@ export function HeaderBar({
             </>
           ) : (
             <>
-              <Button asChild variant="ghost" size="sm">
+              <Button asChild variant="ghost">
                 <Link href="/login" onClick={closeMenu}>
                   Sign in
                 </Link>
               </Button>
-              <Button asChild size="sm">
+              <Button asChild>
                 <Link href="/signup" onClick={closeMenu}>
                   Join
                 </Link>

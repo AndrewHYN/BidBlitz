@@ -57,6 +57,13 @@ export function MessageThread({
       markRead();
       router.refresh();
     }
+    // The server publishes this only after the settlement transaction
+    // committed, so refreshing here can only ever catch the page UP to the
+    // database: payment state stays server-authoritative and this component
+    // never renders a status it computed itself.
+    if (event.type === "transaction.updated" && event.transactionId === transactionId) {
+      router.refresh();
+    }
   });
 
   function onSubmit(event: React.FormEvent<HTMLFormElement>) {
