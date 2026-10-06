@@ -28,12 +28,14 @@ export function PublishButton({
   auctionId,
   title,
   imageCount,
+  hasFulfilment,
   status,
   endsAt,
 }: {
   auctionId: string;
   title: string;
   imageCount: number;
+  hasFulfilment: boolean;
   status: string;
   endsAt: string | null;
 }) {
@@ -136,7 +138,9 @@ export function PublishButton({
     );
   }
 
-  const blocked = imageCount < 1;
+  const blockedByImage = imageCount < 1;
+  const blockedByFulfilment = !hasFulfilment;
+  const blocked = blockedByImage || blockedByFulfilment;
 
   return (
     <div className="space-y-3">
@@ -174,7 +178,11 @@ export function PublishButton({
           data-testid="publish-disabled-reason"
           className="text-sm text-muted-foreground"
         >
-          Add at least one photo before publishing.
+          {blockedByImage && blockedByFulfilment
+            ? "Add at least one photo and choose fulfilment before publishing."
+            : blockedByImage
+              ? "Add at least one photo before publishing."
+              : "Choose how the buyer will receive the item before publishing."}
         </p>
       )}
 
