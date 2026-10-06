@@ -11,6 +11,8 @@ const COLUMNS = [
       { label: "Ending soon", href: "/browse?sort=ending-soon" },
       { label: "Newest", href: "/browse?sort=newest" },
       { label: "Sell an item", href: "/sell" },
+      { label: "How it works", href: "/how-it-works" },
+      { label: "FAQ", href: "/faq" },
     ],
   },
   {
@@ -30,6 +32,7 @@ const COLUMNS = [
       { label: "Terms of use", href: "/terms" },
       { label: "Privacy policy", href: "/privacy" },
       { label: "Help & contact", href: "/help" },
+      { label: "About BidBlitz", href: "/about" },
     ],
   },
 ] as const;
@@ -50,13 +53,22 @@ export function SiteFooter() {
             <span aria-hidden>BidBlitz</span>
           </Link>
           <p className="max-w-xs text-sm text-muted-foreground">
-            Live auctions with real closing times. Sellers list items, buyers
-            compete bid by bid, and the highest bidder when the clock runs out
-            wins.
+            BidBlitz is a Zimbabwean online auction marketplace. Live auctions
+            with real closing times: sellers list items, buyers compete bid by
+            bid, and the highest bidder when the clock runs out wins.
           </p>
 
           <div className="space-y-1.5 text-sm">
             <p className="font-medium">Contact</p>
+            <p className="flex items-center gap-2 text-muted-foreground">
+              <Mail className="size-4 shrink-0" aria-hidden />
+              <a
+                href="mailto:support@bidblitz.co.zw"
+                className="-my-1 inline-block py-1 transition-colors hover:text-foreground"
+              >
+                support@bidblitz.co.zw
+              </a>
+            </p>
             <p className="flex items-center gap-2 text-muted-foreground">
               <Phone className="size-4 shrink-0" aria-hidden />
               <a
@@ -67,15 +79,6 @@ export function SiteFooter() {
                 className="-my-1 inline-block py-1 transition-colors hover:text-foreground"
               >
                 0789335669
-              </a>
-            </p>
-            <p className="flex items-center gap-2 text-muted-foreground">
-              <Mail className="size-4 shrink-0" aria-hidden />
-              <a
-                href="mailto:hyndrrx0@gmail.com"
-                className="-my-1 inline-block py-1 transition-colors hover:text-foreground"
-              >
-                hyndrrx0@gmail.com
               </a>
             </p>
           </div>

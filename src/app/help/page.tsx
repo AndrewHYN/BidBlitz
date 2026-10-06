@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, Coins, Handshake, Mail, Phone, Scale, ShieldAlert } from "lucide-react";
+import { ArrowRight, Coins, Handshake, HelpCircle, ListOrdered, Mail, Phone, Scale, ShieldAlert } from "lucide-react";
 import { PageHeader } from "@/components/auction/page-header";
 import {
   DocumentContactCard,
@@ -18,6 +18,12 @@ export const metadata: Metadata = {
 
 const TOPICS = [
   {
+    href: "/how-it-works",
+    icon: ListOrdered,
+    title: "How BidBlitz works",
+    description: "Both journeys end to end: browse, bid, close, pay, fulfil, pay out.",
+  },
+  {
     href: "/help/fees",
     icon: Coins,
     title: "Fees",
@@ -34,6 +40,12 @@ const TOPICS = [
     icon: Handshake,
     title: "How settlement works",
     description: "What happens after the clock runs out: winner, transaction and reviews.",
+  },
+  {
+    href: "/faq",
+    icon: HelpCircle,
+    title: "Frequently asked questions",
+    description: "The short version: paying, payouts, delivery, disputes and reviews.",
   },
 ] as const;
 
@@ -118,7 +130,7 @@ export default function HelpPage() {
                 ) : (
                   <>
                     No payment provider is connected to BidBlitz yet, so no money
-                    ever moves. the transaction simply waits in that state until
+                    ever moves. The transaction simply waits in that state until
                     one is.
                   </>
                 )}
@@ -149,10 +161,10 @@ export default function HelpPage() {
               <li className="flex items-center gap-2">
                 <Mail className="size-4 shrink-0 text-primary" aria-hidden />
                 <a
-                  href="mailto:hyndrrx0@gmail.com"
+                  href="mailto:support@bidblitz.co.zw"
                   className="inline-flex min-h-6 items-center font-medium text-primary underline-offset-2 hover:underline"
                 >
-                  hyndrrx0@gmail.com
+                  support@bidblitz.co.zw
                 </a>
               </li>
             </ul>
@@ -160,7 +172,8 @@ export default function HelpPage() {
               <ShieldAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
               <span>
                 See a suspicious listing? Open the auction and use the{" "}
-                <strong className="text-foreground">Report</strong> button. reports go straight to the BidBlitz team for review.
+                <strong className="text-foreground">Report</strong> button.
+                Reports go straight to the BidBlitz team for review.
               </span>
             </p>
             <p className="mt-4 text-sm text-muted-foreground">

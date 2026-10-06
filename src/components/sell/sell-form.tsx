@@ -176,9 +176,23 @@ export function SellForm({
             placeholder="e.g. Vintage leather bomber jacket"
             maxLength={120}
             aria-invalid={errors.title ? true : undefined}
-            aria-describedby={errors.title ? "sell-title-error" : undefined}
+            aria-describedby={
+              errors.title ? "sell-title-hint sell-title-error" : "sell-title-hint"
+            }
             data-testid="sell-title"
           />
+          {/* A title is the single biggest lever on whether a listing is ever
+              seen, and "good laptop" is what sellers write when nobody tells
+              them otherwise. Model, specs and capacity are what buyers search
+              for — so the good/bad pair lives next to the field, not in a help
+              doc nobody opens. */}
+          <p id="sell-title-hint" className="text-xs text-muted-foreground">
+            Make, model and specs: that is what buyers search for.{" "}
+            <span className="font-medium text-foreground">Good:</span>{" "}
+            <span className="font-mono">HP EliteBook 840 G7, i5, 16GB RAM, 512GB SSD</span>
+            . <span className="font-medium text-foreground">Too vague:</span>{" "}
+            <span className="font-mono">good laptop</span>.
+          </p>
           <FieldError id="sell-title-error" messages={errors.title} />
         </div>
 
@@ -192,9 +206,19 @@ export function SellForm({
             placeholder="Describe condition, size, what's included, and anything a bidder should know."
             maxLength={5000}
             aria-invalid={errors.description ? true : undefined}
-            aria-describedby={errors.description ? "sell-description-error" : undefined}
+            aria-describedby={
+              errors.description
+                ? "sell-description-hint sell-description-error"
+                : "sell-description-hint"
+            }
             data-testid="sell-description"
           />
+          <p id="sell-description-hint" className="text-xs text-muted-foreground">
+            Condition and any defects, what is included, accessories, and how the
+            item can be collected or delivered. Photos and specifics are what
+            turn a browse into a bid. There is no minimum number of images
+            required to list.
+          </p>
           <FieldError id="sell-description-error" messages={errors.description} />
         </div>
       </section>

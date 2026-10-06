@@ -14,6 +14,11 @@ marketplace.
 
 Each item below is a **blank to fill**, not a value. Owner action required.
 
+Operational counterpart: `docs/GROWTH_PLAN.md` holds the acquisition ladder
+(10 sellers / 20 live listings → 25 sellers / 50 listings), the category focus,
+the daily founder/operator checklist and the Google discovery status. It
+supplies business facts no more than this file does.
+
 ---
 
 ## A. Legal identity

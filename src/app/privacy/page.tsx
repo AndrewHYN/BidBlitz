@@ -203,7 +203,7 @@ export default function PrivacyPage() {
 
         <DocumentContactCard>
             <p>
-              Questions about your data? Reach us directly.we answer as
+              Questions about your data? Reach us directly. We answer as
               individuals, not a faceless support queue:
             </p>
             <ul className="space-y-2">
@@ -219,10 +219,10 @@ export default function PrivacyPage() {
               <li className="flex items-center gap-2">
                 <Mail className="size-4 shrink-0 text-primary" aria-hidden />
                 <a
-                  href="mailto:hyndrrx0@gmail.com"
+                  href="mailto:support@bidblitz.co.zw"
                   className="inline-flex min-h-6 items-center font-medium text-primary underline-offset-2 hover:underline"
                 >
-                  hyndrrx0@gmail.com
+                  support@bidblitz.co.zw
                 </a>
               </li>
             </ul>

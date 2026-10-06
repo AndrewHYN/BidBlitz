@@ -8,6 +8,8 @@ import {
   Gavel,
   Search,
   ShieldCheck,
+  Star,
+  Wallet,
   Zap,
 } from "lucide-react";
 
@@ -38,6 +40,16 @@ export function HomeHero() {
       icon: ShieldCheck,
       label: "Straightforward fees",
       detail: "Sellers pay 5% when an auction sells.",
+    },
+    {
+      icon: Wallet,
+      label: "Confirmed payments",
+      detail: "A sale is marked paid only once the provider confirms it.",
+    },
+    {
+      icon: Star,
+      label: "Reviews that mean something",
+      detail: "Only the two sides of a real transaction can review it.",
     },
   ];
 
@@ -120,7 +132,12 @@ export function HomeHero() {
         >
           <div className="flex items-center gap-2 text-sm font-semibold">
             <Gavel className="size-4 text-primary" aria-hidden />
-            How the blitz works
+            <Link
+              href="/how-it-works"
+              className="underline-offset-4 hover:underline focus-visible:underline focus-visible:outline-none"
+            >
+              How the blitz works
+            </Link>
           </div>
 
           <div className="mt-5 space-y-5">

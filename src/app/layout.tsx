@@ -5,6 +5,7 @@ import { Providers } from "@/components/providers";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { SITE_URL } from "@/lib/site-url";
+import { serializeJsonLd, siteStructuredData } from "@/lib/structured-data";
 
 const geistSans = Geist({
   variable: "--font-sans",
@@ -34,7 +35,7 @@ const baseMetadata: Metadata = {
     template: "%s · BidBlitz",
   },
   description:
-    "BidBlitz is a live auction marketplace: sellers list items with a real closing time, buyers compete bid by bid, and one transparent platform fee applies to sold auctions.",
+    "BidBlitz is a Zimbabwean online auction marketplace: sellers list items with a real closing time, buyers compete bid by bid, and one transparent 5% platform fee applies to sold auctions.",
   openGraph: {
     type: "website",
     siteName: "BidBlitz",
@@ -47,7 +48,7 @@ const baseMetadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "BidBlitz",
-    description: "Live competitive auctions.",
+    description: "Live competitive auctions on BidBlitz.",
     images: [`${siteUrl}/brand/bidblitz-logo-512.png`],
   },
 };
@@ -105,6 +106,18 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col">
+        {/*
+          Organization + WebSite JSON-LD, emitted once for every page. Static
+          values only — no address, no founding date, no social accounts, no
+          rating: see the module header in `src/lib/structured-data.ts` for why
+          each of those is deliberately absent.
+        */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: serializeJsonLd(siteStructuredData(siteUrl)),
+          }}
+        />
         <Providers serverTimeMs={serverTimeMs}>
           <a
             href="#main"

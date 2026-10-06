@@ -6,6 +6,11 @@ import { MapPin } from "lucide-react";
 import { getAuctionDetail, imageUrlFor } from "@/server/queries";
 import { isPaymentProviderConfigured } from "@/server/payments/config";
 import { nextMinimumBid } from "@/lib/money";
+import { SITE_URL } from "@/lib/site-url";
+import {
+  auctionStructuredData,
+  serializeJsonLd,
+} from "@/lib/structured-data";
 import { ImageGallery, type GalleryImage } from "@/components/auction/image-gallery";
 import { AuctionDetailLive } from "@/components/auction/auction-detail-live";
 import { BidHistory } from "@/components/auction/bid-history";
@@ -100,8 +105,29 @@ export default async function AuctionPage({ params }: Props) {
     timeZone: "UTC",
   });
 
+  // Built from the same row the page renders from, so the markup can never
+  // advertise a price, an image or a state the visible page disagrees with.
+  const structuredData = auctionStructuredData({
+    siteUrl: SITE_URL,
+    id: auction.id,
+    title: auction.title,
+    description: auction.description,
+    status: auction.status,
+    currency: auction.currency,
+    currentBidMinor: auction.current_bid_minor,
+    startingBidMinor: auction.starting_bid_minor,
+    endsAt: auction.ends_at,
+    categoryName: auction.categories?.name ?? null,
+    categorySlug: auction.categories?.slug ?? null,
+    imageUrl: images[0]?.url ?? null,
+  });
+
   return (
     <div className="page-container py-10 sm:py-14">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(structuredData) }}
+      />
       <div className="grid gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         {/* media */}
         <ImageGallery
@@ -188,6 +214,39 @@ export default async function AuctionPage({ params }: Props) {
             <p className="text-[0.9375rem] leading-[1.7] break-words whitespace-pre-line text-muted-foreground text-pretty">
               {auction.description}
             </p>
+          </section>
+
+          {/*
+            Fulfilment is the one thing a bidder cannot infer from the listing,
+            and there is no schema field for it — so the section says that
+            rather than inventing a delivery method, a courier or a price. What
+            it can state truthfully is the mechanic that does exist: the sale
+            opens a private thread between the two parties, and that is where
+            collection or delivery is agreed.
+          */}
+          <section aria-labelledby="fulfilment">
+            <h2
+              id="fulfilment"
+              className="mb-3 text-base font-semibold tracking-tight"
+            >
+              Fulfilment
+            </h2>
+            <div className="space-y-3 text-[0.9375rem] leading-[1.7] text-muted-foreground text-pretty">
+              <p>
+                Delivery is arranged directly between the buyer and the seller.
+                BidBlitz does not ship items, does not set delivery prices and
+                does not promise an arrival date.
+              </p>
+              <p>
+                <strong className="text-foreground">
+                  This listing has no separate delivery section from the seller.
+                </strong>{" "}
+                Check the description above, and when the auction closes the
+                sale opens a private message thread between the two parties,
+                where collection or delivery is agreed before either side marks
+                the handover complete.
+              </p>
+            </div>
           </section>
 
           <BidHistory bids={bids} currency={auction.currency} />
