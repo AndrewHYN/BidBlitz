@@ -128,7 +128,7 @@ export const createAuctionSchema = z.object({
     .trim()
     .min(2, "Add a location")
     .max(80, "Location is too long"),
-  fulfilmentMethod: fulfilmentMethodSchema,
+  fulfilmentMethod: fulfilmentMethodSchema.nullable().optional(),
   fulfilmentNotes: z.string().trim().max(500, "Keep fulfilment notes under 500 characters").optional().or(z.literal("")),
   startingBidMinor: minorAmount.refine(
     (v) => v >= MIN_STARTING_BID_MINOR,
