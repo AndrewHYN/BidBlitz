@@ -9,6 +9,14 @@ import { z } from "zod";
 export const CONDITIONS = ["new", "like_new", "good", "fair", "poor"] as const;
 export const conditionSchema = z.enum(CONDITIONS);
 
+export const FULFILMENT_METHODS = ["COLLECTION", "DELIVERY", "BOTH"] as const;
+export const fulfilmentMethodSchema = z.enum(FULFILMENT_METHODS);
+export const fulfilmentMethodLabels: Record<(typeof FULFILMENT_METHODS)[number], string> = {
+  COLLECTION: "Collection only",
+  DELIVERY: "Delivery available",
+  BOTH: "Collection or delivery",
+};
+
 export const conditionLabels: Record<(typeof CONDITIONS)[number], string> = {
   new: "New",
   like_new: "Like new",
@@ -120,6 +128,8 @@ export const createAuctionSchema = z.object({
     .trim()
     .min(2, "Add a location")
     .max(80, "Location is too long"),
+  fulfilmentMethod: fulfilmentMethodSchema,
+  fulfilmentNotes: z.string().trim().max(500, "Keep fulfilment notes under 500 characters").optional().or(z.literal("")),
   startingBidMinor: minorAmount.refine(
     (v) => v >= MIN_STARTING_BID_MINOR,
     "Minimum starting price is $1.00"
