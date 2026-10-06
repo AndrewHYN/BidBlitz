@@ -87,6 +87,30 @@ export function isLinkwaBaseUrl(value: string): boolean {
   return HTTPS_URL_RE.test(value.trim());
 }
 
+/**
+ * True only when a Linkwa refusal body gives enough evidence to say it was
+ * about the minimum amount: the words that name a floor AND the words that
+ * say what is floored. Anything less (missing, unreadable, about auth, about
+ * signatures, about some other field) stays a generic provider error — we
+ * never guess at an undocumented error format.
+ */
+export function linkwaRefusalIndicatesBelowMinimum(bodyText: string): boolean {
+  const text = bodyText.toLowerCase();
+  const namesAFloor = /minimum|min\.\s|lower bound/.test(text);
+  const aboutAmount = /amount|price|charge|value/.test(text);
+  return namesAFloor && aboutAmount;
+}
+
+/** Bounded, best-effort read of a refusal body for classification. */
+async function readRefusalText(response: Response): Promise<string> {
+  try {
+    const text = await response.text();
+    return text.slice(0, 2000);
+  } catch {
+    return "";
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Money — exact decimal strings on the wire, integer minor units inside
 // ---------------------------------------------------------------------------
@@ -224,6 +248,15 @@ export class LinkwaPaymentProvider implements PaymentProvider {
       );
     }
     if (!response.ok) {
+      // Read the body once for classification only: it tells us WHAT failed,
+      // and its text is never forwarded to the client verbatim.
+      const refusalText = await readRefusalText(response);
+      if (linkwaRefusalIndicatesBelowMinimum(refusalText)) {
+        throw new PaymentProviderError(
+          "PAYMENT_AMOUNT_BELOW_MINIMUM",
+          "Linkwa refused the amount as below its published minimum; nothing was charged."
+        );
+      }
       throw new PaymentProviderRequestError(
         `Linkwa answered HTTP ${response.status} for the payment request.`
       );

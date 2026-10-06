@@ -136,10 +136,13 @@ export async function POST(request: Request): Promise<Response> {
     }
     if (err instanceof PaymentProviderError) {
       const unsupported = err.code === "PAYMENT_UNSUPPORTED_CURRENCY";
-      return json(
-        { ok: false, error: unsupported ? "unsupported_currency" : "provider_error" },
-        unsupported ? 400 : 502
-      );
+      if (unsupported) {
+        return json({ ok: false, error: "unsupported_currency" }, 400);
+      }
+      if (err.code === "PAYMENT_AMOUNT_BELOW_MINIMUM") {
+        return json({ ok: false, error: "provider_minimum_amount" }, 400);
+      }
+      return json({ ok: false, error: "provider_error" }, 502);
     }
     console.error(
       "[payments/checkout]",

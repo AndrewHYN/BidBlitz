@@ -5,6 +5,7 @@ import {
   isLinkwaBaseUrl,
   linkwaAmountToMinor,
   linkwaEventId,
+  linkwaRefusalIndicatesBelowMinimum,
   minorToLinkwaAmount,
   verifyLinkwaSignature,
   LINKWA_PROVIDER_ID,
@@ -330,6 +331,51 @@ describe("LinkwaPaymentProvider.createIntent", () => {
         idempotencyKey: "x",
       })
     ).rejects.toThrow(/did not return a payment page/);
+  });
+
+  it("maps a clear minimum-amount refusal to PAYMENT_AMOUNT_BELOW_MINIMUM", async () => {
+    const fetchImpl = (async () =>
+      jsonResponse(
+        { message: "Amount must be at least the minimum payment of $1.00" },
+        400
+      )) as typeof fetch;
+    const err = await providerWith(stubLedger(), fetchImpl)
+      .createIntent({
+        transactionId: TX,
+        amountMinor: 50n,
+        currency: "USD",
+        idempotencyKey: "x",
+      })
+      .catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(PaymentProviderError);
+    expect((err as PaymentProviderError).code).toBe("PAYMENT_AMOUNT_BELOW_MINIMUM");
+  });
+
+  it("keeps an unrelated provider refusal generic", async () => {
+    const fetchImpl = (async () =>
+      jsonResponse({ message: "Invalid API key" }, 401)) as typeof fetch;
+    await expect(
+      providerWith(stubLedger(), fetchImpl).createIntent({
+        transactionId: TX,
+        amountMinor: 50n,
+        currency: "USD",
+        idempotencyKey: "x",
+      })
+    ).rejects.toThrow(/answered HTTP 401/);
+  });
+
+  it("only names the minimum when the refusal clearly indicates it", () => {
+    expect(
+      linkwaRefusalIndicatesBelowMinimum(
+        '{"message":"Amount is below the minimum of $1.00"}'
+      )
+    ).toBe(true);
+    expect(linkwaRefusalIndicatesBelowMinimum('{"message":"Bad API key"}')).toBe(false);
+    expect(linkwaRefusalIndicatesBelowMinimum("")).toBe(false);
+    // No "floor" words -> no guess, even if the amount is mentioned.
+    expect(
+      linkwaRefusalIndicatesBelowMinimum('{"message":"Amount could not be parsed"}')
+    ).toBe(false);
   });
 
   it("reports a transport failure without touching the ledger", async () => {

@@ -15,6 +15,7 @@ import {
   reportSchema,
   reviewSchema,
   watchlistSchema,
+  MIN_STARTING_BID_MINOR,
 } from "./validation";
 
 const UUID = "3f1d2a4c-9b7e-4f0a-8c2d-1e6b5a4f3c2d";
@@ -99,6 +100,22 @@ describe("createAuctionSchema", () => {
     expect(
       createAuctionSchema.safeParse({ ...validAuction(), bidIncrementMinor: "" }).success
     ).toBe(false);
+  });
+
+  it("enforces the $1.00 Linkwa minimum on new auctions", () => {
+    expect(MIN_STARTING_BID_MINOR).toBe(100n);
+    expect(
+      createAuctionSchema.safeParse({ ...validAuction(), startingBidMinor: "99" }).success
+    ).toBe(false);
+    expect(
+      createAuctionSchema.safeParse({ ...validAuction(), startingBidMinor: "50" }).success
+    ).toBe(false);
+    const floor = createAuctionSchema.safeParse({
+      ...validAuction(),
+      startingBidMinor: "100",
+    });
+    expect(floor.success).toBe(true);
+    if (floor.success) expect(floor.data.startingBidMinor).toBe(100n);
   });
 
   it("honours an explicit anti-snipe window", () => {

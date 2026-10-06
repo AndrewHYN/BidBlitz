@@ -336,6 +336,25 @@ describe("POST /api/payments/checkout — starting a payment", () => {
     expect(await read(response)).toEqual({ ok: false, error: "provider_error" });
   });
 
+  it("turns a provider minimum-amount refusal into a readable 400", async () => {
+    session({ id: BUYER }, row());
+    setPaymentProvider(
+      providerWith(async () => {
+        throw new PaymentProviderError(
+          "PAYMENT_AMOUNT_BELOW_MINIMUM",
+          "Linkwa refused the amount as below its published minimum."
+        );
+      })
+    );
+
+    const response = await postJson({ transactionId: TX });
+    expect(response.status).toBe(400);
+    expect(await read(response)).toEqual({
+      ok: false,
+      error: "provider_minimum_amount",
+    });
+  });
+
   it("turns an unsupported currency into a 400 the buyer can read", async () => {
     session({ id: BUYER }, row({ currency: "EUR" }));
     setPaymentProvider(

@@ -75,6 +75,17 @@ export const DURATIONS = [
  */
 export const MIN_PASSWORD_LENGTH = 8;
 
+/**
+ * Minimum auction starting price, in USD minor units (cents).
+ *
+ * Linkwa — the production payment provider — publishes $1.00 as the lowest
+ * amount it will process. A sale can never win for less than its starting
+ * bid, so a starting bid below 100 cents would create an auction whose winner
+ * cannot be paid. New auctions are refused below this floor; historical
+ * sub-$1 rows predate this rule and are left exactly as they are.
+ */
+export const MIN_STARTING_BID_MINOR = 100n;
+
 export const MAX_IMAGES = 8;
 export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 export const ALLOWED_IMAGE_TYPES = [
@@ -106,7 +117,10 @@ export const createAuctionSchema = z.object({
     .trim()
     .min(2, "Add a location")
     .max(80, "Location is too long"),
-  startingBidMinor: minorAmount,
+  startingBidMinor: minorAmount.refine(
+    (v) => v >= MIN_STARTING_BID_MINOR,
+    "Minimum starting price is $1.00"
+  ),
   bidIncrementMinor: minorAmount,
   durationSeconds: z
     .number()

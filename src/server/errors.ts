@@ -24,6 +24,7 @@ export type BidErrorCode =
   | "has_bids"
   | "rate_limited"
   | "account_banned"
+  | "below_minimum_price"
   | "invalid_input"
   | "reset_link_invalid"
   | "duplicate_report"
@@ -62,6 +63,10 @@ const MESSAGES: Record<BidErrorCode, string> = {
   image_required: "Add at least one photo before publishing.",
   has_bids: "People have bid on this auction, so it can't be cancelled.",
   rate_limited: "Too many attempts. Wait a moment and try again.",
+  // Raised by the auctions minimum-price trigger: the payment provider
+  // (Linkwa) will not process anything under $1.00, so a lower starting
+  // price could never settle.
+  below_minimum_price: "Minimum starting price is $1.00.",
   // Raised by the is_banned triggers (migration 20260928000003). It has to be
   // in this table rather than falling through to `unknown`: the terms promise
   // a user can be suspended, so "Something went wrong. Please try again." would
