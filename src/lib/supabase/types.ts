@@ -260,6 +260,10 @@ export interface Database {
         Args: { p_auction_id: string; p_starts_at?: string | null };
         Returns: Json;
       };
+      set_auction_fulfilment: {
+        Args: { p_auction_id: string; p_method: "COLLECTION" | "DELIVERY" | "BOTH"; p_notes?: string | null };
+        Returns: Json;
+      };
       cancel_auction: { Args: { p_auction_id: string }; Returns: Json };
       settle_auction: { Args: { p_auction_id: string }; Returns: Json };
       settle_due_auctions: { Args: { p_limit?: number }; Returns: number };
