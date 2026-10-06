@@ -8,6 +8,8 @@ import {
   CONDITIONS,
   conditionLabels,
   DURATIONS,
+  FULFILMENT_METHODS,
+  fulfilmentMethodLabels,
 } from "@/lib/validation";
 import { formatMoney, money, parseMoneyToMinor, feePercentLabel } from "@/lib/money";
 import { renderRejectionMessage } from "@/server/errors";
@@ -88,6 +90,8 @@ export function SellForm({
   const [categoryId, setCategoryId] = useState(NO_SELECTION);
   const [condition, setCondition] = useState(NO_SELECTION);
   const [location, setLocation] = useState("");
+  const [fulfilmentMethod, setFulfilmentMethod] = useState("");
+  const [fulfilmentNotes, setFulfilmentNotes] = useState("");
   const [startingBid, setStartingBid] = useState("");
   const [bidIncrement, setBidIncrement] = useState("");
   const [durationSeconds, setDurationSeconds] = useState("86400");
@@ -108,6 +112,8 @@ export function SellForm({
       categoryId: Number(categoryId),
       condition,
       location,
+      fulfilmentMethod,
+      fulfilmentNotes,
       startingBidMinor: startingMinor === null ? startingBid : startingMinor.toString(),
       bidIncrementMinor: incrementMinor === null ? bidIncrement : incrementMinor.toString(),
       durationSeconds: Number(durationSeconds),
@@ -214,10 +220,9 @@ export function SellForm({
             data-testid="sell-description"
           />
           <p id="sell-description-hint" className="text-xs text-muted-foreground">
-            Condition and any defects, what is included, accessories, and how the
-            item can be collected or delivered. Photos and specifics are what
-            turn a browse into a bid. There is no minimum number of images
-            required to list.
+            Condition and any defects, what is included, accessories, and anything
+            else a bidder should know. Photos and specifics are what turn a browse
+            into a bid. You&apos;ll add at least one photo before publishing.
           </p>
           <FieldError id="sell-description-error" messages={errors.description} />
         </div>
@@ -280,13 +285,54 @@ export function SellForm({
             id="sell-location"
             value={location}
             onChange={(event) => setLocation(event.target.value)}
-            placeholder="e.g. Portland, OR"
+            placeholder="e.g. Harare, Avondale"
             maxLength={80}
             aria-invalid={errors.location ? true : undefined}
             aria-describedby={errors.location ? "sell-location-error" : undefined}
             data-testid="sell-location"
           />
           <FieldError id="sell-location-error" messages={errors.location} />
+        </div>
+
+        <div className="grid gap-5 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label htmlFor="sell-fulfilment">Fulfilment</Label>
+            <Select value={fulfilmentMethod} onValueChange={setFulfilmentMethod}>
+              <SelectTrigger
+                id="sell-fulfilment"
+                aria-invalid={errors.fulfilmentMethod ? true : undefined}
+                data-testid="sell-fulfilment"
+                className="w-full"
+              >
+                <SelectValue placeholder="How will the buyer receive it?" />
+              </SelectTrigger>
+              <SelectContent>
+                {FULFILMENT_METHODS.map((value) => (
+                  <SelectItem key={value} value={value}>
+                    {fulfilmentMethodLabels[value]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <FieldError messages={errors.fulfilmentMethod} />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="sell-fulfilment-notes">Fulfilment notes</Label>
+            <Input
+              id="sell-fulfilment-notes"
+              value={fulfilmentNotes}
+              onChange={(event) => setFulfilmentNotes(event.target.value)}
+              placeholder="e.g. Collection in Avondale; Harare delivery can be arranged"
+              maxLength={500}
+              aria-invalid={errors.fulfilmentNotes ? true : undefined}
+              data-testid="sell-fulfilment-notes"
+            />
+            <p className="text-xs text-muted-foreground">
+              Optional. Add collection area, delivery limits or who covers delivery costs.
+            </p>
+            <FieldError messages={errors.fulfilmentNotes} />
+          </div>
         </div>
       </section>
 
@@ -314,7 +360,7 @@ export function SellForm({
               data-testid="sell-starting-bid"
             />
             <p id="sell-starting-bid-hint" className="text-xs text-muted-foreground">
-              Any amount above zero. Bidding starts here.
+              Minimum starting bid is $1.00. Bidding starts here.
             </p>
             <FieldError id="sell-starting-bid-error" messages={errors.startingBidMinor} />
           </div>
