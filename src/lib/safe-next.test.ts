@@ -25,4 +25,17 @@ describe("safeNext()", () => {
     expect(safeNext("dashboard")).toBe("/dashboard");
     expect(safeNext("evil.com")).toBe("/dashboard");
   });
+
+  // The URL parser strips tab/CR/LF before parsing, so "/\t/evil.com" is read
+  // as "//evil.com" — a protocol-relative URL off the site. Trimming alone does
+  // not remove an inner control character, so these must be rejected outright.
+  it("rejects control characters that the URL parser would erase", () => {
+    for (const evil of ["/\t/evil.com", "/\n/evil.com", "/\r/evil.com", "/\u0000x"]) {
+      expect(safeNext(evil)).toBe("/dashboard");
+      expect(safeNext(evil)).toBe(safeNext("/dashboard"));
+    }
+    expect(new URL(safeNext("/\t/evil.com"), "https://bidblitz.co.zw/login").origin).toBe(
+      "https://bidblitz.co.zw"
+    );
+  });
 });
