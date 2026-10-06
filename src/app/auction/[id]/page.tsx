@@ -20,6 +20,7 @@ import { SellerCard } from "@/components/auction/seller-card";
 import { ShareButton } from "@/components/auction/share-button";
 import { WatchButton } from "@/components/auction/watch-button";
 import { ConditionBadge } from "@/components/auction/status-badge";
+import { fulfilmentMethodLabels } from "@/lib/validation";
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -104,6 +105,9 @@ export default async function AuctionPage({ params }: Props) {
     dateStyle: "medium",
     timeZone: "UTC",
   });
+  const fulfilmentLabel = auction.fulfilment_method
+    ? fulfilmentMethodLabels[auction.fulfilment_method]
+    : "Not specified";
 
   // Built from the same row the page renders from, so the markup can never
   // advertise a price, an image or a state the visible page disagrees with.
@@ -216,14 +220,6 @@ export default async function AuctionPage({ params }: Props) {
             </p>
           </section>
 
-          {/*
-            Fulfilment is the one thing a bidder cannot infer from the listing,
-            and there is no schema field for it — so the section says that
-            rather than inventing a delivery method, a courier or a price. What
-            it can state truthfully is the mechanic that does exist: the sale
-            opens a private thread between the two parties, and that is where
-            collection or delivery is agreed.
-          */}
           <section aria-labelledby="fulfilment">
             <h2
               id="fulfilment"
@@ -233,18 +229,13 @@ export default async function AuctionPage({ params }: Props) {
             </h2>
             <div className="space-y-3 text-[0.9375rem] leading-[1.7] text-muted-foreground text-pretty">
               <p>
-                Delivery is arranged directly between the buyer and the seller.
-                BidBlitz does not ship items, does not set delivery prices and
-                does not promise an arrival date.
+                <strong className="text-foreground">{fulfilmentLabel}.</strong>
+                {auction.fulfilment_notes ? ` ${auction.fulfilment_notes}` : ""}
               </p>
               <p>
-                <strong className="text-foreground">
-                  This listing has no separate delivery section from the seller.
-                </strong>{" "}
-                Check the description above, and when the auction closes the
-                sale opens a private message thread between the two parties,
-                where collection or delivery is agreed before either side marks
-                the handover complete.
+                BidBlitz does not ship items or set delivery prices. After the
+                auction closes, the buyer and seller get a private message thread
+                to confirm collection or delivery details before handover.
               </p>
             </div>
           </section>
