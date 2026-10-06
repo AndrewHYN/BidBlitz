@@ -225,7 +225,7 @@ export default function TermsPage() {
                 called &ldquo;Awaiting payment&rdquo; and simply waits there.
                 Nothing is charged, collected or paid out through BidBlitz
                 today. Until a payment provider is connected, do not assume
-                that money has moved through the site, and and check back here
+                that money has moved through the site, and check back here
                 before payments are enabled, because these terms will be
                 updated first.
               </p>
@@ -249,12 +249,15 @@ export default function TermsPage() {
                 The two are recorded separately, and they are separate steps.
               </p>
               <p>
-                BidBlitz pays the seller&apos;s proceeds (the winning price less
+                BidBlitz owes the seller their proceeds (the winning price less
                 the 5% platform fee) after the seller has fulfilled the sale
-                and the buyer&apos;s window to raise a dispute has passed. The
-                payout is sent to the seller through Linkwa, or recorded against
-                the sale when made outside BidBlitz. BidBlitz does not split a
-                buyer&apos;s payment between sellers automatically.
+                and the buyer&apos;s window to raise a dispute has passed.
+                Paying it is an explicit, administrator-run step: an operator
+                either sends it through the payout provider connected to
+                BidBlitz at the time, or makes the transfer outside BidBlitz
+                and records it against the sale. BidBlitz never sends a payout
+                on its own, and it does not split a buyer&apos;s payment
+                between sellers automatically.
               </p>
               <p>
                 A payout is held while a dispute about the sale is open, and is

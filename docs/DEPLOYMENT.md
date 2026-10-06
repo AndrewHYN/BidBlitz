@@ -30,7 +30,7 @@ name and does nothing clever.
 | `NEXT_PUBLIC_SUPABASE_URL` | `https://<project-ref>.supabase.co` | Public. Baked into the bundle at build time. |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | `sb_publishable_...` | Public by design; safe to ship because RLS constrains every query it can make. |
 | `SUPABASE_SECRET_KEY` | `sb_secret_...` | **Server only.** Never `NEXT_PUBLIC_`, never logged. Read in exactly one module (`src/lib/supabase/admin.ts`, guarded by `import "server-only"`). |
-| `NEXT_PUBLIC_SITE_URL` | `https://<your-domain>` | Used for canonical URLs and Open Graph tags. Also derives the Paynow `resulturl` / `returnurl` (§5), so it must be the canonical origin before a provider is configured. |
+| `NEXT_PUBLIC_SITE_URL` | `https://bidblitz.co.zw` | Used for canonical URLs and Open Graph tags. Also derives the provider `resulturl` / `returnurl` and OAuth `redirectTo` (§2b), so it must be the canonical origin before a provider is configured. |
 | `CRON_SECRET` | 32+ random bytes | `openssl rand -hex 32`. Authorizes `GET /api/cron/settle`. |
 
 **Payment provider — Production secrets, set 2026-09-26.** These are the only
@@ -59,15 +59,29 @@ exactly which names are missing:
 | `LINKWA_BASE_URL` | Account API origin from the Linkwa dashboard | **Server only.** No default is assumed; sandbox and production origins differ. |
 | `LINKWA_WEBHOOK_SECRET` | Webhook signing secret from the Linkwa dashboard | **Server only.** Verifies `X-Linkwa-Signature` on every event. |
 
-Linkwa go-live checklist (all owner-gated, in order): free-sandbox proof of
-collect → webhook → payout → statement for a controlled sale; establish the
-undocumented behaviors (refunds, payout status, idempotency) from sandbox
-evidence, not assumptions; rewrite the Paynow-specific static copy
-(terms/help/fees/footer/sell-form) to name Linkwa; only then set the three
-production variables. Paynow credentials stay in place throughout as the
-configured fallback. The written Paynow-to-Linkwa approval question (marketplace
-collection, fee, disbursement, KYC, refunds, settlement) is still open and
-still required regardless of provider.
+Linkwa go-live checklist (all owner-gated, in order):
+
+1. ~~free-sandbox proof of collect → webhook → payout → statement for a
+   controlled sale~~ — **done 2026-10-05** in `sandbox/linkwa-preview`: a
+   controlled $10.00 sale collected through a verified webhook and a $9.50
+   payout instructed to a registered SmileCash sandbox wallet, with the
+   statement debit shown (ADR-016).
+2. Establish the undocumented behaviors (refunds, payout status, idempotency)
+   from sandbox evidence, not assumptions — refunds and payout status remain
+   undocumented and are deliberately **unsupported** in code rather than
+   guessed.
+3. Verify the provider-facing copy (terms/help/fees/footer/sell-form). It is
+   already provider-dynamic (`paymentProviderDisplayName()`), so this is a
+   read-through, not a rewrite; the one hard-coded claim, in the terms
+   payout section, has been made provider-neutral.
+4. Only then set the three production variables. Paynow credentials stay in
+   place throughout as the configured fallback.
+
+The written Paynow-to-Linkwa approval question (marketplace collection, fee,
+disbursement, KYC, refunds, settlement) is still open and unanswered. Per
+ADR-016 it is **non-blocking**: approved, Paynow remains a configured
+fallback; not approved, Linkwa remains the launch provider. No approval is
+claimed anywhere in this repository.
 
 **Not** set in Vercel, because they are development-machine only:
 
@@ -84,14 +98,18 @@ committed and npm ci is used automatically.
 
 | Role | URL | Notes |
 | --- | --- | --- |
-| Production / canonical | `https://bid-blitz-ten.vercel.app` | The project's only domain (Project → Domains). Pushes to `main` build and promote here. |
-| Frozen deployment URL | `https://bid-blitz-q9l25rfxv-andrewhyn.vercel.app` | Immutable URL of one earlier deployment. It cannot be aliased or updated — `vercel alias set` refuses deployment URLs — so it is permanently frozen at that build and its then-current env. Never link users here. |
+| **Production / canonical** | `https://bidblitz.co.zw` | The canonical origin for every absolute URL the app produces (canonical/og:url, sitemap, auth email links, provider callbacks) — `src/lib/site-url.ts` is the single definition. Pushes to `main` build and promote here. |
+| Legacy production origin (HISTORICAL) | `https://bid-blitz-ten.vercel.app` | The origin production used before the custom domain. It still resolves and remains in the Supabase allow-list and in Vercel, but it is **not** canonical: never present it as the current production URL. Dated evidence elsewhere in this file and in ADR-011/ADR-016 that was produced against it is kept as-is and labelled historical. |
+| Frozen deployment URL (HISTORICAL) | `https://bid-blitz-q9l25rfxv-andrewhyn.vercel.app` | Immutable URL of one earlier deployment. It cannot be aliased or updated — `vercel alias set` refuses deployment URLs — so it is permanently frozen at that build and its then-current env. Never link users here. |
 
-`NEXT_PUBLIC_SITE_URL` is `https://bid-blitz-ten.vercel.app/`. Vercel snapshots
-environment variables **per deployment**, so a changed value only takes effect
-from the next git push onward (it is inlined into the bundle at build time). It
-drives canonical URLs, Open Graph tags, and the sign-up confirmation
-`emailRedirectTo` (`src/server/actions/auth.ts`).
+`NEXT_PUBLIC_SITE_URL` must be `https://bidblitz.co.zw/` in production. Vercel
+snapshots environment variables **per deployment**, so a changed value only
+takes effect from the next git push onward (it is inlined into the bundle at
+build time). It drives canonical URLs, Open Graph tags, the sign-up confirmation
+`emailRedirectTo` (`src/server/actions/auth.ts`) and every provider
+callback/result URL. The legacy `https://bid-blitz-ten.vercel.app/` value is
+historical: if it is still the live Vercel value, updating it is an owner
+dashboard action (§7), not a code change.
 
 ## 2. Supabase: allow the deployed origin
 
@@ -109,10 +127,12 @@ non-absolute path, so it cannot be used as an open redirect.
 This project's live values, read back through the Management API
 (`GET /v1/projects/{ref}/config/auth`):
 
-- **Site URL** = `https://bid-blitz-ten.vercel.app` — the canonical production
-  domain (§1). It is the fallback landing when no explicit
-  `emailRedirectTo` is honoured. Confirmation links pass
-  `emailRedirectTo = ${NEXT_PUBLIC_SITE_URL}/auth/callback`
+- **Site URL** = `https://bid-blitz-ten.vercel.app` — HISTORICAL read-back from
+  the launch pass (Phase 17), when that was still the production origin. The
+  canonical origin is now `https://bidblitz.co.zw` (§1), so the Site URL must be
+  read back and confirmed to be the canonical origin before cutover: it is the
+  fallback landing when no explicit `emailRedirectTo` is honoured.
+  Confirmation links pass `emailRedirectTo = ${NEXT_PUBLIC_SITE_URL}/auth/callback`
   (`src/server/actions/auth.ts`): production resolves it from the Vercel env,
   local dev from the gitignored `.env.local`
   (`NEXT_PUBLIC_SITE_URL=http://localhost:3000`). The Site URL was moved off
@@ -121,12 +141,15 @@ This project's live values, read back through the Management API
   read-back.
 - **Redirect URLs** (the `uri_allow_list` field, comma-separated) =
   `https://bid-blitz-ten.vercel.app/**,https://bid-blitz-q9l25rfxv-andrewhyn.vercel.app/**,https://bid-blitz*-andrewhyn.vercel.app/**,http://localhost:3000/**`
-  — production first, then every pre-existing pattern **preserved verbatim**.
-  Note the correction: the older `bid-blitz*-andrewhyn.vercel.app/**` wildcard
-  does **not** cover the production alias (it lacks the `-andrewhyn` suffix),
-  which is why the explicit production pattern was prepended rather than
-  assumed. A redirect outside this list is rejected by GoTrue, so any future
-  domain (e.g. a custom domain) must be added here as well as in Vercel.
+  — the value read back during the launch pass (historical). **The canonical
+  origin `https://bidblitz.co.zw/**` must be in this list for cutover**; §2b
+  already records it for the Google provider, and the same applies here. The
+  pre-existing patterns are preserved verbatim. Note the correction: the older
+  `bid-blitz*-andrewhyn.vercel.app/**` wildcard does **not** cover the
+  production alias (it lacks the `-andrewhyn` suffix), which is why the explicit
+  production pattern was prepended rather than assumed. A redirect outside this
+  list is rejected by GoTrue, so a domain must be added here as well as in
+  Vercel.
 
 Two details worth keeping:
 
@@ -177,10 +200,13 @@ needs no code change: the `auth.users` trigger already prefers
 
 ## 3. Cron
 
-`vercel.json` schedules:
+`vercel.json` schedules both of the app's crons:
 
 ```json
-{ "path": "/api/cron/settle", "schedule": "0 4 * * *" }
+[
+  { "path": "/api/cron/settle", "schedule": "0 4 * * *" },
+  { "path": "/api/email/dispatch", "schedule": "0 5 * * *" }
+]
 ```
 
 **Why daily and not every minute:** Vercel **fails the deployment** if a
@@ -441,16 +467,78 @@ deployments stay protected.) Verify with the `project protection` command
 above, then re-run the §4 smoke checks. `gitForkProtection` is unrelated and
 stays on.
 
-> **Verified release state (release audit 2026-09-25):** `deploymentType` is
-> `preview` — production (`bid-blitz-ten.vercel.app`) is publicly reachable for
-> real users while preview deployments stay protected, and `gitForkProtection`
-> stays on. This is the intended launch state; release QA (HTTP smoke, Playwright
-> desktop + mobile, visual pass) ran against the live domain in exactly this
-> state. If `all_except_custom_domains` is ever set again, production on
+> **Historical — release audit 2026-09-25, taken against the then-production
+> origin `https://bid-blitz-ten.vercel.app` (now the legacy origin; the
+> canonical production origin is `https://bidblitz.co.zw`, §1):**
+> `deploymentType` is `preview` — production was publicly reachable for
+> real users while preview deployments stayed protected, and `gitForkProtection`
+> stayed on. That was the intended launch state at the time; release QA (HTTP
+> smoke, Playwright desktop + mobile, visual pass) ran against it in exactly
+> this state. If `all_except_custom_domains` is ever set again, production on
 > `*.vercel.app` is gated (302 to `vercel.com/sso-api`) and the site must not be
 > described as publicly live until it is switched back with the PATCH above.
 
+## 7. Production cutover readiness checklist
+
+Every line is either an owner dashboard action or a check that already exists
+in this repository. Nothing is marked done here; this is the list to walk.
+
+### Owner dashboard / provider actions
+
+- [ ] **Canonical URL** — `NEXT_PUBLIC_SITE_URL` = `https://bidblitz.co.zw` in
+      Vercel → Production, *and* the deployment serving production was created
+      after the change (env is snapshotted per build). §1.
+- [ ] **Supabase config** — Site URL = `https://bidblitz.co.zw`. §2.
+- [ ] **Auth redirect URL** — the allow-list contains
+      `https://bidblitz.co.zw/**` (keeping the legacy origin and localhost).
+      §2, §2b.
+- [ ] **Email configuration** — a custom SMTP provider in Supabase →
+      Authentication → Email (or an accepted launch limitation: the built-in
+      mailer's `rate_limit_email_sent` is 2/hour project-wide, tracked as gate
+      K0), plus `RESEND_API_KEY` and `EMAIL_FROM` in Vercel if outbox mail is
+      expected to send — without them rows stay `QUEUED` and the cron reports
+      `held: no-resend-credentials`. `docs/EMAIL.md`.
+- [ ] **`CRON_SECRET`** — set to 32+ random bytes; both cron routes answer 401
+      without it and 200 with it. §3, §4 items 1–2.
+- [ ] **Selected payment provider** — decided and recorded. Linkwa is the
+      intended launch provider; Paynow test-mode credentials remain in place as
+      the configured fallback and are not to be changed by engineering work.
+      §5.
+- [ ] **Linkwa production credentials** — all three of `LINKWA_API_KEY`,
+      `LINKWA_BASE_URL`, `LINKWA_WEBHOOK_SECRET`, or none. Any subset leaves
+      `NoopPaymentProvider` in place and names the missing variables in the
+      server log; it never half-activates and never silently falls through to
+      Paynow. §1.
+- [ ] **Webhook endpoint** — `POST /api/payments/webhook` answers 400
+      `invalid_json`/`invalid_signature` on an empty or unsigned body and `GET`
+      answers the 200 probe that writes nothing. §4 item 7, §5.
+- [ ] **Admin payout operation** — exactly the intended admin(s) hold
+      `admin.access`, a recipient is on file for the seller, and a payout can
+      be inspected and refused before any provider call (delivery confirmation
+      is a database-enforced fact). §4 item 9, `docs/MARKETPLACE_OPERATIONS.md`.
+- [ ] **Final smoke tests** — the §4 list against the deployed URL, plus
+      `npm run db:verify` where a Supabase management token is available.
+
+### What the server reports today, and what it must never report
+
+The only configuration diagnostic is `paymentBootError()`
+(`src/server/payments/config.ts`), returned in the **503** body of
+`/api/payments/checkout` and `/api/payments/reconcile` when the provider is
+unconfigured. It exposes exactly two things: the provider-selection *state*
+and the **names** of missing variables (e.g. `LINKWA_WEBHOOK_SECRET`). It is
+never rendered into public markup.
+
+It must stay that way. No endpoint — this one or any new one — may expose a
+secret value, a substring or prefix of a value, a decrypted environment
+variable, an API key, a webhook secret, or a database credential, and no public
+endpoint may reveal configuration detail to an unauthenticated caller.
+
+**Not yet true, and not an engineering action:** real production payments are
+**not** live. Do not describe them as live until Linkwa production credentials
+are installed and one controlled real transaction has succeeded end to end.
+
 ## Troubleshooting
+
 
 | Symptom | Cause |
 | --- | --- |

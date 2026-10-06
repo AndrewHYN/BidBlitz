@@ -57,7 +57,7 @@ green suite proving signups work.
 ### Transactional email (Resend) — architecture done, credentials pending
 
 `docs/EMAIL.md` is the contract. Implemented and tested without credentials:
-durable `email_outbox` with idempotency keys, 18-template catalogue, Resend API
+durable `email_outbox` with idempotency keys, 20-template catalogue, Resend API
 dispatcher that holds rows `QUEUED` when no key is configured, per-user
 preferences for optional mail (critical mail always sends), and a daily cron
 backstop. Remaining owner actions, all in dashboards, none in code:
@@ -66,6 +66,16 @@ backstop. Remaining owner actions, all in dashboards, none in code:
   set Vercel `RESEND_API_KEY` / `EMAIL_FROM` / `APP_URL`.
 - Supabase Auth SMTP: `smtp.resend.com:465`, username `resend`, password the
   API key. This is what unblocks the signup ceiling above, on the Free plan.
+
+Deferred **in code** (a real limitation, deliberately not built in this pass):
+
+- **Inline email dispatch.** The daily cron (`/api/email/dispatch`, 05:00) is
+  the only path that calls `dispatchEmailOutbox`, so queued mail — including a
+  critical "you won" notification — can wait up to ~24 hours. The fix is to
+  dispatch inline in the actions that can afford it (or call the dispatcher
+  from `after()`), reusing the existing function. Not an owner action and not
+  a data-loss risk: rows stay `QUEUED` with `attempts`/`last_error` until they
+  are sent.
 
 ### Payments
 MVP deliberately does not fake payment.
@@ -115,14 +125,19 @@ Before enabling real buyer/seller money movement:
 - review legal/regulatory obligations (`docs/COMPLIANCE_LAUNCH_CHECKLIST.md`).
 
 ### Payouts (money path, stated plainly)
-Today the money path is: **buyer → Paynow → the platform's registered
-Zimbabwean bank account**, less Paynow's transaction fee. BidBlitz records a
-5% platform fee and the seller's proceeds in integer minor units, but **nothing
-transfers to a seller automatically**. There is no seller payout API in Paynow
-Zimbabwe, no escrow, and no split-payment support — the `transfers[]` split API
-belongs to Paynow *Poland* (ING), a different company. Any onward payment to a
-seller is a separate, manual administrative process (currently: platform-side
-bank transfer), and must not be described as an automated payout.
+In Paynow **test mode** — the state of production today — **no real money
+moves at all**. The intended path once a provider is live is: **buyer → payment
+provider (Linkwa at launch, ADR-016; Paynow as configured test-mode fallback) →
+the platform's settlement bank account**, less the provider's transaction fee.
+The account's registered holder is an unsupplied owner fact (`C1` in
+`docs/INTERNAL_LAUNCH_CHECKLIST.md`), so no registration claim is made here.
+BidBlitz records a 5% platform fee and the seller's proceeds in integer minor
+units, but **nothing transfers to a seller automatically**. There is no seller
+payout API in Paynow Zimbabwe, no escrow, and no split-payment support — the
+`transfers[]` split API belongs to Paynow *Poland* (ING), a different company.
+Any onward payment to a seller is a separate, manual administrative process
+(bank transfer, or the admin-gated Linkwa payout console), and must not be
+described as an automated payout.
 
 **Built 2026-09-28 (see ADR-012):** the *record* of that manual process now
 exists and is enforced by the database — `seller_payouts`, created automatically
@@ -136,7 +151,9 @@ Still open for payouts:
   merchant to collect buyer funds for third-party sellers and make onward
   payments to them in a manual model. Query drafted in
   `docs/PAYNOW_MARKETPLACE_SUPPORT_REQUEST.md` (point 5); **not sent, no
-  response.** This is a launch blocker, not a backlog nicety.
+  response.** Per ADR-016 this is **non-blocking**: Paynow is the fallback
+  provider and Linkwa (which documents marketplace payouts) is the launch
+  provider. It is not claimed as approved anywhere.
 - **Seller payment details are not collected at all.** No product field, no
   database column, no upload. Payouts are made out of band. Storing seller bank
   details raises real security and legal obligations and must be a deliberate
@@ -147,9 +164,11 @@ Still open for payouts:
 - **No fee ledger export.** Platform fee revenue is frozen per transaction in
   Postgres and exported to nothing.
 
-### External checklist — Paynow (BLOCKERS, not engineering)
+### External checklist — Paynow (fallback provider; external, not engineering)
 Tracked in full in `docs/COMPLIANCE_LAUNCH_CHECKLIST.md` §I. None of these can
-be closed by writing code, and none may be described as closed:
+be closed by writing code, and none may be described as closed. Per ADR-016
+they no longer gate launch: **Linkwa is the intended launch provider**, and
+these items apply to Paynow's continued role as the configured fallback.
 - **Marketplace model approval in writing** (collect for third-party sellers,
   onward manual payouts) — no response.
 - **`resulturl` status delivery** — eight test-mode initiations, zero POSTs.
@@ -219,24 +238,33 @@ Everything classified P0/P1 was implemented (payment webhook seam, fee
 disclosure, publish/share flow, ending-soon + review-request notifications,
 trust facts, buying-page payment state). What follows was judged safe to wait:
 
-### Payment provider research (research only — nothing activated)
+### Payment provider research (PHASE 2 SNAPSHOT — historical, superseded)
+
+> **Historical.** Written when `NoopPaymentProvider` was the only configured
+> state. Superseded: Paynow has been configured in Production (test mode)
+> since 2026-09-26, and Linkwa is the selected launch provider (ADR-016) with
+> sandbox collection and payout proven 2026-10-05. Kept because the research
+> questions themselves (settlement, KYC, fees, webhook signature schemes) are
+> still the right questions to ask of any provider.
+
 - **Provider choice for Zimbabwe / target market** — research candidate
   providers (e.g. Paynow, InnBucks, EcoCash aggregators for local rails;
   Stripe only where officially supported) and compare settlement, KYC,
   fees and webhook signature schemes. Decision required before any code
-  activates a provider: no provider is hard-coded anywhere today, and
-  `NoopPaymentProvider` remains the configured default.
-- **Webhook signature verification** — `POST /api/payments/webhook` now
-  forwards the raw body + headers to the provider seam (`WebhookContext`),
-  but with no provider configured there is nothing to verify yet. The
-  provider integration must implement constant-time signature checks there
-  before trusting any payload.
+  activates a provider: provider selection lives in exactly one module
+  (`src/server/payments/config.ts`) and a provider activates only from
+  complete credentials, never from source being edited to "support" one.
+- **Webhook signature verification** — implemented: `POST /api/payments/webhook`
+  forwards the raw body + headers to the provider seam (`WebhookContext`) and
+  both adapters verify the signature (constant-time) **before** trusting any
+  payload field.
 - **Payouts / seller disbursement** — the 5% fee and `net_minor` split are
-  computed and frozen server-side, but moving money to sellers needs the
-  provider plus payout, refund and dispute rules.
-- **Idempotent provider checkout UI** — `createIntent` is plumbed and
-  typed, but no buyer-facing payment sheet exists while the provider is
-  the Noop one (showing one would fake payment progress).
+  computed and frozen server-side; Linkwa payout instructions exist behind the
+  admin console and are manual (ADR-016). Refund and dispute rules still need
+  provider confirmation.
+- **Idempotent provider checkout UI** — `createIntent` is plumbed and typed;
+  the buyer-facing payment sheet renders whenever a provider is configured
+  (it never renders for the Noop one, which would fake payment progress).
 
 ### Test-suite hygiene (fixed 2026-09-28 — do not reintroduce)
 
@@ -319,7 +347,8 @@ until there is a reason:
   production is verified by Management API read-back (config is authoritative),
   but a full round-trip means receiving one real confirmation email. Do it once
   by signing up on production: the link must land on
-  `https://bid-blitz-ten.vercel.app/auth/callback`, not the site root.
+  `https://bidblitz.co.zw/auth/callback` (the canonical origin), not the site
+  root and not the legacy `bid-blitz-ten.vercel.app` origin.
 - **E2E gap: price filters → URL params** — browse price inputs now edit in
   dollars but write minor units to the URL (server contract). No e2e covers
   that translation yet; add one alongside any future filter work.
@@ -357,12 +386,14 @@ now `20260927000001_payment_intent_poll_url.sql`, and the fallback it enables is
   `PAID` on production with exactly one audit event), so a silent push no
   longer strands a transaction; the push itself remains the primary signal and
   is still undelivered.
-- **Custom domain** — production is `https://bid-blitz-ten.vercel.app`.
-  Registering a domain is a deliberate, paid, human decision and is recorded
-  here so it is not forgotten; do not purchase one as part of engineering work.
-  When it happens: point the domain, update `NEXT_PUBLIC_SITE_URL` (which also
-  rewrites the Paynow `resulturl`/`returnurl`), and re-run the canonical-URL
-  smoke check.
+- **Custom domain** — **DONE.** The canonical production origin is
+  `https://bidblitz.co.zw`; `https://bid-blitz-ten.vercel.app` is the legacy
+  Vercel origin and is historical only. What remains from this item is
+  cleanup, not purchase: make sure `NEXT_PUBLIC_SITE_URL` (which also derives
+  every provider callback/result URL) points at the canonical origin in
+  Production, that the Supabase allow-list and Site URL cover it, and re-run
+  the canonical-URL smoke check. Do not purchase anything as part of
+  engineering work.
 - **Seller payout automation** — see *Payouts* above. No API exists in the
   chosen market; payouts stay manual and platform-administered.
 - **Dispute and refund operations** — the states and writers exist; the

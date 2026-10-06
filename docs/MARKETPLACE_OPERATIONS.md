@@ -2,17 +2,28 @@
 
 **Audience:** whoever runs a sale end to end. This is an operating manual, not
 marketing and not a contract. Where it says "Paynow does X", that is Paynow's
-documented process, not BidBlitz's, and it can change.
+documented process, not BidBlitz's, and it can change. **Linkwa** is the
+intended launch provider (ADR-016); the provider that is actually connected
+decides which parts of this SOP apply, and production Linkwa credentials are
+**not configured** as of 2026-10-06.
 
 **Scope note that must not be skipped:** BidBlitz is a marketplace where the
-buyers pay the *platform* and the *platform* then pays sellers. Paynow
-settles into the platform's registered bank account. There is no automatic
-split, no escrow and no seller-facing payout API. Every seller payment is a
-manual, human-executed transfer that an administrator records afterwards.
+buyers pay the *platform* and the *platform* then pays sellers. The buyer's
+money settles into the platform's settlement bank account (whose registered
+holder is an unsupplied owner fact — `C1` in
+`docs/INTERNAL_LAUNCH_CHECKLIST.md`, so no registration claim is made here).
+There is no automatic split, no escrow and no automatic settlement.
 
-Nothing in BidBlitz sends money. "Record seller payout" means an operator has
-already made the transfer through their own bank and is writing down its
-reference.
+A seller payment is made in one of exactly two ways, and never on its own:
+
+1. An operator transfers from their own bank and records the reference against
+   the sale — the "record seller payout" path.
+2. An administrator starts it from the `/admin` payout console, which instructs
+   the connected payout provider. That path is provider-gated: with no Linkwa
+   production credentials it cannot run in production at all.
+
+Either way an administrator starts it, the amount comes from the frozen
+`seller_payouts.amount_minor`, and delivery must have been confirmed first.
 
 ---
 
@@ -31,6 +42,13 @@ or described as if it does.
 
 ## 1. Money flow, exactly as it works
 
+The diagram below is the **Paynow** shape — the provider currently connected to
+production (test mode, so no real money moves). With Linkwa configured, step 1
+runs through Linkwa's collection instead, and the seller leg can be instructed
+from the admin console (option 2 in the scope note above). Everything else in
+this SOP — freeze on publish, delivery confirmation, manual payout gating — is
+identical for both providers.
+
 ```
 BUYER                    PAYNOW                     PLATFORM                     SELLER
   |                        |                          |                           |
@@ -47,11 +65,13 @@ BUYER                    PAYNOW                     PLATFORM                    
 
 Two things follow, and both must be said to users:
 
-- The buyer pays **winning bid + the applicable Paynow charge**. That charge is
-  Paynow's, is calculated and displayed by Paynow before the buyer authorises
-  anything, and is not revenue BidBlitz receives.
-- The seller receives **winning bid − the 5% BidBlitz platform fee**, paid later,
-  after fulfilment and after the buyer's window to dispute has passed.
+- The buyer pays **winning bid + the applicable provider charge**. That charge
+  is the provider's, is calculated and displayed by the provider before the
+  buyer authorises anything, and is not revenue BidBlitz receives. It is
+  illustrative in the UI until a provider is live — do not quote a figure you
+  have not verified with that provider.
+- The seller receives **winning bid − the 5% BidBlitz platform fee**, paid
+  later, after fulfilment and after the buyer's window to dispute has passed.
 
 ---
 
@@ -416,17 +436,24 @@ the database has not authorised.
 ## 14. What is still externally blocked
 
 Read `docs/PAYNOW_MARKETPLACE_SUPPORT_REQUEST.md` for the questions that must
-be answered in writing before this SOP describes a live marketplace:
+be answered in writing before this SOP describes Paynow as a live marketplace
+capability:
 
 1. Whether Paynow permits a merchant to collect buyer funds for third-party
    sellers and make onward payments to those sellers. **No answer has been
-   received. This is not approved.**
+   received. This is not approved, and no approval is claimed.** Per ADR-016
+   this is **non-blocking**: Linkwa is the intended launch provider, Paynow the
+   configured fallback.
 2. Why `resulturl` receives no POST in test mode, and what must change for
-   delivery to work. **No answer has been received.**
+   delivery to work. **No answer has been received.** `pollurl` reconciliation
+   is the proven path meanwhile.
 3. The refund endpoint available to an advanced-integration merchant.
 4. What "Set Live" requires, and what must happen to the Integration Key when
    moving from test to live.
 
-Until (1) and (2) are answered in writing, the honest description of BidBlitz's
-payment capability is: *verified as a receiver, a state machine and a
-reconciler, in test mode*.
+Separately, and this one is the real gate for launch: **Linkwa production
+credentials are not installed**, so production payments are not live. The
+honest description of BidBlitz's payment capability today is: *Paynow verified
+as a receiver, a state machine and a reconciler, in test mode; Linkwa verified
+end to end in sandbox.* It becomes "live" only after production credentials are
+installed and one controlled real transaction succeeds.

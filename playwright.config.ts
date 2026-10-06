@@ -12,7 +12,7 @@ import { defineConfig, devices } from "@playwright/test";
  * Set `PLAYWRIGHT_BASE_URL=http://localhost:3000` to run against a local
  * server. Nothing else in this file needs to change.
  */
-const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "https://bid-blitz-ten.vercel.app";
+const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "https://bidblitz.co.zw";
 
 /** True when we are pointed at a remote deployment rather than a local server. */
 const isRemote = /^https?:\/\//.test(baseURL) && !/^https?:\/\/(localhost|127\.0\.0\.1)/.test(baseURL);

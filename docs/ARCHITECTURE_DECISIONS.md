@@ -592,11 +592,16 @@ installed.
 5. **Disputes.** `Disputed` is recorded in the audit log and changes no state;
    no dispute-resolution flow exists.
 
-### Test-mode verification — 2026-09-26
+### Test-mode verification — 2026-09-26 (HISTORICAL)
 
-Run against production (`https://bid-blitz-ten.vercel.app`) with a real Paynow
-merchant account in test mode. Credentials are Vercel **Production secrets**,
-never in git or `.env.example`.
+> **Historical evidence, preserved as observed.** This ran against production
+> as it was on that date — `https://bid-blitz-ten.vercel.app`, which was then
+> the production origin and is now the **legacy** origin. The canonical
+> production origin is `https://bidblitz.co.zw`.
+
+Run against production (`https://bid-blitz-ten.vercel.app`, historical origin)
+with a real Paynow merchant account in test mode. Credentials are Vercel
+**Production secrets**, never in git or `.env.example`.
 
 | Proof-list check | Result | Evidence |
 | --- | --- | --- |
@@ -629,11 +634,12 @@ Two behaviours worth naming explicitly:
   for any of the five test transactions. `pollurl` did answer, and polling it is
   how the genuine `Paid` and `Cancelled` messages above were obtained.
 
-### Reconciliation proof — 2026-09-27
+### Reconciliation proof — 2026-09-27 (HISTORICAL)
 
 A second production run closed the loop the 2026-09-26 run left open: the
 fallback built that same day was exercised against a genuinely completed hosted
-payment, end to end, on `https://bid-blitz-ten.vercel.app`.
+payment, end to end, on `https://bid-blitz-ten.vercel.app` (the production
+origin on that date; the canonical origin is now `https://bidblitz.co.zw`).
 
 | Proof-list check | Result | Evidence |
 | --- | --- | --- |
@@ -667,13 +673,20 @@ table above). A repeat attempt through the hosted flow on 2026-09-27 could not
 reach a cancel control: the hosted page gates every action behind the merchant
 login screen, which stops automation by design.
 
-### Information prepared for Paynow support (2026-09-27 — not yet sent)
+### Information prepared for Paynow support (2026-09-27 — DRAFT, never sent)
+
+> **DRAFT / HISTORICAL.** Keep as evidence of what was prepared. If this packet
+> is ever sent, replace the legacy origin below with the canonical one first —
+> `https://bidblitz.co.zw/api/payments/webhook`.
 
 - **Integration ID:** `27042` (test mode; the integration key is a secret and
   is never included in any message, ticket or repository).
-- **Production result URL:** `https://bid-blitz-ten.vercel.app/api/payments/webhook`
+- **Result URL as drafted (legacy origin):**
+  `https://bid-blitz-ten.vercel.app/api/payments/webhook`
   — answers `200` to the GET reachability probe (observed: Paynow GETs it at
   initiation) and is ready to accept signed POSTs.
+- **Result URL to use if sent:**
+  `https://bidblitz.co.zw/api/payments/webhook`
 - **Test initiations:** eight in total across seven test transactions —
   2026-09-26: six initiations (four hosted, two express); 2026-09-27: two
   hosted (one completed at ~10:11 UTC, one abandoned at the merchant-login
@@ -1107,7 +1120,9 @@ non-payment expiry, and the dead `PAID → SETTLED` edge.
 
 Date: 2026-10-04
 
-Status: Accepted (code) / pending sandbox proof (money movement)
+Status: Accepted (code) / sandbox proof complete 2026-10-05 (money movement
+proven in the Linkwa **sandbox**; production credentials are NOT configured, so
+production payments are not live)
 
 ### Context
 
@@ -1141,14 +1156,19 @@ for marketplaces that pay sellers.
   lookup), never through buyer-visible text; checkout resumes a recorded
   link instead of minting an untraceable sibling.
 - Interactive result copy (`CheckStatusButton`, `PayButton`) takes the
-  configured provider's display name as a prop. Static marketing/help/terms
-  copy still names Paynow and must be rewritten as part of Linkwa go-live.
+  configured provider's display name as a prop, and so does the footer, help
+  and fees copy — the user-facing wording is provider-dynamic. The one
+  hard-coded claim, the terms payout section saying proceeds are sent
+  "through Linkwa", was made provider-neutral during the final launch pass
+  because Linkwa is not configured in production.
 
-### Open items (owner-gated, sandbox required)
+### Open items (owner-gated)
 
-- Sandbox proof of collect -> webhook -> status -> payout -> statement for a
-  controlled sale; Linkwa refund behavior and payout-status visibility are
-  undocumented and must be established there, not assumed here.
+- ~~Sandbox proof of collect -> webhook -> status -> payout -> statement for a
+  controlled sale~~ — **closed 2026-10-05** (evidence nested below). Linkwa
+  refund behavior and payout-status visibility remain undocumented and are
+  therefore **unsupported in code**, not assumed: they still have to be
+  established from evidence before anyone relies on them in production.
   - 2026-10-05 progress (sandbox/linkwa-preview): a controlled $10.00 sale
     (transaction b44c3c45, link 01m45hzcdmyx32fbemvem4c1t2, receipt ZETE86CA)
     collected via a verified webhook, and a $9.50 payout (net = gross $10.00
@@ -1248,10 +1268,13 @@ for marketplaces that pay sellers.
     the same fact before claiming (`delivery_confirmed_at` is read server-side;
     the browser cannot supply it). Migration history stays dual-ledger clean.
 
-    Not yet verified live: this environment has no `SUPABASE_ACCESS_TOKEN` /
-    `SUPABASE_DB_URL`, so the migration is **pending application**. Verify with
-    the queries in the migration header once SQL access exists; the contract
-    test `src/server/payout-delivery-invariant.test.ts` pins the invariants on
+    Verified live: the migration **is applied** — `20261005215001_…` is
+    recorded in the live migration ledger (33/33) and
+    `private.seller_payouts_protect_state()` enforces the delivery guard. The
+    header queries were run read-only at application time; this environment
+    still has no `SUPABASE_ACCESS_TOKEN` / `SUPABASE_DB_URL`, so a fresh
+    re-run here is not possible and is not claimed. The contract test
+    `src/server/payout-delivery-invariant.test.ts` pins the invariants on
     every push.
 - Paynow marketplace-approval answer still outstanding; either outcome is now
   non-blocking (approved => Paynow remains a configured fallback).
