@@ -240,6 +240,16 @@ export function paymentProviderDisplayName(): string {
   return ensurePaymentProvider().capabilities.displayName;
 }
 
+/**
+ * Whether the configured provider exposes a trustworthy server-side status
+ * reconciliation method. Linkwa currently confirms payments by signed webhook,
+ * so the UI must not offer a button that can only return 501.
+ */
+export function paymentProviderSupportsReconciliation(): boolean {
+  const provider = ensurePaymentProvider();
+  return provider.capabilities.configured && typeof provider.reconcile === "function";
+}
+
 /** Test hook: forget the boot decision and return to the honest default. */
 export function resetPaymentProviderForTests(): void {
   initialised = false;
