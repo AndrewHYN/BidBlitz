@@ -59,6 +59,9 @@ export const DURATIONS = [
   { label: "12 hours", seconds: 43200 },
   { label: "1 day", seconds: 86400 },
   { label: "3 days", seconds: 259200 },
+  { label: "7 days", seconds: 604800 },
+  { label: "14 days", seconds: 1209600 },
+  { label: "30 days", seconds: 2592000 },
 ] as const;
 
 /**
@@ -126,7 +129,7 @@ export const createAuctionSchema = z.object({
     .number()
     .int()
     .min(60, "Minimum duration is 60 seconds")
-    .max(604800, "Maximum duration is 7 days"),
+    .max(2592000, "Maximum duration is 30 days"),
   antiSnipeWindowSeconds: z.number().int().min(0).max(600).default(30),
   antiSnipeExtensionSeconds: z.number().int().min(0).max(600).default(30),
   currency: z.literal("USD").default("USD"),
