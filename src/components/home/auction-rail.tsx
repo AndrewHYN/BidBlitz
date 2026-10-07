@@ -23,7 +23,7 @@ export function AuctionRail({
   title: string;
   description?: string;
   auctions: AuctionCardData[];
-  testid: "home-ending-soon" | "home-live" | "home-recent";
+  testid: "home-promoted" | "home-ending-soon" | "home-live" | "home-recent";
   emptyTitle: string;
   emptyDescription?: string;
   /** A real, working call to action. An empty state with no way forward is a dead end. */
