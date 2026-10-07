@@ -120,6 +120,7 @@ export const getHomeFeed = cache(async () => {
       .from("auctions")
       .select(CARD_SELECT)
       .eq("status", "LIVE")
+      .is("archived_at", null)
       .order("ends_at", { ascending: true })
       .limit(12),
     supabase
@@ -136,6 +137,7 @@ export const getHomeFeed = cache(async () => {
       .from("auctions")
       .select(CARD_SELECT)
       .in("status", ["LIVE", "SCHEDULED"])
+      .is("archived_at", null)
       .gt("listed_at", recentCutoffIso)
       .order("listed_at", { ascending: false })
       .limit(12),
@@ -175,7 +177,8 @@ export const browseAuctions = cache(async (filters: BrowseFilters) => {
     .from("auctions")
     .select(CARD_SELECT, { count: "exact" })
     .neq("status", "DRAFT")
-    .neq("status", "CANCELLED");
+    .neq("status", "CANCELLED")
+    .is("archived_at", null);
 
   if (filters.q) {
     // Postgres full-text, no search cluster needed at this scale
@@ -244,6 +247,7 @@ export const getAuctionDetail = cache(async (id: string) => {
        )`
     )
     .eq("id", id)
+    .is("archived_at", null)
     .maybeSingle();
 
   if (error) {
@@ -354,15 +358,15 @@ export const getWatchlist = cache(async (userId: string) => {
     .from("watchlist")
     .select(
       `created_at,
-       auctions:auction_id(${CARD_SELECT})`
+       auctions:auction_id(${CARD_SELECT}, archived_at)`
     )
     .eq("user_id", userId)
     .order("created_at", { ascending: false });
 
   return (data ?? [])
     .map((row) => {
-      const auction = row.auctions as unknown as CardJoin | null;
-      return auction ? toCard(auction) : null;
+      const auction = row.auctions as unknown as (CardJoin & { archived_at: string | null }) | null;
+      return auction && auction.archived_at === null ? toCard(auction) : null;
     })
     .filter(Boolean) as AuctionCardData[];
 });
@@ -403,7 +407,7 @@ export const getBuying = cache(async (userId: string) => {
     .from("bids")
     .select(
       `auction_id, amount_minor, created_at,
-       auctions:auction_id(${CARD_SELECT}, winner_id, status, current_bidder_id, current_bid_minor)`
+       auctions:auction_id(${CARD_SELECT}, winner_id, status, current_bidder_id, current_bid_minor, archived_at)`
     )
     .eq("bidder_id", userId)
     .order("created_at", { ascending: false })
@@ -426,8 +430,9 @@ export const getBuying = cache(async (userId: string) => {
       winner_id: string | null;
       current_bidder_id: string | null;
       current_bid_minor: number | null;
+      archived_at: string | null;
     };
-    if (!a) continue;
+    if (!a || a.archived_at !== null) continue;
     out.push({
       ...toCard(a),
       myBidMinor: row.amount_minor as number,
@@ -450,6 +455,7 @@ export const getSelling = cache(async (userId: string) => {
        transactions(id, status, gross_minor, fee_minor, net_minor, currency)`
     )
     .eq("seller_id", userId)
+    .is("archived_at", null)
     .order("created_at", { ascending: false });
 
   type SellingTx = {
@@ -661,6 +667,7 @@ export const getProfileByUsername = cache(async (username: string) => {
       .select(CARD_SELECT)
       .eq("seller_id", data.id)
       .neq("status", "DRAFT")
+      .is("archived_at", null)
       .order("created_at", { ascending: false })
       .limit(12),
   ]);
