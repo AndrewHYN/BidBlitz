@@ -144,7 +144,7 @@ export default async function DashboardOverviewPage() {
           >
             <Gavel className="size-4 text-ending" aria-hidden />
             {outbid.length === 1
-              ? "You’ve been outbid — the auction is still live"
+              ? "You’ve been outbid. The auction is still live"
               : `You’ve been outbid on ${outbid.length} live auctions`}
           </h2>
           <Button asChild size="sm" variant="outline" data-testid="dashboard-bid-again">
