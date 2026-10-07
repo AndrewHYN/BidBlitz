@@ -54,7 +54,7 @@ export function AuctionCard({
     <Link
       href={href ?? `/auction/${auction.id}`}
       className={cn(
-        "group relative flex flex-col overflow-hidden rounded-lg border bg-card transition-[transform,box-shadow,border-color] duration-200 ease-out",
+        "group relative flex flex-col overflow-hidden rounded-xl border border-border/80 bg-card shadow-sm transition-[transform,box-shadow,border-color] duration-200 ease-out",
         "hover:-translate-y-1 hover:border-primary/35 hover:shadow-lg hover:shadow-primary/5",
         "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
         className
@@ -94,7 +94,7 @@ export function AuctionCard({
 
       <div className="flex flex-1 flex-col gap-2 p-3.5">
         <div className="flex items-start justify-between gap-2">
-          <Heading className="line-clamp-2 text-sm font-medium leading-snug transition-colors group-hover:text-primary">
+          <Heading className="line-clamp-2 text-sm font-semibold leading-snug tracking-tight transition-colors group-hover:text-primary">
             {auction.title}
           </Heading>
         </div>
