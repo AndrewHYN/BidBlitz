@@ -10,6 +10,7 @@ import {
   StaffActions,
 } from "@/components/dashboard/team-controls";
 import { Users } from "lucide-react";
+import { AdminNav } from "@/components/dashboard/admin-nav";
 
 export const metadata = {
   title: "Team",
@@ -117,6 +118,8 @@ export default async function TeamPage() {
           </Link>
         }
       />
+
+      <AdminNav active="team" showTeam />
 
       <section aria-labelledby="team-members-heading" className="space-y-4">
         <SectionHeading
