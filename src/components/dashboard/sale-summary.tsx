@@ -101,11 +101,13 @@ export function SaleSummary({
  */
 const PAYOUT_COPY: Record<string, string> = {
   WAITING_FOR_FULFILMENT:
-    "the buyer has paid; deliver or hand over the item, then we confirm it.",
-  DELIVERY_CONFIRMED: "delivery is confirmed; the payout is being prepared.",
-  PAYOUT_PENDING: "we are waiting for the payment provider to settle this sale.",
-  PAYOUT_DUE: "this payout is ready to be paid to you.",
-  PAID_OUT: "paid out.",
+    "the buyer has paid; hand over the item, then ask the buyer to confirm receipt.",
+  DELIVERY_CONFIRMED:
+    "the buyer confirmed handover; BidBlitz is starting the seller payout.",
+  PAYOUT_PENDING: "your seller payout is queued for Linkwa.",
+  PAYOUT_DUE:
+    "the payout is being reconciled with Linkwa before any retry.",
+  PAID_OUT: "seller payout sent.",
   HELD: "held while a dispute is looked into.",
   DISPUTED: "held because a dispute has been raised.",
 };
