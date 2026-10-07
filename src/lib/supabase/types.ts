@@ -440,6 +440,7 @@ export interface Database {
           updated_at: string;
         }[];
       };
+      admin_finance_snapshot: { Args: Record<string, never>; Returns: Json };
       server_now: { Args: Record<string, never>; Returns: string };
       // is_admin intentionally absent: the function lives in the `private`
       // schema (migration 000010) and has no PostgREST route. Admin UI reads
