@@ -1,0 +1,159 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { z } from "zod";
+import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { normalizeZimbabwePhone } from "@/lib/phone";
+import { readLinkwaEnvironment } from "@/server/payments/config";
+import {
+  linkLinkwaUser,
+  registerLinkwaWallet,
+} from "@/server/payments/linkwa-payouts";
+import {
+  PaymentPayloadError,
+  PaymentProviderError,
+} from "@/server/payments/provider";
+
+const setupSchema = z.object({
+  firstName: z.string().trim().min(1, "Enter the payout first name.").max(80),
+  lastName: z.string().trim().min(1, "Enter the payout surname.").max(80),
+  phone: z.string().trim().min(1, "Enter a Zimbabwe mobile number.").max(30),
+});
+
+export async function setupSellerPayoutAction(input: unknown): Promise<
+  | { ok: true; status: "READY"; maskedPhone: string }
+  | { ok: false; status?: "NEEDS_WALLET"; message: string }
+> {
+  const parsed = setupSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, message: parsed.error.issues[0]?.message ?? "Invalid payout details." };
+  }
+
+  const phone = normalizeZimbabwePhone(parsed.data.phone);
+  if (!phone) {
+    return {
+      ok: false,
+      message: "Use a Zimbabwe mobile number such as 0771234567.",
+    };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, message: "Sign in again." };
+
+  const linkwa = readLinkwaEnvironment();
+  if (linkwa.state !== "ready" || !linkwa.config) {
+    return {
+      ok: false,
+      message: "Seller payouts are not configured on this BidBlitz deployment yet.",
+    };
+  }
+
+  const admin = createAdminClient();
+  await admin.from("seller_payout_recipients").upsert(
+    {
+      seller_id: user.id,
+      provider: "linkwa",
+      phone_e164: phone,
+      legal_first_name: parsed.data.firstName,
+      legal_last_name: parsed.data.lastName,
+      setup_status: "LINKING",
+      setup_error: null,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "seller_id" }
+  );
+
+  try {
+    const linked = await linkLinkwaUser(
+      { apiKey: linkwa.config.apiKey, baseUrl: linkwa.config.baseUrl },
+      {
+        firstName: parsed.data.firstName,
+        lastName: parsed.data.lastName,
+        phoneNumber: phone,
+        email: user.email ?? undefined,
+      }
+    );
+
+    const wallet = await registerLinkwaWallet(
+      { apiKey: linkwa.config.apiKey, baseUrl: linkwa.config.baseUrl },
+      {
+        externalUserId: linked.externalUserId,
+        phoneNumber: phone,
+        firstName: parsed.data.firstName,
+        lastName: parsed.data.lastName,
+      }
+    );
+
+    const now = new Date().toISOString();
+    const { error } = await admin.from("seller_payout_recipients").upsert(
+      {
+        seller_id: user.id,
+        provider: "linkwa",
+        phone_e164: phone,
+        legal_first_name: parsed.data.firstName,
+        legal_last_name: parsed.data.lastName,
+        external_user_id: linked.externalUserId,
+        external_wallet_id: wallet.externalWalletId,
+        wallet_provider: "smilecash",
+        setup_status: "READY",
+        setup_error: null,
+        linked_at: now,
+        updated_at: now,
+      },
+      { onConflict: "seller_id" }
+    );
+    if (error) {
+      return { ok: false, message: "The wallet linked, but BidBlitz could not save it. Contact support before selling." };
+    }
+
+    revalidatePath("/settings");
+    revalidatePath("/settings/payouts");
+    revalidatePath("/sell");
+    revalidatePath("/dashboard/selling");
+
+    return {
+      ok: true,
+      status: "READY",
+      maskedPhone: `${phone.slice(0, 4)}•••••${phone.slice(-3)}`,
+    };
+  } catch (error) {
+    const needsWallet =
+      error instanceof PaymentPayloadError &&
+      error.reason === "wallet_registration_required";
+
+    await admin.from("seller_payout_recipients").upsert(
+      {
+        seller_id: user.id,
+        provider: "linkwa",
+        phone_e164: phone,
+        legal_first_name: parsed.data.firstName,
+        legal_last_name: parsed.data.lastName,
+        setup_status: needsWallet ? "NEEDS_WALLET" : "ERROR",
+        setup_error: needsWallet ? "SmileCash wallet required" : "Linkwa setup failed",
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "seller_id" }
+    );
+
+    if (needsWallet) {
+      return {
+        ok: false,
+        status: "NEEDS_WALLET",
+        message:
+          "This number is not linked to a SmileCash wallet yet. Create/activate SmileCash for this number, then return and retry payout setup.",
+      };
+    }
+
+    if (error instanceof PaymentProviderError) {
+      return {
+        ok: false,
+        message: "Linkwa could not link this payout wallet. Check the details and try again.",
+      };
+    }
+    return { ok: false, message: "Payout setup failed. Nothing was paid or charged." };
+  }
+}
