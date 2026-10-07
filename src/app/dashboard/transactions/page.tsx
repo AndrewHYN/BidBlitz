@@ -81,8 +81,15 @@ export default async function TransactionsPage() {
   // word about the seller. Collapsing them is how a marketplace talks itself
   // into a lie.
   const payoutByTx = new Map(payouts.map((p) => [p.transaction_id, p]));
-  const partyPayoutByTx = new Map(
-    (payoutStatesRes.data ?? []).map((p) => [p.transaction_id, p])
+  type PartyPayoutState = {
+    transaction_id: string;
+    payout_status: string;
+    delivery_confirmed_at: string | null;
+    paid_at: string | null;
+  };
+  const partyPayoutRows = (payoutStatesRes.data ?? []) as PartyPayoutState[];
+  const partyPayoutByTx = new Map<string, PartyPayoutState>(
+    partyPayoutRows.map((p) => [p.transaction_id, p])
   );
 
   return (
