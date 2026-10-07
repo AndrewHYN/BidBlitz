@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { ForgotPasswordForm } from "@/components/auth/forgot-password-form";
+import { AuthShell } from "@/components/auth/auth-shell";
 
 export const metadata: Metadata = {
   title: "Reset your password",
@@ -9,10 +10,14 @@ export const metadata: Metadata = {
 
 export default function ForgotPasswordPage() {
   return (
-    <div className="page-container flex min-h-[70vh] flex-col justify-center py-10 sm:py-14">
-      <div className="mx-auto w-full max-w-md">
+    <AuthShell
+      eyebrow="Account recovery"
+      title="Get back into your BidBlitz account securely."
+      description="Reset access without exposing whether an email address is registered on the marketplace."
+    >
+      <div className="rounded-xl border bg-card p-6 shadow-sm sm:p-8">
         <ForgotPasswordForm />
       </div>
-    </div>
+    </AuthShell>
   );
 }
