@@ -96,8 +96,13 @@ export default async function DashboardOverviewPage() {
   const activeListings = selling.filter(
     (item) => item.status === "LIVE" || item.status === "SCHEDULED"
   );
+  // One request-scoped server timestamp; this page is not a reactive client render.
+  // eslint-disable-next-line react-hooks/purity
+  const now = Date.now();
   const dueSettle = selling.filter(
-    (item) => item.status === "ENDED" || (item.status === "LIVE" && item.endsAt && Date.parse(item.endsAt) <= Date.now())
+    (item) =>
+      item.status === "ENDED" ||
+      (item.status === "LIVE" && item.endsAt !== null && Date.parse(item.endsAt) <= now)
   );
   const latestTransactions = transactions.slice(0, 3);
   const nothingYet =
