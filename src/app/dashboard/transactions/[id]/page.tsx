@@ -60,7 +60,13 @@ export default async function TransactionThreadPage({
 
   const role = thread.role === "moderator" ? "Moderator" : thread.seller_id === user.id ? "Seller" : "Buyer";
   const { data: payoutStates } = await supabase.rpc("my_transaction_payout_states");
-  const payoutState = (payoutStates ?? []).find(
+  type PartyPayoutState = {
+    transaction_id: string;
+    payout_status: string;
+    delivery_confirmed_at: string | null;
+    paid_at: string | null;
+  };
+  const payoutState = ((payoutStates ?? []) as PartyPayoutState[]).find(
     (row) => row.transaction_id === thread.id
   );
   const buyerMayConfirm =
