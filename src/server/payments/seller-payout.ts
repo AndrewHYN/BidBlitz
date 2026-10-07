@@ -67,6 +67,31 @@ export async function releaseSellerPayout(
 
   // PAYOUT_DUE means the provider instruction may already have happened but
   // the final ledger write may have failed. Never auto-retry that state.
+  const { data: priorEvents, error: eventsError } = await admin
+    .from("seller_payout_events")
+    .select("to_status, payout_reference")
+    .eq("payout_id", payout.id);
+  if (eventsError) {
+    return {
+      ok: false,
+      code: "manual_reconciliation_required",
+      message: "BidBlitz could not verify the payout audit trail, so nothing was sent.",
+    };
+  }
+  if (
+    (priorEvents ?? []).some(
+      (event) =>
+        event.to_status === "PAID_OUT" ||
+        Boolean(event.payout_reference?.trim())
+    )
+  ) {
+    return {
+      ok: false,
+      code: "manual_reconciliation_required",
+      message: "A provider payout is already recorded for this sale. Do not send another.",
+    };
+  }
+
   if (payout.status === "PAYOUT_DUE") {
     return {
       ok: false,
