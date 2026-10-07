@@ -198,7 +198,7 @@ returns trigger
 language plpgsql
 security invoker
 set search_path=''
-as $
+as $$
 begin
   if new.status='PAYOUT_DUE'
      and new.status is distinct from old.status
@@ -212,7 +212,7 @@ begin
   end if;
   return new;
 end;
-$;
+$$;
 
 drop trigger if exists seller_payout_block_unresolved_dispute on public.seller_payouts;
 create trigger seller_payout_block_unresolved_dispute
