@@ -16,7 +16,7 @@ export const metadata: Metadata = {
   alternates: { canonical: "/privacy" },
 };
 
-const LAST_UPDATED = "25 September 2026";
+const LAST_UPDATED = "7 October 2026";
 
 /** Declared once, used for both the headings and the table of contents. */
 const SECTIONS = [
@@ -89,6 +89,12 @@ export default function PrivacyPage() {
               time.
             </li>
             <li>
+              <strong>Seller payout data:</strong> if you sell, BidBlitz may
+              store the private mobile number and payout name you provide,
+              payout-wallet status, and provider identifiers needed to send
+              seller proceeds. These details are not shown on your public profile.
+            </li>
+            <li>
               <strong>Your listings:</strong> item titles, descriptions,
               category, condition, location, pricing, timing and the photos you
               upload.
@@ -96,6 +102,18 @@ export default function PrivacyPage() {
             <li>
               <strong>Your activity:</strong> bids you place, auctions you
               watch, reviews you write and reports you file.
+            </li>
+            <li>
+              <strong>Dispute data:</strong> case reasons, messages, staff
+              decisions and any evidence images uploaded for a transaction
+              dispute. Evidence is stored privately for the buyer, seller and
+              authorised BidBlitz staff involved in the case.
+            </li>
+            <li>
+              <strong>Business seller data:</strong> if you create a business
+              storefront, its public business name, description, logo and
+              location, plus private ownership records linking that storefront
+              to your account.
             </li>
             <li>
               <strong>Settlement records:</strong> for auctions you win or sell,
@@ -125,8 +143,12 @@ export default function PrivacyPage() {
             <li>your public profile page, including your rating summary.</li>
           </ul>
           <p>
-            Your email address is never shown to other users. Transaction
-            amounts are visible only to the buyer and seller of that sale.
+            A business storefront&apos;s business name, logo, description and
+            location are public when you choose to use that identity. Your email
+            address, payout phone, payout-provider identifiers and payout setup
+            details are not public. Transaction amounts and dispute-case content
+            are limited to the buyer, seller and authorised BidBlitz staff who
+            need them for that sale or case.
           </p>
         </PrivacySection>
 
@@ -141,7 +163,18 @@ export default function PrivacyPage() {
               to send you the essential account emails: sign-up confirmation and
               password reset. There are no marketing emails.
             </li>
-            <li>to handle reports and keep the marketplace safe from abuse.</li>
+            <li>to handle reports and keep the marketplace safe from abuse;</li>
+            <li>
+              to run transaction disputes, preserve evidence and prevent a
+              seller payout from being released while an unresolved case blocks it;
+            </li>
+            <li>
+              to link and operate seller payout details when payout features are
+              enabled; and
+            </li>
+            <li>
+              to display a business storefront when a seller chooses to use one.
+            </li>
           </ul>
         </PrivacySection>
 
@@ -156,9 +189,12 @@ export default function PrivacyPage() {
         <PrivacySection id="sharing" title="6. Who else receives it">
           <p>
             We do not sell or rent personal data. Data is processed only by the
-            services that run BidBlitz: hosting and delivery (Vercel), database,
-            authentication and file storage (Supabase), and, where the product
-            makes it public, by the other users described above.
+            services needed to run BidBlitz: hosting and delivery (Vercel);
+            database, authentication and file storage (Supabase); transactional
+            email delivery (Resend); and, when payment or payout features are
+            used, the connected payment/payout provider such as Linkwa. We send
+            each provider only the information needed for the service it performs.
+            Public marketplace data is also visible to the users described above.
           </p>
         </PrivacySection>
 
@@ -166,9 +202,10 @@ export default function PrivacyPage() {
           <p>
             We keep your data while your account is active. You can ask us to
             delete your account and its data at any time using the contact
-            details below. Records of settled sales may need to be kept so the
-            buyer and seller transactions stay consistent. if that applies, we
-            will tell you.
+            details below. Records of settled sales, payout instructions,
+            moderation actions and disputes may need to be kept so transaction,
+            audit and case histories stay consistent. If that applies, we will
+            tell you.
           </p>
         </PrivacySection>
 
