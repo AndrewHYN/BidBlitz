@@ -94,7 +94,12 @@ export default async function SellDraftPage({
   // The seller's own pending business, if any: a cancellation request waiting
   // on the team, or a review holding the listing. Both are the seller's rows
   // (RLS), so a missing row here simply means nothing pending.
-  const [{ data: pendingRequest }, { data: pendingReview }, { data: pendingPromotion }] = await Promise.all([
+  const [
+    { data: pendingRequest },
+    { data: pendingReview },
+    { data: pendingPromotion },
+    { data: promotionOffers },
+  ] = await Promise.all([
     supabase
       .from("auction_cancellation_requests")
       .select("id, reason_code, created_at")
@@ -109,10 +114,14 @@ export default async function SellDraftPage({
       .maybeSingle(),
     supabase
       .from("promotion_requests")
-      .select("id, requested_days, requested_at")
+      .select("id, requested_days, requested_at, quoted_price_minor, currency")
       .eq("auction_id", auction.id)
       .eq("status", "PENDING")
       .maybeSingle(),
+    supabase
+      .from("promotion_settings")
+      .select("days, price_minor, currency, enabled")
+      .order("days", { ascending: true }),
   ]);
   // A with-bids LIVE auction cannot be cancelled directly; it gets a request
   // instead. PAUSED auctions get neither: the hold lifts only through admin.
@@ -376,9 +385,17 @@ export default async function SellDraftPage({
                 <PromotionRequest
                   auctionId={auction.id}
                   activeUntil={activePromotionUntil}
-                  pendingDays={
-                    (pendingPromotion as { requested_days?: number } | null)?.requested_days ?? null
-                  }
+                  pendingDays={pendingPromotion?.requested_days ?? null}
+                  pendingPriceMinor={pendingPromotion?.quoted_price_minor ?? null}
+                  pendingCurrency={pendingPromotion?.currency ?? null}
+                  offers={(promotionOffers ?? [])
+                    .filter((offer) => offer.days === 3 || offer.days === 7)
+                    .map((offer) => ({
+                      days: offer.days as 3 | 7,
+                      priceMinor: offer.price_minor,
+                      currency: offer.currency,
+                      enabled: offer.enabled,
+                    }))}
                 />
               </div>
             </section>
