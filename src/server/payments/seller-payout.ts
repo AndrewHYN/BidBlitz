@@ -2,7 +2,10 @@ import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { readLinkwaEnvironment } from "@/server/payments/config";
-import { instructLinkwaPayout } from "@/server/payments/linkwa-payouts";
+import {
+  fetchLinkwaBalance,
+  instructLinkwaPayout,
+} from "@/server/payments/linkwa-payouts";
 import { paymentsRuntimeEnabled } from "@/server/payments/runtime";
 
 export type SellerPayoutReleaseResult =
@@ -15,6 +18,7 @@ export type SellerPayoutReleaseResult =
         | "recipient_not_ready"
         | "provider_not_ready"
         | "provider_failed"
+        | "provider_funds_pending"
         | "manual_reconciliation_required";
       message: string;
     };
@@ -174,6 +178,32 @@ export async function releaseSellerPayout(
     if (pending.error) {
       return { ok: false, code: "not_ready", message: "The payout could not be prepared." };
     }
+  }
+
+  // Mobile-wallet collections can settle quickly while card collections may
+  // remain pending for several working days. Never claim a payout for sending
+  // until Linkwa's AVAILABLE USD balance can cover the seller's frozen net.
+  try {
+    const balances = await fetchLinkwaBalance({
+      apiKey: linkwa.config.apiKey,
+      baseUrl: linkwa.config.baseUrl,
+    });
+    const usd = balances.find((balance) => balance.currency === "USD");
+    if (!usd || usd.availableMinor < BigInt(payout.amount_minor)) {
+      return {
+        ok: false,
+        code: "provider_funds_pending",
+        message:
+          "The seller payout is ready, but Linkwa has not made enough settlement balance available yet.",
+      };
+    }
+  } catch {
+    return {
+      ok: false,
+      code: "provider_failed",
+      message:
+        "BidBlitz could not verify the available Linkwa balance, so no payout was sent.",
+    };
   }
 
   // Atomic state claim before the network call. Only one caller can move
