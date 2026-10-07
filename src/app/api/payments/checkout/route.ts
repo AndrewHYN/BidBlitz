@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { rateLimit } from "@/server/rate-limit";
 import { ensurePaymentProvider, paymentBootError } from "@/server/payments/config";
+import { paymentsRuntimeEnabled } from "@/server/payments/runtime";
 import {
   PaymentPayloadError,
   PaymentProviderError,
@@ -45,15 +46,10 @@ function clientKey(request: Request): string {
   return ip && ip.length > 0 ? ip : "unknown";
 }
 
-function paymentsEmergencyPaused(): boolean {
-  return true;
-}
-
 export async function POST(request: Request): Promise<Response> {
-  // Emergency marketplace pause: do not create any new provider-side payment
-  // link while the seller payout path is being rebuilt. Signed webhooks stay
-  // live so a payment that was already in flight can still reconcile safely.
-  if (paymentsEmergencyPaused()) {
+  // Signed webhooks remain live even when this switch is off so an already
+  // in-flight payment can still reconcile. Only NEW checkout initiation stops.
+  if (!(await paymentsRuntimeEnabled())) {
     return json({ ok: false, error: "payments_paused" }, 503);
   }
 
