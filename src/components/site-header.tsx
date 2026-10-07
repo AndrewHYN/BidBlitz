@@ -51,5 +51,18 @@ export async function SiteHeader() {
     }
   }
 
-  return <HeaderBar user={headerUser} unreadCount={unreadCount} />;
+  return (
+    <>
+      <div className={headerUser ? "-mb-20 lg:mb-0" : undefined}>
+        <HeaderBar user={headerUser} unreadCount={unreadCount} />
+      </div>
+      {headerUser && (
+        <style>{`
+          @media (max-width: 1023px) {
+            #main { padding-bottom: 5rem; }
+          }
+        `}</style>
+      )}
+    </>
+  );
 }
