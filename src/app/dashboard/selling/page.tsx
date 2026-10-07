@@ -89,11 +89,11 @@ export default async function SellingPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Selling"
-        description="Your listings, from draft through settlement."
+        title="My selling"
+        description="Manage drafts, live auctions, completed sales and seller payouts in one place."
         actions={
           <Button asChild>
-            <Link href="/sell">New listing</Link>
+            <Link href="/sell">List another item</Link>
           </Button>
         }
       />
