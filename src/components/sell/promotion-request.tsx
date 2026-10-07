@@ -18,7 +18,7 @@ export function PromotionRequest({
   const [selected, setSelected] = useState<3 | 7>(3);
   const [message, setMessage] = useState<string | null>(null);
 
-  if (activeUntil && new Date(activeUntil).getTime() > Date.now()) {
+  if (activeUntil) {
     return (
       <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
         <div className="flex items-center gap-2 text-sm font-semibold">
@@ -53,7 +53,7 @@ export function PromotionRequest({
   }
 
   return (
-    <div className="space-y-4 rounded-xl border border-primary/15 bg-gradient-to-br from-primary/5 via-card to-card p-5 shadow-sm">
+    <div className="promotion-surface interactive-surface space-y-4 rounded-xl border border-primary/15 p-5">
       <div>
         <div className="flex items-center gap-2">
           <Megaphone className="size-4 text-primary" aria-hidden />
