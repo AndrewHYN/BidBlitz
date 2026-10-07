@@ -15,6 +15,7 @@ import { safeNext } from "@/lib/safe-next";
 import { AUTH_LIMIT, peekRateLimit, rateLimit } from "@/server/rate-limit";
 import type { BidRejection } from "@/server/errors";
 import { MIN_PASSWORD_LENGTH } from "@/lib/validation";
+import { normalizeZimbabwePhone } from "@/lib/phone";
 
 export type AuthResult = { ok: true } | { ok: false; rejection: BidRejection };
 
@@ -142,6 +143,17 @@ export async function signInAction(input: {
   password: string;
   redirectTo?: string;
 }): Promise<AuthResult> {
+  const phone = normalizeZimbabwePhone(input.phone);
+  if (!phone) {
+    return {
+      ok: false,
+      rejection: {
+        code: "invalid_input",
+        message: "Enter a Zimbabwe mobile number such as 0771234567.",
+      },
+    };
+  }
+
   const budgetKey = await authFailureKey(input.email);
   if (!peekRateLimit(budgetKey, AUTH_LIMIT.limit, AUTH_LIMIT.windowMs).allowed) {
     return { ok: false, rejection: { code: "rate_limited", message: AUTH_RATE_MESSAGE } };
@@ -172,6 +184,7 @@ export async function signUpAction(input: {
   email: string;
   password: string;
   displayName: string;
+  phone: string;
   redirectTo?: string;
 }): Promise<AuthResult> {
   const budgetKey = await authFailureKey(input.email);
@@ -189,7 +202,10 @@ export async function signUpAction(input: {
     email: input.email.trim(),
     password: input.password,
     options: {
-      data: { display_name: input.displayName.trim() },
+      data: {
+        display_name: input.displayName.trim(),
+        payout_phone_e164: phone,
+      },
       // Canonical origin, trailing slash stripped (site-url.ts) — otherwise
       // confirmation links point at "//auth/callback" and miss the route.
       emailRedirectTo: absoluteUrl("/auth/callback"),
