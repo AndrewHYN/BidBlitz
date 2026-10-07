@@ -14,7 +14,7 @@ import type {
 } from "@/lib/supabase/types";
 import { hasPermission } from "@/server/permissions";
 import { notifyAdmins } from "@/server/email/notify";
-import { emailKey } from "@/server/email/key";
+import { emailKey } from "@/server/email/sender";
 
 const reasonSchema = z.enum([
   "ITEM_NOT_RECEIVED",
