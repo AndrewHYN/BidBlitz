@@ -22,6 +22,7 @@ function mockAuctions(rows: unknown[]) {
   const builder: Record<string, (...args: unknown[]) => unknown> = {};
   builder.select = () => builder;
   builder.eq = () => builder;
+  builder.is = () => builder;
   builder.order = async () => ({ data: rows, error: null });
   vi.mocked(createClient).mockResolvedValue({
     from: () => builder,
