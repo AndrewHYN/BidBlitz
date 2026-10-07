@@ -1,21 +1,38 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { Megaphone, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { formatMoney, money } from "@/lib/money";
 import { requestPromotionAction } from "@/server/actions/promotion";
+
+type Offer = {
+  days: 3 | 7;
+  priceMinor: number;
+  currency: string;
+  enabled: boolean;
+};
 
 export function PromotionRequest({
   auctionId,
   activeUntil,
   pendingDays,
+  pendingPriceMinor,
+  pendingCurrency,
+  offers,
 }: {
   auctionId: string;
   activeUntil: string | null;
   pendingDays: number | null;
+  pendingPriceMinor: number | null;
+  pendingCurrency: string | null;
+  offers: Offer[];
 }) {
+  const available = useMemo(() => offers.filter((offer) => offer.enabled), [offers]);
   const [pending, startTransition] = useTransition();
-  const [selected, setSelected] = useState<3 | 7>(3);
+  const [selected, setSelected] = useState<3 | 7>(
+    available[0]?.days ?? 3
+  );
   const [message, setMessage] = useState<string | null>(null);
 
   if (activeUntil) {
@@ -46,8 +63,20 @@ export function PromotionRequest({
           Promotion request pending
         </div>
         <p className="mt-1 text-sm text-muted-foreground">
-          You requested {pendingDays} days of promoted placement. BidBlitz will notify you after review.
+          You requested {pendingDays} days of promoted placement
+          {pendingPriceMinor !== null && pendingCurrency
+            ? ` for ${formatMoney(money(pendingPriceMinor, pendingCurrency))}`
+            : ""}
+          . BidBlitz will notify you after review.
         </p>
+      </div>
+    );
+  }
+
+  if (available.length === 0) {
+    return (
+      <div className="rounded-xl border bg-muted/30 p-4 text-sm text-muted-foreground">
+        Promoted placement is temporarily unavailable.
       </div>
     );
   }
@@ -60,25 +89,32 @@ export function PromotionRequest({
           <p className="text-sm font-bold">Give this auction more visibility</p>
         </div>
         <p className="mt-1 text-sm leading-6 text-muted-foreground">
-          Request a promoted placement. During the pilot, promotions are reviewed manually before they are activated.
+          Request promoted placement at the quoted price below. Staff review the request before activation.
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-2" role="group" aria-label="Promotion length">
-        {[3, 7].map((days) => (
+      <div
+        className="grid gap-2 sm:grid-cols-2"
+        role="group"
+        aria-label="Promotion length"
+      >
+        {available.map((offer) => (
           <button
-            key={days}
+            key={offer.days}
             type="button"
             disabled={pending}
-            onClick={() => setSelected(days as 3 | 7)}
+            onClick={() => setSelected(offer.days)}
             className={
-              selected === days
-                ? "rounded-lg border border-primary bg-primary/10 px-3 py-3 text-left shadow-sm ring-1 ring-primary/20"
-                : "rounded-lg border bg-background px-3 py-3 text-left transition hover:border-primary/30 hover:bg-accent"
+              selected === offer.days
+                ? "rounded-xl border border-primary bg-primary/10 px-3 py-3 text-left shadow-sm ring-1 ring-primary/20"
+                : "rounded-xl border bg-background px-3 py-3 text-left transition hover:border-primary/30 hover:bg-accent"
             }
           >
-            <span className="block text-sm font-bold">{days} days</span>
-            <span className="mt-0.5 block text-xs text-muted-foreground">
+            <span className="block text-sm font-bold">{offer.days} days</span>
+            <span className="mt-1 block text-lg font-bold text-primary" data-numeric>
+              {formatMoney(money(offer.priceMinor, offer.currency))}
+            </span>
+            <span className="mt-1 block text-xs text-muted-foreground">
               Promoted placement
             </span>
           </button>
@@ -88,14 +124,14 @@ export function PromotionRequest({
       <Button
         type="button"
         className="w-full"
-        disabled={pending}
+        disabled={pending || !available.some((offer) => offer.days === selected)}
         onClick={() => {
           setMessage(null);
           startTransition(async () => {
             const result = await requestPromotionAction({ auctionId, days: selected });
             setMessage(
               result.ok
-                ? "Promotion request sent. You will be notified after review."
+                ? "Promotion request sent with this quoted price. You will be notified after review."
                 : result.message
             );
           });
@@ -111,7 +147,7 @@ export function PromotionRequest({
         </p>
       )}
       <p className="text-[11px] leading-5 text-muted-foreground">
-        Promotion changes placement only. It never changes bids, closing time, auction rules or winner selection.
+        Promotion changes placement only. It never changes bids, closing time, auction rules or winner selection. Payment for promotion is not automated in this pilot.
       </p>
     </div>
   );
