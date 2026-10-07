@@ -32,10 +32,10 @@ export default async function SellPage() {
   return (
     <div className="page-container py-10 sm:py-14">
       <PageHeader
-        title="Create a listing"
-        description="Describe the item, set your terms, then add photos and start the blitz."
+        title="Sell on BidBlitz"
+        description="Four simple steps, then add photos and publish your auction."
       />
-      <div className="mt-8 max-w-3xl">
+      <div className="mt-7 max-w-4xl">
         <SellForm
           feeBps={feeBps}
           providerName={providerName}
