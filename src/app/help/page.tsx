@@ -8,6 +8,7 @@ import {
   DocumentSection,
 } from "@/components/document-page";
 import { isPaymentProviderConfigured, paymentProviderDisplayName } from "@/server/payments/config";
+import { paymentsRuntimeEnabled } from "@/server/payments/runtime";
 
 export const metadata: Metadata = {
   title: "Help",
@@ -49,7 +50,11 @@ const TOPICS = [
   },
 ] as const;
 
-export default function HelpPage() {
+export default async function HelpPage() {
+  const paymentConfigured = isPaymentProviderConfigured();
+  const paymentsEnabled = paymentConfigured && (await paymentsRuntimeEnabled());
+  const providerName = paymentProviderDisplayName();
+
   return (
     <div data-testid="help-page">
       <DocumentPage>
@@ -118,15 +123,23 @@ export default function HelpPage() {
               </li>
               <li>
                 <strong>The transaction starts as “Awaiting payment”.</strong>{" "}
-                {isPaymentProviderConfigured() ? (
-                  <>
-                    The buyer completes payment through {paymentProviderDisplayName()}, and BidBlitz
-                    marks the sale paid only when {paymentProviderDisplayName()}&apos;s own confirmation
-                    arrives and passes its signature and amount checks. Being
-                    sent back to the site never marks a sale paid on its own. If
-                    the payment fails or is cancelled, the transaction becomes
-                    “Failed”.
-                  </>
+                {paymentConfigured ? (
+                  paymentsEnabled ? (
+                    <>
+                      The buyer completes payment through {providerName}, and BidBlitz
+                      marks the sale paid only when {providerName}&apos;s own confirmation
+                      arrives and passes its signature and amount checks. Being
+                      sent back to the site never marks a sale paid on its own. If
+                      the payment fails or is cancelled, the transaction becomes
+                      “Failed”.
+                    </>
+                  ) : (
+                    <>
+                      The payment provider is configured, but new checkout is
+                      temporarily paused by BidBlitz&apos;s runtime safety switch.
+                      Nothing new can be charged while that switch is off.
+                    </>
+                  )
                 ) : (
                   <>
                     No payment provider is connected to BidBlitz yet, so no money
