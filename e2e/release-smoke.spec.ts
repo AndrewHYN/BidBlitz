@@ -5,12 +5,33 @@ const PUBLIC_ROUTES = [
   "/browse",
   "/how-it-works",
   "/help",
+  "/help/fees",
+  "/help/rules",
   "/faq",
   "/about",
   "/terms",
   "/privacy",
   "/login",
   "/signup",
+  "/forgot-password",
+] as const;
+
+const PROTECTED_ROUTES = [
+  "/dashboard",
+  "/dashboard/buying",
+  "/dashboard/selling",
+  "/dashboard/watchlist",
+  "/dashboard/transactions",
+  "/dashboard/disputes",
+  "/sell",
+  "/settings",
+  "/settings/payouts",
+  "/settings/business",
+  "/notifications",
+  "/admin",
+  "/admin/disputes",
+  "/admin/finance",
+  "/admin/guide",
 ] as const;
 
 test.describe("release visual smoke", () => {
@@ -36,6 +57,20 @@ test.describe("release visual smoke", () => {
         `${route} should not horizontally overflow the viewport`
       ).toBeLessThanOrEqual(sizes.clientWidth + 2);
 
+      expect(fatal, `${route} emitted a browser page error`).toEqual([]);
+    });
+  }
+
+  for (const route of PROTECTED_ROUTES) {
+    test(`${route} safely requires authentication`, async ({ page }) => {
+      const fatal: string[] = [];
+      page.on("pageerror", (error) => fatal.push(error.message));
+      const response = await page.goto(route, {
+        waitUntil: "domcontentloaded",
+        timeout: 45_000,
+      });
+      expect(response?.status(), `${route} should not server-error`).toBeLessThan(500);
+      await expect(page).toHaveURL(/\/login(?:\?|$)/);
       expect(fatal, `${route} emitted a browser page error`).toEqual([]);
     });
   }
