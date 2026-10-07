@@ -21,7 +21,6 @@ import {
 } from "@/components/dashboard/review-decisions";
 import { cancellationReasonLabel } from "@/lib/validation";
 import { PayoutControls } from "@/components/dashboard/payout-controls";
-import { LinkwaPayoutControls } from "@/components/dashboard/linkwa-payout-controls";
 import { getAdminPayouts, type AdminPayoutRow } from "@/server/queries";
 import { isPaymentProviderConfigured } from "@/server/payments/config";
 import { AdminNav } from "@/components/dashboard/admin-nav";
@@ -219,19 +218,11 @@ function PayoutRow({ row }: { row: AdminPayoutRow }) {
         deliveryConfirmedAt={row.deliveryConfirmedAt}
       />
 
-      {/*
-        Money moves only from this button, only by an admin, only after the
-        explicit confirmation step, and only once the row has been walked to
-        PAYOUT_PENDING. Nothing here auto-pays when a sale becomes paid.
-      */}
       {row.status === "PAYOUT_PENDING" && (
-        <LinkwaPayoutControls
-          payoutId={row.payoutId}
-          amountMinor={row.amountMinor}
-          currency={row.currency}
-          sellerName={row.sellerName}
-          recipientOnFile={row.recipientOnFile}
-        />
+        <p className="rounded-lg border border-primary/15 bg-primary/5 px-3 py-2 text-xs leading-5 text-muted-foreground">
+          Automatic payout is waiting for Linkwa settlement balance or seller wallet readiness.
+          Do not send a second manual payout unless you have reconciled the provider statement first.
+        </p>
       )}
     </div>
   );
