@@ -7,9 +7,9 @@ vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }));
 vi.mock("@/server/permissions", () => ({ requirePermission: vi.fn() }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
-const USER_ID = "00000000-0000-0000-0000-000000000001";
-const AUCTION_ID = "00000000-0000-0000-0000-000000000002";
-const REQUEST_ID = "00000000-0000-0000-0000-000000000003";
+const USER_ID = "3f1d2a4c-9b7e-4f0a-8c2d-1e6b5a4f3c2d";
+const AUCTION_ID = "4a2c1e7d-8b6f-4d3a-9c1e-2f7b5a6d4c3e";
+const REQUEST_ID = "5b3d2f8e-7c6a-4e1b-8d2f-3a6c5b7e4d2f";
 
 function clientWithRpc(
   rpc: (name: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }>
