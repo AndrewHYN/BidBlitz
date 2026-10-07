@@ -27,6 +27,9 @@ import { PayButton } from "@/components/dashboard/pay-button";
 import { CheckStatusButton } from "@/components/dashboard/check-status-button";
 import { ConfirmDeliveryButton } from "@/components/dashboard/confirm-delivery-button";
 import { paymentsRuntimeEnabled } from "@/server/payments/runtime";
+import { OpenDisputeDialog } from "@/components/dashboard/open-dispute-dialog";
+import { DisputeStatusBadge } from "@/components/dashboard/dispute-status-badge";
+import type { DisputeStatus } from "@/lib/supabase/types";
 
 export const metadata: Metadata = {
   title: "Transactions",
@@ -69,6 +72,18 @@ export default async function TransactionsPage() {
     supabase.rpc("my_transaction_payout_states"),
     paymentsRuntimeEnabled(),
   ]);
+  const transactionIds = rows.map((row) => row.id);
+  const { data: disputeRows } =
+    transactionIds.length > 0
+      ? await supabase
+          .from("transaction_disputes")
+          .select("id, transaction_id, status")
+          .in("transaction_id", transactionIds)
+      : { data: [] as Array<{ id: string; transaction_id: string; status: string }> };
+  const disputeByTx = new Map(
+    (disputeRows ?? []).map((dispute) => [dispute.transaction_id, dispute])
+  );
+
   const configured = isPaymentProviderConfigured();
   const canReconcile = paymentProviderSupportsReconciliation();
   // When no provider is connected the copy names the role, never a provider
@@ -130,6 +145,7 @@ export default async function TransactionsPage() {
               {rows.map((row) => {
                 const payout = payoutByTx.get(row.id);
                 const partyPayout = partyPayoutByTx.get(row.id);
+                const dispute = disputeByTx.get(row.id);
                 return (
                 <TableRow key={row.id} data-testid="transaction-row">
                   <TableCell className="max-w-[16rem] truncate whitespace-normal">
@@ -139,6 +155,21 @@ export default async function TransactionsPage() {
                     >
                       {row.auctions?.title ?? "Auction"}
                     </Link>
+                    {(row.status === "PAID" || row.status === "SETTLED") && (
+                      <div className="mt-2">
+                        {dispute ? (
+                          <Link
+                            href={`/dashboard/disputes/${dispute.id}`}
+                            className="inline-flex items-center gap-1.5 text-xs font-semibold text-foreground hover:text-primary"
+                          >
+                            Case
+                            <DisputeStatusBadge status={dispute.status as DisputeStatus} />
+                          </Link>
+                        ) : (
+                          <OpenDisputeDialog transactionId={row.id} compact />
+                        )}
+                      </div>
+                    )}
                   </TableCell>
                   <TableCell>{row.seller_id === user.id ? "Seller" : "Buyer"}</TableCell>
                   <TableCell data-numeric>
@@ -238,6 +269,7 @@ export default async function TransactionsPage() {
                       </span>
                     )}
                     {row.buyer_id === user.id &&
+                      !dispute &&
                       (row.status === "PAID" || row.status === "SETTLED") &&
                       partyPayout &&
                       !["HELD", "DISPUTED"].includes(partyPayout.payout_status) && (
@@ -303,12 +335,11 @@ export default async function TransactionsPage() {
 
       {configured && rows.length > 0 && (
         <p className="text-xs text-muted-foreground">
-          <strong className="text-foreground">Payment status</strong> is the
-          buyer&apos;s payment, as {providerName} reports it. <strong className="text-foreground">Payout status</strong>{" "}
-          is the seller&apos;s proceeds, tracked separately: it appears only on
-          sales you sold, and reaching &ldquo;Paid out&rdquo; means an
-          administrator sent the payout or recorded a transfer made outside
-          BidBlitz. {providerName} reports the buyer&apos;s payment, not the payout.
+          <strong className="text-foreground">Payment status</strong> is the buyer&apos;s
+          payment, as {providerName} reports it. <strong className="text-foreground">Payout status</strong>{" "}
+          is the seller&apos;s frozen proceeds, tracked separately. After buyer-confirmed
+          handover, BidBlitz releases an eligible seller payout through the configured
+          payout provider. Held, disputed or provider-sensitive payouts are never blindly retried.
         </p>
       )}
     </div>
