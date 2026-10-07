@@ -76,6 +76,7 @@ async function missingResourceKind(
       .from("auctions")
       .select("id")
       .eq("id", auction[1])
+      .is("archived_at", null)
       .maybeSingle();
     if (error) {
       console.error("[proxy/auction]", error.message);
