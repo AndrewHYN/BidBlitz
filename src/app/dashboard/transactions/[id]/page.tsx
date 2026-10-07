@@ -12,7 +12,8 @@ import { Button } from "@/components/ui/button";
 import { ConfirmDeliveryButton } from "@/components/dashboard/confirm-delivery-button";
 import { OpenDisputeDialog } from "@/components/dashboard/open-dispute-dialog";
 import { DisputeStatusBadge } from "@/components/dashboard/dispute-status-badge";
-import type { DisputeStatus } from "@/lib/supabase/types";
+import type { DisputeStatus, SellerPayoutStatus, TransactionStatus } from "@/lib/supabase/types";
+import { TransactionMoneyStory } from "@/components/dashboard/transaction-money-story";
 
 export const metadata: Metadata = {
   title: "Sale conversation",
@@ -62,12 +63,17 @@ export default async function TransactionThreadPage({
   }
 
   const role = thread.role === "moderator" ? "Moderator" : thread.seller_id === user.id ? "Seller" : "Buyer";
-  const [{ data: payoutStates }, { data: existingDispute }] = await Promise.all([
+  const [{ data: payoutStates }, { data: existingDispute }, { data: transactionMoney }] = await Promise.all([
     supabase.rpc("my_transaction_payout_states"),
     supabase
       .from("transaction_disputes")
       .select("id, status")
       .eq("transaction_id", thread.id)
+      .maybeSingle(),
+    supabase
+      .from("transactions")
+      .select("currency, gross_minor, fee_minor, net_minor, status")
+      .eq("id", thread.id)
       .maybeSingle(),
   ]);
   type PartyPayoutState = {
@@ -98,6 +104,21 @@ export default async function TransactionThreadPage({
               : `Private conversation with ${thread.counterparty.display_name} (@${thread.counterparty.username}) · you are the ${role.toLowerCase()}. Only the two of you can read this.`
           }
         />
+        {transactionMoney && (
+          <TransactionMoneyStory
+            currency={transactionMoney.currency}
+            grossMinor={transactionMoney.gross_minor}
+            feeMinor={transactionMoney.fee_minor}
+            netMinor={transactionMoney.net_minor}
+            transactionStatus={transactionMoney.status as TransactionStatus}
+            payoutStatus={
+              (payoutState?.payout_status as SellerPayoutStatus | undefined) ?? null
+            }
+            handoverConfirmed={Boolean(payoutState?.delivery_confirmed_at)}
+            hasDispute={Boolean(existingDispute && existingDispute.status !== "RESOLVED")}
+          />
+        )}
+
         <div className="flex flex-wrap items-center gap-2">
           <TransactionBadge status={thread.status} />
           <Link
