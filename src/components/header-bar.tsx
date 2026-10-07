@@ -8,7 +8,10 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useMounted } from "@/hooks/use-mounted";
 import {
   Bell,
+  Eye,
   Gavel,
+  Home,
+  LayoutGrid,
   Menu,
   Moon,
   Plus,
@@ -59,15 +62,16 @@ const NAV = [
 
 /** Desktop shows the two anchors; the full set lives in the mobile drawer. */
 const DESKTOP_AUTH_NAV = [
-  { label: "Dashboard", href: "/dashboard", exact: true },
   { label: "Watchlist", href: "/dashboard/watchlist", exact: true },
+  { label: "Messages", href: "/dashboard/transactions", exact: true },
 ] as const;
 
 const AUTH_NAV = [
-  { label: "Dashboard", href: "/dashboard", exact: true },
+  { label: "My BidBlitz", href: "/dashboard", exact: true },
+  { label: "My bids", href: "/dashboard/buying", exact: true },
+  { label: "My listings", href: "/dashboard/selling", exact: true },
   { label: "Watchlist", href: "/dashboard/watchlist", exact: true },
-  { label: "Bidding", href: "/dashboard/buying", exact: true },
-  { label: "Selling", href: "/dashboard/selling", exact: true },
+  { label: "Messages & purchases", href: "/dashboard/transactions", exact: true },
 ] as const;
 
 /**
@@ -373,7 +377,8 @@ export function HeaderBar({
   );
 
   return (
-    <header className="sticky top-0 z-40 border-b bg-background/85 backdrop-blur-md">
+    <>
+    <header className="sticky top-0 z-40 border-b border-border/80 bg-background/92 shadow-[0_8px_28px_-26px_rgba(15,23,42,0.55)] backdrop-blur-xl">
       <div className="page-container flex h-16 items-center gap-3">
         {/* mobile menu trigger */}
         <Button
@@ -561,5 +566,51 @@ export function HeaderBar({
           </AnimatePresence>
         ))}
     </header>
+
+      {user && (
+        <>
+          <div className="h-20 lg:hidden" aria-hidden />
+          <nav
+            aria-label="BidBlitz shortcuts"
+            className="fixed inset-x-0 bottom-0 z-50 border-t border-border/80 bg-background/95 px-2 pb-2 pt-2 shadow-[0_-12px_28px_-24px_rgba(15,23,42,0.55)] backdrop-blur-xl lg:hidden"
+          >
+            <div className="mx-auto grid max-w-lg grid-cols-5 gap-1">
+              {[
+                { label: "Home", href: "/", icon: Home, exact: true },
+                { label: "Browse", href: "/browse", icon: LayoutGrid, exact: false },
+                { label: "Sell", href: "/sell", icon: Plus, exact: false, action: true },
+                { label: "Watch", href: "/dashboard/watchlist", icon: Eye, exact: false },
+                { label: "My BidBlitz", href: "/dashboard", icon: Gavel, exact: false },
+              ].map(({ label, href, icon: Icon, exact, action }) => {
+                const current = isActive(pathname, href, exact);
+                return (
+                  <Link
+                    key={href}
+                    href={href}
+                    aria-current={current ? "page" : undefined}
+                    className={cn(
+                      "flex min-h-14 flex-col items-center justify-center gap-1 rounded-lg px-1 text-[0.68rem] font-medium text-muted-foreground transition-colors",
+                      current && !action && "bg-accent text-accent-foreground",
+                      action && "text-primary"
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "grid size-8 place-items-center rounded-lg",
+                        action && "bg-primary text-primary-foreground shadow-md",
+                        current && !action && "text-primary"
+                      )}
+                    >
+                      <Icon className="size-[1.15rem]" aria-hidden />
+                    </span>
+                    <span>{label}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          </nav>
+        </>
+      )}
+    </>
   );
 }
