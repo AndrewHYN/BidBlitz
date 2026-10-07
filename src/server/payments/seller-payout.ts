@@ -69,6 +69,33 @@ export async function releaseSellerPayout(
     };
   }
 
+  // Defence in depth: an unresolved transaction dispute blocks money movement
+  // independently of the payout-status transition. The dispute-opening RPC
+  // normally moves a safely reversible payout to DISPUTED, but release must
+  // never rely on that single state write to protect the parties.
+  const { data: openDispute, error: disputeError } = await admin
+    .from("transaction_disputes")
+    .select("id")
+    .eq("transaction_id", payout.transaction_id)
+    .neq("status", "RESOLVED")
+    .limit(1)
+    .maybeSingle();
+
+  if (disputeError) {
+    return {
+      ok: false,
+      code: "manual_reconciliation_required",
+      message: "BidBlitz could not verify the dispute state, so no payout was sent.",
+    };
+  }
+  if (openDispute) {
+    return {
+      ok: false,
+      code: "not_ready",
+      message: "This transaction has an unresolved dispute. Seller payout remains blocked.",
+    };
+  }
+
   // PAYOUT_DUE means the provider instruction may already have happened but
   // the final ledger write may have failed. Never auto-retry that state.
   const { data: priorEvents, error: eventsError } = await admin
