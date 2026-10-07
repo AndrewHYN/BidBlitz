@@ -125,11 +125,17 @@ export function AuctionCard({
             </p>
           </div>
 
-          <div className="flex shrink-0 items-center gap-1 text-[11px] text-muted-foreground">
-            <Gavel className="size-3" aria-hidden />
-            <span data-numeric>{auction.bidCount}</span>
-            <span>{auction.bidCount === 1 ? "bid" : "bids"}</span>
-          </div>
+          {auction.bidCount > 0 ? (
+            <div className="flex shrink-0 items-center gap-1 text-[11px] text-muted-foreground">
+              <Gavel className="size-3" aria-hidden />
+              <span data-numeric>{auction.bidCount}</span>
+              <span>{auction.bidCount === 1 ? "bid" : "bids"}</span>
+            </div>
+          ) : !closed && auction.status !== "PAUSED" ? (
+            <span className="shrink-0 text-[11px] font-semibold text-primary">
+              Be first to bid
+            </span>
+          ) : null}
         </div>
 
         {meta && <div className="border-t pt-2 text-[11px]">{meta}</div>}
