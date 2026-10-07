@@ -100,6 +100,7 @@ export interface Database {
           winner_id: string | null;
           winning_bid_minor: number | null;
           settled_at: string | null;
+          archived_at: string | null;
           featured: boolean;
           image_count: number;
           created_at: string;
@@ -119,6 +120,7 @@ export interface Database {
           starting_bid_minor: number;
           bid_increment_minor: number;
           status?: AuctionStatus;
+          archived_at?: string | null;
           duration_seconds?: number;
           anti_snipe_window_seconds?: number;
           anti_snipe_extension_seconds?: number;
