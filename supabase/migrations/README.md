@@ -63,3 +63,15 @@ migration to make the histories match.
   sweep, so an auction closes exactly once even under parallel workers.
 - `fee_settings.fee_bps` is read only by server functions; clients cannot
   write it (no RLS policy + `REVOKE`).
+
+
+## 2026-10-07 seller payout release
+
+| File | Purpose |
+| --- | --- |
+| `20261007000004_seller_payout_onboarding_and_release.sql` | Adds the runtime payment kill switch, private seller payout onboarding, payout-readiness publish guard, buyer-confirmed handover, and service-only seller payout transitions. |
+| `20261007000005_harden_payout_rpc_surface.sql` | Moves privileged payout helpers into the unexposed `private` schema and leaves authenticated public RPCs as security-invoker wrappers. |
+
+These migrations deliberately shipped with `payment_settings.payments_enabled = false`.
+Enable that switch only after the matching application release has passed the
+full quality/build gate and production deployment is confirmed.
