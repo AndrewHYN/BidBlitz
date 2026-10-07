@@ -64,6 +64,13 @@ export async function confirmDeliveryAction(input: unknown): Promise<
       message: "Handover confirmed. Seller payout is queued until payments resume.",
     };
   }
+  if (release.code === "provider_funds_pending") {
+    return {
+      ok: true,
+      payoutReleased: false,
+      message: "Handover confirmed. The seller payout is queued while Linkwa finishes settling the buyer payment.",
+    };
+  }
   if (release.code === "recipient_not_ready") {
     return {
       ok: true,
