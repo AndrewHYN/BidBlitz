@@ -127,6 +127,7 @@ export const getHomeFeed = cache(async () => {
       .from("auctions")
       .select(CARD_SELECT)
       .eq("status", "LIVE")
+      .is("archived_at", null)
       .order("ends_at", { ascending: true })
       .limit(8),
     // Recently listed is a merchandising window, not a lifecycle state:
