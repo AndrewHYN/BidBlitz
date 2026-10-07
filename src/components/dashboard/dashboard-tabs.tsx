@@ -11,11 +11,11 @@ import { cn } from "@/lib/utils";
  */
 
 const TABS = [
-  { href: "/dashboard", label: "Overview" },
-  { href: "/dashboard/buying", label: "Buying" },
+  { href: "/dashboard", label: "Home" },
+  { href: "/dashboard/buying", label: "My bids" },
   { href: "/dashboard/selling", label: "Selling" },
   { href: "/dashboard/watchlist", label: "Watchlist" },
-  { href: "/dashboard/transactions", label: "Transactions" },
+  { href: "/dashboard/transactions", label: "Activity" },
 ] as const;
 
 export function DashboardTabs() {
@@ -25,7 +25,7 @@ export function DashboardTabs() {
     <nav
       data-testid="dashboard-tabs"
       aria-label="Dashboard sections"
-      className="flex flex-wrap gap-1 rounded-lg border bg-muted p-1"
+      className="flex gap-1 overflow-x-auto rounded-xl border bg-muted/60 p-1.5 shadow-sm"
     >
       {TABS.map((tab) => {
         const active =
@@ -37,7 +37,7 @@ export function DashboardTabs() {
             href={tab.href}
             aria-current={active ? "page" : undefined}
             className={cn(
-              "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+              "min-h-9 shrink-0 rounded-lg px-3.5 py-2 text-sm font-semibold transition-colors",
               "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
               active
                 ? "bg-background text-foreground shadow-sm"
