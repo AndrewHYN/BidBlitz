@@ -111,7 +111,11 @@ export default async function TransactionsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Activity & payments"
-        description={`Wins and sales after the auction closes: payment, messages, seller payout and reviews. Buyers pay the winning bid plus ${providerName}'s payment charge; sellers receive the winning bid less BidBlitz's 5% fee.`}
+        description={
+          configured && !paymentsEnabled
+            ? `Wins and sales after the auction closes: payment, messages, seller payout and reviews. BidBlitz's 5% / seller 95% split is fixed, but new checkout is temporarily paused.`
+            : `Wins and sales after the auction closes: payment, messages, seller payout and reviews. Buyers pay the winning bid plus ${providerName}'s payment charge; sellers receive the winning bid less BidBlitz's 5% fee.`
+        }
       />
 
       <div>
@@ -180,7 +184,9 @@ export default async function TransactionsPage() {
                         implied to be included in the number above. */}
                     {row.buyer_id === user.id && (
                       <span className="mt-1 block text-xs text-muted-foreground">
-                        plus {providerName}&apos;s charge
+                        {configured && !paymentsEnabled && row.status === "AWAITING_PAYMENT"
+                          ? "provider charge applies when checkout resumes"
+                          : <>plus {providerName}&apos;s charge</>}
                       </span>
                     )}
                   </TableCell>
