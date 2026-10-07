@@ -6,9 +6,10 @@ import {
   ArrowRight,
   Clock3,
   Gavel,
+  MapPinned,
+  MessageCircle,
   Search,
   ShieldCheck,
-  Star,
   Wallet,
   Zap,
 } from "lucide-react";
@@ -47,9 +48,14 @@ export function HomeHero() {
       detail: "A sale is marked paid only once the provider confirms it.",
     },
     {
-      icon: Star,
-      label: "Reviews that mean something",
-      detail: "Only the two sides of a real transaction can review it.",
+      icon: MessageCircle,
+      label: "Private post-sale chat",
+      detail: "Buyer and seller get a transaction-linked thread after a win.",
+    },
+    {
+      icon: MapPinned,
+      label: "Safer handovers",
+      detail: "Agree collection clearly and use a public meeting place when practical.",
     },
   ];
 
@@ -74,8 +80,9 @@ export function HomeHero() {
           </h1>
 
           <p className="mt-5 max-w-2xl text-base leading-7 text-muted-foreground sm:text-lg">
-            List an item, set the closing time and let buyers across Zimbabwe
-            compete. The highest valid bid when the clock runs out wins.
+            Find the item, watch the clock and bid with confidence. Sellers set
+            the terms up front; the highest valid bid when the server closes the
+            auction wins.
           </p>
 
           <form
@@ -107,14 +114,14 @@ export function HomeHero() {
           </form>
 
           <div className="mt-5 flex flex-wrap items-center gap-2">
-            <Button asChild variant="secondary">
-              <Link href="/sell">
-                Start selling
+            <Button asChild size="lg">
+              <Link href="/browse">
+                Browse live auctions
                 <ArrowRight aria-hidden />
               </Link>
             </Button>
-            <Button asChild variant="ghost">
-              <Link href="/browse">Browse auctions</Link>
+            <Button asChild variant="outline" size="lg">
+              <Link href="/sell">Sell an item</Link>
             </Button>
           </div>
         </motion.div>
@@ -136,7 +143,7 @@ export function HomeHero() {
               href="/how-it-works"
               className="underline-offset-4 hover:underline focus-visible:underline focus-visible:outline-none"
             >
-              How the blitz works
+              Built for real auctions
             </Link>
           </div>
 
