@@ -27,9 +27,10 @@ export default async function AdminDisputeDetailPage({
   } = await supabase.auth.getUser();
   if (!user) redirect(`/login?next=/admin/disputes/${id}`);
 
-  const [caseData, canManageTeam] = await Promise.all([
+  const [caseData, canManageTeam, canManageDisputes] = await Promise.all([
     getStaffDisputeCase(id, user.id),
     hasPermission(user.id, "admin.manage_team"),
+    hasPermission(user.id, "disputes.manage"),
   ]);
 
   if (!caseData) {
@@ -52,7 +53,12 @@ export default async function AdminDisputeDetailPage({
     <div className="page-container space-y-5 py-8 sm:py-12">
       <AdminNav active="disputes" showTeam={canManageTeam} />
       <div className="mx-auto max-w-5xl">
-        <DisputeCaseView caseData={caseData} viewerId={user.id} staff />
+        <DisputeCaseView
+          caseData={caseData}
+          viewerId={user.id}
+          staff={canManageDisputes}
+          canContribute={canManageDisputes}
+        />
       </div>
     </div>
   );
