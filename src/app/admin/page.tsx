@@ -244,7 +244,11 @@ export default async function AdminPage() {
     p_permission: "admin.access",
   });
   const isAdmin = permission === true;
-  const [{ data: canManageTeam }, { data: canManagePromotions }] = await Promise.all([
+  const [
+    { data: canManageTeam },
+    { data: canManagePromotions },
+    { data: canViewDisputes },
+  ] = await Promise.all([
     supabase.rpc("has_permission", {
       p_user_id: user.id,
       p_permission: "admin.manage_team",
@@ -252,6 +256,10 @@ export default async function AdminPage() {
     supabase.rpc("has_permission", {
       p_user_id: user.id,
       p_permission: "settings.manage_marketplace",
+    }),
+    supabase.rpc("has_permission", {
+      p_user_id: user.id,
+      p_permission: "disputes.view",
     }),
   ]);
 
@@ -303,6 +311,14 @@ export default async function AdminPage() {
       .maybeSingle(),
     getAdminPayouts(),
   ]);
+
+  const { count: openDisputeCount } =
+    canViewDisputes === true
+      ? await supabase
+          .from("transaction_disputes")
+          .select("id", { count: "exact", head: true })
+          .neq("status", "RESOLVED")
+      : { count: 0 };
 
   const reports = (reportsRes.data ?? []) as ReportRow[];
   const fee = (feeRes.data ?? null) as FeeRow | null;
@@ -474,7 +490,11 @@ export default async function AdminPage() {
         description="Review marketplace work, promotions, safety actions and money operations from one console."
       />
 
-      <AdminNav active="overview" showTeam={canManageTeam === true} />
+      <AdminNav
+        active="overview"
+        showTeam={canManageTeam === true}
+        disputeCount={openDisputeCount ?? 0}
+      />
 
       {canManagePromotions === true && (
         <section id="admin-promotions" aria-labelledby="admin-promotions-heading" className="space-y-4 scroll-mt-24">
