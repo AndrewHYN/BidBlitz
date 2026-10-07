@@ -24,6 +24,7 @@ export function PayoutSettingsForm({
 
   return (
     <form
+      method="post"
       className="promotion-surface space-y-5 rounded-2xl border p-5 shadow-sm sm:p-6"
       onSubmit={(event) => {
         event.preventDefault();
