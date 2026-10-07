@@ -10,6 +10,9 @@ import { MessageThread } from "@/components/dashboard/message-thread";
 import { ReportDialog } from "@/components/auction/report-dialog";
 import { Button } from "@/components/ui/button";
 import { ConfirmDeliveryButton } from "@/components/dashboard/confirm-delivery-button";
+import { OpenDisputeDialog } from "@/components/dashboard/open-dispute-dialog";
+import { DisputeStatusBadge } from "@/components/dashboard/dispute-status-badge";
+import type { DisputeStatus } from "@/lib/supabase/types";
 
 export const metadata: Metadata = {
   title: "Sale conversation",
@@ -59,7 +62,14 @@ export default async function TransactionThreadPage({
   }
 
   const role = thread.role === "moderator" ? "Moderator" : thread.seller_id === user.id ? "Seller" : "Buyer";
-  const { data: payoutStates } = await supabase.rpc("my_transaction_payout_states");
+  const [{ data: payoutStates }, { data: existingDispute }] = await Promise.all([
+    supabase.rpc("my_transaction_payout_states"),
+    supabase
+      .from("transaction_disputes")
+      .select("id, status")
+      .eq("transaction_id", thread.id)
+      .maybeSingle(),
+  ]);
   type PartyPayoutState = {
     transaction_id: string;
     payout_status: string;
@@ -70,6 +80,7 @@ export default async function TransactionThreadPage({
     (row) => row.transaction_id === thread.id
   );
   const buyerMayConfirm =
+    !existingDispute &&
     thread.role !== "moderator" &&
     thread.seller_id !== user.id &&
     (thread.status === "PAID" || thread.status === "SETTLED") &&
@@ -100,6 +111,38 @@ export default async function TransactionThreadPage({
           </span>
           <ReportDialog userId={thread.counterparty.id} username={thread.counterparty.username} />
         </div>
+        {thread.role !== "moderator" &&
+          (thread.status === "PAID" || thread.status === "SETTLED") && (
+            <div className="case-entry-card rounded-xl border p-4 shadow-sm">
+              {existingDispute ? (
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <p className="font-semibold">Transaction dispute</p>
+                      <DisputeStatusBadge status={existingDispute.status as DisputeStatus} />
+                    </div>
+                    <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                      This case is part of the transaction record. Unpaid seller proceeds stay protected according to the case state.
+                    </p>
+                  </div>
+                  <Button asChild variant="outline" size="sm">
+                    <Link href={`/dashboard/disputes/${existingDispute.id}`}>Open case</Link>
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="font-semibold">Something seriously wrong?</p>
+                    <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                      Open a case before confirming handover if the item, delivery or money state needs BidBlitz review.
+                    </p>
+                  </div>
+                  <OpenDisputeDialog transactionId={thread.id} />
+                </div>
+              )}
+            </div>
+          )}
+
         {buyerMayConfirm && payoutState && (
           <div className="promotion-surface rounded-xl border border-primary/20 p-4 shadow-sm">
             <p className="font-semibold">Received the item?</p>
