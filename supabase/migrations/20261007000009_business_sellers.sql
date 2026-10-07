@@ -42,8 +42,16 @@ alter table public.business_sellers enable row level security;
 
 drop policy if exists business_sellers_public_read on public.business_sellers;
 create policy business_sellers_public_read
-on public.business_sellers for select
-using (status='ACTIVE' or owner_id=(select auth.uid()) or private.is_admin());
+on public.business_sellers for select to public
+using (status='ACTIVE');
+
+drop policy if exists business_sellers_owner_staff_read on public.business_sellers;
+create policy business_sellers_owner_staff_read
+on public.business_sellers for select to authenticated
+using (
+  owner_id=(select auth.uid())
+  or public.has_permission((select auth.uid()),'admin.access')
+);
 
 revoke insert,update,delete on public.business_sellers from anon,authenticated;
 grant select on public.business_sellers to anon,authenticated;
