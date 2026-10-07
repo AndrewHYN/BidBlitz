@@ -31,7 +31,7 @@ async function userContact(userId: string): Promise<{ email: string; name: strin
   }
 }
 
-async function adminContacts(): Promise<Array<{ email: string; name: string }>> {
+async function adminContacts(permission?: string): Promise<Array<{ email: string; name: string }>> {
   try {
     if (!hasAdminCredentials()) return [];
     const admin = createAdminClient();
@@ -40,8 +40,20 @@ async function adminContacts(): Promise<Array<{ email: string; name: string }>> 
       .select("user_id")
       .eq("status", "ACTIVE");
     const ids = [...new Set(((data ?? []) as Array<{ user_id: string }>).map((r) => r.user_id))];
+    const allowedIds: string[] = [];
+    for (const id of ids) {
+      if (!permission) {
+        allowedIds.push(id);
+        continue;
+      }
+      const { data: allowed } = await admin.rpc("has_permission", {
+        p_user_id: id,
+        p_permission: permission,
+      });
+      if (allowed === true) allowedIds.push(id);
+    }
     const out: Array<{ email: string; name: string }> = [];
-    for (const id of ids.slice(0, 10)) {
+    for (const id of allowedIds.slice(0, 20)) {
       const contact = await userContact(id);
       if (contact) out.push(contact);
     }
@@ -110,9 +122,10 @@ export async function notifyAuctionAudience(
 export async function notifyAdmins(
   template: string,
   data: Record<string, string>,
-  key: string
+  key: string,
+  permission?: string
 ): Promise<void> {
-  for (const contact of await adminContacts()) {
+  for (const contact of await adminContacts(permission)) {
     await queueEmail({
       to: contact.email,
       template,
