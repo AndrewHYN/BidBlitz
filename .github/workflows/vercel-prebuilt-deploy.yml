@@ -22,6 +22,7 @@ permissions:
 env:
   VERCEL_ORG_ID: team_udUjK9zSNigqrDngeAo1pBp0
   VERCEL_PROJECT_ID: prj_8OA1C8dJMwxV0gxa2u3ilbvNYwAN
+  VERCEL_CLI_VERSION: "59.19.1"
 
 jobs:
   deploy:
@@ -49,13 +50,8 @@ jobs:
             echo "::error::Add repository/environment secret VERCEL_TOKEN before using this workflow."
             exit 1
           }
-          test -n "${VERCEL_CLI_VERSION:-}" || {
-            echo "::error::Add repository variable VERCEL_CLI_VERSION pinned to a reviewed exact Vercel CLI version."
-            exit 1
-          }
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_CLI_VERSION: ${{ vars.VERCEL_CLI_VERSION }}
 
       - name: Install dependencies
         run: npm ci
@@ -68,8 +64,6 @@ jobs:
 
       - name: Install pinned Vercel CLI
         run: npm install --global "vercel@${VERCEL_CLI_VERSION}"
-        env:
-          VERCEL_CLI_VERSION: ${{ vars.VERCEL_CLI_VERSION }}
 
       - name: Pull Vercel environment
         run: vercel pull --yes --environment="${{ inputs.target }}"
@@ -90,12 +84,47 @@ jobs:
 
       - name: Deploy prebuilt preview
         if: inputs.target == 'preview'
-        run: vercel deploy --prebuilt
+        id: preview_deploy
+        shell: bash
+        run: |
+          set -euo pipefail
+          url="$(vercel deploy --prebuilt --yes --token="$VERCEL_TOKEN" | tail -n 1)"
+          test -n "$url"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "Preview: $url"
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
 
       - name: Stage prebuilt production without assigning domains
         if: inputs.target == 'production'
-        run: vercel deploy --prebuilt --prod --skip-domain
+        id: production_stage
+        shell: bash
+        run: |
+          set -euo pipefail
+          url="$(vercel deploy --prebuilt --prod --skip-domain --yes --token="$VERCEL_TOKEN" | tail -n 1)"
+          test -n "$url"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "Staged production candidate: $url"
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+
+      - name: Install Chromium for staged smoke
+        run: npx playwright install --with-deps chromium
+
+      - name: Smoke preview
+        if: inputs.target == 'preview'
+        run: npx playwright test e2e/release-smoke.spec.ts
+        env:
+          PLAYWRIGHT_BASE_URL: ${{ steps.preview_deploy.outputs.url }}
+
+      - name: Smoke staged production candidate
+        if: inputs.target == 'production'
+        run: npx playwright test e2e/release-smoke.spec.ts
+        env:
+          PLAYWRIGHT_BASE_URL: ${{ steps.production_stage.outputs.url }}
+
+      - name: Promotion reminder
+        if: inputs.target == 'production'
+        run: |
+          echo "::notice::Production candidate is staged and smoke-tested, but domains were NOT assigned."
+          echo "::notice::Promote only after reviewing the staged deployment URL."
