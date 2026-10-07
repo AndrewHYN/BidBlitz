@@ -308,7 +308,7 @@ export default async function AdminPage() {
       .maybeSingle(),
     supabase
       .from("payment_settings")
-      .select("payment_window_seconds, updated_at")
+      .select("payment_window_seconds, payments_enabled, updated_at")
       .maybeSingle(),
     getAdminPayouts(),
   ]);
@@ -325,9 +325,11 @@ export default async function AdminPage() {
   const fee = (feeRes.data ?? null) as FeeRow | null;
   const paymentWindow = (windowRes.data ?? null) as {
     payment_window_seconds: number;
+    payments_enabled: boolean;
     updated_at: string;
   } | null;
   const configured = isPaymentProviderConfigured();
+  const runtimePaymentsEnabled = paymentWindow?.payments_enabled === true;
 
   // What the reports point at, so the queue shows names instead of UUIDs.
   // A report target is one id in one of two tables; both reads are batched,
@@ -1149,9 +1151,11 @@ export default async function AdminPage() {
           )}
 
           <p className="mt-4 text-xs text-muted-foreground">
-            {configured
-              ? "A payment provider is configured; settled sales can move money."
-              : "No payment provider is configured yet, so no money has moved. Fees here are what WOULD be charged on settlement."}
+            {!configured
+              ? "No payment provider is configured, so BidBlitz cannot start new money movement."
+              : runtimePaymentsEnabled
+                ? "The payment provider is configured and the runtime payment switch is ON."
+                : "The payment provider is configured, but the runtime payment switch is OFF. New checkout and seller payout instructions remain paused."}
           </p>
           <div className="mt-4 border-t border-border/70 pt-4">
             <p className="text-xs uppercase tracking-wide text-muted-foreground">
