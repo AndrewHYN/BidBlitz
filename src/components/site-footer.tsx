@@ -18,10 +18,11 @@ const COLUMNS = [
   {
     title: "Your account",
     links: [
-      { label: "Dashboard", href: "/dashboard" },
+      { label: "Your home", href: "/dashboard" },
       { label: "Watchlist", href: "/dashboard/watchlist" },
-      { label: "Bidding", href: "/dashboard/buying" },
-      { label: "Selling", href: "/dashboard/selling" },
+      { label: "My bids", href: "/dashboard/buying" },
+      { label: "My selling", href: "/dashboard/selling" },
+      { label: "Activity & payments", href: "/dashboard/transactions" },
     ],
   },
   {
