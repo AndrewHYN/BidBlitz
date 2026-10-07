@@ -322,6 +322,15 @@ export interface Database {
           linked_at: string | null;
         }[];
       };
+      my_transaction_payout_states: {
+        Args: Record<string, never>;
+        Returns: {
+          transaction_id: string;
+          payout_status: SellerPayoutStatus;
+          delivery_confirmed_at: string | null;
+          paid_at: string | null;
+        }[];
+      };
       buyer_confirm_delivery: {
         Args: { p_transaction_id: string };
         Returns: Json;
