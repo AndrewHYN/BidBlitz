@@ -34,6 +34,21 @@ const txLink = (appUrl: string) => `${appUrl}/dashboard/transactions`;
 const helpLink = (appUrl: string) => `${appUrl}/help`;
 
 export const EMAIL_TEMPLATES: Record<string, EmailTemplate> = {
+  dispute_staff_required: {
+    key: "dispute_staff_required",
+    critical: true,
+    subject: (d) => `Dispute needs review: ${d.title}`,
+    content: (d, appUrl) => ({
+      subject: `Dispute needs review: ${d.title}`,
+      name: d.name,
+      headline: "A transaction dispute needs staff attention",
+      paragraphs: [
+        `A buyer or seller opened a dispute about “${d.title}”.`,
+        "Review the case, evidence and payout state. BidBlitz records the outcome but does not issue refunds from this workflow.",
+      ],
+      cta: { label: "Open dispute queue", href: `${appUrl}/admin/disputes` },
+    }),
+  },
   staff_review_required: {
     key: "staff_review_required",
     critical: true,

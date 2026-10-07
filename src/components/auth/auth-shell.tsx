@@ -82,8 +82,33 @@ export function AuthShell({
           </p>
         </aside>
 
-        <main className="flex items-center justify-center bg-background/35 p-4 sm:p-8 lg:p-10">
-          <div className="w-full max-w-md">{children}</div>
+        <main className="auth-stage flex items-center justify-center bg-background/35 p-4 sm:p-8 lg:p-10">
+          <div className="w-full max-w-md">
+            <div className="mb-5 rounded-2xl border bg-foreground p-5 text-background shadow-lg lg:hidden">
+              <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.18em] text-background/65">
+                <Zap className="size-4" aria-hidden />
+                {eyebrow}
+              </div>
+              <h1 className="mt-3 text-2xl font-bold tracking-[-0.03em] text-balance">
+                {title}
+              </h1>
+              <p className="mt-2 text-sm leading-6 text-background/65">
+                {description}
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2 text-[11px] font-semibold text-background/70">
+                <span className="rounded-md border border-background/15 bg-background/10 px-2 py-1">
+                  Real auction rules
+                </span>
+                <span className="rounded-md border border-background/15 bg-background/10 px-2 py-1">
+                  Private handover chat
+                </span>
+                <span className="rounded-md border border-background/15 bg-background/10 px-2 py-1">
+                  Provider-confirmed payments
+                </span>
+              </div>
+            </div>
+            {children}
+          </div>
         </main>
       </div>
     </div>

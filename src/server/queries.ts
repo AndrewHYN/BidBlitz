@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { sweepDueAuctions } from "@/server/sweep";
 import { recentlyListedCutoffIso } from "@/lib/auction-status";
 import type { Database, SellerPayoutStatus, TransactionStatus } from "@/lib/supabase/types";
+import { businessLogoUrl } from "@/lib/business";
 
 /**
  * Read model. Server Components call these so the first paint already has
@@ -35,12 +36,15 @@ export type AuctionCardData = {
   featured: boolean;
   categorySlug: string | null;
   categoryName: string | null;
+  businessName: string | null;
+  businessSlug: string | null;
 };
 
 const CARD_SELECT = `
   id, title, current_bid_minor, starting_bid_minor, bid_count,
   ends_at, status, location, condition, featured, featured_until,
   categories:category_id(slug, name),
+  business:business_id(slug, display_name),
   auction_images(position, storage_path)
 `;
 
@@ -62,6 +66,10 @@ type CardJoin = {
    * accept both and normalise here rather than lying in a cast.
    */
   categories: { slug: string; name: string } | Array<{ slug: string; name: string }> | null;
+  business:
+    | { slug: string; display_name: string }
+    | Array<{ slug: string; display_name: string }>
+    | null;
   auction_images: Array<{ position: number; storage_path: string }>;
 };
 
@@ -89,6 +97,7 @@ export function imageUrlFor(path: string | null | undefined): string | null {
 function toCard(row: CardJoin): AuctionCardData {
   const sorted = [...(row.auction_images ?? [])].sort((a, b) => a.position - b.position);
   const category = Array.isArray(row.categories) ? (row.categories[0] ?? null) : row.categories;
+  const business = Array.isArray(row.business) ? (row.business[0] ?? null) : row.business;
   return {
     id: row.id,
     title: row.title,
@@ -106,6 +115,8 @@ function toCard(row: CardJoin): AuctionCardData {
       new Date(row.featured_until).getTime() > Date.now(),
     categorySlug: category?.slug ?? null,
     categoryName: category?.name ?? null,
+    businessName: business?.display_name ?? null,
+    businessSlug: business?.slug ?? null,
   };
 }
 
@@ -255,6 +266,7 @@ export const getAuctionDetail = cache(async (id: string) => {
       `*,
        categories:category_id(id, slug, name),
        auction_images(id, storage_path, position, width, height),
+       business:business_id(id, slug, display_name, description, location, logo_path, status),
        seller:profiles!auctions_seller_id_fkey(
          id, username, display_name, avatar_path, bio, location,
          rating_sum, rating_count, sales_count, purchases_count,
@@ -329,6 +341,15 @@ export const getAuctionDetail = cache(async (id: string) => {
         height: number | null;
       }>;
       seller: ProfileRow | null;
+      business: {
+        id: string;
+        slug: string;
+        display_name: string;
+        description: string | null;
+        location: string | null;
+        logo_path: string | null;
+        status: "ACTIVE" | "SUSPENDED";
+      } | null;
     },
     bids: (bids ?? []) as unknown as Array<
       BidRow & { bidder: { username: string; display_name: string } | null }
@@ -337,6 +358,47 @@ export const getAuctionDetail = cache(async (id: string) => {
     watched,
     myHighestBidMinor,
     transaction,
+  };
+});
+
+export const getBusinessStorefront = cache(async (slug: string) => {
+  const supabase = await createClient();
+  const { data: business, error } = await supabase
+    .from("business_sellers")
+    .select(
+      "id, owner_id, slug, display_name, description, location, logo_path, status, created_at"
+    )
+    .eq("slug", slug)
+    .eq("status", "ACTIVE")
+    .maybeSingle();
+
+  if (error || !business) return null;
+
+  const [{ data: owner }, { data: auctions }] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select(
+        "id, username, display_name, avatar_path, rating_sum, rating_count, sales_count, email_verified, created_at"
+      )
+      .eq("id", business.owner_id)
+      .maybeSingle(),
+    supabase
+      .from("auctions")
+      .select(CARD_SELECT)
+      .eq("business_id", business.id)
+      .in("status", ["LIVE", "SCHEDULED"])
+      .is("archived_at", null)
+      .order("created_at", { ascending: false })
+      .limit(48),
+  ]);
+
+  return {
+    business: {
+      ...business,
+      logoUrl: businessLogoUrl(business.logo_path),
+    },
+    owner,
+    auctions: (auctions ?? []).map(toCard),
   };
 });
 

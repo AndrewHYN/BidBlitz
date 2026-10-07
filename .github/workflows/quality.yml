@@ -16,13 +16,13 @@ concurrency:
 jobs:
   quality:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - name: Check out
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
       - name: Set up Node
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version: "22"
           cache: npm
@@ -40,4 +40,50 @@ jobs:
         run: npm test
 
       - name: Production build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://zteakuiuvcikwpnkgxsn.supabase.co
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_FQDrBsoHL030r1jC4CvIaQ_Csq8cYuK
+          NEXT_PUBLIC_SITE_URL: http://127.0.0.1:3000
         run: npm run build
+
+      - name: Install Chromium for release smoke
+        run: npx playwright install chromium
+
+      - name: Start exact production build
+        shell: bash
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://zteakuiuvcikwpnkgxsn.supabase.co
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_FQDrBsoHL030r1jC4CvIaQ_Csq8cYuK
+          NEXT_PUBLIC_SITE_URL: http://127.0.0.1:3000
+        run: |
+          set -euo pipefail
+          npm run start -- -H 127.0.0.1 > /tmp/bidblitz-release-server.log 2>&1 &
+          echo $! > /tmp/bidblitz-release-server.pid
+          for attempt in {1..60}; do
+            if curl --fail --silent --show-error http://127.0.0.1:3000/login >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/bidblitz-release-server.log
+          exit 1
+
+      - name: Desktop and mobile release smoke
+        env:
+          PLAYWRIGHT_BASE_URL: http://127.0.0.1:3000
+          PLAYWRIGHT_EXTERNAL_SERVER: "true"
+          NEXT_PUBLIC_SUPABASE_URL: https://zteakuiuvcikwpnkgxsn.supabase.co
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_FQDrBsoHL030r1jC4CvIaQ_Csq8cYuK
+          NEXT_PUBLIC_SITE_URL: http://127.0.0.1:3000
+        run: npx playwright test e2e/release-smoke.spec.ts
+
+      - name: Stop release smoke server
+        if: always()
+        shell: bash
+        run: |
+          if [ -f /tmp/bidblitz-release-server.pid ]; then
+            kill "$(cat /tmp/bidblitz-release-server.pid)" 2>/dev/null || true
+          fi
+          if [ -f /tmp/bidblitz-release-server.log ]; then
+            tail -n 80 /tmp/bidblitz-release-server.log
+          fi

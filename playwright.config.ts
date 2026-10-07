@@ -16,6 +16,7 @@ const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "https://bidblitz.co.zw";
 
 /** True when we are pointed at a remote deployment rather than a local server. */
 const isRemote = /^https?:\/\//.test(baseURL) && !/^https?:\/\/(localhost|127\.0\.0\.1)/.test(baseURL);
+const externalServer = process.env.PLAYWRIGHT_EXTERNAL_SERVER === "true";
 
 export default defineConfig({
   testDir: "./e2e",
@@ -76,7 +77,7 @@ export default defineConfig({
    * (that is what happened on 2026-09-28) and the suite then validates old code
    * while appearing to test the current build.
    */
-  webServer: isRemote
+  webServer: isRemote || externalServer
     ? undefined
     : {
         command: "npm run dev",

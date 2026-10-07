@@ -80,7 +80,8 @@ export function GoogleSignInButton({ next }: { next?: string }) {
     <div className="space-y-2">
       <Button
         type="button"
-        className="w-full"
+        size="lg"
+        className="w-full shadow-sm"
         disabled={submitting}
         aria-busy={submitting}
         onClick={() => void start()}

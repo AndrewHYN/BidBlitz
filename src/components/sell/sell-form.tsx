@@ -73,12 +73,15 @@ export function SellForm({
   categories,
   feeBps,
   providerName,
+  paymentsEnabled,
 }: {
   categories: CategoryOption[];
   /** Live rate from fee_settings; null = omit the percent rather than guess. */
   feeBps: number | null;
   /** Configured payment provider's display name, read server-side and passed in. */
   providerName: string | null;
+  /** Runtime kill switch; provider configuration alone never means checkout is live. */
+  paymentsEnabled: boolean;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -406,10 +409,17 @@ export function SellForm({
           If this auction sells, BidBlitz takes{" "}
           {feeBps !== null ? <strong>{feePercentLabel(feeBps)}</strong> : "a platform fee"}{" "}
           of the winning price out of your proceeds.{" "}
-          {providerName !== null ? (
+          {providerName !== null && paymentsEnabled ? (
             <>
               The buyer pays your winning bid plus {providerName}&apos;s own
               payment charge, which is not money you receive.
+            </>
+          ) : providerName !== null ? (
+            <>
+              {providerName} is connected, but new payments are temporarily paused
+              by BidBlitz&apos;s safety switch. The 5% fee and seller-proceeds
+              calculation still stays fixed on a sold auction; no checkout starts
+              until payments are re-enabled.
             </>
           ) : (
             <>
@@ -418,8 +428,9 @@ export function SellForm({
               own payment charge, which is not money you receive.
             </>
           )}{" "}
-          You keep the rest, and it is paid to you after the sale is
-          fulfilled and the buyer&apos;s window to dispute has passed.
+          You keep the rest. Your seller proceeds stay frozen until the buyer
+          confirms handover. An unresolved dispute blocks payout until BidBlitz
+          records the case outcome.
         </p>
       </section>
 

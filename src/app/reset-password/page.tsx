@@ -31,7 +31,7 @@ export default async function ResetPasswordPage() {
       title="Choose a new password and get back to your auctions."
       description="Recovery links are single-use and time-limited so an old link cannot keep opening your account."
     >
-      <div className="rounded-xl border bg-card p-6 shadow-sm sm:p-8">
+      <div className="auth-card rounded-2xl border bg-card p-6 sm:p-8">
         <ResetPasswordForm linkState={user ? "valid" : "invalid"} />
       </div>
     </AuthShell>

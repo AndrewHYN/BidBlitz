@@ -11,6 +11,7 @@ import { TransactionBadge } from "@/components/auction/status-badge";
 import { Button } from "@/components/ui/button";
 import { isClosed } from "@/lib/auction-status";
 import { isPaymentProviderConfigured, paymentProviderDisplayName } from "@/server/payments/config";
+import { paymentsRuntimeEnabled } from "@/server/payments/runtime";
 import type { AuctionCardData } from "@/server/queries";
 
 export const metadata: Metadata = {
@@ -67,8 +68,11 @@ export default async function BuyingPage() {
   // Sequential on purpose: `getBuying` must read settlement FIRST, so the
   // transactions read that follows can only see the same win or a newer one —
   // never a stale "no transaction yet" for a row already marked "You won".
-  const items = await getBuying(user.id);
-  const transactions = await getTransactions(user.id);
+  const [items, transactions, paymentsEnabled] = await Promise.all([
+    getBuying(user.id),
+    getTransactions(user.id),
+    paymentsRuntimeEnabled(),
+  ]);
   const txByAuction = new Map(transactions.map((row) => [row.auction_id, row]));
   const configured = isPaymentProviderConfigured();
   const providerName = paymentProviderDisplayName();
@@ -145,7 +149,12 @@ export default async function BuyingPage() {
                         been charged.
                       </p>
                     )}
-                    {configured && tx.status === "AWAITING_PAYMENT" && (
+                    {configured && !paymentsEnabled && tx.status === "AWAITING_PAYMENT" && (
+                      <p className="text-xs font-medium text-primary">
+                        New payments are temporarily paused. Nothing can be charged until BidBlitz re-enables checkout.
+                      </p>
+                    )}
+                    {configured && paymentsEnabled && tx.status === "AWAITING_PAYMENT" && (
                       <p className="text-xs text-muted-foreground">
                         Not paid yet. Your total is your winning bid plus
                         {providerName}&apos;s payment charge, which {providerName}{" "}

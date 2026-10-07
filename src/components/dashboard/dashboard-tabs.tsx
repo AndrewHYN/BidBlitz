@@ -16,6 +16,7 @@ const TABS = [
   { href: "/dashboard/selling", label: "Selling" },
   { href: "/dashboard/watchlist", label: "Watchlist" },
   { href: "/dashboard/transactions", label: "Activity" },
+  { href: "/dashboard/disputes", label: "Cases" },
 ] as const;
 
 export function DashboardTabs() {

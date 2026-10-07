@@ -1,0 +1,56 @@
+name: Promote Staged Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      deployment_url:
+        description: "Smoke-tested staged production URL"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  VERCEL_ORG_ID: team_udUjK9zSNigqrDngeAo1pBp0
+  VERCEL_PROJECT_ID: prj_8OA1C8dJMwxV0gxa2u3ilbvNYwAN
+  VERCEL_CLI_VERSION: "59.19.1"
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production
+    steps:
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: "22"
+
+      - name: Require Vercel token
+        shell: bash
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          test -n "${VERCEL_TOKEN:-}" || {
+            echo "::error::Add production environment secret VERCEL_TOKEN before promotion."
+            exit 1
+          }
+
+      - name: Install pinned Vercel CLI
+        run: npm install --global "vercel@${VERCEL_CLI_VERSION}"
+
+      - name: Inspect staged deployment
+        run: vercel inspect "${{ inputs.deployment_url }}"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+
+      - name: Promote exact staged deployment
+        run: vercel promote "${{ inputs.deployment_url }}" --yes
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+
+      - name: Confirm production response
+        run: vercel httpstat /
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}

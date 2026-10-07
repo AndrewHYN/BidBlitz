@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowUpRight, Gavel, MapPin, ImageIcon } from "lucide-react";
+import { ArrowUpRight, Building2, Gavel, MapPin, ImageIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { AuctionCardData } from "@/server/queries";
 import { Money } from "@/components/auction/money";
@@ -105,6 +105,12 @@ export function AuctionCard({
             <span className="rounded-md bg-muted px-1.5 py-0.5">{auction.categoryName}</span>
           )}
           <ConditionBadge condition={auction.condition} className="px-1.5 py-0 text-[11px]" />
+          {auction.businessName && (
+            <span className="inline-flex items-center gap-1 rounded-md bg-primary/5 px-1.5 py-0.5 font-semibold text-primary">
+              <Building2 className="size-3" aria-hidden />
+              Business seller
+            </span>
+          )}
         </div>
 
         <div className="mt-auto flex items-end justify-between gap-2 pt-1">

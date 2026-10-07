@@ -194,7 +194,7 @@ export function LoginForm({
       method="post"
       data-testid="login-form"
       data-hydrated={hydrated ? "true" : undefined}
-      className="space-y-5 rounded-xl border bg-card p-6 shadow-sm sm:p-8"
+      className="auth-card space-y-5 rounded-2xl border bg-card p-6 sm:p-8"
     >
       <div className="space-y-1.5 text-center">
         <BrandMark size={40} alt="BidBlitz" className="mx-auto" />
@@ -253,7 +253,8 @@ export function LoginForm({
 
           <Button
             type="submit"
-            className="w-full"
+            size="lg"
+            className="auth-primary-action w-full"
             disabled={submitting}
             aria-busy={submitting}
             data-testid="sign-in-button"
@@ -270,6 +271,7 @@ export function LoginForm({
           <Button
             type="button"
             variant="outline"
+            size="lg"
             className="w-full"
             onClick={switchToOtp}
             data-testid="otp-toggle-button"

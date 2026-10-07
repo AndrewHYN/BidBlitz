@@ -7,6 +7,7 @@ import {
   Flag,
   Gavel,
   Megaphone,
+  Scale,
   ShieldAlert,
   TriangleAlert,
 } from "lucide-react";
@@ -53,6 +54,16 @@ const GUIDES = [
     ],
   },
   {
+    icon: Scale,
+    title: "Disputes",
+    accent: "Freeze facts, not stories",
+    steps: [
+      "Read the transaction conversation, case timeline, evidence and payout state before deciding anything.",
+      "Use Waiting for buyer / seller when you need a response, and Under review when staff are actively assessing the case.",
+      "Resolve with a factual outcome plus Release, Hold or No payout change. This workflow never issues a refund.",
+    ],
+  },
+  {
     icon: TriangleAlert,
     title: "Cancellations",
     accent: "Protect bidders when bids already exist",
@@ -91,11 +102,19 @@ export default async function AdminGuidePage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login?next=/admin/guide");
 
-  const [canAdmin, canManageTeam] = await Promise.all([
+  const [canAdmin, canManageTeam, canViewDisputes] = await Promise.all([
     hasPermission(user.id, "admin.access"),
     hasPermission(user.id, "admin.manage_team"),
+    hasPermission(user.id, "disputes.view"),
   ]);
   if (!canAdmin) redirect("/");
+
+  const { count: openDisputeCount } = canViewDisputes
+    ? await supabase
+        .from("transaction_disputes")
+        .select("id", { count: "exact", head: true })
+        .neq("status", "RESOLVED")
+    : { count: 0 };
 
   return (
     <div className="page-container space-y-8 py-10 sm:py-14">
@@ -109,7 +128,11 @@ export default async function AdminGuidePage() {
         }
       />
 
-      <AdminNav active="guide" showTeam={canManageTeam} />
+      <AdminNav
+        active="guide"
+        showTeam={canManageTeam}
+        disputeCount={openDisputeCount ?? 0}
+      />
 
       <section className="relative overflow-hidden rounded-2xl border bg-foreground p-6 text-background shadow-xl shadow-black/5 sm:p-8">
         <div

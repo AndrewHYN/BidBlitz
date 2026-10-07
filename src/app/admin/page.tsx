@@ -25,6 +25,7 @@ import { getAdminPayouts, type AdminPayoutRow } from "@/server/queries";
 import { isPaymentProviderConfigured } from "@/server/payments/config";
 import { AdminNav } from "@/components/dashboard/admin-nav";
 import { PromotionDecisions } from "@/components/dashboard/promotion-decisions";
+import { PromotionPricing } from "@/components/dashboard/promotion-pricing";
 
 export const metadata: Metadata = {
   title: "Admin",
@@ -244,7 +245,11 @@ export default async function AdminPage() {
     p_permission: "admin.access",
   });
   const isAdmin = permission === true;
-  const [{ data: canManageTeam }, { data: canManagePromotions }] = await Promise.all([
+  const [
+    { data: canManageTeam },
+    { data: canManagePromotions },
+    { data: canViewDisputes },
+  ] = await Promise.all([
     supabase.rpc("has_permission", {
       p_user_id: user.id,
       p_permission: "admin.manage_team",
@@ -252,6 +257,10 @@ export default async function AdminPage() {
     supabase.rpc("has_permission", {
       p_user_id: user.id,
       p_permission: "settings.manage_marketplace",
+    }),
+    supabase.rpc("has_permission", {
+      p_user_id: user.id,
+      p_permission: "disputes.view",
     }),
   ]);
 
@@ -299,18 +308,28 @@ export default async function AdminPage() {
       .maybeSingle(),
     supabase
       .from("payment_settings")
-      .select("payment_window_seconds, updated_at")
+      .select("payment_window_seconds, payments_enabled, updated_at")
       .maybeSingle(),
     getAdminPayouts(),
   ]);
+
+  const { count: openDisputeCount } =
+    canViewDisputes === true
+      ? await supabase
+          .from("transaction_disputes")
+          .select("id", { count: "exact", head: true })
+          .neq("status", "RESOLVED")
+      : { count: 0 };
 
   const reports = (reportsRes.data ?? []) as ReportRow[];
   const fee = (feeRes.data ?? null) as FeeRow | null;
   const paymentWindow = (windowRes.data ?? null) as {
     payment_window_seconds: number;
+    payments_enabled: boolean;
     updated_at: string;
   } | null;
   const configured = isPaymentProviderConfigured();
+  const runtimePaymentsEnabled = paymentWindow?.payments_enabled === true;
 
   // What the reports point at, so the queue shows names instead of UUIDs.
   // A report target is one id in one of two tables; both reads are batched,
@@ -364,7 +383,13 @@ export default async function AdminPage() {
   // whose foreign-key name is proven (`auctions_seller_id_fkey`, used by the
   // detail query), so the queue never shows bare UUIDs and never guesses at
   // constraint names.
-  const [reviewsRes, cancelReqsRes, pausedRes, promotionsRes] = await Promise.all([
+  const [
+    reviewsRes,
+    cancelReqsRes,
+    pausedRes,
+    promotionsRes,
+    promotionSettingsRes,
+  ] = await Promise.all([
     supabase
       .from("listing_reviews")
       .select("id, auction_id, created_at, risk_flags")
@@ -386,10 +411,18 @@ export default async function AdminPage() {
     canManagePromotions === true
       ? supabase
           .from("promotion_requests")
-          .select("id, auction_id, seller_id, requested_days, requested_at")
+          .select(
+            "id, auction_id, seller_id, requested_days, requested_at, quoted_price_minor, currency"
+          )
           .eq("status", "PENDING")
           .order("requested_at", { ascending: true })
           .limit(50)
+      : Promise.resolve({ data: [] as unknown[] }),
+    canManagePromotions === true
+      ? supabase
+          .from("promotion_settings")
+          .select("days, price_minor, currency, enabled")
+          .order("days", { ascending: true })
       : Promise.resolve({ data: [] as unknown[] }),
   ]);
   type ReviewRow = {
@@ -404,6 +437,8 @@ export default async function AdminPage() {
     seller_id: string;
     requested_days: number;
     requested_at: string;
+    quoted_price_minor: number;
+    currency: string;
   };
   type CancelRow = {
     id: string;
@@ -416,6 +451,12 @@ export default async function AdminPage() {
   const reviewRows = ((reviewsRes.data ?? []) as ReviewRow[]);
   const cancelRows = ((cancelReqsRes.data ?? []) as CancelRow[]);
   const promotionRows = ((promotionsRes.data ?? []) as PromotionRow[]);
+  const promotionOffers = (promotionSettingsRes.data ?? []) as Array<{
+    days: number;
+    price_minor: number;
+    currency: string;
+    enabled: boolean;
+  }>;
   const queueAuctionIds = [
     ...new Set([
       ...reviewRows.map((r) => r.auction_id),
@@ -474,7 +515,11 @@ export default async function AdminPage() {
         description="Review marketplace work, promotions, safety actions and money operations from one console."
       />
 
-      <AdminNav active="overview" showTeam={canManageTeam === true} />
+      <AdminNav
+        active="overview"
+        showTeam={canManageTeam === true}
+        disputeCount={openDisputeCount ?? 0}
+      />
 
       {canManagePromotions === true && (
         <section id="admin-promotions" aria-labelledby="admin-promotions-heading" className="space-y-4 scroll-mt-24">
@@ -492,9 +537,22 @@ export default async function AdminPage() {
             }
           />
           <div className="promotion-surface rounded-2xl border border-primary/15 p-4 sm:p-5">
-            <p className="mb-4 text-sm leading-6 text-muted-foreground">
+            <p className="text-sm leading-6 text-muted-foreground">
               Promotion changes visibility only. Approving a request never changes bidding, timing, settlement or who wins.
+              Prices below are future quotes only. Existing seller requests keep the price they saw when requesting.
             </p>
+            <div className="mt-4">
+              <PromotionPricing
+                offers={promotionOffers
+                  .filter((offer) => offer.days === 3 || offer.days === 7)
+                  .map((offer) => ({
+                    days: offer.days as 3 | 7,
+                    priceMinor: offer.price_minor,
+                    enabled: offer.enabled,
+                  }))}
+              />
+            </div>
+            <div className="my-5 border-t" />
             {pendingPromotions.length === 0 ? (
               <EmptyState
                 compact
@@ -512,7 +570,11 @@ export default async function AdminPage() {
                           {request.auction?.title ?? "Auction"}
                         </p>
                         <p className="mt-1 text-xs text-muted-foreground">
-                          @{request.seller?.username ?? "seller"} · {request.requested_days} days · requested {formatDate(request.requested_at)}
+                          @{request.seller?.username ?? "seller"} · {request.requested_days} days ·{" "}
+                          <span className="font-semibold text-foreground" data-numeric>
+                            <Money minor={request.quoted_price_minor} currency={request.currency} />
+                          </span>{" "}
+                          quoted · requested {formatDate(request.requested_at)}
                         </p>
                       </div>
                       {request.auction && (
@@ -1089,9 +1151,11 @@ export default async function AdminPage() {
           )}
 
           <p className="mt-4 text-xs text-muted-foreground">
-            {configured
-              ? "A payment provider is configured; settled sales can move money."
-              : "No payment provider is configured yet, so no money has moved. Fees here are what WOULD be charged on settlement."}
+            {!configured
+              ? "No payment provider is configured, so BidBlitz cannot start new money movement."
+              : runtimePaymentsEnabled
+                ? "The payment provider is configured and the runtime payment switch is ON."
+                : "The payment provider is configured, but the runtime payment switch is OFF. New checkout and seller payout instructions remain paused."}
           </p>
           <div className="mt-4 border-t border-border/70 pt-4">
             <p className="text-xs uppercase tracking-wide text-muted-foreground">

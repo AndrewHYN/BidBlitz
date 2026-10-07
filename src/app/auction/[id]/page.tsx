@@ -197,7 +197,7 @@ export default async function AuctionPage({ params }: Props) {
             <ShareButton auctionId={auction.id} title={auction.title} />
           </div>
 
-          <SellerCard seller={auction.seller} />
+          <SellerCard seller={auction.seller} business={auction.business} />
         </div>
       </div>
 

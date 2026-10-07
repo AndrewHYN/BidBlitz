@@ -183,6 +183,56 @@ function describe(
         href: "/dashboard/transactions",
         actionLabel: "View activity",
       };
+    case "DISPUTE_STAFF_REQUIRED":
+      return {
+        headline: `Dispute needs review: ${headline}`,
+        detail: <>A buyer or seller opened a case on a paid transaction. Review the evidence and payout state.</>,
+        href: "/admin/disputes",
+        actionLabel: "Open dispute queue",
+      };
+    case "DISPUTE_OPENED":
+      return {
+        headline: `Dispute opened for ${headline}`,
+        detail: <>The transaction now has a BidBlitz case. Unpaid seller proceeds may be frozen while staff review it.</>,
+        href:
+          typeof p.disputeId === "string"
+            ? `/dashboard/disputes/${p.disputeId}`
+            : "/dashboard/disputes",
+        actionLabel: "Open case",
+      };
+    case "DISPUTE_MESSAGE":
+      return {
+        headline: `New dispute update: ${headline}`,
+        detail: <>A new message was added to the transaction case.</>,
+        href:
+          typeof p.disputeId === "string"
+            ? `/dashboard/disputes/${p.disputeId}`
+            : "/dashboard/disputes",
+        actionLabel: "Read case",
+      };
+    case "DISPUTE_STATUS_CHANGED":
+      return {
+        headline: `Dispute status changed: ${headline}`,
+        detail:
+          typeof p.status === "string"
+            ? <>The case is now {p.status.replaceAll("_", " ").toLowerCase()}.</>
+            : <>BidBlitz updated the case status.</>,
+        href:
+          typeof p.disputeId === "string"
+            ? `/dashboard/disputes/${p.disputeId}`
+            : "/dashboard/disputes",
+        actionLabel: "Open case",
+      };
+    case "DISPUTE_RESOLVED":
+      return {
+        headline: `Dispute resolved: ${headline}`,
+        detail: <>BidBlitz recorded the case outcome and seller-payout decision. This workflow does not issue refunds.</>,
+        href:
+          typeof p.disputeId === "string"
+            ? `/dashboard/disputes/${p.disputeId}`
+            : "/dashboard/disputes",
+        actionLabel: "View decision",
+      };
     case "REVIEW_SUBMITTED":
       return {
         headline: `${headline} sent for review`,

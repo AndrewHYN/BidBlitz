@@ -73,6 +73,7 @@ const AUTH_NAV = [
   { label: "My bids", href: "/dashboard/buying", exact: true },
   { label: "My selling", href: "/dashboard/selling", exact: true },
   { label: "Activity", href: "/dashboard/transactions", exact: true },
+  { label: "Cases", href: "/dashboard/disputes", exact: false },
   { label: "Help", href: "/help", exact: false },
 ] as const;
 
