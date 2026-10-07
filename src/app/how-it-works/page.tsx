@@ -58,8 +58,8 @@ function Step({
  * "seller creates -> publishes -> buyers discover -> competing bids -> realtime
  * updates -> authoritative close -> winner -> transaction -> fee"; this page is
  * that sentence in the language a first-time visitor uses. Every claim here is
- * something the running system does today — no escrow, no automatic payout, no
- * delivery guarantee, and no named payment provider, because the provider that
+ * something the running system does today — no escrow promise, no payout on
+ * buyer payment alone, no delivery guarantee, and no named payment provider, because the provider that
  * answers for a given deployment is read from configuration rather than
  * hard-coded into public copy.
  */
@@ -157,17 +157,19 @@ export default function HowItWorksPage() {
             <Step n={4} title="Fulfil the sale">
               <p>
                 Hand the item over as agreed in the transaction&apos;s message
-                thread, then mark it delivered. Confirming delivery is what lets
-                the next step happen, and it is recorded as a fact rather than
-                assumed.
+                thread. The buyer then confirms handover. That confirmation is
+                what lets the seller payout move toward release, and it is
+                recorded as a fact rather than assumed.
               </p>
             </Step>
             <Step n={5} title="Get paid out">
               <p>
-                <strong>Payout is a separate, controlled step</strong>. It does
-                not fire automatically the moment a buyer pays. BidBlitz applies
-                the 5% platform fee and releases the rest to you, and the payout
-                is recorded so you can see its status on your dashboard.
+                <strong>The buyer&apos;s payment does not pay you immediately.</strong>{" "}
+                Your seller proceeds are frozen at the winning price minus the
+                5% BidBlitz fee. After the buyer confirms handover, BidBlitz can
+                release those proceeds through the connected payout provider if
+                your payout wallet is ready, provider settlement funds are
+                available and no unresolved dispute blocks the sale.
               </p>
             </Step>
             <Step n={6} title="Build a reputation">
@@ -218,8 +220,10 @@ export default function HowItWorksPage() {
             payment page, so what you authorise there is what you pay there.
           </p>
           <p>
-            The seller&apos;s 5% comes out of the sale, and the payout that
-            follows is a separate, deliberate step.{" "}
+            The seller&apos;s 5% comes out of the sale. The remaining proceeds
+            are frozen on the transaction and are released only after
+            buyer-confirmed handover and the payout safety checks described
+            above.{" "}
             <Link href="/help/fees">The fee page shows a full worked example</Link>{" "}
             with both sides of the transaction.
           </p>
@@ -248,9 +252,10 @@ export default function HowItWorksPage() {
             record. A person looks at it, not a refund button.
           </p>
           <p>
-            BidBlitz is not an escrow service and does not hold your money while
-            you argue. What it holds is the evidence, which is what a dispute
-            actually needs.
+            BidBlitz does not offer or promise escrow. An unresolved dispute
+            blocks a seller payout while it is still safely reversible, and
+            BidBlitz keeps the case evidence and decision record. The dispute
+            workflow itself does not issue a refund.
           </p>
         </DocumentSection>
 
