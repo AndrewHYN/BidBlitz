@@ -189,6 +189,41 @@ grant all on public.transaction_disputes,
              public.transaction_dispute_evidence
   to service_role;
 
+-- Final payout-race guard. Application code checks for open disputes before
+-- payout, and opening a dispute moves safely reversible payouts to DISPUTED.
+-- This trigger closes the concurrency gap between that read and the provider
+-- claim: PAYOUT_DUE cannot be entered while a case is unresolved.
+create or replace function private.seller_payout_block_unresolved_dispute()
+returns trigger
+language plpgsql
+security invoker
+set search_path=''
+as $
+begin
+  if new.status='PAYOUT_DUE'
+     and new.status is distinct from old.status
+     and exists (
+       select 1
+         from public.transaction_disputes d
+        where d.transaction_id=new.transaction_id
+          and d.status <> 'RESOLVED'
+     ) then
+    raise exception 'payout_dispute_open' using errcode='P0001';
+  end if;
+  return new;
+end;
+$;
+
+drop trigger if exists seller_payout_block_unresolved_dispute on public.seller_payouts;
+create trigger seller_payout_block_unresolved_dispute
+before update of status on public.seller_payouts
+for each row execute function private.seller_payout_block_unresolved_dispute();
+
+revoke all on function private.seller_payout_block_unresolved_dispute()
+  from public,anon;
+grant execute on function private.seller_payout_block_unresolved_dispute()
+  to postgres,supabase_admin,service_role;
+
 -- Extend the single notification vocabulary.
 alter table public.notifications drop constraint if exists notifications_type_check;
 alter table public.notifications add constraint notifications_type_check
