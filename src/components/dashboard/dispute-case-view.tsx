@@ -36,10 +36,12 @@ export function DisputeCaseView({
   caseData,
   viewerId,
   staff = false,
+  canContribute = true,
 }: {
   caseData: DisputeCase;
   viewerId: string;
   staff?: boolean;
+  canContribute?: boolean;
 }) {
   const resolved = caseData.status === "RESOLVED";
   const viewerRole =
@@ -201,7 +203,13 @@ export function DisputeCaseView({
         </ol>
 
         <div className="mt-5 border-t pt-5">
-          <DisputeMessageForm disputeId={caseData.id} resolved={resolved} />
+          {canContribute ? (
+            <DisputeMessageForm disputeId={caseData.id} resolved={resolved} />
+          ) : (
+            <p className="rounded-xl border bg-muted/30 p-4 text-sm leading-6 text-muted-foreground">
+              Read-only staff view. Staff with dispute-management permission can reply or change case state.
+            </p>
+          )}
         </div>
       </section>
 
@@ -238,9 +246,11 @@ export function DisputeCaseView({
           </div>
         )}
 
-        <div className="mt-4">
-          <DisputeEvidenceUploader disputeId={caseData.id} resolved={resolved} />
-        </div>
+        {canContribute && (
+          <div className="mt-4">
+            <DisputeEvidenceUploader disputeId={caseData.id} resolved={resolved} />
+          </div>
+        )}
       </section>
 
       {staff && (
