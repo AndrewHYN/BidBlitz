@@ -1,0 +1,37 @@
+name: Release Smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "Exact deployment URL to smoke-test"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Public desktop and mobile release smoke
+        run: npx playwright test e2e/release-smoke.spec.ts
+        env:
+          PLAYWRIGHT_BASE_URL: ${{ inputs.base_url }}
