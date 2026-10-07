@@ -69,6 +69,8 @@ const MESSAGES: Record<BidErrorCode, string> = {
   // price could never settle.
   below_minimum_price: "Minimum starting price is $1.00.",
   payout_setup_required:
+    "Set up your seller payout wallet in Settings → Seller payouts before publishing.",
+  payout_setup_required:
     "Set up your seller payout wallet before publishing this auction.",
   // Raised by the is_banned triggers (migration 20260928000003). It has to be
   // in this table rather than falling through to `unknown`: the terms promise
