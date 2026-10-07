@@ -21,7 +21,7 @@ const catalog = readFileSync(
 describe("listing review staff alert contract", () => {
   it("creates in-app alerts only for active staff with listing-review permission", () => {
     expect(reviewMigration).toContain("STAFF_REVIEW_REQUIRED");
-    expect(reviewMigration).toContain("sa.status = 'ACTIVE'");
+    expect(reviewMigration).toContain("a.status = 'ACTIVE'");
     expect(reviewMigration).toContain("listings.review");
   });
 
