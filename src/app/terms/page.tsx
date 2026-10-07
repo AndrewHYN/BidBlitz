@@ -17,7 +17,7 @@ export const metadata: Metadata = {
   alternates: { canonical: "/terms" },
 };
 
-const LAST_UPDATED = "26 September 2026";
+const LAST_UPDATED = "7 October 2026";
 
 /**
  * The page index.
@@ -127,9 +127,11 @@ export default function TermsPage() {
             </strong>{" "}
             Your description and photos are the promise you are being held to: a
             materially wrong description, a damaged item, or an item that was
-            never available can leave your payout held and can lead to a refund
-            to the buyer. If you genuinely cannot fulfil, tell the buyer and us
-            as soon as you know rather than going quiet.
+            never available can leave your payout blocked or held while a
+            dispute is reviewed. Any return or refund arrangement is handled
+            between buyer and seller and should be recorded in the dispute.
+            If you genuinely cannot fulfil, tell the buyer and us as soon as you
+            know rather than going quiet.
           </p>
         </TermsSection>
 
@@ -249,32 +251,38 @@ export default function TermsPage() {
                 The two are recorded separately, and they are separate steps.
               </p>
               <p>
-                BidBlitz owes the seller their proceeds (the winning price less
-                the 5% platform fee) after the seller has fulfilled the sale
-                and the buyer&apos;s window to raise a dispute has passed.
-                Paying it is an explicit, administrator-run step: an operator
-                either sends it through the payout provider connected to
-                BidBlitz at the time, or makes the transfer outside BidBlitz
-                and records it against the sale. BidBlitz never sends a payout
-                on its own, and it does not split a buyer&apos;s payment
-                between sellers automatically.
+                The seller&apos;s proceeds are fixed when the sale is created:
+                the winning price less the 5% platform fee. A confirmed buyer
+                payment does not release those proceeds by itself. After the
+                buyer confirms handover, BidBlitz can release the frozen seller
+                amount through the connected payout provider if the seller&apos;s
+                payout wallet is ready, provider settlement funds are available,
+                and no unresolved dispute blocks the transaction. Every payout
+                instruction and provider reference is recorded against the sale.
               </p>
               <p>
-                A payout is held while a dispute about the sale is open, and is
-                held if the buyer&apos;s payment is refunded. Sellers can see the
-                current payout status for their own sales on their dashboard.
+                An unresolved dispute blocks a seller payout while the payout
+                is still safely reversible. If a payout has already reached a
+                provider-sensitive state, BidBlitz does not claim it was
+                reversed; staff must reconcile the provider record. Sellers can
+                see the current payout status for their own sales on their
+                dashboard.
               </p>
               <p>
                 If you are a seller, you are responsible for delivering what you
                 listed and for describing it accurately. Failing to fulfil a won
-                sale can hold your payout and, if it is not put right, can lead
-                to a refund to the buyer and action on your account.
+                sale can block or hold your payout and can lead to moderation
+                action on your account. BidBlitz does not issue an automatic
+                refund from the dispute workflow; any agreed return or refund
+                is handled between buyer and seller.
               </p>
             </>
           ) : (
             <p>
-              No money moves through BidBlitz yet, so there is no seller payout
-              to describe. A transaction is a record of what is owed.
+              No payment provider is connected to this deployment, so a sale
+              cannot start provider-side money movement here. A transaction is
+              still the record of the winning price, BidBlitz fee and seller
+              proceeds that would apply once payments are enabled.
             </p>
           )}
         </TermsSection>
