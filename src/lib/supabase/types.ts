@@ -34,7 +34,8 @@ export type SellerPayoutStatus =
 export type NotificationType =
   | "AUCTION_PUBLISHED" | "NEW_BID" | "OUTBID" | "ENDING_SOON"
   | "WON" | "SOLD" | "ENDED_UNSOLD" | "REVIEW_REQUEST" | "NEW_MESSAGE" | "PAYMENT_EXPIRED"
-  | "STAFF_REVIEW_REQUIRED" | "PROMOTION_REQUESTED" | "PROMOTION_APPROVED" | "PROMOTION_REJECTED";
+  | "STAFF_REVIEW_REQUIRED" | "PROMOTION_REQUESTED" | "PROMOTION_APPROVED" | "PROMOTION_REJECTED"
+  | "DELIVERY_CONFIRMED" | "PAYOUT_SENT" | "PAYOUT_SETUP_REQUIRED" | "PAYOUT_ATTENTION";
 
 export type Condition = "new" | "like_new" | "good" | "fair" | "poor";
 
@@ -226,8 +227,15 @@ export interface Database {
         Row: {
           seller_id: string;
           provider: string;
-          external_user_id: string;
-          external_wallet_id: string;
+          external_user_id: string | null;
+          external_wallet_id: string | null;
+          phone_e164: string | null;
+          legal_first_name: string | null;
+          legal_last_name: string | null;
+          wallet_provider: string | null;
+          setup_status: "UNLINKED" | "LINKING" | "READY" | "NEEDS_WALLET" | "ERROR";
+          setup_error: string | null;
+          linked_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -296,6 +304,29 @@ export interface Database {
       settle_auction: { Args: { p_auction_id: string }; Returns: Json };
       settle_due_auctions: { Args: { p_limit?: number }; Returns: number };
       admin_transition_seller_payout: {
+        Args: {
+          p_payout_id: string;
+          p_to_status: SellerPayoutStatus;
+          p_payout_reference?: string | null;
+          p_internal_note?: string | null;
+        };
+        Returns: Json;
+      };
+      my_payout_setup: {
+        Args: Record<string, never>;
+        Returns: {
+          setup_status: string;
+          masked_phone: string | null;
+          wallet_provider: string | null;
+          ready: boolean;
+          linked_at: string | null;
+        }[];
+      };
+      buyer_confirm_delivery: {
+        Args: { p_transaction_id: string };
+        Returns: Json;
+      };
+      service_transition_seller_payout: {
         Args: {
           p_payout_id: string;
           p_to_status: SellerPayoutStatus;
