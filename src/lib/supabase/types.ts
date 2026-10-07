@@ -166,6 +166,16 @@ export interface Database {
         Insert: never;
         Update: never;
       };
+      payment_settings: {
+        Row: {
+          id: number;
+          payment_window_seconds: number;
+          payments_enabled: boolean;
+          updated_at: string;
+        };
+        Insert: never;
+        Update: never;
+      };
       transactions: {
         Row: {
           id: string; auction_id: string; seller_id: string; buyer_id: string;
