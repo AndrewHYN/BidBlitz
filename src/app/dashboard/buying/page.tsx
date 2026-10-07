@@ -76,8 +76,8 @@ export default async function BuyingPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Buying"
-        description="Every auction you’ve put a bid on, newest first."
+        title="My bids"
+        description="See where you’re winning, where you’ve been outbid, and what you’ve won."
       />
 
       <div data-testid="buying-list">
