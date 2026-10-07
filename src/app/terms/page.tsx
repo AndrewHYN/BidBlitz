@@ -9,6 +9,7 @@ import {
 } from "@/components/document-page";
 import { PageHeader } from "@/components/auction/page-header";
 import { isPaymentProviderConfigured, paymentProviderDisplayName } from "@/server/payments/config";
+import { paymentsRuntimeEnabled } from "@/server/payments/runtime";
 
 export const metadata: Metadata = {
   title: "Terms of Use",
@@ -58,11 +59,12 @@ function TermsSection({
   );
 }
 
-export default function TermsPage() {
+export default async function TermsPage() {
   // Whether payments are wired up is a deployment fact, not a fixed promise:
   // the section below must describe the state the site is actually in.
   const paymentConfigured = isPaymentProviderConfigured();
   const providerName = paymentProviderDisplayName();
+  const paymentsEnabled = paymentConfigured && (await paymentsRuntimeEnabled());
 
   return (
     <div data-testid="terms-page">
@@ -192,13 +194,23 @@ export default function TermsPage() {
         <TermsSection
           id="payments"
           title={
-            paymentConfigured
-              ? "7. Payments"
-              : "7. Payments (current limitation)"
+            !paymentConfigured
+              ? "7. Payments (current limitation)"
+              : paymentsEnabled
+                ? "7. Payments"
+                : "7. Payments (temporarily paused)"
           }
         >
           {paymentConfigured ? (
             <>
+              {!paymentsEnabled && (
+                <p>
+                  <strong>New payment initiation is temporarily paused.</strong>{" "}
+                  The provider is configured, but BidBlitz&apos;s runtime safety
+                  switch is off. A buyer cannot start a new checkout while that
+                  switch is off.
+                </p>
+              )}
               <p>
                 <strong>Payments are processed by {providerName}.</strong> When an
                 auction settles, BidBlitz records the gross winning price, the
