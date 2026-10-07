@@ -15,7 +15,7 @@ export default function ForgotPasswordPage() {
       title="Get back into your BidBlitz account securely."
       description="Reset access without exposing whether an email address is registered on the marketplace."
     >
-      <div className="rounded-xl border bg-card p-6 shadow-sm sm:p-8">
+      <div className="auth-card rounded-2xl border bg-card p-6 sm:p-8">
         <ForgotPasswordForm />
       </div>
     </AuthShell>
