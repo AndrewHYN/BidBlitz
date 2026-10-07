@@ -54,20 +54,24 @@ export type HeaderUser = {
 
 const NAV = [
   { label: "Browse", href: "/browse" },
-  { label: "Help", href: "/help" },
+  { label: "How it works", href: "/how-it-works" },
 ] as const;
 
-/** Desktop shows the two anchors; the full set lives in the mobile drawer. */
+/** Keep the signed-in desktop mental model deliberately small. */
 const DESKTOP_AUTH_NAV = [
-  { label: "Dashboard", href: "/dashboard", exact: true },
+  { label: "Home", href: "/dashboard", exact: true },
+  { label: "Browse", href: "/browse", exact: false },
   { label: "Watchlist", href: "/dashboard/watchlist", exact: true },
 ] as const;
 
 const AUTH_NAV = [
-  { label: "Dashboard", href: "/dashboard", exact: true },
+  { label: "Home", href: "/dashboard", exact: true },
+  { label: "Browse", href: "/browse", exact: false },
   { label: "Watchlist", href: "/dashboard/watchlist", exact: true },
-  { label: "Bidding", href: "/dashboard/buying", exact: true },
-  { label: "Selling", href: "/dashboard/selling", exact: true },
+  { label: "My bids", href: "/dashboard/buying", exact: true },
+  { label: "My selling", href: "/dashboard/selling", exact: true },
+  { label: "Activity", href: "/dashboard/transactions", exact: true },
+  { label: "Help", href: "/help", exact: false },
 ] as const;
 
 /**
@@ -311,8 +315,8 @@ export function HeaderBar({
     setOpen(false);
   }
 
-  const links = user ? [...NAV, ...AUTH_NAV] : NAV;
-  const desktopLinks = user ? [...NAV, ...DESKTOP_AUTH_NAV] : NAV;
+  const links = user ? AUTH_NAV : NAV;
+  const desktopLinks = user ? DESKTOP_AUTH_NAV : NAV;
   // Admin discoverability: the entry appears if and only if the server says
   // the session is an admin. Visibility is not authorization - /admin and
   // every admin action re-check server-side - but an operator should not have
@@ -525,14 +529,14 @@ export function HeaderBar({
             </>
           ) : (
             <>
-              <Button asChild variant="ghost">
+              <Button asChild variant="outline" className="hidden sm:inline-flex">
                 <Link href="/login" onClick={closeMenu}>
                   Sign in
                 </Link>
               </Button>
-              <Button asChild>
+              <Button asChild className="shadow-md shadow-primary/10">
                 <Link href="/signup" onClick={closeMenu}>
-                  Join
+                  Join BidBlitz
                 </Link>
               </Button>
             </>
