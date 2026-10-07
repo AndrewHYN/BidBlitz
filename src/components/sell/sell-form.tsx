@@ -168,10 +168,14 @@ export function SellForm({
         in. The fee explanation below keeps its own frame: it is a thing the
         seller has to agree to, not another field.
       */}
-      <section className="space-y-5" aria-labelledby="sell-basics-heading">
-        <h2 id="sell-basics-heading" className="text-base font-semibold tracking-tight">
-          The item
-        </h2>
+      <section className="space-y-5 rounded-xl border bg-card p-5 shadow-sm sm:p-6" aria-labelledby="sell-basics-heading">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Step 1 of 4</p>
+          <h2 id="sell-basics-heading" className="mt-1 text-lg font-bold tracking-tight">
+            Tell buyers what you’re selling
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">Specific listings get better bids. Start with the facts a buyer would search for.</p>
+        </div>
 
         <div className="space-y-1.5">
           <Label htmlFor="sell-title">Title</Label>
@@ -228,10 +232,14 @@ export function SellForm({
         </div>
       </section>
 
-      <section className="space-y-5 border-t border-border/70 pt-8" aria-labelledby="sell-details-heading">
-        <h2 id="sell-details-heading" className="text-base font-semibold tracking-tight">
-          Details
-        </h2>
+      <section className="space-y-5 rounded-xl border bg-card p-5 shadow-sm sm:p-6" aria-labelledby="sell-details-heading">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Step 2 of 4</p>
+          <h2 id="sell-details-heading" className="mt-1 text-lg font-bold tracking-tight">
+            Set condition and handover
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">Buyers should know where the item is and how the winner can receive it before they bid.</p>
+        </div>
 
         <div className="grid gap-5 sm:grid-cols-2">
           <div className="space-y-1.5">
@@ -296,7 +304,7 @@ export function SellForm({
 
         <div className="grid gap-5 sm:grid-cols-2">
           <div className="space-y-1.5">
-            <Label htmlFor="sell-fulfilment">Fulfilment</Label>
+            <Label htmlFor="sell-fulfilment">How will the winner receive it?</Label>
             <Select value={fulfilmentMethod} onValueChange={setFulfilmentMethod}>
               <SelectTrigger
                 id="sell-fulfilment"
@@ -318,7 +326,7 @@ export function SellForm({
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="sell-fulfilment-notes">Fulfilment notes</Label>
+            <Label htmlFor="sell-fulfilment-notes">Collection or delivery details</Label>
             <Input
               id="sell-fulfilment-notes"
               value={fulfilmentNotes}
@@ -336,10 +344,14 @@ export function SellForm({
         </div>
       </section>
 
-      <section className="space-y-5 border-t border-border/70 pt-8" aria-labelledby="sell-pricing-heading">
-        <h2 id="sell-pricing-heading" className="text-base font-semibold tracking-tight">
-          Pricing
-        </h2>
+      <section className="space-y-5 rounded-xl border bg-card p-5 shadow-sm sm:p-6" aria-labelledby="sell-pricing-heading">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Step 3 of 4</p>
+          <h2 id="sell-pricing-heading" className="mt-1 text-lg font-bold tracking-tight">
+            Set the bidding price
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">Choose where bidding begins and how much each new bid must beat the current price by.</p>
+        </div>
 
         <div className="grid gap-5 sm:grid-cols-2">
           <div className="space-y-1.5">
@@ -366,7 +378,7 @@ export function SellForm({
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="sell-increment">Bid increment (USD)</Label>
+            <Label htmlFor="sell-increment">Minimum amount each new bid adds (USD)</Label>
             <Input
               id="sell-increment"
               value={bidIncrement}
@@ -410,10 +422,14 @@ export function SellForm({
         </p>
       </section>
 
-      <section className="space-y-5 border-t border-border/70 pt-8" aria-labelledby="sell-timing-heading">
-        <h2 id="sell-timing-heading" className="text-base font-semibold tracking-tight">
-          Timing
-        </h2>
+      <section className="space-y-5 rounded-xl border bg-card p-5 shadow-sm sm:p-6" aria-labelledby="sell-timing-heading">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Step 4 of 4</p>
+          <h2 id="sell-timing-heading" className="mt-1 text-lg font-bold tracking-tight">
+            Choose how long bidding stays open
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">The standard last-second protection is already filled in. Most sellers can leave it as-is.</p>
+        </div>
 
         <div className="space-y-1.5">
           <Label htmlFor="sell-duration">Duration</Label>
@@ -437,9 +453,14 @@ export function SellForm({
           <FieldError messages={errors.durationSeconds} />
         </div>
 
-        <div className="grid gap-5 sm:grid-cols-2">
+        <details className="rounded-lg border bg-muted/20 p-4">
+          <summary className="cursor-pointer text-sm font-semibold">Advanced: last-second bid protection</summary>
+          <p className="mt-2 text-xs leading-5 text-muted-foreground">
+            If someone bids right before closing, BidBlitz can add a little more time so another bidder has a fair chance to respond.
+          </p>
+          <div className="mt-4 grid gap-5 sm:grid-cols-2">
           <div className="space-y-1.5">
-            <Label htmlFor="sell-anti-snipe-window">Anti-snipe window</Label>
+            <Label htmlFor="sell-anti-snipe-window">Protect the final seconds</Label>
             <Input
               id="sell-anti-snipe-window"
               type="number"
@@ -467,7 +488,7 @@ export function SellForm({
 
           <div className="space-y-1.5">
             <Label htmlFor="sell-anti-snipe-extension">
-              Anti-snipe extension
+              Extra seconds added after a late bid
             </Label>
             <Input
               id="sell-anti-snipe-extension"
@@ -492,7 +513,8 @@ export function SellForm({
               messages={errors.antiSnipeExtensionSeconds}
             />
           </div>
-        </div>
+          </div>
+        </details>
       </section>
 
       {formError && (
@@ -508,8 +530,8 @@ export function SellForm({
         <p className="text-sm text-muted-foreground">
           Saved as a draft. You&apos;ll add photos next, then publish.
         </p>
-        <Button type="submit" disabled={pending} data-testid="sell-submit">
-          {pending ? "Saving draft…" : "Create draft"}
+        <Button type="submit" size="lg" disabled={pending} data-testid="sell-submit">
+          {pending ? "Saving draft…" : "Continue to photos"}
         </Button>
       </div>
     </form>
