@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Gavel, MessageCircle, ShieldCheck, Sparkles } from "lucide-react";
+import { Gavel, MessageCircle, ShieldCheck, Zap } from "lucide-react";
 
 export function AuthShell({
   children,
@@ -45,7 +45,7 @@ export function AuthShell({
           />
           <div className="relative z-10">
             <div className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-background/70">
-              <Sparkles className="size-4" aria-hidden />
+              <Zap className="size-4" aria-hidden />
               {eyebrow}
             </div>
             <h1 className="mt-5 max-w-xl text-4xl font-bold tracking-[-0.035em] text-balance">
