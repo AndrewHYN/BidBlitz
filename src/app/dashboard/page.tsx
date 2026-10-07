@@ -12,6 +12,7 @@ import { TransactionBadge } from "@/components/auction/status-badge";
 import { Button } from "@/components/ui/button";
 import { SettleButton } from "@/components/dashboard/settle-button";
 import { isPaymentProviderConfigured } from "@/server/payments/config";
+import { paymentsRuntimeEnabled } from "@/server/payments/runtime";
 
 export const metadata: Metadata = {
   title: "Dashboard",
@@ -57,11 +58,12 @@ export default async function DashboardOverviewPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login?next=/dashboard");
 
-  const [buying, selling, watchlist, transactions] = await Promise.all([
+  const [buying, selling, watchlist, transactions, paymentsEnabled] = await Promise.all([
     getBuying(user.id),
     getSelling(user.id),
     getWatchlist(user.id),
     getTransactions(user.id),
+    paymentsRuntimeEnabled(),
   ]);
 
   // eslint-disable-next-line react-hooks/purity -- server component: one render per request
@@ -298,11 +300,15 @@ export default async function DashboardOverviewPage() {
           </ul>
         )}
 
-        {!isPaymentProviderConfigured() && (
+        {!isPaymentProviderConfigured() ? (
           <p className="text-xs text-muted-foreground">
-            No payment provider is configured yet, so no money has moved.
+            No payment provider is configured yet, so BidBlitz cannot start checkout.
           </p>
-        )}
+        ) : !paymentsEnabled ? (
+          <p className="text-xs font-medium text-primary">
+            New checkout and seller payout instructions are temporarily paused by BidBlitz&apos;s payment safety switch.
+          </p>
+        ) : null}
       </section>
 
       {activeListings > 0 && (
