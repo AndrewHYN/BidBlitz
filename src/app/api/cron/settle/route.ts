@@ -287,6 +287,33 @@ export async function GET(request: Request): Promise<Response> {
     console.error("[cron/settle] expiry threw", err);
   }
 
+  // 7. Retry seller payouts that are genuinely ready but were waiting for
+  // provider settlement balance. The payout service checks the runtime switch,
+  // recipient readiness, audit history, available Linkwa balance and the
+  // provider response before it can record PAID_OUT.
+  let sellerPayoutsReleased = 0;
+  try {
+    const { releaseSellerPayout } = await import("@/server/payments/seller-payout");
+    const { data: payoutRows, error: payoutRowsError } = await admin
+      .from("seller_payouts")
+      .select("id")
+      .in("status", ["DELIVERY_CONFIRMED", "PAYOUT_PENDING"])
+      .not("delivery_confirmed_at", "is", null)
+      .order("updated_at", { ascending: true })
+      .limit(25);
+
+    if (payoutRowsError) {
+      console.error("[cron/settle] seller payout scan failed", payoutRowsError.message);
+    } else {
+      for (const row of payoutRows ?? []) {
+        const released = await releaseSellerPayout(row.id);
+        if (released.ok) sellerPayoutsReleased += 1;
+      }
+    }
+  } catch (err) {
+    console.error("[cron/settle] seller payout retry threw", err);
+  }
+
   return json({
     ok: true,
     scanned: candidates.length,
@@ -297,6 +324,7 @@ export async function GET(request: Request): Promise<Response> {
     emailed,
     expired,
     endingSoon,
+    sellerPayoutsReleased,
     durationMs: Date.now() - started,
   });
 }
