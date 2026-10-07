@@ -570,14 +570,15 @@ export function HeaderBar({
             </>
           ) : (
             <>
-              <Button asChild variant="outline" className="hidden sm:inline-flex">
+              <Button asChild variant="outline" size="sm">
                 <Link href="/login" onClick={closeMenu}>
                   Sign in
                 </Link>
               </Button>
-              <Button asChild className="shadow-md shadow-primary/10">
+              <Button asChild size="sm" className="shadow-md shadow-primary/10 sm:h-10 sm:px-4">
                 <Link href="/signup" onClick={closeMenu}>
-                  Join BidBlitz
+                  <span className="sm:hidden">Join</span>
+                  <span className="hidden sm:inline">Join BidBlitz</span>
                 </Link>
               </Button>
             </>
