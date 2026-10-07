@@ -55,11 +55,14 @@ export default async function SellDraftPage({
   if (!detail) notFound();
   const { auction } = detail;
   if (auction.seller_id !== user.id) notFound();
-  const [feeBps, serverNowResult] = await Promise.all([
+  const [feeBps, serverNowResult, payoutSetupResult] = await Promise.all([
     getFeeBps(),
     supabase.rpc("server_now"),
+    supabase.rpc("my_payout_setup"),
   ]);
   const serverNow = typeof serverNowResult.data === "string" ? serverNowResult.data : null;
+  const payoutSetup = payoutSetupResult.data?.[0] ?? null;
+  const payoutReady = payoutSetup?.ready === true;
   const activePromotionUntil =
     auction.featured_until &&
     serverNow &&
@@ -313,6 +316,7 @@ export default async function SellDraftPage({
                 title={auction.title}
                 imageCount={auction.image_count}
                 hasFulfilment={auction.fulfilment_method !== null}
+                payoutReady={payoutReady}
                 status={auction.status}
                 endsAt={auction.ends_at}
               />
@@ -351,9 +355,8 @@ export default async function SellDraftPage({
                     receive.
                   </>
                 )}{" "}
-                Your proceeds are paid after the sale is fulfilled and the
-                buyer&apos;s window to dispute has passed, and they are held
-                while any dispute is open.
+                Your proceeds are sent after the buyer confirms handover.
+                BidBlitz does not reduce that frozen seller amount again after the sale.
               </p>
             </div>
           </section>
