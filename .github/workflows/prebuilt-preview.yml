@@ -53,13 +53,13 @@ jobs:
 
       - name: Pull preview environment
         if: steps.token.outputs.available == 'true'
-        run: vercel pull --yes --environment=preview --token="$VERCEL_TOKEN"
+        run: vercel pull --yes --environment=preview
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
 
       - name: Build prebuilt preview
         if: steps.token.outputs.available == 'true'
-        run: vercel build --token="$VERCEL_TOKEN"
+        run: vercel build
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
 
@@ -69,7 +69,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          url="$(vercel deploy --prebuilt --token="$VERCEL_TOKEN" --yes | tail -n 1)"
+          url="$(vercel deploy --prebuilt --yes | tail -n 1)"
           test -n "$url"
           echo "url=$url" >> "$GITHUB_OUTPUT"
           echo "Preview: $url"
