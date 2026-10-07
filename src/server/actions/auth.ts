@@ -143,17 +143,6 @@ export async function signInAction(input: {
   password: string;
   redirectTo?: string;
 }): Promise<AuthResult> {
-  const phone = normalizeZimbabwePhone(input.phone);
-  if (!phone) {
-    return {
-      ok: false,
-      rejection: {
-        code: "invalid_input",
-        message: "Enter a Zimbabwe mobile number such as 0771234567.",
-      },
-    };
-  }
-
   const budgetKey = await authFailureKey(input.email);
   if (!peekRateLimit(budgetKey, AUTH_LIMIT.limit, AUTH_LIMIT.windowMs).allowed) {
     return { ok: false, rejection: { code: "rate_limited", message: AUTH_RATE_MESSAGE } };
@@ -187,6 +176,17 @@ export async function signUpAction(input: {
   phone: string;
   redirectTo?: string;
 }): Promise<AuthResult> {
+  const phone = normalizeZimbabwePhone(input.phone);
+  if (!phone) {
+    return {
+      ok: false,
+      rejection: {
+        code: "invalid_input",
+        message: "Enter a Zimbabwe mobile number such as 0771234567.",
+      },
+    };
+  }
+
   const budgetKey = await authFailureKey(input.email);
   if (!peekRateLimit(budgetKey, AUTH_LIMIT.limit, AUTH_LIMIT.windowMs).allowed) {
     return { ok: false, rejection: { code: "rate_limited", message: AUTH_RATE_MESSAGE } };
