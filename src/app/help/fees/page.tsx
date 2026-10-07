@@ -271,14 +271,17 @@ export default function HelpFeesPage() {
                 seller&apos;s money.
               </strong>{" "}
               It means {providerName} has confirmed that the buyer paid the winning
-              bid. It is not a statement that the seller has been paid. Paying
-              the seller is a separate step: we pay the proceeds once the sale
-              has been fulfilled and the dispute window has passed, and the
-              seller can see that step and its status on their dashboard.
+              bid. It is not a statement that the seller has been paid. The
+              seller&apos;s recorded proceeds become eligible for release after
+              the buyer confirms handover. An unresolved dispute, an unready
+              payout wallet or unavailable provider settlement balance can keep
+              that payout pending.
             </p>
             <p className="text-muted-foreground">
-              If a dispute is opened, a seller payout is held while it is looked
-              into. A refund to the buyer also holds the payout.
+              If a dispute is opened before the payout reaches a
+              provider-sensitive state, the seller payout is blocked while the
+              case is reviewed. BidBlitz&apos;s dispute workflow records the
+              outcome but does not issue an automatic refund.
             </p>
         </Explain>
 
