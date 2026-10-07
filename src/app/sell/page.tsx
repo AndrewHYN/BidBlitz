@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCategories, getFeeBps } from "@/server/queries";
 import { isPaymentProviderConfigured, paymentProviderDisplayName } from "@/server/payments/config";
+import { paymentsRuntimeEnabled } from "@/server/payments/runtime";
 import { PageHeader } from "@/components/auction/page-header";
 import { SellForm } from "@/components/sell/sell-form";
 
@@ -23,8 +24,11 @@ export default async function SellPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login?next=/sell");
 
-  const categories = await getCategories();
-  const feeBps = await getFeeBps();
+  const [categories, feeBps, paymentsEnabled] = await Promise.all([
+    getCategories(),
+    getFeeBps(),
+    paymentsRuntimeEnabled(),
+  ]);
   const providerName = isPaymentProviderConfigured()
     ? paymentProviderDisplayName()
     : null;
@@ -39,6 +43,7 @@ export default async function SellPage() {
         <SellForm
           feeBps={feeBps}
           providerName={providerName}
+          paymentsEnabled={paymentsEnabled}
           categories={categories.map((category: { id: number; name: string }) => ({
             id: category.id,
             name: category.name,
