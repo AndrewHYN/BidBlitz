@@ -35,7 +35,19 @@ export type NotificationType =
   | "AUCTION_PUBLISHED" | "NEW_BID" | "OUTBID" | "ENDING_SOON"
   | "WON" | "SOLD" | "ENDED_UNSOLD" | "REVIEW_REQUEST" | "NEW_MESSAGE" | "PAYMENT_EXPIRED"
   | "STAFF_REVIEW_REQUIRED" | "PROMOTION_REQUESTED" | "PROMOTION_APPROVED" | "PROMOTION_REJECTED"
-  | "DELIVERY_CONFIRMED" | "PAYOUT_SENT" | "PAYOUT_SETUP_REQUIRED" | "PAYOUT_ATTENTION";
+  | "DELIVERY_CONFIRMED" | "PAYOUT_SENT" | "PAYOUT_SETUP_REQUIRED" | "PAYOUT_ATTENTION"
+  | "DISPUTE_OPENED" | "DISPUTE_MESSAGE" | "DISPUTE_STATUS_CHANGED"
+  | "DISPUTE_STAFF_REQUIRED" | "DISPUTE_RESOLVED";
+
+export type DisputeStatus =
+  | "OPEN" | "WAITING_FOR_BUYER" | "WAITING_FOR_SELLER" | "UNDER_REVIEW" | "RESOLVED";
+export type DisputeReason =
+  | "ITEM_NOT_RECEIVED" | "ITEM_NOT_AS_DESCRIBED" | "ITEM_DAMAGED"
+  | "HANDOVER_SAFETY" | "PAYMENT_OR_PAYOUT" | "OTHER";
+export type DisputeResolution =
+  | "AGREEMENT_REACHED" | "SELLER_RESPONSIBLE" | "BUYER_RESPONSIBLE"
+  | "INSUFFICIENT_EVIDENCE" | "CLOSED_NO_ACTION" | "OTHER";
+export type DisputePayoutResolution = "RELEASE" | "HOLD" | "NONE";
 
 export type Condition = "new" | "like_new" | "good" | "fair" | "poor";
 
@@ -203,6 +215,50 @@ export interface Database {
         Insert: { id?: string; reporter_id: string; target_type: "auction" | "user"; target_id: string; reason: string };
         Update: { status?: string; resolution?: string | null };
       };
+      transaction_disputes: {
+        Row: {
+          id: string;
+          transaction_id: string;
+          opened_by: string;
+          reason: DisputeReason;
+          status: DisputeStatus;
+          payout_status_at_open: string | null;
+          payout_frozen: boolean;
+          resolution: DisputeResolution | null;
+          payout_resolution: DisputePayoutResolution | null;
+          resolution_note: string | null;
+          resolved_by: string | null;
+          resolved_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: never;
+        Update: never;
+      };
+      transaction_dispute_messages: {
+        Row: {
+          id: string;
+          dispute_id: string;
+          author_id: string;
+          body: string;
+          created_at: string;
+        };
+        Insert: never;
+        Update: never;
+      };
+      transaction_dispute_evidence: {
+        Row: {
+          id: string;
+          dispute_id: string;
+          uploaded_by: string;
+          storage_path: string;
+          mime_type: string;
+          size_bytes: number;
+          created_at: string;
+        };
+        Insert: never;
+        Update: never;
+      };
       transaction_messages: {
         Row: {
           id: string; transaction_id: string; sender_id: string; body: string;
@@ -343,6 +399,24 @@ export interface Database {
       };
       buyer_confirm_delivery: {
         Args: { p_transaction_id: string };
+        Returns: Json;
+      };
+      open_transaction_dispute: {
+        Args: { p_transaction_id: string; p_reason: DisputeReason; p_summary: string };
+        Returns: string;
+      };
+      add_transaction_dispute_message: {
+        Args: { p_dispute_id: string; p_body: string };
+        Returns: string;
+      };
+      staff_update_transaction_dispute: {
+        Args: {
+          p_dispute_id: string;
+          p_status: DisputeStatus;
+          p_resolution?: DisputeResolution | null;
+          p_payout_resolution?: DisputePayoutResolution | null;
+          p_resolution_note?: string | null;
+        };
         Returns: Json;
       };
       service_transition_seller_payout: {
