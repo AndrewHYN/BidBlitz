@@ -72,18 +72,18 @@ describe("createAuctionSchema", () => {
     ).toBe(false);
   });
 
-  it("enforces durationSeconds between 60 and 604800", () => {
+  it("enforces durationSeconds between 60 seconds and 30 days", () => {
     expect(
       createAuctionSchema.safeParse({ ...validAuction(), durationSeconds: 60 }).success
     ).toBe(true);
     expect(
-      createAuctionSchema.safeParse({ ...validAuction(), durationSeconds: 604800 }).success
+      createAuctionSchema.safeParse({ ...validAuction(), durationSeconds: 2592000 }).success
     ).toBe(true);
     expect(
       createAuctionSchema.safeParse({ ...validAuction(), durationSeconds: 59 }).success
     ).toBe(false);
     expect(
-      createAuctionSchema.safeParse({ ...validAuction(), durationSeconds: 604801 }).success
+      createAuctionSchema.safeParse({ ...validAuction(), durationSeconds: 2592001 }).success
     ).toBe(false);
     expect(
       createAuctionSchema.safeParse({ ...validAuction(), durationSeconds: 60.5 }).success
@@ -295,7 +295,7 @@ describe("exported constants", () => {
   it("publishes the documented conditions and durations", () => {
     expect([...CONDITIONS]).toEqual(["new", "like_new", "good", "fair", "poor"]);
     expect(DURATIONS.map((d) => d.seconds)).toEqual([
-      3600, 21600, 43200, 86400, 259200,
+      3600, 21600, 43200, 86400, 259200, 604800, 1209600, 2592000,
     ]);
   });
 });
