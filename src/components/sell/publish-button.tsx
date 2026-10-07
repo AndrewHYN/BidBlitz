@@ -29,6 +29,7 @@ export function PublishButton({
   title,
   imageCount,
   hasFulfilment,
+  payoutReady,
   status,
   endsAt,
 }: {
@@ -36,6 +37,7 @@ export function PublishButton({
   title: string;
   imageCount: number;
   hasFulfilment: boolean;
+  payoutReady: boolean;
   status: string;
   endsAt: string | null;
 }) {
@@ -140,7 +142,8 @@ export function PublishButton({
 
   const blockedByImage = imageCount < 1;
   const blockedByFulfilment = !hasFulfilment;
-  const blocked = blockedByImage || blockedByFulfilment;
+  const blockedByPayout = !payoutReady;
+  const blocked = blockedByImage || blockedByFulfilment || blockedByPayout;
 
   return (
     <div className="space-y-3">
@@ -178,12 +181,20 @@ export function PublishButton({
           data-testid="publish-disabled-reason"
           className="text-sm text-muted-foreground"
         >
-          {blockedByImage && blockedByFulfilment
-            ? "Add at least one photo and choose fulfilment before publishing."
-            : blockedByImage
-              ? "Add at least one photo before publishing."
-              : "Choose how the buyer will receive the item before publishing."}
+          {blockedByPayout
+            ? "Set up your seller payout wallet before publishing."
+            : blockedByImage && blockedByFulfilment
+              ? "Add at least one photo and choose fulfilment before publishing."
+              : blockedByImage
+                ? "Add at least one photo before publishing."
+                : "Choose how the buyer will receive the item before publishing."}
         </p>
+      )}
+
+      {blockedByPayout && (
+        <Button asChild variant="outline" size="sm">
+          <Link href="/settings/payouts">Set up seller payouts</Link>
+        </Button>
       )}
 
       {error && !confirmOpen && (
