@@ -34,6 +34,21 @@ const txLink = (appUrl: string) => `${appUrl}/dashboard/transactions`;
 const helpLink = (appUrl: string) => `${appUrl}/help`;
 
 export const EMAIL_TEMPLATES: Record<string, EmailTemplate> = {
+  staff_review_required: {
+    key: "staff_review_required",
+    critical: true,
+    subject: (d) => `Review needed: ${d.title}`,
+    content: (d, appUrl) => ({
+      subject: `Review needed: ${d.title}`,
+      name: d.name,
+      headline: "A listing is waiting for review",
+      paragraphs: [
+        `“${d.title}” was held before going public and needs a staff decision.`,
+        "Open the review queue, inspect the listing, then approve it, request changes or reject it.",
+      ],
+      cta: { label: "Open listing reviews", href: `${appUrl}/admin#admin-review-heading` },
+    }),
+  },
   review_submitted: {
     key: "review_submitted",
     critical: true,
