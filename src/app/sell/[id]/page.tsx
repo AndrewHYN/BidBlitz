@@ -24,6 +24,7 @@ import {
   isPaymentProviderConfigured,
   paymentProviderDisplayName,
 } from "@/server/payments/config";
+import { paymentsRuntimeEnabled } from "@/server/payments/runtime";
 import { DeleteDraftButton } from "@/components/sell/delete-draft-button";
 import { PromotionRequest } from "@/components/sell/promotion-request";
 
@@ -55,10 +56,11 @@ export default async function SellDraftPage({
   if (!detail) notFound();
   const { auction } = detail;
   if (auction.seller_id !== user.id) notFound();
-  const [feeBps, serverNowResult, payoutSetupResult] = await Promise.all([
+  const [feeBps, serverNowResult, payoutSetupResult, paymentsEnabled] = await Promise.all([
     getFeeBps(),
     supabase.rpc("server_now"),
     supabase.rpc("my_payout_setup"),
+    paymentsRuntimeEnabled(),
   ]);
   const serverNow = typeof serverNowResult.data === "string" ? serverNowResult.data : null;
   const payoutSetup = payoutSetupResult.data?.[0] ?? null;
@@ -351,10 +353,16 @@ export default async function SellDraftPage({
                   "a platform fee"
                 )}{" "}
                 of the winning price from your proceeds.{" "}
-                {providerName !== null ? (
+                {providerName !== null && paymentsEnabled ? (
                   <>
                     The buyer pays your winning bid plus {providerName}&apos;s
                     own payment charge, which is not money you receive.
+                  </>
+                ) : providerName !== null ? (
+                  <>
+                    {providerName} is connected, but new checkout is temporarily
+                    paused by BidBlitz&apos;s payment safety switch. No buyer can
+                    start a new payment until it is re-enabled.
                   </>
                 ) : (
                   <>
