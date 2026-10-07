@@ -216,7 +216,7 @@ export function AuctionDetailLive({
           : null;
 
   return (
-    <div className="space-y-4 rounded-xl border bg-card p-5">
+    <div id="bid-panel" className="space-y-4 rounded-xl border border-primary/20 bg-card p-5 shadow-lg shadow-primary/5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div data-testid="auction-status">
           <LiveStatus status={live.status} endsAt={live.endsAt} />
@@ -254,7 +254,7 @@ export function AuctionDetailLive({
           <p
             key={live.currentBidMinor ?? "starting"}
             className={cn(
-              "text-3xl font-semibold tracking-tight",
+              "text-4xl font-bold tracking-tight",
               state.revision > 0 && "animate-flash"
             )}
           >
