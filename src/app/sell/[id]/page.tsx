@@ -55,7 +55,18 @@ export default async function SellDraftPage({
   if (!detail) notFound();
   const { auction } = detail;
   if (auction.seller_id !== user.id) notFound();
-  const feeBps = await getFeeBps();
+  const [feeBps, serverNowResult] = await Promise.all([
+    getFeeBps(),
+    supabase.rpc("server_now"),
+  ]);
+  const serverNow = typeof serverNowResult.data === "string" ? serverNowResult.data : null;
+  const activePromotionUntil =
+    auction.featured_until &&
+    serverNow &&
+    new Date(auction.featured_until).getTime() > new Date(serverNow).getTime()
+      ? auction.featured_until
+      : null;
+
   // Name the configured provider, or nothing: this page must not claim a
   // payment rail the deployment does not have.
   const providerName = isPaymentProviderConfigured()
@@ -361,12 +372,7 @@ export default async function SellDraftPage({
               <div className="mt-4">
                 <PromotionRequest
                   auctionId={auction.id}
-                  activeUntil={
-                    auction.featured_until &&
-                    new Date(auction.featured_until).getTime() > Date.now()
-                      ? auction.featured_until
-                      : null
-                  }
+                  activeUntil={activePromotionUntil}
                   pendingDays={
                     (pendingPromotion as { requested_days?: number } | null)?.requested_days ?? null
                   }
