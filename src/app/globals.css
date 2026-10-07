@@ -400,3 +400,51 @@
     transform: none !important;
   }
 }
+
+
+/* Auth surfaces deliberately feel like an auction product, not a generic
+   account form. Strong depth is reserved for the conversion surface while the
+   rest of the product keeps quieter cards. */
+.auth-stage {
+  background:
+    radial-gradient(
+      circle at 12% 0%,
+      color-mix(in oklab, var(--primary) 8%, transparent) 0,
+      transparent 28rem
+    ),
+    color-mix(in oklab, var(--background) 97%, var(--primary) 3%);
+}
+
+.auth-card {
+  box-shadow:
+    0 28px 70px -52px color-mix(in oklab, var(--foreground) 48%, transparent),
+    0 10px 30px -24px color-mix(in oklab, var(--primary) 42%, transparent),
+    0 1px 0 color-mix(in oklab, var(--foreground) 6%, transparent) inset;
+}
+
+.auth-card:focus-within {
+  border-color: color-mix(in oklab, var(--primary) 24%, var(--border));
+  box-shadow:
+    0 30px 78px -52px color-mix(in oklab, var(--foreground) 54%, transparent),
+    0 12px 34px -25px color-mix(in oklab, var(--primary) 50%, transparent),
+    0 0 0 1px color-mix(in oklab, var(--primary) 8%, transparent);
+}
+
+.auth-primary-action {
+  box-shadow:
+    0 12px 24px -14px color-mix(in oklab, var(--primary) 75%, transparent),
+    0 1px 0 color-mix(in oklab, white 18%, transparent) inset;
+}
+
+.auth-primary-action:hover {
+  box-shadow:
+    0 15px 30px -15px color-mix(in oklab, var(--primary) 80%, transparent),
+    0 1px 0 color-mix(in oklab, white 22%, transparent) inset;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-card,
+  .auth-primary-action {
+    transition: none !important;
+  }
+}
