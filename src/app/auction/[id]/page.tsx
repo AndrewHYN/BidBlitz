@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { MapPin } from "lucide-react";
+import { MapPin, ShieldCheck } from "lucide-react";
 
 import { getAuctionDetail, imageUrlFor } from "@/server/queries";
 import { isPaymentProviderConfigured } from "@/server/payments/config";
@@ -225,7 +225,7 @@ export default async function AuctionPage({ params }: Props) {
               id="fulfilment"
               className="mb-3 text-base font-semibold tracking-tight"
             >
-              Fulfilment
+              Collection & delivery
             </h2>
             <div className="space-y-3 text-[0.9375rem] leading-[1.7] text-muted-foreground text-pretty">
               <p>
@@ -238,6 +238,24 @@ export default async function AuctionPage({ params }: Props) {
                 to confirm collection or delivery details before handover.
               </p>
             </div>
+          </section>
+
+          <section
+            aria-labelledby="meet-safely"
+            className="rounded-xl border border-live/25 bg-live/5 p-5"
+          >
+            <h2 id="meet-safely" className="flex items-center gap-2 text-base font-semibold tracking-tight">
+              <ShieldCheck className="size-4 text-live" aria-hidden />
+              Meet and trade safely
+            </h2>
+            <ul className="mt-3 grid gap-2 text-sm leading-6 text-muted-foreground sm:grid-cols-2">
+              <li>• For portable items, meet in a busy, well-lit public place when possible.</li>
+              <li>• Inspect the item before you confirm that you received it.</li>
+              <li>• Keep transaction messages inside BidBlitz so there is a record.</li>
+              <li>• Never share passwords, PINs or one-time security codes.</li>
+              <li>• Use the BidBlitz payment flow. Be cautious of payment links sent in messages.</li>
+              <li>• For home collection, arrange daylight pickup and have another adult present.</li>
+            </ul>
           </section>
 
           <BidHistory bids={bids} currency={auction.currency} />
@@ -254,7 +272,7 @@ export default async function AuctionPage({ params }: Props) {
           bid costs, and when the listing was published.
         */}
         <aside className="space-y-4 self-start lg:sticky lg:top-24">
-          <div className="rounded-xl border bg-card p-5">
+          <div className="rounded-xl border border-border/80 bg-card p-5 shadow-[0_10px_28px_-24px_rgba(15,23,42,0.5)]">
             <h2 className="mb-2 text-base font-semibold tracking-tight">
               Bidding terms
             </h2>
@@ -264,6 +282,9 @@ export default async function AuctionPage({ params }: Props) {
                   minor={auction.bid_increment_minor}
                   currency={auction.currency}
                 />
+              </FactRow>
+              <FactRow label="Fair ending">
+                A bid in the final {auction.anti_snipe_window_seconds}s can add {auction.anti_snipe_extension_seconds}s
               </FactRow>
               <FactRow label="Listed">{listedOn}</FactRow>
             </dl>
