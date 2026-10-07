@@ -262,7 +262,7 @@ export default async function DashboardOverviewPage() {
           title="Continue bidding"
           description={outbid.length > 0 ? "Somebody is ahead on at least one of these." : "You're currently leading on your live bids."}
           auctions={liveBids.slice(0, 12)}
-          testid="dashboard-live-bids"
+          testid="home-live"
           emptyTitle="No live bids"
           emptyDescription="Auctions you bid on appear here."
         />
@@ -273,7 +273,7 @@ export default async function DashboardOverviewPage() {
           title="Your watchlist"
           description="Saved auctions, one tap away."
           auctions={watchlist.slice(0, 12)}
-          testid="dashboard-watchlist"
+          testid="home-recent"
           emptyTitle="Nothing watched yet"
           emptyDescription="Tap Watch on an auction to save it."
         />
