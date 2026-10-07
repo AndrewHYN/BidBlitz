@@ -56,6 +56,7 @@ export function SignupForm() {
     const displayName = String(data.get("name") ?? "").trim();
     const email = String(data.get("email") ?? "").trim();
     const password = String(data.get("password") ?? "");
+    const phone = String(data.get("phone") ?? "").trim();
 
     if (!displayName) {
       setError("Enter your name.");
@@ -71,7 +72,7 @@ export function SignupForm() {
     setError(null);
     startTransition(async () => {
       try {
-        const result = await signUpAction({ email, password, displayName });
+        const result = await signUpAction({ email, password, displayName, phone });
         if (!result.ok) {
           setError(result.rejection.message);
           return;
@@ -228,6 +229,23 @@ export function SignupForm() {
           required
           data-testid="email-field"
         />
+      </div>
+
+      <div className="space-y-1.5">
+        <Label htmlFor="signup-phone">Mobile number</Label>
+        <Input
+          id="signup-phone"
+          name="phone"
+          type="tel"
+          inputMode="tel"
+          autoComplete="tel"
+          placeholder="0771234567"
+          required
+          data-testid="phone-field"
+        />
+        <p className="text-xs text-muted-foreground">
+          Kept private. If you sell, this becomes the starting number for your payout setup.
+        </p>
       </div>
 
       <div className="space-y-1.5">
