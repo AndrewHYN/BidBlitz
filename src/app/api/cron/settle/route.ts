@@ -62,6 +62,36 @@ function isAuthorized(request: Request): boolean {
   return matches(secret, header.slice(prefix.length));
 }
 
+async function retryReadySellerPayouts(
+  admin: ReturnType<typeof createAdminClient>
+): Promise<number> {
+  try {
+    const { releaseSellerPayout } = await import("@/server/payments/seller-payout");
+    const { data: payoutRows, error } = await admin
+      .from("seller_payouts")
+      .select("id")
+      .in("status", ["DELIVERY_CONFIRMED", "PAYOUT_PENDING"])
+      .not("delivery_confirmed_at", "is", null)
+      .order("updated_at", { ascending: true })
+      .limit(25);
+
+    if (error) {
+      console.error("[cron/settle] seller payout scan failed", error.message);
+      return 0;
+    }
+
+    let released = 0;
+    for (const row of payoutRows ?? []) {
+      const result = await releaseSellerPayout(row.id);
+      if (result.ok) released += 1;
+    }
+    return released;
+  } catch (err) {
+    console.error("[cron/settle] seller payout retry threw", err);
+    return 0;
+  }
+}
+
 export async function GET(request: Request): Promise<Response> {
   const started = Date.now();
 
@@ -73,6 +103,7 @@ export async function GET(request: Request): Promise<Response> {
   }
 
   const admin = createAdminClient();
+  const sellerPayoutsReleased = await retryReadySellerPayouts(admin);
 
   // 0. Ending-soon notices. Independent of settlement (an auction can sit in
   //    its final window long before anything is due to close) and fully best
@@ -114,6 +145,7 @@ export async function GET(request: Request): Promise<Response> {
       closed: 0,
       announced: 0,
       endingSoon,
+      sellerPayoutsReleased,
       durationMs: Date.now() - started,
     });
   }
@@ -285,33 +317,6 @@ export async function GET(request: Request): Promise<Response> {
     }
   } catch (err) {
     console.error("[cron/settle] expiry threw", err);
-  }
-
-  // 7. Retry seller payouts that are genuinely ready but were waiting for
-  // provider settlement balance. The payout service checks the runtime switch,
-  // recipient readiness, audit history, available Linkwa balance and the
-  // provider response before it can record PAID_OUT.
-  let sellerPayoutsReleased = 0;
-  try {
-    const { releaseSellerPayout } = await import("@/server/payments/seller-payout");
-    const { data: payoutRows, error: payoutRowsError } = await admin
-      .from("seller_payouts")
-      .select("id")
-      .in("status", ["DELIVERY_CONFIRMED", "PAYOUT_PENDING"])
-      .not("delivery_confirmed_at", "is", null)
-      .order("updated_at", { ascending: true })
-      .limit(25);
-
-    if (payoutRowsError) {
-      console.error("[cron/settle] seller payout scan failed", payoutRowsError.message);
-    } else {
-      for (const row of payoutRows ?? []) {
-        const released = await releaseSellerPayout(row.id);
-        if (released.ok) sellerPayoutsReleased += 1;
-      }
-    }
-  } catch (err) {
-    console.error("[cron/settle] seller payout retry threw", err);
   }
 
   return json({
