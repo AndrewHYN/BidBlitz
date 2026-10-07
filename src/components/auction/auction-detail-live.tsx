@@ -216,7 +216,8 @@ export function AuctionDetailLive({
           : null;
 
   return (
-    <div id="bid-panel" className="space-y-4 rounded-xl border border-primary/20 bg-card p-5 shadow-lg shadow-primary/5">
+    <>
+    <div id="bid-panel" className="space-y-4 scroll-mt-24 rounded-xl border border-primary/20 bg-card p-5 shadow-lg shadow-primary/5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div data-testid="auction-status">
           <LiveStatus status={live.status} endsAt={live.endsAt} />
@@ -293,5 +294,31 @@ export function AuctionDetailLive({
         onServerEcho={handleEcho}
       />
     </div>
+
+    {live.status === "LIVE" && viewerId !== sellerId && (
+      <div className="fixed inset-x-3 bottom-3 z-40 rounded-xl border bg-background/95 p-2 shadow-2xl backdrop-blur-md lg:hidden">
+        <a
+          href="#bid-panel"
+          className="flex min-h-12 items-center justify-between gap-3 rounded-lg bg-primary px-4 text-primary-foreground shadow-md"
+        >
+          <span className="min-w-0">
+            <span className="block text-[11px] font-medium uppercase tracking-wide opacity-80">
+              {live.currentBidMinor === null ? "Starting bid" : "Current bid"}
+            </span>
+            <span className="block truncate text-base font-bold">
+              <Money
+                minor={live.currentBidMinor ?? startingBidMinor}
+                currency={currency}
+                compact={false}
+              />
+            </span>
+          </span>
+          <span className="shrink-0 text-sm font-bold">
+            {viewerId === null ? "Sign in to bid" : "Bid now"}
+          </span>
+        </a>
+      </div>
+    )}
+    </>
   );
 }
