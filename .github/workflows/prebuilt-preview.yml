@@ -1,0 +1,87 @@
+name: Prebuilt Preview
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: prebuilt-preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  VERCEL_ORG_ID: team_udUjK9zSNigqrDngeAo1pBp0
+  VERCEL_PROJECT_ID: prj_8OA1C8dJMwxV0gxa2u3ilbvNYwAN
+  VERCEL_CLI_VERSION: "59.19.1"
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Detect Vercel token
+        id: token
+        shell: bash
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          if [ -n "${VERCEL_TOKEN:-}" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::VERCEL_TOKEN is not configured; prebuilt preview is skipped."
+          fi
+
+      - name: Install app dependencies
+        if: steps.token.outputs.available == 'true'
+        run: npm ci
+
+      - name: Install pinned Vercel CLI
+        if: steps.token.outputs.available == 'true'
+        run: npm install --global "vercel@${VERCEL_CLI_VERSION}"
+
+      - name: Pull preview environment
+        if: steps.token.outputs.available == 'true'
+        run: vercel pull --yes --environment=preview --token="$VERCEL_TOKEN"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+
+      - name: Build prebuilt preview
+        if: steps.token.outputs.available == 'true'
+        run: vercel build --token="$VERCEL_TOKEN"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deploy prebuilt preview
+        if: steps.token.outputs.available == 'true'
+        id: deploy
+        shell: bash
+        run: |
+          set -euo pipefail
+          url="$(vercel deploy --prebuilt --token="$VERCEL_TOKEN" --yes | tail -n 1)"
+          test -n "$url"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "Preview: $url"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+
+      - name: Install Chromium
+        if: steps.token.outputs.available == 'true'
+        run: npx playwright install --with-deps chromium
+
+      - name: Desktop and mobile release smoke
+        if: steps.token.outputs.available == 'true'
+        run: npx playwright test e2e/release-smoke.spec.ts
+        env:
+          PLAYWRIGHT_BASE_URL: ${{ steps.deploy.outputs.url }}
