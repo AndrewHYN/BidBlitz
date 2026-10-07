@@ -51,7 +51,7 @@ function Question({ q, children }: { q: string; children: React.ReactNode }) {
 /**
  * The questions a first-time visitor actually asks, answered from the same
  * facts the rest of the site states. Where the honest answer is a limitation —
- * no escrow, no automatic payout, no identity checks, no delivery guarantee —
+ * no escrow promise, no payout on buyer payment alone, no identity checks, no delivery guarantee —
  * it leads with that, because a FAQ that only flatters the product is worse
  * than no FAQ at all.
  */
@@ -141,20 +141,20 @@ export default function FaqPage() {
           </Question>
           <Question q="Does BidBlitz hold my money in escrow?">
             <p>
-              No. BidBlitz is not a bank and does not custody funds. Payment goes
-              through the connected provider between buyer and seller, and the
-              sale is marked paid only once that provider confirms it. Nothing on
-              this site should be read as an escrow promise.
+              No. BidBlitz does not provide users with an escrow account or
+              promise escrow protection. Payment is processed by the connected
+              provider, and the sale is marked paid only once that provider
+              confirms it. Seller payout eligibility is tracked separately.
             </p>
           </Question>
           <Question q="When does a seller get paid out?">
             <p>
-              Payout is a <strong>separate, controlled step</strong>. It does not
-              fire automatically the moment a buyer pays. The buyer&apos;s payment
-              is confirmed first, the fulfilment is confirmed, the 5% platform fee
-              is applied, and the payout is then released and recorded so its
-              status is visible. That deliberate gap is what makes a dispute
-              possible before money has already left.
+              The seller is <strong>not paid the moment the buyer pays</strong>.
+              The sale first records the winning price, BidBlitz&apos;s 5% fee
+              and the seller&apos;s frozen proceeds. After the buyer confirms
+              handover, the payout can be released through the connected
+              provider if the seller wallet is ready, settlement balance is
+              available and no unresolved dispute blocks the sale.
             </p>
           </Question>
           <Question q="Can a seller change the price or terms after bidding starts?">
