@@ -6,6 +6,7 @@ import { DocumentPage } from "@/components/document-page";
 import { Money } from "@/components/auction/money";
 import { previewFeeMinor } from "@/lib/money";
 import { isPaymentProviderConfigured, paymentProviderDisplayName } from "@/server/payments/config";
+import { paymentsRuntimeEnabled } from "@/server/payments/runtime";
 
 export const metadata: Metadata = {
   title: "Fees",
@@ -98,7 +99,7 @@ function ExampleRow({
   );
 }
 
-export default function HelpFeesPage() {
+export default async function HelpFeesPage() {
   // The badge and the note below must track the deployment, not a fixed
   // claim: with a provider configured, "No provider connected" would be false.
   // When nothing is connected, name the role generically rather than claiming
@@ -107,6 +108,7 @@ export default function HelpFeesPage() {
   const providerName = paymentConfigured
     ? paymentProviderDisplayName()
     : "the payment provider";
+  const paymentsEnabled = paymentConfigured && (await paymentsRuntimeEnabled());
 
   return (
     <div data-testid="help-fees-page" >
@@ -231,7 +233,11 @@ export default function HelpFeesPage() {
           action={
             <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <CreditCard className="size-3.5" aria-hidden />
-              {paymentConfigured ? `${providerName} connected` : "No provider connected"}
+              {!paymentConfigured
+                ? "No provider connected"
+                : paymentsEnabled
+                  ? `${providerName} connected`
+                  : `${providerName} · payments paused`}
             </span>
           }
         >
@@ -250,12 +256,20 @@ export default function HelpFeesPage() {
             </p>
             <p>
               {paymentConfigured ? (
-                <>
-                  <strong>The payment is handled by {providerName}.</strong> The
-                  transaction records what is owed until {providerName} confirms
-                  the payment; a failed or cancelled payment leaves it{" "}
-                  <strong>Failed</strong>.
-                </>
+                paymentsEnabled ? (
+                  <>
+                    <strong>The payment is handled by {providerName}.</strong> The
+                    transaction records what is owed until {providerName} confirms
+                    the payment; a failed or cancelled payment leaves it{" "}
+                    <strong>Failed</strong>.
+                  </>
+                ) : (
+                  <>
+                    <strong>New payments are temporarily paused.</strong> {providerName}{" "}
+                    is configured, but BidBlitz&apos;s runtime safety switch is
+                    off, so a buyer cannot start a new checkout right now.
+                  </>
+                )
               ) : (
                 <>
                   <strong>No payment provider is configured yet</strong>, so no
