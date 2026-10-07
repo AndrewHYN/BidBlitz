@@ -123,6 +123,7 @@ describe("signUpAction", () => {
       email: EMAIL,
       password: "longenough",
       displayName: "New User",
+      phone: "0771234567",
     });
 
     expect(result).toEqual({ ok: true });
@@ -143,6 +144,7 @@ describe("signUpAction", () => {
       email: EMAIL,
       password: "longenough",
       displayName: "New User",
+      phone: "0771234567",
     });
 
     expect(result).toEqual({ ok: true });
@@ -171,6 +173,7 @@ describe("signUpAction", () => {
         email: EMAIL,
         password: "longenough",
         displayName: "New User",
+      phone: "0771234567",
       });
       expect(result.ok).toBe(false);
       if (result.ok) continue;
@@ -190,6 +193,7 @@ describe("signUpAction", () => {
       email: EMAIL,
       password: "longenough",
       displayName: "New User",
+      phone: "0771234567",
     });
 
     expect(result.ok).toBe(false);
@@ -211,6 +215,7 @@ describe("signUpAction", () => {
       email: EMAIL,
       password: "longenough",
       displayName: "New User",
+      phone: "0771234567",
     });
 
     expect(result.ok).toBe(false);
@@ -227,6 +232,7 @@ describe("signUpAction", () => {
       email: EMAIL,
       password: "longenough",
       displayName: "New User",
+      phone: "0771234567",
     });
 
     expect(result.ok).toBe(false);
@@ -242,6 +248,7 @@ describe("signUpAction", () => {
       email: EMAIL,
       password: "short",
       displayName: "New User",
+      phone: "0771234567",
     });
 
     expect(result.ok).toBe(false);
@@ -260,6 +267,7 @@ describe("signUpAction", () => {
       email: EMAIL,
       password: "longenough",
       displayName: "New User",
+      phone: "0771234567",
     });
 
     expect(result.ok).toBe(false);
@@ -277,7 +285,7 @@ describe("signUpAction", () => {
       for (let i = 0; i < AUTH_LIMIT.limit; i += 1) {
         rateLimit(KEY, AUTH_LIMIT.limit, AUTH_LIMIT.windowMs);
       }
-      expect((await signUpAction({ email: EMAIL, password: "longenough", displayName: "N" })).ok).toBe(
+      expect((await signUpAction({ email: EMAIL, password: "longenough", displayName: "N", phone: "0771234567" })).ok).toBe(
         false
       );
 
@@ -287,6 +295,7 @@ describe("signUpAction", () => {
         email: EMAIL,
         password: "longenough",
         displayName: "New User",
+      phone: "0771234567",
       });
       expect(after).toEqual({ ok: true });
       expect(budget().remaining).toBe(AUTH_LIMIT.limit);
