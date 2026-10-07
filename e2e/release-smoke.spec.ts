@@ -75,6 +75,23 @@ test.describe("release visual smoke", () => {
     });
   }
 
+  test("dynamic public resources return real 404s without browser errors", async ({ page }) => {
+    for (const route of [
+      "/auction/not-a-valid-uuid",
+      "/profile/bidblitz-release-smoke-user-that-does-not-exist",
+    ]) {
+      const fatal: string[] = [];
+      page.on("pageerror", (error) => fatal.push(error.message));
+      const response = await page.goto(route, {
+        waitUntil: "domcontentloaded",
+        timeout: 45_000,
+      });
+      expect(response?.status(), `${route} should be a real 404`).toBe(404);
+      await expect(page.locator("body")).toBeVisible();
+      expect(fatal, `${route} emitted a browser page error`).toEqual([]);
+    }
+  });
+
   test("landing page exposes obvious marketplace actions", async ({ page }) => {
     await page.goto("/", { waitUntil: "domcontentloaded" });
     await expect(
