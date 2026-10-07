@@ -45,11 +45,17 @@ function clientKey(request: Request): string {
   return ip && ip.length > 0 ? ip : "unknown";
 }
 
+function paymentsEmergencyPaused(): boolean {
+  return true;
+}
+
 export async function POST(request: Request): Promise<Response> {
   // Emergency marketplace pause: do not create any new provider-side payment
   // link while the seller payout path is being rebuilt. Signed webhooks stay
   // live so a payment that was already in flight can still reconcile safely.
-  return json({ ok: false, error: "payments_paused" }, 503);
+  if (paymentsEmergencyPaused()) {
+    return json({ ok: false, error: "payments_paused" }, 503);
+  }
 
   const provider = ensurePaymentProvider();
 
