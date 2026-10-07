@@ -94,14 +94,17 @@ export default function AboutPage() {
           <p>This is the part most marketplaces leave vague. BidBlitz does not:</p>
           <ul>
             <li>
-              <strong>hold your money in escrow.</strong> Payment goes through
-              the connected provider between buyer and seller; BidBlitz is not a
-              bank and does not custody funds.
+              <strong>offer or promise escrow.</strong> Payments are processed
+              and settled through the connected provider. BidBlitz records the
+              transaction and enforces when a seller payout is eligible to be
+              released, but it does not provide users with an escrow account.
             </li>
             <li>
-              <strong>pay sellers automatically.</strong> A payout is a separate,
-              controlled step an operator runs after the sale is confirmed. It
-              is not a button that fires by itself.
+              <strong>pay a seller merely because the buyer paid.</strong> The
+              seller&apos;s frozen proceeds become eligible only after the buyer
+              confirms handover, no unresolved dispute blocks the sale, the
+              payout wallet is ready and the provider has available settlement
+              balance.
             </li>
             <li>
               <strong>guarantee an item.</strong> We do not inspect, photograph
