@@ -25,6 +25,7 @@ export type BidErrorCode =
   | "rate_limited"
   | "account_banned"
   | "below_minimum_price"
+  | "payout_setup_required"
   | "invalid_input"
   | "reset_link_invalid"
   | "duplicate_report"
@@ -67,6 +68,8 @@ const MESSAGES: Record<BidErrorCode, string> = {
   // (Linkwa) will not process anything under $1.00, so a lower starting
   // price could never settle.
   below_minimum_price: "Minimum starting price is $1.00.",
+  payout_setup_required:
+    "Set up your seller payout wallet before publishing this auction.",
   // Raised by the is_banned triggers (migration 20260928000003). It has to be
   // in this table rather than falling through to `unknown`: the terms promise
   // a user can be suspended, so "Something went wrong. Please try again." would
