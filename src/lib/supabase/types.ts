@@ -118,6 +118,7 @@ export interface Database {
           featured: boolean;
           featured_until: string | null;
           featured_by: string | null;
+          business_id: string | null;
           image_count: number;
           created_at: string;
           updated_at: string;
@@ -137,6 +138,7 @@ export interface Database {
           bid_increment_minor: number;
           status?: AuctionStatus;
           archived_at?: string | null;
+          business_id?: string | null;
           duration_seconds?: number;
           anti_snipe_window_seconds?: number;
           anti_snipe_extension_seconds?: number;
@@ -324,6 +326,22 @@ export interface Database {
         Insert: never;
         Update: never;
       };
+      business_sellers: {
+        Row: {
+          id: string;
+          owner_id: string;
+          slug: string;
+          display_name: string;
+          description: string | null;
+          location: string | null;
+          logo_path: string | null;
+          status: "ACTIVE" | "SUSPENDED";
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: never;
+        Update: never;
+      };
       promotion_settings: {
         Row: {
           days: number;
@@ -381,6 +399,18 @@ export interface Database {
       };
       admin_update_promotion_pricing: {
         Args: { p_days: number; p_price_minor: number; p_enabled: boolean };
+        Returns: Json;
+      };
+      upsert_my_business: {
+        Args: {
+          p_display_name: string;
+          p_description?: string | null;
+          p_location?: string | null;
+        };
+        Returns: Database["public"]["Tables"]["business_sellers"]["Row"];
+      };
+      set_auction_business_identity: {
+        Args: { p_auction_id: string; p_business_id?: string | null };
         Returns: Json;
       };
       cancel_auction: { Args: { p_auction_id: string }; Returns: Json };
