@@ -81,8 +81,8 @@ export default async function TransactionsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Transactions"
-        description={`Every sale you were part of. Buyers pay the winning bid plus ${providerName}'s payment charge; sellers receive the winning bid less BidBlitz's 5% fee, paid out separately.`}
+        title="Activity & payments"
+        description={`Wins and sales after the auction closes: payment, messages, seller payout and reviews. Buyers pay the winning bid plus ${providerName}'s payment charge; sellers receive the winning bid less BidBlitz's 5% fee.`}
       />
 
       <div>
