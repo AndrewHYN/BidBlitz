@@ -500,9 +500,9 @@ export default async function AdminPage() {
               </span>
             }
           />
-          <div className="rounded-2xl border border-primary/15 bg-gradient-to-br from-primary/5 via-card to-card p-4 shadow-sm sm:p-5">
+          <div className="promotion-surface rounded-2xl border border-primary/15 p-4 sm:p-5">
             <p className="mb-4 text-sm leading-6 text-muted-foreground">
-              Promotion buys visibility only. Approving a request never changes bidding, timing, settlement or who wins.
+              Promotion changes visibility only. Approving a request never changes bidding, timing, settlement or who wins.
             </p>
             {pendingPromotions.length === 0 ? (
               <EmptyState
