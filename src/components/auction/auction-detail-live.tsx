@@ -292,6 +292,9 @@ export function AuctionDetailLive({
         paymentConfigured={paymentConfigured}
         onServerEcho={handleEcho}
       />
+      {live.status === "LIVE" && viewerId !== null && viewerId !== sellerId && (
+        <div className="h-56 lg:hidden" aria-hidden />
+      )}
     </div>
   );
 }
