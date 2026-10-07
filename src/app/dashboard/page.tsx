@@ -1,48 +1,74 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Activity, ArrowRight, Clock, Gavel, Tag, Wallet } from "lucide-react";
+import {
+  ArrowRight,
+  Eye,
+  Gavel,
+  Search,
+  Store,
+  Tag,
+  Trophy,
+  Wallet,
+} from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getBuying, getSelling, getTransactions, getWatchlist } from "@/server/queries";
-import { CARD_ENDING_SOON_MS } from "@/lib/auction-status";
-import { EmptyState, PageHeader, SectionHeading } from "@/components/auction/page-header";
-import { Countdown } from "@/components/auction/countdown";
+import { EmptyState, SectionHeading } from "@/components/auction/page-header";
 import { Money } from "@/components/auction/money";
 import { TransactionBadge } from "@/components/auction/status-badge";
+import { AuctionRail } from "@/components/home/auction-rail";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { SettleButton } from "@/components/dashboard/settle-button";
-import { isPaymentProviderConfigured } from "@/server/payments/config";
 
 export const metadata: Metadata = {
-  title: "Dashboard",
-  description: "Your bidding, selling and settlement activity on BidBlitz.",
+  title: "My BidBlitz",
+  description: "Your bids, watchlist, listings and purchases on BidBlitz.",
   robots: { index: false, follow: false },
 };
 
-function Stat({
+function QuickAction({
+  href,
   label,
   value,
-  href,
+  helper,
   icon: Icon,
+  urgent = false,
 }: {
+  href: string;
   label: string;
   value: number;
-  href: string;
+  helper: string;
   icon: typeof Gavel;
+  urgent?: boolean;
 }) {
   return (
     <Link
       href={href}
-      className="group rounded-xl border bg-card p-4 transition-colors hover:border-primary/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+      className={[
+        "group rounded-xl border bg-card p-4 shadow-[0_12px_32px_-26px_rgba(15,23,42,0.5)] transition-[transform,border-color,box-shadow] duration-200 hover:-translate-y-0.5 hover:border-primary/35 hover:shadow-md",
+        urgent ? "border-ending/50 bg-ending/5" : "border-border/80",
+      ].join(" ")}
     >
-      <span className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-        <Icon className="size-3.5" aria-hidden />
-        {label}
-      </span>
-      <span className="mt-2 block text-3xl font-semibold tabular-nums" data-numeric>
-        {value}
-      </span>
-      <span className="mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors group-hover:text-primary">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            {label}
+          </p>
+          <p className="mt-1 text-2xl font-semibold tabular-nums">{value}</p>
+        </div>
+        <span
+          className={[
+            "grid size-9 place-items-center rounded-lg",
+            urgent ? "bg-ending/15 text-ending" : "bg-primary/10 text-primary",
+          ].join(" ")}
+        >
+          <Icon className="size-4" aria-hidden />
+        </span>
+      </div>
+      <p className="mt-2 text-xs leading-5 text-muted-foreground">{helper}</p>
+      <span className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-primary">
         Open
         <ArrowRight className="size-3" aria-hidden />
       </span>
@@ -64,185 +90,226 @@ export default async function DashboardOverviewPage() {
     getTransactions(user.id),
   ]);
 
-  // eslint-disable-next-line react-hooks/purity -- server component: one render per request
-  const now = Date.now();
-
-  const endingSoon = selling.filter((item) => {
-    if (item.status !== "LIVE" || !item.endsAt) return false;
-    const remaining = Date.parse(item.endsAt) - now;
-    return remaining > 0 && remaining <= CARD_ENDING_SOON_MS;
-  });
-
-  const dueSettle = selling.filter((item) => {
-    if (item.status === "ENDED") return true;
-    return item.status === "LIVE" && item.endsAt !== null && Date.parse(item.endsAt) <= now;
-  });
-
+  const liveBids = buying.filter((item) => item.status === "LIVE");
+  const winning = liveBids.filter((item) => item.isWinning);
+  const outbid = liveBids.filter((item) => !item.isWinning);
   const activeListings = selling.filter(
     (item) => item.status === "LIVE" || item.status === "SCHEDULED"
-  ).length;
-
+  );
+  const dueSettle = selling.filter(
+    (item) => item.status === "ENDED" || (item.status === "LIVE" && item.endsAt && Date.parse(item.endsAt) <= Date.now())
+  );
   const latestTransactions = transactions.slice(0, 3);
   const nothingYet =
     buying.length === 0 && selling.length === 0 && watchlist.length === 0;
 
-  /*
-   * What actually needs the user, in order.
-   *
-   * The four counters were equal: bids placed, ending soon, active listings,
-   * watchlist. But they are not equally urgent, and treating them as equals is
-   * why the page felt like a reporting screen rather than a list of things to
-   * do. "You have 3 bids placed" is history. Being outbid is an action with a
-   * deadline.
-   *
-   * So the strip only appears when there is something in it. A dashboard whose
-   * first screen is four zeroes tells the user nothing and makes them scroll to
-   * find out what to do — the empty state below already answers that case in
-   * one sentence.
-   *
-   * Only being-outbid is lifted to the top. Settling an ended auction already
-   * has its own section on this page, with the actual SettleButton beside each
-   * auction, and repeating it here as a link would be the same fact twice with
-   * the weaker version first.
-   *
-   * `isWinning` and `won` come from the same query the Buying tab uses, so this
-   * cannot disagree with it: an auction is outbid only while it is still live
-   * and someone else holds the lead. An auction already won or already closed
-   * needs settling or paying, not bidding again.
-   */
-  const outbid = buying.filter(
-    (item) => !item.won && !item.isWinning && item.status === "LIVE"
-  );
-  const showCounts = !nothingYet;
-
   return (
-    <div className="space-y-8">
-      <PageHeader
-        title="Dashboard"
-        description="Everything you’re bidding on, selling and watching."
-      />
+    <div className="space-y-9">
+      <section className="overflow-hidden rounded-2xl border border-border/80 bg-card shadow-[0_18px_46px_-34px_rgba(15,23,42,0.55)]">
+        <div className="grid lg:grid-cols-[minmax(0,1.25fr)_minmax(300px,0.75fr)]">
+          <div className="p-5 sm:p-7">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
+              My BidBlitz
+            </p>
+            <h1 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">
+              What are you looking for today?
+            </h1>
+            <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
+              Search the marketplace, keep an eye on your bids, or list something in a few steps.
+            </p>
+
+            <form action="/browse" method="get" className="mt-5 flex gap-2">
+              <div className="relative min-w-0 flex-1">
+                <Search
+                  className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                  aria-hidden
+                />
+                <Label htmlFor="dashboard-search" className="sr-only">
+                  Search BidBlitz
+                </Label>
+                <Input
+                  id="dashboard-search"
+                  name="q"
+                  type="search"
+                  placeholder="Search phones, gaming, fashion, home…"
+                  className="h-12 pl-9"
+                />
+              </div>
+              <Button type="submit" size="lg">
+                Search
+              </Button>
+            </form>
+
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Button asChild size="sm">
+                <Link href="/sell">
+                  <Tag className="size-3.5" aria-hidden />
+                  Sell an item
+                </Link>
+              </Button>
+              <Button asChild variant="outline" size="sm">
+                <Link href="/browse">Browse auctions</Link>
+              </Button>
+            </div>
+          </div>
+
+          <div className="border-t bg-muted/25 p-4 sm:p-5 lg:border-l lg:border-t-0">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              At a glance
+            </p>
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              <div className="rounded-lg border bg-card p-3">
+                <p className="text-xl font-semibold tabular-nums">{winning.length}</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">Winning</p>
+              </div>
+              <div className="rounded-lg border bg-card p-3">
+                <p className="text-xl font-semibold tabular-nums">{outbid.length}</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">Outbid</p>
+              </div>
+              <div className="rounded-lg border bg-card p-3">
+                <p className="text-xl font-semibold tabular-nums">{watchlist.length}</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">Watching</p>
+              </div>
+              <div className="rounded-lg border bg-card p-3">
+                <p className="text-xl font-semibold tabular-nums">{activeListings.length}</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">Selling</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
 
       {outbid.length > 0 && (
         <section
-          aria-labelledby="dashboard-outbid"
           data-testid="dashboard-outbid"
-          className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-ending/40 bg-ending/5 p-4 sm:p-5"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-ending/45 bg-ending/10 p-4 shadow-sm"
         >
-          <h2
-            id="dashboard-outbid"
-            className="flex items-center gap-2 text-sm font-semibold tracking-tight"
-          >
-            <Gavel className="size-4 text-ending" aria-hidden />
-            {outbid.length === 1
-              ? "You have been outbid"
-              : `You have been outbid on ${outbid.length} auctions`}
-          </h2>
-          <Button asChild size="sm" variant="outline" data-testid="dashboard-bid-again">
-            <Link href="/dashboard/buying">Bid again</Link>
+          <div>
+            <p className="text-sm font-semibold">
+              {outbid.length === 1
+                ? "You've been outbid"
+                : `You've been outbid on ${outbid.length} auctions`}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              The auctions are still live. You can bid again before their clocks run out.
+            </p>
+          </div>
+          <Button asChild size="sm">
+            <Link href="/dashboard/buying">See my bids</Link>
           </Button>
         </section>
       )}
 
-      {showCounts && (
-        <div
-          data-testid="dashboard-stats"
-          className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
-        >
-          <Stat label="Bids placed" value={buying.length} href="/dashboard/buying" icon={Gavel} />
-          <Stat
-            label="Ending soon"
-            value={endingSoon.length}
-            href="/dashboard/selling"
-            icon={Clock}
+      {!nothingYet && (
+        <section aria-label="Your BidBlitz shortcuts" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <QuickAction
+            href="/dashboard/buying"
+            label="Live bids"
+            value={liveBids.length}
+            helper="Auctions you've joined that are still open."
+            icon={Gavel}
           />
-          <Stat
-            label="Active listings"
-            value={activeListings}
-            href="/dashboard/selling"
-            icon={Tag}
+          <QuickAction
+            href="/dashboard/buying"
+            label="Outbid"
+            value={outbid.length}
+            helper="Auctions where another bidder currently leads."
+            icon={Trophy}
+            urgent={outbid.length > 0}
           />
-          <Stat
+          <QuickAction
+            href="/dashboard/watchlist"
             label="Watchlist"
             value={watchlist.length}
-            href="/dashboard/watchlist"
-            icon={Activity}
+            helper="Saved auctions you want to come back to."
+            icon={Eye}
           />
-        </div>
+          <QuickAction
+            href="/dashboard/selling"
+            label="My listings"
+            value={selling.length}
+            helper="Draft, live and completed auctions you've listed."
+            icon={Store}
+          />
+        </section>
       )}
 
       {nothingYet && (
         <EmptyState
           icon={Wallet}
-          title="Nothing here yet"
-          description="List something to sell, or browse live auctions to place your first bid."
+          title="Your BidBlitz starts here"
+          description="Browse live auctions to find a deal, or list something you want buyers to compete for."
           action={
             <div className="flex flex-wrap justify-center gap-2">
               <Button asChild>
-                <Link href="/sell">Start selling</Link>
+                <Link href="/browse">Find an auction</Link>
               </Button>
               <Button asChild variant="outline">
-                <Link href="/browse">Browse auctions</Link>
+                <Link href="/sell">Sell something</Link>
               </Button>
             </div>
           }
         />
       )}
 
-      <section aria-labelledby="dashboard-settle-heading" className="space-y-4">
-        <SectionHeading
-          title={
-            <span id="dashboard-settle-heading" className="inline-flex items-center gap-2">
-              Needs settlement
-              {dueSettle.length > 0 && (
-                <span
-                  className="rounded-full bg-ending px-2 py-0.5 text-xs font-medium text-ending-foreground"
-                  data-numeric
-                >
-                  {dueSettle.length}
-                </span>
-              )}
-            </span>
-          }
+      {liveBids.length > 0 && (
+        <AuctionRail
+          title="Continue bidding"
+          description={outbid.length > 0 ? "Somebody is ahead on at least one of these." : "You're currently leading on your live bids."}
+          auctions={liveBids.slice(0, 12)}
+          testid="dashboard-live-bids"
+          emptyTitle="No live bids"
+          emptyDescription="Auctions you bid on appear here."
         />
+      )}
 
-        {dueSettle.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            No auctions are waiting on a result right now.
-          </p>
-        ) : (
+      {watchlist.length > 0 && (
+        <AuctionRail
+          title="Your watchlist"
+          description="Saved auctions, one tap away."
+          auctions={watchlist.slice(0, 12)}
+          testid="dashboard-watchlist"
+          emptyTitle="Nothing watched yet"
+          emptyDescription="Tap Watch on an auction to save it."
+        />
+      )}
+
+      {dueSettle.length > 0 && (
+        <section aria-labelledby="dashboard-needs-attention" className="space-y-4">
+          <SectionHeading
+            title={<span id="dashboard-needs-attention">Needs your attention</span>}
+          />
           <ul className="space-y-3">
             {dueSettle.map((item) => (
               <li
                 key={item.id}
-                className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-4"
+                className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-ending/40 bg-ending/5 p-4"
               >
                 <div className="min-w-0">
                   <Link
                     href={`/auction/${item.id}`}
-                    className="font-medium hover:text-primary hover:underline"
+                    className="font-semibold hover:text-primary hover:underline"
                   >
                     {item.title}
                   </Link>
-                  <p className="text-xs text-muted-foreground">
-                    The clock has run out. Settle to record the winner, the fee and the proceeds.
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    The clock has ended. Record the final auction result.
                   </p>
                 </div>
                 <SettleButton auctionId={item.id} />
               </li>
             ))}
           </ul>
-        )}
-      </section>
+        </section>
+      )}
 
       <section aria-labelledby="dashboard-transactions-heading" className="space-y-4">
         <SectionHeading
-          title={
-            <span id="dashboard-transactions-heading">Latest transactions</span>
-          }
+          title={<span id="dashboard-transactions-heading">Recent purchases & sales</span>}
           action={
             <Link
               href="/dashboard/transactions"
-              className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground"
+              className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
             >
               View all
               <ArrowRight className="size-3.5" aria-hidden />
@@ -252,76 +319,37 @@ export default async function DashboardOverviewPage() {
 
         {latestTransactions.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            Settled sales show up here with the gross, the fee and the proceeds.
+            When an auction ends with a winner, the purchase or sale appears here.
           </p>
         ) : (
-          <ul className="space-y-3">
+          <ul className="grid gap-3">
             {latestTransactions.map((row) => (
               <li
                 key={row.id}
-                className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-4"
+                className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-4 shadow-[0_8px_24px_-22px_rgba(15,23,42,0.45)]"
               >
                 <div className="min-w-0">
                   <Link
                     href={`/auction/${row.auction_id}`}
-                    className="font-medium hover:text-primary hover:underline"
+                    className="font-semibold hover:text-primary hover:underline"
                   >
                     {row.auctions?.title ?? "Auction"}
                   </Link>
                   <p className="mt-1 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                    <span className="inline-flex items-center gap-1.5">
-                      <TransactionBadge status={row.status} />
-                    </span>
+                    <TransactionBadge status={row.status} />
                     <span>
-                      Gross <Money minor={row.gross_minor} currency={row.currency} />
-                    </span>
-                    <span>
-                      Fee <Money minor={row.fee_minor} currency={row.currency} />
-                    </span>
-                    <span>
-                      Proceeds <Money minor={row.net_minor} currency={row.currency} />
+                      Total <Money minor={row.gross_minor} currency={row.currency} />
                     </span>
                   </p>
                 </div>
+                <Button asChild variant="outline" size="sm">
+                  <Link href={`/dashboard/transactions/${row.id}`}>Open</Link>
+                </Button>
               </li>
             ))}
           </ul>
         )}
-
-        {!isPaymentProviderConfigured() && (
-          <p className="text-xs text-muted-foreground">
-            No payment provider is configured yet, so no money has moved.
-          </p>
-        )}
       </section>
-
-      {activeListings > 0 && (
-        <section aria-labelledby="dashboard-ending-heading" className="space-y-4">
-          <SectionHeading title={<span id="dashboard-ending-heading">Ending soon</span>} />
-          <ul className="space-y-3">
-            {endingSoon.length === 0 ? (
-              <li className="text-sm text-muted-foreground">
-                Nothing of yours closes in the next ten minutes.
-              </li>
-            ) : (
-              endingSoon.map((item) => (
-                <li
-                  key={item.id}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-4"
-                >
-                  <Link
-                    href={`/auction/${item.id}`}
-                    className="font-medium hover:text-primary hover:underline"
-                  >
-                    {item.title}
-                  </Link>
-                  <Countdown endsAt={item.endsAt} status={item.status} />
-                </li>
-              ))
-            )}
-          </ul>
-        </section>
-      )}
     </div>
   );
 }
