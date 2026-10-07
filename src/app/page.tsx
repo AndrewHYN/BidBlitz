@@ -84,7 +84,7 @@ export default async function HomePage() {
           {feed.promoted.length > 0 && (
             <AuctionRail
               title="Promoted"
-              description="Extra visibility, same auction rules. These listings paid for placement, not advantage."
+              description="Extra visibility, same auction rules. Promotion affects placement, never bidding."
               auctions={feed.promoted}
               testid="home-promoted"
               emptyTitle="No promoted auctions"
