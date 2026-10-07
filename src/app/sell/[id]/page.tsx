@@ -356,12 +356,17 @@ export default async function SellDraftPage({
                 title={<span id="draft-promotion-heading">Promote this auction</span>}
               />
               <p className="mt-1 text-sm text-muted-foreground">
-                Paid placement gives your auction extra visibility without changing how bidding works.
+                Promoted placement gives your auction extra visibility without changing how bidding works.
               </p>
               <div className="mt-4">
                 <PromotionRequest
                   auctionId={auction.id}
-                  activeUntil={auction.featured_until}
+                  activeUntil={
+                    auction.featured_until &&
+                    new Date(auction.featured_until).getTime() > Date.now()
+                      ? auction.featured_until
+                      : null
+                  }
                   pendingDays={
                     (pendingPromotion as { requested_days?: number } | null)?.requested_days ?? null
                   }
