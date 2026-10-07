@@ -272,3 +272,25 @@
     padding-bottom: 4.5rem;
   }
 }
+
+
+/* Premium placement has one visual language across seller and staff surfaces:
+   a restrained warm lift, not a different app skin. The glow is static so it
+   never competes with auction countdowns or reduced-motion preferences. */
+.promotion-surface {
+  background:
+    radial-gradient(
+      circle at 92% 8%,
+      color-mix(in oklab, var(--primary) 13%, transparent) 0,
+      transparent 34%
+    ),
+    linear-gradient(
+      145deg,
+      color-mix(in oklab, var(--card) 96%, var(--primary) 4%) 0%,
+      var(--card) 58%,
+      color-mix(in oklab, var(--card) 97%, var(--primary) 3%) 100%
+    );
+  box-shadow:
+    0 16px 45px -34px color-mix(in oklab, var(--primary) 65%, transparent),
+    0 1px 0 color-mix(in oklab, var(--primary) 8%, transparent) inset;
+}
