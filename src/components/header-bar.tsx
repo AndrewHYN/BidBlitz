@@ -383,6 +383,7 @@ export function HeaderBar({
   const mobileDock = showMobileDock ? (
     <nav
       aria-label="Quick navigation"
+      data-mobile-dock
       className="fixed inset-x-2 bottom-2 z-30 grid grid-cols-5 rounded-2xl border bg-background/95 p-1.5 shadow-2xl backdrop-blur-md md:hidden"
     >
       {[
