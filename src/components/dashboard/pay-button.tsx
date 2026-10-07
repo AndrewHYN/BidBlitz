@@ -115,6 +115,7 @@ function checkoutErrorCopy(error: string, providerName: string): string {
 /** The currency line lives in `checkoutErrorCopy`: it is the only entry that
  *  names the settler. Everything else here names no provider at all. */
 const CHECKOUT_ERRORS: Record<string, string> = {
+  payments_paused: "Payments are temporarily paused while BidBlitz completes seller payout setup. Nothing was charged.",
   no_payment_provider: "Payment isn't available yet, so nothing has been charged.",
   unauthenticated: "Sign in again to continue.",
   invalid_request: "We couldn't start that payment. Reload the page and try again.",
