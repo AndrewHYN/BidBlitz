@@ -52,6 +52,12 @@ function providerFailureMessage(raw: unknown): string {
 }
 
 export async function initiateLinkwaPayoutAction(input: unknown): Promise<InitiateResult> {
+  void input;
+  return {
+    ok: false,
+    message: "Seller payouts are temporarily paused while BidBlitz completes the new payout setup.",
+  };
+
   const parsed = initiateSchema.safeParse(input);
   if (!parsed.success) {
     return {
