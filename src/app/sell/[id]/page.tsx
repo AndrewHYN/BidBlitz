@@ -217,9 +217,6 @@ export default async function SellDraftPage({
             <p className="mt-1 text-sm text-muted-foreground">
               Use clear, well-lit photos of the actual item. At least one is required before publishing.
             </p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              When you publish, bidding starts immediately and the auction terms lock.
-            </p>
             <div className="mt-4">
               {editable ? (
                 <ImageUploader auctionId={auction.id} images={images} />
@@ -289,6 +286,9 @@ export default async function SellDraftPage({
                 </span>
               }
             />
+            <p className="mt-1 text-sm text-muted-foreground">
+              When you publish, bidding starts immediately and the auction terms lock.
+            </p>
             <div className="mt-4">
               <PublishButton
                 auctionId={auction.id}
