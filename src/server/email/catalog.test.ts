@@ -13,6 +13,7 @@ import { emailKey } from "./sender";
  */
 
 const DATA: Record<string, Record<string, string>> = {
+  staff_review_required: { title: "Radio", auctionId: "a-1", name: "Moderator" },
   review_submitted: { title: "Radio", auctionId: "a-1", name: "Seller" },
   review_approved: { title: "Radio", auctionId: "a-1", name: "Seller", endsAt: "soon" },
   review_rejected: { title: "Radio", auctionId: "a-1", name: "Seller", reason: "Blurry photos" },
@@ -72,6 +73,7 @@ describe("email catalog", () => {
     expect(critical).toContain("payment_received");
     expect(critical).toContain("account_suspended");
     expect(critical).toContain("listing_removed");
+    expect(critical).toContain("staff_review_required");
     expect(critical).toContain("auction_cancelled");
     const optional = Object.values(EMAIL_TEMPLATES).filter((t) => !t.critical);
     expect(optional.map((t) => t.key)).toEqual(["outbid"]);

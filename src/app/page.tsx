@@ -32,6 +32,7 @@ export default async function HomePage() {
   const feed = await getHomeFeed();
 
   const marketplaceEmpty =
+    feed.promoted.length === 0 &&
     feed.live.length === 0 &&
     feed.endingSoon.length === 0 &&
     feed.recent.length === 0;
@@ -80,6 +81,15 @@ export default async function HomePage() {
         />
       ) : (
         <div className="space-y-10">
+          {feed.promoted.length > 0 && (
+            <AuctionRail
+              title="Promoted"
+              description="Extra visibility, same auction rules. Promotion affects placement, never bidding."
+              auctions={feed.promoted}
+              testid="home-promoted"
+              emptyTitle="No promoted auctions"
+            />
+          )}
           <AuctionRail
             title="Ending soon"
             description="The clock is running. These close first."

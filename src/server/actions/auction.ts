@@ -19,7 +19,7 @@ import {
 } from "@/lib/validation";
 import { normalizeEngineError, type BidRejection } from "@/server/errors";
 import { AUCTION_CREATE_LIMIT, rateLimit } from "@/server/rate-limit";
-import { notifySeller } from "@/server/email/notify";
+import { notifyAdmins, notifySeller } from "@/server/email/notify";
 import { emailKey } from "@/server/email/sender";
 
 export type ActionResult<T = unknown> =
@@ -427,7 +427,27 @@ export async function publishAuctionAction(input: unknown): Promise<
   // needs to know to wait, and "under review" with no message looks stuck.
   // Best-effort and keyed: a retry of this action reuses the row.
   if (payload.status === "PENDING_REVIEW") {
-    await notifySeller(user.id, "review_submitted", { auctionId: parsed.data.auctionId }, emailKey("review_submitted", "auction", parsed.data.auctionId)).catch(() => undefined);
+    const { data: held } = await supabase
+      .from("auctions")
+      .select("title")
+      .eq("id", parsed.data.auctionId)
+      .maybeSingle();
+    const title = held?.title ?? "Listing";
+
+    await Promise.all([
+      notifySeller(
+        user.id,
+        "review_submitted",
+        { auctionId: parsed.data.auctionId, title },
+        emailKey("review_submitted", "auction", parsed.data.auctionId)
+      ).catch(() => undefined),
+      notifyAdmins(
+        "staff_review_required",
+        { auctionId: parsed.data.auctionId, title },
+        emailKey("staff_review_required", "auction", parsed.data.auctionId),
+        "listings.review"
+      ).catch(() => undefined),
+    ]);
   }
 
   try {

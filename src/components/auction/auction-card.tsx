@@ -61,6 +61,7 @@ export function AuctionCard({
       )}
       data-testid="auction-card"
       data-auction-id={auction.id}
+      data-promoted={auction.featured ? "true" : undefined}
     >
       <div className="relative aspect-[4/3] overflow-hidden bg-muted">
         <ImageWithFallback
@@ -78,8 +79,8 @@ export function AuctionCard({
         <div className="absolute left-2 top-2 flex flex-wrap gap-1.5">
           <LiveStatus status={auction.status} endsAt={auction.endsAt} />
           {auction.featured && (
-            <span className="rounded-md bg-primary px-2 py-0.5 text-[11px] font-semibold text-primary-foreground shadow-sm">
-              Featured
+            <span className="rounded-md border border-primary/20 bg-primary px-2 py-0.5 text-[11px] font-bold text-primary-foreground shadow-md shadow-primary/10">
+              Promoted
             </span>
           )}
           {badge}

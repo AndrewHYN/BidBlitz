@@ -33,7 +33,8 @@ export type SellerPayoutStatus =
 
 export type NotificationType =
   | "AUCTION_PUBLISHED" | "NEW_BID" | "OUTBID" | "ENDING_SOON"
-  | "WON" | "SOLD" | "ENDED_UNSOLD" | "REVIEW_REQUEST" | "NEW_MESSAGE" | "PAYMENT_EXPIRED";
+  | "WON" | "SOLD" | "ENDED_UNSOLD" | "REVIEW_REQUEST" | "NEW_MESSAGE" | "PAYMENT_EXPIRED"
+  | "STAFF_REVIEW_REQUIRED" | "PROMOTION_REQUESTED" | "PROMOTION_APPROVED" | "PROMOTION_REJECTED";
 
 export type Condition = "new" | "like_new" | "good" | "fair" | "poor";
 
@@ -102,6 +103,8 @@ export interface Database {
           settled_at: string | null;
           archived_at: string | null;
           featured: boolean;
+          featured_until: string | null;
+          featured_by: string | null;
           image_count: number;
           created_at: string;
           updated_at: string;
@@ -247,6 +250,21 @@ export interface Database {
         Insert: never;
         Update: never;
       };
+      promotion_requests: {
+        Row: {
+          id: string;
+          auction_id: string;
+          seller_id: string;
+          requested_days: number;
+          status: "PENDING" | "APPROVED" | "REJECTED";
+          requested_at: string;
+          decided_at: string | null;
+          decided_by: string | null;
+          admin_note: string | null;
+        };
+        Insert: never;
+        Update: never;
+      };
       schema_migrations: {
         Row: { filename: string; applied_at: string };
         Insert: { filename: string; applied_at?: string };
@@ -264,6 +282,14 @@ export interface Database {
       };
       set_auction_fulfilment: {
         Args: { p_auction_id: string; p_method: "COLLECTION" | "DELIVERY" | "BOTH"; p_notes?: string | null };
+        Returns: Json;
+      };
+      request_auction_promotion: {
+        Args: { p_auction_id: string; p_days: number };
+        Returns: Json;
+      };
+      admin_decide_promotion: {
+        Args: { p_request_id: string; p_approve: boolean; p_note?: string | null };
         Returns: Json;
       };
       cancel_auction: { Args: { p_auction_id: string }; Returns: Json };

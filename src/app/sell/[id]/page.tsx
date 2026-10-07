@@ -25,6 +25,7 @@ import {
   paymentProviderDisplayName,
 } from "@/server/payments/config";
 import { DeleteDraftButton } from "@/components/sell/delete-draft-button";
+import { PromotionRequest } from "@/components/sell/promotion-request";
 
 export const metadata: Metadata = {
   title: "Finish your listing",
@@ -54,7 +55,18 @@ export default async function SellDraftPage({
   if (!detail) notFound();
   const { auction } = detail;
   if (auction.seller_id !== user.id) notFound();
-  const feeBps = await getFeeBps();
+  const [feeBps, serverNowResult] = await Promise.all([
+    getFeeBps(),
+    supabase.rpc("server_now"),
+  ]);
+  const serverNow = typeof serverNowResult.data === "string" ? serverNowResult.data : null;
+  const activePromotionUntil =
+    auction.featured_until &&
+    serverNow &&
+    new Date(auction.featured_until).getTime() > new Date(serverNow).getTime()
+      ? auction.featured_until
+      : null;
+
   // Name the configured provider, or nothing: this page must not claim a
   // payment rail the deployment does not have.
   const providerName = isPaymentProviderConfigured()
@@ -79,7 +91,7 @@ export default async function SellDraftPage({
   // The seller's own pending business, if any: a cancellation request waiting
   // on the team, or a review holding the listing. Both are the seller's rows
   // (RLS), so a missing row here simply means nothing pending.
-  const [{ data: pendingRequest }, { data: pendingReview }] = await Promise.all([
+  const [{ data: pendingRequest }, { data: pendingReview }, { data: pendingPromotion }] = await Promise.all([
     supabase
       .from("auction_cancellation_requests")
       .select("id, reason_code, created_at")
@@ -89,6 +101,12 @@ export default async function SellDraftPage({
     supabase
       .from("listing_reviews")
       .select("id, created_at")
+      .eq("auction_id", auction.id)
+      .eq("status", "PENDING")
+      .maybeSingle(),
+    supabase
+      .from("promotion_requests")
+      .select("id, requested_days, requested_at")
       .eq("auction_id", auction.id)
       .eq("status", "PENDING")
       .maybeSingle(),
@@ -339,6 +357,29 @@ export default async function SellDraftPage({
               </p>
             </div>
           </section>
+
+          {(auction.status === "LIVE" || auction.status === "SCHEDULED") && (
+            <section
+              className="rounded-xl border bg-card p-6 shadow-sm"
+              aria-labelledby="draft-promotion-heading"
+            >
+              <SectionHeading
+                title={<span id="draft-promotion-heading">Promote this auction</span>}
+              />
+              <p className="mt-1 text-sm text-muted-foreground">
+                Promoted placement gives your auction extra visibility without changing how bidding works.
+              </p>
+              <div className="mt-4">
+                <PromotionRequest
+                  auctionId={auction.id}
+                  activeUntil={activePromotionUntil}
+                  pendingDays={
+                    (pendingPromotion as { requested_days?: number } | null)?.requested_days ?? null
+                  }
+                />
+              </div>
+            </section>
+          )}
 
           {auction.status === "PENDING_REVIEW" && (
             <section
