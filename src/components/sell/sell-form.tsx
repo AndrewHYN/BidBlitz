@@ -418,8 +418,9 @@ export function SellForm({
               own payment charge, which is not money you receive.
             </>
           )}{" "}
-          You keep the rest, and it is paid to you after the sale is
-          fulfilled and the buyer&apos;s window to dispute has passed.
+          You keep the rest. Your seller proceeds stay frozen until the buyer
+          confirms handover. An unresolved dispute blocks payout until BidBlitz
+          records the case outcome.
         </p>
       </section>
 
