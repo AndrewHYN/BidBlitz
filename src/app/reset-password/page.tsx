@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { ResetPasswordForm } from "@/components/auth/reset-password-form";
+import { AuthShell } from "@/components/auth/auth-shell";
 
 export const metadata: Metadata = {
   title: "Choose a new password",
@@ -25,10 +26,14 @@ export default async function ResetPasswordPage() {
   } = await supabase.auth.getUser();
 
   return (
-    <div className="page-container flex min-h-[70vh] flex-col justify-center py-10 sm:py-14">
-      <div className="mx-auto w-full max-w-md">
+    <AuthShell
+      eyebrow="Secure reset"
+      title="Choose a new password and get back to your auctions."
+      description="Recovery links are single-use and time-limited so an old link cannot keep opening your account."
+    >
+      <div className="rounded-xl border bg-card p-6 shadow-sm sm:p-8">
         <ResetPasswordForm linkState={user ? "valid" : "invalid"} />
       </div>
-    </div>
+    </AuthShell>
   );
 }
