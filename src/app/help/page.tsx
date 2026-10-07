@@ -136,6 +136,20 @@ export default function HelpPage() {
                 )}
               </li>
               <li>
+                <strong>The buyer confirms handover.</strong> After provider-confirmed
+                payment, buyer and seller arrange collection or delivery in the
+                private transaction thread. Buyer confirmation is the normal
+                trigger that makes the seller&apos;s frozen proceeds eligible
+                for payout.
+              </li>
+              <li>
+                <strong>The seller payout follows the safety checks.</strong>{" "}
+                BidBlitz keeps 5% of the winning price. The remaining seller
+                proceeds can be released through the connected payout provider
+                when the payout wallet is ready, settlement funds are available,
+                and no unresolved dispute blocks the transaction.
+              </li>
+              <li>
                 <strong>Both sides can leave a review.</strong> Reviews are
                 attached to the transaction, so only real buyers and sellers
                 can write them, and they show up on each profile.
