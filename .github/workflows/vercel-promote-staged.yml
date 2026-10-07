@@ -41,16 +41,16 @@ jobs:
         run: npm install --global "vercel@${VERCEL_CLI_VERSION}"
 
       - name: Inspect staged deployment
-        run: vercel inspect "${{ inputs.deployment_url }}" --token="$VERCEL_TOKEN"
+        run: vercel inspect "${{ inputs.deployment_url }}"
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
 
       - name: Promote exact staged deployment
-        run: vercel promote "${{ inputs.deployment_url }}" --yes --token="$VERCEL_TOKEN"
+        run: vercel promote "${{ inputs.deployment_url }}" --yes
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
 
       - name: Confirm production response
-        run: vercel httpstat / --token="$VERCEL_TOKEN"
+        run: vercel httpstat /
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
