@@ -127,7 +127,7 @@ export default async function AuctionPage({ params }: Props) {
   });
 
   return (
-    <div className="page-container py-10 sm:py-14">
+    <div className="page-container pt-8 pb-24 sm:py-14 lg:pb-14">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: serializeJsonLd(structuredData) }}
