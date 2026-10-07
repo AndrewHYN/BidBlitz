@@ -85,7 +85,7 @@ export default async function TermsPage() {
           </p>
           <p>
             BidBlitz is a live auction marketplace. Every listing is a
-            competitive auction with a real closing time. these terms, together
+            competitive auction with a real closing time. These terms, together
             with the{" "}
             <Link href="/help/rules" className="inline-flex min-h-6 items-center font-medium text-primary underline-offset-2 hover:underline">
               bidding rules
@@ -94,9 +94,9 @@ export default async function TermsPage() {
           </p>
         </TermsSection>
 
-        <TermsSection id="accounts" title="2. Your account">
+        <TermsSection id="account" title="2. Your account">
           <p>
-            You need an account to bid or sell. Keep your password to yourself. you are responsible for what happens on your account. Tell us
+            You need an account to bid or sell. Keep your password to yourself. You are responsible for what happens on your account. Tell us
             straight away if you think someone else has access to it.
           </p>
           <p>
@@ -119,9 +119,20 @@ export default async function TermsPage() {
           </p>
           <p>
             Once you publish an auction, its starting price, bid increment,
-            duration and closing time are locked. they cannot be edited
+            duration and closing time are locked. They cannot be edited
             afterwards. If your auction ends with a winning bid, you agree to
             complete the sale with the winning bidder.
+          </p>
+          <p>
+            A <strong>Business seller</strong> label identifies the storefront
+            chosen by the seller. It is not a claim that BidBlitz has verified
+            the company, its stock or its representatives unless the site
+            explicitly says otherwise.
+          </p>
+          <p>
+            Promoted listings are clearly labelled. Promotion can change where
+            a listing appears in discovery, but it never changes bid order,
+            closing time, anti-sniping, settlement or who wins the auction.
           </p>
           <p>
             <strong>
@@ -319,7 +330,7 @@ export default async function TermsPage() {
           </p>
         </TermsSection>
 
-        <TermsSection id="content" title="11. What you list is yours">
+        <TermsSection id="ownership" title="11. What you list is yours">
           <p>
             You keep ownership of the items, photos and text you upload. You
             give BidBlitz permission to display them on the site for as long as
@@ -328,7 +339,7 @@ export default async function TermsPage() {
           </p>
         </TermsSection>
 
-        <TermsSection id="disclaimer" title="12. How the site is provided">
+        <TermsSection id="provision" title="12. How the site is provided">
           <p>
             BidBlitz is provided as-is. Listings are written by other users, so
             use your judgement before bidding. We do not guarantee that every
