@@ -131,7 +131,7 @@ export default function HowItWorksPage() {
             <Step n={1} title="List the item">
               <p>
                 Write a specific title, describe the condition honestly, add real
-                photos and set a starting bid, a reserve if you want one, and a
+                photos, choose collection or delivery, set a starting bid, and choose a
                 closing time. A draft saves as you go; publishing puts it in front
                 of buyers.{" "}
                 <Link href="/sell">Start a listing</Link>.
