@@ -51,12 +51,17 @@ function providerFailureMessage(raw: unknown): string {
   return message.length > 300 ? `${message.slice(0, 300)}…` : message;
 }
 
+function payoutsEmergencyPaused(): boolean {
+  return true;
+}
+
 export async function initiateLinkwaPayoutAction(input: unknown): Promise<InitiateResult> {
-  void input;
-  return {
-    ok: false,
-    message: "Seller payouts are temporarily paused while BidBlitz completes the new payout setup.",
-  };
+  if (payoutsEmergencyPaused()) {
+    return {
+      ok: false,
+      message: "Seller payouts are temporarily paused while BidBlitz completes the new payout setup.",
+    };
+  }
 
   const parsed = initiateSchema.safeParse(input);
   if (!parsed.success) {
