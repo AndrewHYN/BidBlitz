@@ -14,6 +14,10 @@ const actions = readFileSync(
   join(process.cwd(), "src/server/actions/disputes.ts"),
   "utf8"
 );
+const payoutRelease = readFileSync(
+  join(process.cwd(), "src/server/payments/seller-payout.ts"),
+  "utf8"
+);
 
 describe("transaction dispute workflow", () => {
   it("freezes only safely unpaid seller payout states when a case opens", () => {
@@ -54,6 +58,18 @@ describe("transaction dispute workflow", () => {
     expect(disputes).toMatch(
       /create or replace function public\.staff_update_transaction_dispute[\s\S]*?security invoker/
     );
+  });
+
+  it("independently blocks automatic payout while a dispute is unresolved", () => {
+    expect(payoutRelease).toContain('from("transaction_disputes")');
+    expect(payoutRelease).toContain('.neq("status", "RESOLVED")');
+    expect(payoutRelease).toContain("Seller payout remains blocked");
+  });
+
+  it("tracks payout existence explicitly when freezing a newly opened case", () => {
+    expect(disputes).toContain("v_payout_found boolean := false");
+    expect(disputes).toContain("v_payout_found := found");
+    expect(disputes).toContain("if v_payout_found and p.status in");
   });
 
   it("permission-gates the finance snapshot", () => {
