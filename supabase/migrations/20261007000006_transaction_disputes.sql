@@ -222,6 +222,7 @@ declare
   v_title text;
   v_counterparty uuid;
   v_frozen boolean := false;
+  v_payout_found boolean := false;
 begin
   if v_uid is null then
     raise exception 'not_authenticated' using errcode='42501';
@@ -265,6 +266,7 @@ begin
     from public.seller_payouts
    where transaction_id=t.id
    for update;
+  v_payout_found := found;
 
   insert into public.transaction_disputes(
     transaction_id,
@@ -276,7 +278,7 @@ begin
     t.id,
     v_uid,
     p_reason,
-    p.status,
+    case when v_payout_found then p.status else null end,
     false
   )
   returning id into v_dispute_id;
@@ -284,7 +286,7 @@ begin
   insert into public.transaction_dispute_messages(dispute_id, author_id, body)
   values(v_dispute_id, v_uid, btrim(p_summary));
 
-  if found and p.status in (
+  if v_payout_found and p.status in (
     'WAITING_FOR_FULFILMENT','DELIVERY_CONFIRMED','PAYOUT_PENDING'
   ) then
     update public.seller_payouts
