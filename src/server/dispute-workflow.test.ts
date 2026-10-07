@@ -66,6 +66,13 @@ describe("transaction dispute workflow", () => {
     expect(payoutRelease).toContain("Seller payout remains blocked");
   });
 
+  it("closes the payout-claim race in Postgres itself", () => {
+    expect(disputes).toContain("seller_payout_block_unresolved_dispute");
+    expect(disputes).toContain("new.status='PAYOUT_DUE'");
+    expect(disputes).toContain("d.status <> 'RESOLVED'");
+    expect(disputes).toContain("payout_dispute_open");
+  });
+
   it("tracks payout existence explicitly when freezing a newly opened case", () => {
     expect(disputes).toContain("v_payout_found boolean := false");
     expect(disputes).toContain("v_payout_found := found");
