@@ -166,7 +166,7 @@ export function BidPanel({
   }, [currentBidMinor, startingBidMinor, bidIncrementMinor, nextMinMinor]);
 
   const parsedAmount =
-    value.trim() === "" ? null : parseMoneyToMinor(value, currency);
+    value.trim() === "" ? floor : parseMoneyToMinor(value, currency);
 
   const errorText = rejection
     ? renderRejectionMessage(rejection, (minor) =>
@@ -192,13 +192,9 @@ export function BidPanel({
     setRejection(null);
     setSuccess(false);
 
-    const minor = value.trim() === "" ? null : parseMoneyToMinor(value, currency);
+    const minor = value.trim() === "" ? floor : parseMoneyToMinor(value, currency);
     if (minor === null) {
-      setParseError(
-        value.trim() === ""
-          ? "Enter a bid amount."
-          : "Enter a valid bid amount."
-      );
+      setParseError("Enter a valid bid amount.");
       // Validation failure: this attempt ends, the next one gets a new key.
       requestRef.current = null;
       return;
@@ -459,7 +455,7 @@ export function BidPanel({
       /* POST: a pre-hydration native GET would put the bid amount into the URL.
          See login-form.tsx for the full reasoning. */
       method="post"
-      className="space-y-3 border-t border-border/70 pt-5"
+      className="fixed inset-x-3 bottom-20 z-40 space-y-3 rounded-xl border border-border/90 bg-background/96 p-3 shadow-[0_18px_46px_-18px_rgba(15,23,42,0.55)] backdrop-blur-xl lg:static lg:inset-auto lg:rounded-none lg:border-x-0 lg:border-b-0 lg:bg-transparent lg:p-0 lg:pt-5 lg:shadow-none lg:backdrop-blur-none"
       noValidate
     >
       {/* The bid control is the point of this page, so its heading states the
@@ -467,10 +463,22 @@ export function BidPanel({
           bid" above a button that already says it. The minimum moves up here,
           where a bidder checks it before typing, rather than below the field
           where it is read after. */}
+      <div className="flex items-center justify-between gap-3 lg:hidden">
+        <div>
+          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            {currentBidMinor === null ? "Starting bid" : "Current bid"}
+          </p>
+          <p className="text-lg font-semibold">
+            <Money minor={currentBidMinor ?? startingBidMinor} currency={currency} />
+          </p>
+        </div>
+        <Countdown endsAt={endsAt} status={status} />
+      </div>
+
       <div className="flex items-baseline justify-between gap-3">
         <h2 className="text-sm font-semibold tracking-tight">Your bid</h2>
         <span className="text-xs text-muted-foreground">
-          Minimum <Money minor={floor} currency={currency} />
+          Next minimum <Money minor={floor} currency={currency} />
         </span>
       </div>
 
@@ -533,7 +541,7 @@ export function BidPanel({
             aria-label="Your bid amount"
             value={value}
             onChange={handleChange}
-            placeholder={formatMoney(money(floor, currency))}
+            placeholder={`Optional: enter more than ${formatMoney(money(floor, currency))}`}
             disabled={pending}
             aria-invalid={errorText ? true : undefined}
             aria-describedby={errorText ? "bid-error-text" : undefined}
@@ -546,7 +554,11 @@ export function BidPanel({
             className="h-12 w-full text-base"
             disabled={pending || parsedAmount === null}
           >
-            {pending ? "Placing bid…" : "Place bid"}
+            {pending
+              ? "Placing bid…"
+              : value.trim() === ""
+                ? <>Bid <Money minor={floor} currency={currency} /></>
+                : <>Bid {parsedAmount !== null ? <Money minor={parsedAmount} currency={currency} /> : null}</>}
           </Button>
         </div>
 
@@ -559,7 +571,7 @@ export function BidPanel({
             </>
           ) : (
             <>
-              Bids are final.{" "}
+              A bid is a commitment to buy if you win.{" "}
               <Link
                 href="/help/rules"
                 className="font-medium text-primary underline-offset-2 hover:underline"
