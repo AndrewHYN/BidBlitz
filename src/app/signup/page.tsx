@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { SignupForm } from "@/components/auth/signup-form";
+import { AuthShell } from "@/components/auth/auth-shell";
 
 export const metadata: Metadata = {
   title: "Create account",
@@ -9,10 +10,12 @@ export const metadata: Metadata = {
 
 export default function SignupPage() {
   return (
-    <div className="page-container flex min-h-[70vh] flex-col justify-center py-10 sm:py-14">
-      <div className="mx-auto w-full max-w-md">
-        <SignupForm />
-      </div>
-    </div>
+    <AuthShell
+      eyebrow="Join BidBlitz"
+      title="Turn browsing into bidding in a few minutes."
+      description="Create one account to bid, sell, watch auctions and manage every transaction from one place."
+    >
+      <SignupForm />
+    </AuthShell>
   );
 }
