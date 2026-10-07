@@ -88,7 +88,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          url="$(vercel deploy --prebuilt --yes --token="$VERCEL_TOKEN" | tail -n 1)"
+          url="$(vercel deploy --prebuilt --yes | tail -n 1)"
           test -n "$url"
           echo "url=$url" >> "$GITHUB_OUTPUT"
           echo "Preview: $url"
@@ -101,7 +101,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          url="$(vercel deploy --prebuilt --prod --skip-domain --yes --token="$VERCEL_TOKEN" | tail -n 1)"
+          url="$(vercel deploy --prebuilt --prod --skip-domain --yes | tail -n 1)"
           test -n "$url"
           echo "url=$url" >> "$GITHUB_OUTPUT"
           echo "Staged production candidate: $url"
