@@ -131,6 +131,27 @@ create trigger auction_require_payout_ready
 before update of status on public.auctions
 for each row execute function private.auction_require_payout_ready();
 
+-- Buyer/seller-safe payout projection for their own transactions. Internal
+-- notes, provider ids and payout references remain private.
+create or replace function public.my_transaction_payout_states()
+returns table (
+  transaction_id uuid,
+  payout_status text,
+  delivery_confirmed_at timestamptz,
+  paid_at timestamptz
+)
+language sql stable security definer set search_path = ''
+as $
+  select p.transaction_id, p.status, p.delivery_confirmed_at, p.paid_at
+    from public.seller_payouts p
+    join public.transactions t on t.id = p.transaction_id
+   where t.buyer_id = auth.uid() or t.seller_id = auth.uid();
+$;
+
+revoke all on function public.my_transaction_payout_states() from public, anon;
+grant execute on function public.my_transaction_payout_states()
+  to authenticated, service_role;
+
 -- Buyer confirms the seller handed over the item. This is the only non-admin
 -- path that establishes the delivery fact. It cannot pay money by itself.
 create or replace function public.buyer_confirm_delivery(p_transaction_id uuid)
