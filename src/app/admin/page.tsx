@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Banknote, Flag, ReceiptText, ShieldAlert } from "lucide-react";
+import { Banknote, Flag, Megaphone, ReceiptText, ShieldAlert } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import {
   EmptyState,
@@ -24,6 +24,8 @@ import { PayoutControls } from "@/components/dashboard/payout-controls";
 import { LinkwaPayoutControls } from "@/components/dashboard/linkwa-payout-controls";
 import { getAdminPayouts, type AdminPayoutRow } from "@/server/queries";
 import { isPaymentProviderConfigured } from "@/server/payments/config";
+import { AdminNav } from "@/components/dashboard/admin-nav";
+import { PromotionDecisions } from "@/components/dashboard/promotion-decisions";
 
 export const metadata: Metadata = {
   title: "Admin",
@@ -251,10 +253,16 @@ export default async function AdminPage() {
     p_permission: "admin.access",
   });
   const isAdmin = permission === true;
-  const { data: canManageTeam } = await supabase.rpc("has_permission", {
-    p_user_id: user.id,
-    p_permission: "admin.manage_team",
-  });
+  const [{ data: canManageTeam }, { data: canManagePromotions }] = await Promise.all([
+    supabase.rpc("has_permission", {
+      p_user_id: user.id,
+      p_permission: "admin.manage_team",
+    }),
+    supabase.rpc("has_permission", {
+      p_user_id: user.id,
+      p_permission: "settings.manage_marketplace",
+    }),
+  ]);
 
   // Not an admin: say so and run NO moderation queries. The report and fee
   // reads below never execute for a caller who failed this check. The gate is
@@ -365,7 +373,7 @@ export default async function AdminPage() {
   // whose foreign-key name is proven (`auctions_seller_id_fkey`, used by the
   // detail query), so the queue never shows bare UUIDs and never guesses at
   // constraint names.
-  const [reviewsRes, cancelReqsRes, pausedRes] = await Promise.all([
+  const [reviewsRes, cancelReqsRes, pausedRes, promotionsRes] = await Promise.all([
     supabase
       .from("listing_reviews")
       .select("id, auction_id, created_at, risk_flags")
@@ -384,12 +392,27 @@ export default async function AdminPage() {
       .eq("status", "PAUSED")
       .order("paused_at", { ascending: true })
       .limit(50),
+    canManagePromotions === true
+      ? supabase
+          .from("promotion_requests")
+          .select("id, auction_id, seller_id, requested_days, requested_at")
+          .eq("status", "PENDING")
+          .order("requested_at", { ascending: true })
+          .limit(50)
+      : Promise.resolve({ data: [] as unknown[] }),
   ]);
   type ReviewRow = {
     id: string;
     auction_id: string;
     created_at: string;
     risk_flags: Record<string, boolean>;
+  };
+  type PromotionRow = {
+    id: string;
+    auction_id: string;
+    seller_id: string;
+    requested_days: number;
+    requested_at: string;
   };
   type CancelRow = {
     id: string;
@@ -401,10 +424,20 @@ export default async function AdminPage() {
   };
   const reviewRows = ((reviewsRes.data ?? []) as ReviewRow[]);
   const cancelRows = ((cancelReqsRes.data ?? []) as CancelRow[]);
+  const promotionRows = ((promotionsRes.data ?? []) as PromotionRow[]);
   const queueAuctionIds = [
-    ...new Set([...reviewRows.map((r) => r.auction_id), ...cancelRows.map((r) => r.auction_id)]),
+    ...new Set([
+      ...reviewRows.map((r) => r.auction_id),
+      ...cancelRows.map((r) => r.auction_id),
+      ...promotionRows.map((r) => r.auction_id),
+    ]),
   ];
-  const queueRequesterIds = [...new Set(cancelRows.map((r) => r.requester_id))];
+  const queueRequesterIds = [
+    ...new Set([
+      ...cancelRows.map((r) => r.requester_id),
+      ...promotionRows.map((r) => r.seller_id),
+    ]),
+  ];
   const [queueAuctionsRes, queueUsersRes] = await Promise.all([
     queueAuctionIds.length > 0
       ? supabase
@@ -437,20 +470,74 @@ export default async function AdminPage() {
     requester: queueUserById.get(r.requester_id) ?? null,
   }));
   const pausedAuctions = ((pausedRes.data ?? []) as PausedAuction[]);
+  const pendingPromotions = promotionRows.map((r) => ({
+    ...r,
+    auction: queueAuctionById.get(r.auction_id) ?? null,
+    seller: queueUserById.get(r.seller_id) ?? null,
+  }));
 
   return (
     <div className="page-container py-10 sm:py-14 space-y-8" data-testid="admin-page">
       <PageHeader
         title="Admin"
-        description="Payout operations, open moderation reports and the platform fee currently in force."
-        actions={
-          canManageTeam === true ? (
-            <Button asChild variant="outline" size="sm">
-              <Link href="/admin/team">Team</Link>
-            </Button>
-          ) : undefined
-        }
+        description="Review marketplace work, promotions, safety actions and money operations from one console."
       />
+
+      <AdminNav active="overview" showTeam={canManageTeam === true} />
+
+      {canManagePromotions === true && (
+        <section id="admin-promotions" aria-labelledby="admin-promotions-heading" className="space-y-4 scroll-mt-24">
+          <SectionHeading
+            title={
+              <span id="admin-promotions-heading" className="inline-flex items-center gap-2">
+                <Megaphone className="size-4 text-primary" aria-hidden />
+                Promotion requests
+                {pendingPromotions.length > 0 && (
+                  <span className="rounded-full bg-primary px-2 py-0.5 text-xs font-bold text-primary-foreground" data-numeric>
+                    {pendingPromotions.length}
+                  </span>
+                )}
+              </span>
+            }
+          />
+          <div className="rounded-2xl border border-primary/15 bg-gradient-to-br from-primary/5 via-card to-card p-4 shadow-sm sm:p-5">
+            <p className="mb-4 text-sm leading-6 text-muted-foreground">
+              Promotion buys visibility only. Approving a request never changes bidding, timing, settlement or who wins.
+            </p>
+            {pendingPromotions.length === 0 ? (
+              <EmptyState
+                compact
+                icon={Megaphone}
+                title="No promotion requests"
+                description="Seller requests for extra placement appear here."
+              />
+            ) : (
+              <ul className="space-y-3">
+                {pendingPromotions.map((request) => (
+                  <li key={request.id} className="rounded-xl border bg-background p-4 shadow-sm">
+                    <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="font-semibold">
+                          {request.auction?.title ?? "Auction"}
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          @{request.seller?.username ?? "seller"} · {request.requested_days} days · requested {formatDate(request.requested_at)}
+                        </p>
+                      </div>
+                      {request.auction && (
+                        <Button asChild variant="outline" size="sm">
+                          <Link href={`/auction/${request.auction.id}`}>Inspect auction</Link>
+                        </Button>
+                      )}
+                    </div>
+                    <PromotionDecisions requestId={request.id} />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </section>
+      )}
 
       <section aria-labelledby="admin-payouts-heading" className="space-y-4">
         <SectionHeading
@@ -671,7 +758,7 @@ export default async function AdminPage() {
         </div>
       </section>
 
-      <section aria-labelledby="admin-review-heading" className="space-y-4">
+      <section aria-labelledby="admin-review-heading" className="space-y-4 scroll-mt-24">
         <SectionHeading
           title={
             <span id="admin-review-heading" className="inline-flex items-center gap-2">
