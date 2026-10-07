@@ -25,6 +25,8 @@ import {
 } from "@/server/payments/config";
 import { PayButton } from "@/components/dashboard/pay-button";
 import { CheckStatusButton } from "@/components/dashboard/check-status-button";
+import { ConfirmDeliveryButton } from "@/components/dashboard/confirm-delivery-button";
+import { paymentsRuntimeEnabled } from "@/server/payments/runtime";
 
 export const metadata: Metadata = {
   title: "Transactions",
@@ -60,10 +62,12 @@ export default async function TransactionsPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login?next=/dashboard/transactions");
 
-  const [rows, payouts, unread] = await Promise.all([
+  const [rows, payouts, unread, payoutStatesRes, paymentsEnabled] = await Promise.all([
     getTransactions(user.id),
     getMySellerPayouts(),
     getMessageUnreadCounts(user.id),
+    supabase.rpc("my_transaction_payout_states"),
+    paymentsRuntimeEnabled(),
   ]);
   const configured = isPaymentProviderConfigured();
   const canReconcile = paymentProviderSupportsReconciliation();
@@ -77,6 +81,16 @@ export default async function TransactionsPage() {
   // word about the seller. Collapsing them is how a marketplace talks itself
   // into a lie.
   const payoutByTx = new Map(payouts.map((p) => [p.transaction_id, p]));
+  type PartyPayoutState = {
+    transaction_id: string;
+    payout_status: string;
+    delivery_confirmed_at: string | null;
+    paid_at: string | null;
+  };
+  const partyPayoutRows = (payoutStatesRes.data ?? []) as PartyPayoutState[];
+  const partyPayoutByTx = new Map<string, PartyPayoutState>(
+    partyPayoutRows.map((p) => [p.transaction_id, p])
+  );
 
   return (
     <div className="space-y-6">
@@ -115,6 +129,7 @@ export default async function TransactionsPage() {
             <TableBody>
               {rows.map((row) => {
                 const payout = payoutByTx.get(row.id);
+                const partyPayout = partyPayoutByTx.get(row.id);
                 return (
                 <TableRow key={row.id} data-testid="transaction-row">
                   <TableCell className="max-w-[16rem] truncate whitespace-normal">
@@ -183,6 +198,7 @@ export default async function TransactionsPage() {
                           one exists: an unconfigured deployment must not show
                           a button that leads to a 503. */}
                       {configured &&
+                        paymentsEnabled &&
                         row.buyer_id === user.id &&
                         row.status === "AWAITING_PAYMENT" && (
                           <PayButton transactionId={row.id} providerName={providerName} />
@@ -190,7 +206,7 @@ export default async function TransactionsPage() {
                       {/* Both sides may ask the server to reconcile a payment
                           that is still waiting — the answer always comes back
                           from Postgres, never from this page. */}
-                      {configured && canReconcile && row.status === "AWAITING_PAYMENT" && (
+                      {configured && paymentsEnabled && canReconcile && row.status === "AWAITING_PAYMENT" && (
                         <CheckStatusButton transactionId={row.id} providerName={providerName} />
                       )}
                     </div>
@@ -199,6 +215,11 @@ export default async function TransactionsPage() {
                         seller relists. Expired and failed sales state plainly
                         that no money moved, and offer nothing that is not
                         wired: checkout refuses both states server-side. */}
+                    {configured && !paymentsEnabled && row.status === "AWAITING_PAYMENT" && (
+                      <span className="mt-1 block text-xs font-medium text-primary">
+                        Payments are temporarily paused. Nothing can be charged right now.
+                      </span>
+                    )}
                     {row.status === "AWAITING_PAYMENT" && row.payment_due_at && (
                       <span className="mt-1 block text-xs text-muted-foreground">
                         {row.buyer_id === user.id ? "Pay by " : "Due "}
@@ -216,6 +237,17 @@ export default async function TransactionsPage() {
                         Payment was not completed. No money moved.
                       </span>
                     )}
+                    {row.buyer_id === user.id &&
+                      (row.status === "PAID" || row.status === "SETTLED") &&
+                      partyPayout &&
+                      !["HELD", "DISPUTED"].includes(partyPayout.payout_status) && (
+                        <div className="mt-2">
+                          <ConfirmDeliveryButton
+                            transactionId={row.id}
+                            confirmed={Boolean(partyPayout.delivery_confirmed_at)}
+                          />
+                        </div>
+                      )}
                   </TableCell>
                   <TableCell>
                     <Link

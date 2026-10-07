@@ -60,8 +60,9 @@ function confirmCopy(to: SellerPayoutStatus, amountMinor: number, currency: stri
       return (
         <>
           Record this payout of <Money minor={amountMinor} currency={currency} /> as
-          paid to the seller? This only states that you have already transferred
-          it yourself. BidBlitz does not send money. It cannot be undone.
+          already paid to the seller outside the normal automatic Linkwa flow?
+          Use this only for a verified reconciliation or external transfer.
+          It cannot be undone.
         </>
       );
     case "HELD":
@@ -160,8 +161,7 @@ export function PayoutControls({
               data-testid="payout-reference"
             />
             <p className="text-xs text-muted-foreground">
-              Required. This is the reference of the transfer you already made
-              outside BidBlitz.
+              Required. Use the exact external transfer or reconciliation reference.
             </p>
           </div>
         )}

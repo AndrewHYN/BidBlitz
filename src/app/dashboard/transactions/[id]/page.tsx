@@ -9,6 +9,7 @@ import { TransactionBadge } from "@/components/auction/status-badge";
 import { MessageThread } from "@/components/dashboard/message-thread";
 import { ReportDialog } from "@/components/auction/report-dialog";
 import { Button } from "@/components/ui/button";
+import { ConfirmDeliveryButton } from "@/components/dashboard/confirm-delivery-button";
 
 export const metadata: Metadata = {
   title: "Sale conversation",
@@ -58,6 +59,22 @@ export default async function TransactionThreadPage({
   }
 
   const role = thread.role === "moderator" ? "Moderator" : thread.seller_id === user.id ? "Seller" : "Buyer";
+  const { data: payoutStates } = await supabase.rpc("my_transaction_payout_states");
+  type PartyPayoutState = {
+    transaction_id: string;
+    payout_status: string;
+    delivery_confirmed_at: string | null;
+    paid_at: string | null;
+  };
+  const payoutState = ((payoutStates ?? []) as PartyPayoutState[]).find(
+    (row) => row.transaction_id === thread.id
+  );
+  const buyerMayConfirm =
+    thread.role !== "moderator" &&
+    thread.seller_id !== user.id &&
+    (thread.status === "PAID" || thread.status === "SETTLED") &&
+    payoutState !== undefined &&
+    !["HELD", "DISPUTED"].includes(payoutState.payout_status);
 
   return (
     <div className="page-container space-y-6 py-10 sm:py-14">
@@ -83,6 +100,21 @@ export default async function TransactionThreadPage({
           </span>
           <ReportDialog userId={thread.counterparty.id} username={thread.counterparty.username} />
         </div>
+        {buyerMayConfirm && payoutState && (
+          <div className="promotion-surface rounded-xl border border-primary/20 p-4 shadow-sm">
+            <p className="font-semibold">Received the item?</p>
+            <p className="mt-1 text-sm leading-6 text-muted-foreground">
+              Confirm only after the item has been handed over and you are satisfied with the handover. Confirmation releases the seller&apos;s payout if their wallet is ready.
+            </p>
+            <div className="mt-3">
+              <ConfirmDeliveryButton
+                transactionId={thread.id}
+                confirmed={Boolean(payoutState.delivery_confirmed_at)}
+              />
+            </div>
+          </div>
+        )}
+
         {thread.role !== "moderator" && (
           <div className="flex gap-3 rounded-xl border border-primary/20 bg-primary/5 p-4 text-sm">
             <ShieldCheck className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />

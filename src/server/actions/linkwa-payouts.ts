@@ -37,6 +37,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { readLinkwaEnvironment } from "@/server/payments/config";
 import { instructLinkwaPayout } from "@/server/payments/linkwa-payouts";
+import { paymentsRuntimeEnabled } from "@/server/payments/runtime";
 
 const initiateSchema = z
   .object({ payoutId: z.string().uuid("Invalid payout") })
@@ -51,12 +52,8 @@ function providerFailureMessage(raw: unknown): string {
   return message.length > 300 ? `${message.slice(0, 300)}…` : message;
 }
 
-function payoutsEmergencyPaused(): boolean {
-  return true;
-}
-
 export async function initiateLinkwaPayoutAction(input: unknown): Promise<InitiateResult> {
-  if (payoutsEmergencyPaused()) {
+  if (!(await paymentsRuntimeEnabled())) {
     return {
       ok: false,
       message: "Seller payouts are temporarily paused while BidBlitz completes the new payout setup.",

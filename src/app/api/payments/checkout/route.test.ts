@@ -11,6 +11,7 @@ import {
   type PaymentProvider,
 } from "@/server/payments/provider";
 import { POST } from "./route";
+import { paymentsRuntimeEnabled } from "@/server/payments/runtime";
 
 /**
  * Checkout contract.
@@ -27,6 +28,9 @@ import { POST } from "./route";
 
 vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn(),
+}));
+vi.mock("@/server/payments/runtime", () => ({
+  paymentsRuntimeEnabled: vi.fn(),
 }));
 
 const TX = "3f1d2a4c-9b8e-4f6a-8c2d-1e5b7a9c0f34";
@@ -113,11 +117,22 @@ async function read(response: Response): Promise<Record<string, unknown>> {
 beforeEach(() => {
   resetRateLimits();
   vi.mocked(createClient).mockReset();
+  vi.mocked(paymentsRuntimeEnabled).mockResolvedValue(true);
 });
 
 afterEach(() => {
   setPaymentProvider(new NoopPaymentProvider());
   resetRateLimits();
+});
+
+describe("POST /api/payments/checkout — runtime pause", () => {
+  it("blocks new checkout before touching provider or database", async () => {
+    vi.mocked(paymentsRuntimeEnabled).mockResolvedValue(false);
+    const response = await postJson({ transactionId: TX });
+    expect(response.status).toBe(503);
+    expect(await read(response)).toEqual({ ok: false, error: "payments_paused" });
+    expect(createClient).not.toHaveBeenCalled();
+  });
 });
 
 describe("POST /api/payments/checkout — unconfigured", () => {

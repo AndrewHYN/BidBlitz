@@ -7,6 +7,9 @@ import { ChangePasswordForm } from "@/components/auth/change-password-form";
 import { AvatarUploader } from "@/components/profile/avatar-uploader";
 import { EmailPreferences } from "@/components/auth/email-preferences";
 import { getPreferencesAction } from "@/server/actions/preferences";
+import Link from "next/link";
+import { WalletCards } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export const metadata: Metadata = {
   title: "Settings",
@@ -43,6 +46,22 @@ export default async function SettingsPage() {
           avatarPath={profile?.avatar_path ?? null}
           displayName={fallbackName}
         />
+        <div className="rounded-xl border bg-card p-5 shadow-sm">
+          <div className="flex items-start gap-3">
+            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+              <WalletCards className="size-5" aria-hidden />
+            </span>
+            <div className="min-w-0 flex-1">
+              <h2 className="font-bold">Seller payouts</h2>
+              <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                Set the private wallet where your seller proceeds are sent after handover.
+              </p>
+              <Button asChild variant="outline" className="mt-3">
+                <Link href="/settings/payouts">Manage seller payouts</Link>
+              </Button>
+            </div>
+          </div>
+        </div>
         <SettingsForm
           email={user.email ?? ""}
           initial={{

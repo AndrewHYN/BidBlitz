@@ -149,6 +149,40 @@ function describe(
         headline: `Promotion not activated for ${headline}`,
         detail: <>{typeof p.reason === "string" && p.reason ? p.reason : "The promotion request was not approved."}</>,
       };
+    case "DELIVERY_CONFIRMED":
+      return {
+        headline: `Handover confirmed for ${headline}`,
+        detail: <>The buyer confirmed receipt. BidBlitz can now release the seller proceeds.</>,
+        href:
+          typeof p.transactionId === "string"
+            ? `/dashboard/transactions/${p.transactionId}`
+            : "/dashboard/transactions",
+        actionLabel: "Open sale",
+      };
+    case "PAYOUT_SENT":
+      return {
+        headline: `Seller payout sent`,
+        detail:
+          typeof p.amountMinor === "number" && typeof p.currency === "string"
+            ? <>Your seller proceeds were sent through Linkwa.</>
+            : <>Your seller proceeds were sent through Linkwa.</>,
+        href: "/dashboard/transactions",
+        actionLabel: "View activity",
+      };
+    case "PAYOUT_SETUP_REQUIRED":
+      return {
+        headline: "Finish seller payout setup",
+        detail: <>Your sale is ready for payout, but BidBlitz still needs a ready payout wallet.</>,
+        href: "/settings/payouts",
+        actionLabel: "Set up payouts",
+      };
+    case "PAYOUT_ATTENTION":
+      return {
+        headline: "Seller payout needs a reconciliation check",
+        detail: <>BidBlitz will not retry this payout automatically until the provider record is checked.</>,
+        href: "/dashboard/transactions",
+        actionLabel: "View activity",
+      };
     case "REVIEW_SUBMITTED":
       return {
         headline: `${headline} sent for review`,

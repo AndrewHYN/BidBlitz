@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { readLinkwaEnvironment } from "@/server/payments/config";
 import { instructLinkwaPayout } from "@/server/payments/linkwa-payouts";
 import { initiateLinkwaPayoutAction } from "./linkwa-payouts";
+import { paymentsRuntimeEnabled } from "@/server/payments/runtime";
 
 /**
  * The admin Linkwa payout action's contract.
@@ -28,6 +29,9 @@ vi.mock("@/server/payments/config", () => ({
 }));
 vi.mock("@/server/payments/linkwa-payouts", () => ({
   instructLinkwaPayout: vi.fn(),
+}));
+vi.mock("@/server/payments/runtime", () => ({
+  paymentsRuntimeEnabled: vi.fn(),
 }));
 
 const PAYOUT_ID = "11111111-1111-4111-8111-111111111111";
@@ -125,6 +129,7 @@ function mockClient() {
 }
 
 beforeEach(() => {
+  vi.mocked(paymentsRuntimeEnabled).mockResolvedValue(true);
   sessionUserId = "admin-user";
   isAdmin = true;
   payoutRow = defaultPayout();
@@ -148,6 +153,15 @@ beforeEach(() => {
     payoutId: "01m463ry96b1v2tbk1w42qfhjs",
     amountMinor: 950n,
     currency: "USD",
+  });
+});
+
+describe("initiateLinkwaPayoutAction - runtime pause", () => {
+  it("refuses all manual payout instructions while money movement is paused", async () => {
+    vi.mocked(paymentsRuntimeEnabled).mockResolvedValue(false);
+    const result = await initiateLinkwaPayoutAction({ payoutId: PAYOUT_ID });
+    expect(result.ok).toBe(false);
+    expect(instructLinkwaPayout).not.toHaveBeenCalled();
   });
 });
 

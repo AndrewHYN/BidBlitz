@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Money } from "@/components/auction/money";
 
 /**
- * The explicit, confirmed "send the seller's net through Linkwa" action.
+ * Manual payout fallback for operators. Normal seller payouts auto-release
+ * after buyer-confirmed handover; this control exists for a reviewed exception.
  *
  * One click opens the confirmation, a second sends exactly one request with
  * only the payout id. Amount, recipient and provider are derived server-side;
@@ -64,9 +65,9 @@ export function LinkwaPayoutControls({
         <p className="text-xs leading-relaxed">
           Send exactly <Money minor={amountMinor} currency={currency} /> to{" "}
           <strong>{sellerName}</strong>&apos;s registered Linkwa payout
-          recipient? This moves real money. It cannot be recalled, and a second
-          payout for this sale is refused by the ledger. Only do this when the
-          sale is fulfilled and the payout shows as payout pending.
+          recipient as a manual fallback? Normal payouts release automatically
+          after buyer-confirmed handover. This moves real money, cannot be
+          recalled, and duplicate payout protection will refuse a second send.
         </p>
         {error && (
           <p role="alert" data-testid="linkwa-payout-error" className="text-xs text-destructive">
@@ -129,7 +130,7 @@ export function LinkwaPayoutControls({
           setConfirming(true);
         }}
       >
-        Pay seller with Linkwa
+        Manual Linkwa payout
       </Button>
       {error && (
         <p role="alert" data-testid="linkwa-payout-error" className="text-xs text-destructive">
