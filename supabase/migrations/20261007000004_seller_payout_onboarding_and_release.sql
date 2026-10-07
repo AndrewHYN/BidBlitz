@@ -141,12 +141,12 @@ returns table (
   paid_at timestamptz
 )
 language sql stable security definer set search_path = ''
-as $
+as $$
   select p.transaction_id, p.status, p.delivery_confirmed_at, p.paid_at
     from public.seller_payouts p
     join public.transactions t on t.id = p.transaction_id
    where t.buyer_id = auth.uid() or t.seller_id = auth.uid();
-$;
+$$;
 
 revoke all on function public.my_transaction_payout_states() from public, anon;
 grant execute on function public.my_transaction_payout_states()
