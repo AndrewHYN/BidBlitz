@@ -8,7 +8,9 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useMounted } from "@/hooks/use-mounted";
 import {
   Bell,
+  Bookmark,
   Gavel,
+  Home,
   Menu,
   Moon,
   Plus,
@@ -376,7 +378,45 @@ export function HeaderBar({
     </div>
   );
 
+  const showMobileDock = user !== null && !pathname.startsWith("/auction/");
+
+  const mobileDock = showMobileDock ? (
+    <nav
+      aria-label="Quick navigation"
+      className="fixed inset-x-2 bottom-2 z-30 grid grid-cols-5 rounded-2xl border bg-background/95 p-1.5 shadow-2xl backdrop-blur-md md:hidden"
+    >
+      {[
+        { label: "Home", href: "/dashboard", icon: Home, exact: true },
+        { label: "Browse", href: "/browse", icon: Search, exact: false },
+        { label: "Sell", href: "/sell", icon: Plus, exact: false, primary: true },
+        { label: "Watch", href: "/dashboard/watchlist", icon: Bookmark, exact: true },
+        { label: "Activity", href: "/dashboard/transactions", icon: Gavel, exact: true },
+      ].map(({ label, href, icon: Icon, exact, primary }) => {
+        const active = isActive(pathname, href, exact);
+        return (
+          <Link
+            key={href}
+            href={href}
+            aria-current={active ? "page" : undefined}
+            className={cn(
+              "flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-xl px-1 text-[10px] font-semibold transition-colors",
+              primary
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : active
+                  ? "bg-accent text-accent-foreground"
+                  : "text-muted-foreground hover:bg-accent/70 hover:text-foreground"
+            )}
+          >
+            <Icon className="size-4" aria-hidden />
+            <span>{label}</span>
+          </Link>
+        );
+      })}
+    </nav>
+  ) : null;
+
   return (
+    <>
     <header className="sticky top-0 z-40 border-b bg-background/85 backdrop-blur-md">
       <div className="page-container flex h-16 items-center gap-3">
         {/* mobile menu trigger */}
@@ -565,5 +605,7 @@ export function HeaderBar({
           </AnimatePresence>
         ))}
     </header>
+    {mobileDock}
+    </>
   );
 }
