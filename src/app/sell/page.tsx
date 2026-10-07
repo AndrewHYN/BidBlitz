@@ -33,7 +33,7 @@ export default async function SellPage() {
     <div className="page-container py-10 sm:py-14">
       <PageHeader
         title="Create a listing"
-        description="Describe the item, set your terms, then add photos and start the blitz."
+        description="Four short steps for the item, handover, bidding price and timing. You’ll add photos and review everything before it goes live."
       />
       <div className="mt-8 max-w-3xl">
         <SellForm
