@@ -258,3 +258,17 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+
+/* Signed-in mobile navigation is fixed to stay one tap away. Reserve space
+   only when that dock actually exists; signed-out pages keep their normal
+   rhythm. :has() is supported by our modern browser baseline. */
+@media (max-width: 767px) {
+  body:has([data-mobile-dock]) main {
+    padding-bottom: 5rem;
+  }
+
+  body:has([data-mobile-dock]) footer {
+    padding-bottom: 4.5rem;
+  }
+}

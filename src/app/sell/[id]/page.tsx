@@ -102,7 +102,11 @@ export default async function SellDraftPage({
     <div className="page-container py-10 sm:py-14">
       <PageHeader
         title={auction.title}
-        description="Add photos, check the terms, then start the blitz."
+        description={
+          auction.status === "DRAFT"
+            ? "Your draft is saved. Add strong photos, check the handover details, then review and publish."
+            : "Review this listing’s current status, photos and auction details."
+        }
         actions={
           <div className="flex flex-wrap items-center gap-4">
             <Link
@@ -127,9 +131,14 @@ export default async function SellDraftPage({
         <div className="space-y-6">
           <section className="rounded-xl border bg-card p-6 shadow-sm" aria-labelledby="draft-terms-heading">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 id="draft-terms-heading" className="text-base font-semibold tracking-tight">
-                Listing summary
-              </h2>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
+                  Review
+                </p>
+                <h2 id="draft-terms-heading" className="mt-1 text-lg font-bold tracking-tight">
+                  Check what bidders will see
+                </h2>
+              </div>
               <span data-testid="draft-status">
                 <LiveStatus status={auction.status} endsAt={auction.ends_at} />
               </span>
@@ -166,7 +175,7 @@ export default async function SellDraftPage({
               </div>
               <div>
                 <dt className="text-xs uppercase tracking-wide text-muted-foreground">
-                  Anti-snipe window
+                  Last-second protection
                 </dt>
                 <dd className="text-sm font-medium">
                   {auction.anti_snipe_window_seconds}s before the end
@@ -174,7 +183,7 @@ export default async function SellDraftPage({
               </div>
               <div>
                 <dt className="text-xs uppercase tracking-wide text-muted-foreground">
-                  Anti-snipe extension
+                  Time added after a protected bid
                 </dt>
                 <dd className="text-sm font-medium">
                   +{auction.anti_snipe_extension_seconds}s per last-second bid
@@ -200,13 +209,13 @@ export default async function SellDraftPage({
             <SectionHeading
               title={
                 <span id="draft-photos-heading" className="inline-flex items-center gap-2">
-                  <Images className="size-4 text-muted-foreground" aria-hidden />
-                  Photos
+                  <Images className="size-4 text-primary" aria-hidden />
+                  Step 2 · Add clear photos
                 </span>
               }
             />
             <p className="mt-1 text-sm text-muted-foreground">
-              At least one photo is required before publishing.
+              Use clear, well-lit photos of the actual item. At least one is required before publishing.
             </p>
             <div className="mt-4">
               {editable ? (
@@ -253,10 +262,10 @@ export default async function SellDraftPage({
               aria-labelledby="draft-fulfilment-heading"
             >
               <SectionHeading
-                title={<span id="draft-fulfilment-heading">Fulfilment</span>}
+                title={<span id="draft-fulfilment-heading">Step 3 · Confirm handover</span>}
               />
               <p className="mt-1 text-sm text-muted-foreground">
-                Tell bidders how the winner can receive the item. This must be set before publishing.
+                Make collection or delivery clear before anyone commits to a bid.
               </p>
               <div className="mt-4">
                 <FulfilmentEditor
@@ -272,11 +281,14 @@ export default async function SellDraftPage({
             <SectionHeading
               title={
                 <span id="draft-publish-heading" className="inline-flex items-center gap-2">
-                  <Rocket className="size-4 text-muted-foreground" aria-hidden />
-                  Publish
+                  <Rocket className="size-4 text-primary" aria-hidden />
+                  Step 4 · Review and publish
                 </span>
               }
             />
+            <p className="mt-1 text-sm text-muted-foreground">
+              When you publish, bidding starts immediately and the auction terms lock.
+            </p>
             <div className="mt-4">
               <PublishButton
                 auctionId={auction.id}

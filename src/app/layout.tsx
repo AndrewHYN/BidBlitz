@@ -75,7 +75,7 @@ const baseMetadata: Metadata = {
  */
 export const metadata: Metadata = baseMetadata;
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   // Seed the client clock from request time. This is a Server Component, which
   // renders exactly once per request, so `Date.now()` here is deterministic in
   // the way the purity rule exists to guarantee. (The rule still applies to

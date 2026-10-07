@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { MessageCircleOff } from "lucide-react";
+import { MessageCircleOff, ShieldCheck } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getThread } from "@/server/queries";
 import { PageHeader } from "@/components/auction/page-header";
@@ -83,6 +83,18 @@ export default async function TransactionThreadPage({
           </span>
           <ReportDialog userId={thread.counterparty.id} username={thread.counterparty.username} />
         </div>
+        {thread.role !== "moderator" && (
+          <div className="flex gap-3 rounded-xl border border-primary/20 bg-primary/5 p-4 text-sm">
+            <ShieldCheck className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
+            <div>
+              <p className="font-semibold">Keep the handover safe</p>
+              <p className="mt-1 leading-6 text-muted-foreground">
+                Keep arrangements in this thread. For collection, use a busy public place during daylight when practical, inspect the item before leaving, and never share passwords, PINs or one-time codes.
+              </p>
+            </div>
+          </div>
+        )}
+
         <MessageThread
           transactionId={thread.id}
           viewerId={user.id}

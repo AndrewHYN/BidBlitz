@@ -95,8 +95,9 @@ export default function HowItWorksPage() {
             <Step n={3} title="Let the server close it">
               <p>
                 When the countdown reaches zero, our servers decide the result.
-                If someone bids in the final minutes, anti-sniping extends the
-                ending so a last-second bid cannot simply outrun everyone else.
+                If someone bids inside the auction&apos;s protected closing
+                window, anti-sniping extends the ending so a last-second bid
+                cannot simply outrun everyone else.
                 See <Link href="/help/rules">the bidding rules</Link>.
               </p>
             </Step>
@@ -131,8 +132,8 @@ export default function HowItWorksPage() {
             <Step n={1} title="List the item">
               <p>
                 Write a specific title, describe the condition honestly, add real
-                photos and set a starting bid, a reserve if you want one, and a
-                closing time. A draft saves as you go; publishing puts it in front
+                photos, set a starting bid and choose how long bidding stays
+                open. A draft saves first; publishing puts it in front
                 of buyers.{" "}
                 <Link href="/sell">Start a listing</Link>.
               </p>

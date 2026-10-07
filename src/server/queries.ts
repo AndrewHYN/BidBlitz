@@ -120,12 +120,14 @@ export const getHomeFeed = cache(async () => {
       .from("auctions")
       .select(CARD_SELECT)
       .eq("status", "LIVE")
+      .is("archived_at", null)
       .order("ends_at", { ascending: true })
       .limit(12),
     supabase
       .from("auctions")
       .select(CARD_SELECT)
       .eq("status", "LIVE")
+      .is("archived_at", null)
       .order("ends_at", { ascending: true })
       .limit(8),
     // Recently listed is a merchandising window, not a lifecycle state:
@@ -136,6 +138,7 @@ export const getHomeFeed = cache(async () => {
       .from("auctions")
       .select(CARD_SELECT)
       .in("status", ["LIVE", "SCHEDULED"])
+      .is("archived_at", null)
       .gt("listed_at", recentCutoffIso)
       .order("listed_at", { ascending: false })
       .limit(12),
@@ -175,7 +178,8 @@ export const browseAuctions = cache(async (filters: BrowseFilters) => {
     .from("auctions")
     .select(CARD_SELECT, { count: "exact" })
     .neq("status", "DRAFT")
-    .neq("status", "CANCELLED");
+    .neq("status", "CANCELLED")
+    .is("archived_at", null);
 
   if (filters.q) {
     // Postgres full-text, no search cluster needed at this scale
@@ -244,6 +248,7 @@ export const getAuctionDetail = cache(async (id: string) => {
        )`
     )
     .eq("id", id)
+    .is("archived_at", null)
     .maybeSingle();
 
   if (error) {
@@ -354,46 +359,78 @@ export const getWatchlist = cache(async (userId: string) => {
     .from("watchlist")
     .select(
       `created_at,
-       auctions:auction_id(${CARD_SELECT})`
+       auctions:auction_id(${CARD_SELECT}, archived_at)`
     )
     .eq("user_id", userId)
     .order("created_at", { ascending: false });
 
   return (data ?? [])
     .map((row) => {
-      const auction = row.auctions as unknown as CardJoin | null;
-      return auction ? toCard(auction) : null;
+      const auction = row.auctions as unknown as (CardJoin & { archived_at: string | null }) | null;
+      return auction && auction.archived_at === null ? toCard(auction) : null;
     })
     .filter(Boolean) as AuctionCardData[];
 });
 
 export const getNotifications = cache(async (userId: string) => {
   const supabase = await createClient();
-  const [list, unread] = await Promise.all([
-    supabase
-      .from("notifications")
-      .select("id, type, payload, read_at, created_at, auction_id")
-      .eq("user_id", userId)
-      .order("created_at", { ascending: false })
-      .limit(50),
-    supabase
-      .from("notifications")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", userId)
-      .is("read_at", null),
-  ]);
+  const { data: list } = await supabase
+    .from("notifications")
+    .select("id, type, payload, read_at, created_at, auction_id")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(80);
 
-  return { items: list.data ?? [], unreadCount: unread.count ?? 0 };
+  const rows = list ?? [];
+  const auctionIds = [
+    ...new Set(rows.flatMap((row) => (row.auction_id ? [row.auction_id] : []))),
+  ];
+  const archived = new Set<string>();
+
+  if (auctionIds.length > 0) {
+    const { data: hidden } = await supabase
+      .from("auctions")
+      .select("id")
+      .in("id", auctionIds)
+      .not("archived_at", "is", null);
+    for (const row of hidden ?? []) archived.add(row.id);
+  }
+
+  const items = rows
+    .filter((row) => row.auction_id === null || !archived.has(row.auction_id))
+    .slice(0, 50);
+
+  return {
+    items,
+    unreadCount: items.filter((row) => row.read_at === null).length,
+  };
 });
 
 export const getUnreadCount = async (userId: string): Promise<number> => {
   const admin = createAdminClient();
-  const { count } = await admin
+  const { data: rows } = await admin
     .from("notifications")
-    .select("id", { count: "exact", head: true })
+    .select("id, auction_id")
     .eq("user_id", userId)
-    .is("read_at", null);
-  return count ?? 0;
+    .is("read_at", null)
+    .limit(500);
+
+  const unread = rows ?? [];
+  const auctionIds = [
+    ...new Set(unread.flatMap((row) => (row.auction_id ? [row.auction_id] : []))),
+  ];
+  if (auctionIds.length === 0) return unread.length;
+
+  const { data: hidden } = await admin
+    .from("auctions")
+    .select("id")
+    .in("id", auctionIds)
+    .not("archived_at", "is", null);
+  const archived = new Set((hidden ?? []).map((row) => row.id));
+
+  return unread.filter(
+    (row) => row.auction_id === null || !archived.has(row.auction_id)
+  ).length;
 };
 
 /** Buyer view: auctions I bid on. */
@@ -403,7 +440,7 @@ export const getBuying = cache(async (userId: string) => {
     .from("bids")
     .select(
       `auction_id, amount_minor, created_at,
-       auctions:auction_id(${CARD_SELECT}, winner_id, status, current_bidder_id, current_bid_minor)`
+       auctions:auction_id(${CARD_SELECT}, winner_id, status, current_bidder_id, current_bid_minor, archived_at)`
     )
     .eq("bidder_id", userId)
     .order("created_at", { ascending: false })
@@ -426,8 +463,9 @@ export const getBuying = cache(async (userId: string) => {
       winner_id: string | null;
       current_bidder_id: string | null;
       current_bid_minor: number | null;
+      archived_at: string | null;
     };
-    if (!a) continue;
+    if (!a || a.archived_at !== null) continue;
     out.push({
       ...toCard(a),
       myBidMinor: row.amount_minor as number,
@@ -450,6 +488,7 @@ export const getSelling = cache(async (userId: string) => {
        transactions(id, status, gross_minor, fee_minor, net_minor, currency)`
     )
     .eq("seller_id", userId)
+    .is("archived_at", null)
     .order("created_at", { ascending: false });
 
   type SellingTx = {
@@ -495,7 +534,7 @@ export const getTransactions = cache(async (userId: string) => {
       .select(
         `id, auction_id, seller_id, buyer_id, currency, gross_minor, fee_bps,
          fee_minor, net_minor, status, provider, payment_due_at, created_at,
-         auctions:auction_id(title)`
+         auctions:auction_id(title, archived_at)`
       )
       .or(`seller_id.eq.${userId},buyer_id.eq.${userId}`)
       .order("created_at", { ascending: false }),
@@ -523,8 +562,10 @@ export const getTransactions = cache(async (userId: string) => {
     provider: string | null;
     payment_due_at: string | null;
     created_at: string;
-    auctions: { title: string } | null;
-  }>).map((row) => ({ ...row, reviewed: reviewed.has(row.id) }));
+    auctions: { title: string; archived_at: string | null } | null;
+  }>)
+    .filter((row) => row.auctions?.archived_at === null)
+    .map((row) => ({ ...row, reviewed: reviewed.has(row.id) }));
 });
 
 // ---------------------------------------------------------------------------
@@ -568,7 +609,7 @@ export const getThread = cache(async (userId: string, transactionId: string): Pr
   const [{ data: tx, error: txError }, { data: self }] = await Promise.all([
     supabase
       .from("transactions")
-      .select("id, auction_id, seller_id, buyer_id, status, auctions:auction_id(title)")
+      .select("id, auction_id, seller_id, buyer_id, status, auctions:auction_id(title, archived_at)")
       .eq("id", transactionId)
       .maybeSingle(),
     supabase.from("profiles").select("is_admin").eq("id", userId).maybeSingle(),
@@ -580,11 +621,12 @@ export const getThread = cache(async (userId: string, transactionId: string): Pr
     seller_id: string;
     buyer_id: string;
     status: string;
-    auctions: { title: string } | null;
+    auctions: { title: string; archived_at: string | null } | null;
   };
   const isParty = row.seller_id === userId || row.buyer_id === userId;
   const isAdmin = (self as { is_admin?: boolean } | null)?.is_admin === true;
   if (!isParty && !isAdmin) return null;
+  if (row.auctions?.archived_at !== null && !isAdmin) return null;
   const role = !isParty ? "moderator" : row.seller_id === userId ? "seller" : "buyer";
 
   const counterpartyId = row.seller_id === userId ? row.buyer_id : row.seller_id;
@@ -661,6 +703,7 @@ export const getProfileByUsername = cache(async (username: string) => {
       .select(CARD_SELECT)
       .eq("seller_id", data.id)
       .neq("status", "DRAFT")
+      .is("archived_at", null)
       .order("created_at", { ascending: false })
       .limit(12),
   ]);

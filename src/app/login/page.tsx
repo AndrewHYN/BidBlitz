@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { safeNext } from "@/lib/safe-next";
 import { LoginForm } from "@/components/auth/login-form";
+import { AuthShell } from "@/components/auth/auth-shell";
 
 export const metadata: Metadata = {
   title: "Sign in",
@@ -34,10 +35,12 @@ export default async function LoginPage({
       : undefined;
 
   return (
-    <div className="page-container flex min-h-[70vh] flex-col justify-center py-10 sm:py-14">
-      <div className="mx-auto w-full max-w-md">
-        <LoginForm redirectTo={redirectTo} initialError={callbackFailed} />
-      </div>
-    </div>
+    <AuthShell
+      eyebrow="Welcome back"
+      title="Your next bid, sale or win is one sign-in away."
+      description="Pick up exactly where you left off: live bids, watched items, seller activity and post-sale handovers."
+    >
+      <LoginForm redirectTo={redirectTo} initialError={callbackFailed} />
+    </AuthShell>
   );
 }

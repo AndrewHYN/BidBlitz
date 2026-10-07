@@ -8,7 +8,9 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useMounted } from "@/hooks/use-mounted";
 import {
   Bell,
+  Bookmark,
   Gavel,
+  Home,
   Menu,
   Moon,
   Plus,
@@ -54,20 +56,24 @@ export type HeaderUser = {
 
 const NAV = [
   { label: "Browse", href: "/browse" },
-  { label: "Help", href: "/help" },
+  { label: "How it works", href: "/how-it-works" },
 ] as const;
 
-/** Desktop shows the two anchors; the full set lives in the mobile drawer. */
+/** Keep the signed-in desktop mental model deliberately small. */
 const DESKTOP_AUTH_NAV = [
-  { label: "Dashboard", href: "/dashboard", exact: true },
+  { label: "Home", href: "/dashboard", exact: true },
+  { label: "Browse", href: "/browse", exact: false },
   { label: "Watchlist", href: "/dashboard/watchlist", exact: true },
 ] as const;
 
 const AUTH_NAV = [
-  { label: "Dashboard", href: "/dashboard", exact: true },
+  { label: "Home", href: "/dashboard", exact: true },
+  { label: "Browse", href: "/browse", exact: false },
   { label: "Watchlist", href: "/dashboard/watchlist", exact: true },
-  { label: "Bidding", href: "/dashboard/buying", exact: true },
-  { label: "Selling", href: "/dashboard/selling", exact: true },
+  { label: "My bids", href: "/dashboard/buying", exact: true },
+  { label: "My selling", href: "/dashboard/selling", exact: true },
+  { label: "Activity", href: "/dashboard/transactions", exact: true },
+  { label: "Help", href: "/help", exact: false },
 ] as const;
 
 /**
@@ -311,8 +317,8 @@ export function HeaderBar({
     setOpen(false);
   }
 
-  const links = user ? [...NAV, ...AUTH_NAV] : NAV;
-  const desktopLinks = user ? [...NAV, ...DESKTOP_AUTH_NAV] : NAV;
+  const links = user ? AUTH_NAV : NAV;
+  const desktopLinks = user ? DESKTOP_AUTH_NAV : NAV;
   // Admin discoverability: the entry appears if and only if the server says
   // the session is an admin. Visibility is not authorization - /admin and
   // every admin action re-check server-side - but an operator should not have
@@ -372,7 +378,46 @@ export function HeaderBar({
     </div>
   );
 
+  const showMobileDock = user !== null && !pathname.startsWith("/auction/");
+
+  const mobileDock = showMobileDock ? (
+    <nav
+      aria-label="Quick navigation"
+      data-mobile-dock
+      className="fixed inset-x-2 bottom-2 z-30 grid grid-cols-5 rounded-2xl border bg-background/95 p-1.5 shadow-2xl backdrop-blur-md md:hidden"
+    >
+      {[
+        { label: "Home", href: "/dashboard", icon: Home, exact: true },
+        { label: "Browse", href: "/browse", icon: Search, exact: false },
+        { label: "Sell", href: "/sell", icon: Plus, exact: false, primary: true },
+        { label: "Watch", href: "/dashboard/watchlist", icon: Bookmark, exact: true },
+        { label: "Activity", href: "/dashboard/transactions", icon: Gavel, exact: true },
+      ].map(({ label, href, icon: Icon, exact, primary }) => {
+        const active = isActive(pathname, href, exact);
+        return (
+          <Link
+            key={href}
+            href={href}
+            aria-current={active ? "page" : undefined}
+            className={cn(
+              "flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-xl px-1 text-[10px] font-semibold transition-colors",
+              primary
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : active
+                  ? "bg-accent text-accent-foreground"
+                  : "text-muted-foreground hover:bg-accent/70 hover:text-foreground"
+            )}
+          >
+            <Icon className="size-4" aria-hidden />
+            <span>{label}</span>
+          </Link>
+        );
+      })}
+    </nav>
+  ) : null;
+
   return (
+    <>
     <header className="sticky top-0 z-40 border-b bg-background/85 backdrop-blur-md">
       <div className="page-container flex h-16 items-center gap-3">
         {/* mobile menu trigger */}
@@ -525,14 +570,15 @@ export function HeaderBar({
             </>
           ) : (
             <>
-              <Button asChild variant="ghost">
+              <Button asChild variant="outline" size="sm">
                 <Link href="/login" onClick={closeMenu}>
                   Sign in
                 </Link>
               </Button>
-              <Button asChild>
+              <Button asChild size="sm" className="shadow-md shadow-primary/10 sm:h-10 sm:px-4">
                 <Link href="/signup" onClick={closeMenu}>
-                  Join
+                  <span className="sm:hidden">Join</span>
+                  <span className="hidden sm:inline">Join BidBlitz</span>
                 </Link>
               </Button>
             </>
@@ -561,5 +607,7 @@ export function HeaderBar({
           </AnimatePresence>
         ))}
     </header>
+    {mobileDock}
+    </>
   );
 }

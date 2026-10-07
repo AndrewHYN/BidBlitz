@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { MapPin } from "lucide-react";
+import { MapPin, ShieldCheck } from "lucide-react";
 
 import { getAuctionDetail, imageUrlFor } from "@/server/queries";
 import { isPaymentProviderConfigured } from "@/server/payments/config";
@@ -127,7 +127,7 @@ export default async function AuctionPage({ params }: Props) {
   });
 
   return (
-    <div className="page-container py-10 sm:py-14">
+    <div className="page-container pt-8 pb-24 sm:py-14 lg:pb-14">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: serializeJsonLd(structuredData) }}
@@ -237,6 +237,29 @@ export default async function AuctionPage({ params }: Props) {
                 auction closes, the buyer and seller get a private message thread
                 to confirm collection or delivery details before handover.
               </p>
+
+              <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 text-sm leading-6 text-foreground">
+                <div className="flex items-start gap-3">
+                  <span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-lg bg-background text-primary shadow-sm">
+                    <ShieldCheck className="size-4" aria-hidden />
+                  </span>
+                  <div>
+                    <h3 className="font-semibold">Safer handover</h3>
+                    <p className="mt-1 text-muted-foreground">
+                      Keep arrangements in the BidBlitz message thread. For
+                      in-person collection, meet in a busy public place during
+                      daylight when practical, inspect the item before leaving,
+                      and do not share passwords, PINs or one-time codes.
+                    </p>
+                    <Link
+                      href="/help/rules"
+                      className="mt-2 inline-flex font-semibold text-primary underline-offset-4 hover:underline"
+                    >
+                      Read the marketplace safety rules
+                    </Link>
+                  </div>
+                </div>
+              </div>
             </div>
           </section>
 

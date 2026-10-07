@@ -29,7 +29,7 @@ export function CategoryChips({ categories }: { categories: HomeCategory[] }) {
     <nav
       data-testid="home-category-chips"
       aria-label="Browse by category"
-      className="flex flex-wrap gap-2"
+      className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap"
     >
       {categories.map((category) => {
         const Icon = categoryIcon(category.slug);
@@ -37,10 +37,12 @@ export function CategoryChips({ categories }: { categories: HomeCategory[] }) {
           <Link
             key={category.slug}
             href={`/browse?category=${encodeURIComponent(category.slug)}`}
-            className="inline-flex items-center gap-1.5 rounded-full border bg-card px-3 py-1.5 text-sm font-medium transition-colors hover:border-primary/40 hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            className="group interactive-surface inline-flex min-h-11 items-center gap-2.5 rounded-lg border bg-card px-3.5 py-2.5 text-sm font-semibold shadow-sm hover:border-primary/40 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
           >
-            <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-            {category.name}
+            <span className="grid size-7 shrink-0 place-items-center rounded-md bg-muted text-muted-foreground transition-colors group-hover:text-primary">
+              <Icon className="size-4" aria-hidden />
+            </span>
+            <span>{category.name}</span>
           </Link>
         );
       })}

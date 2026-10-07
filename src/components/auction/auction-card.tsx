@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Gavel, MapPin, ImageIcon } from "lucide-react";
+import { ArrowUpRight, Gavel, MapPin, ImageIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { AuctionCardData } from "@/server/queries";
 import { Money } from "@/components/auction/money";
@@ -54,8 +54,8 @@ export function AuctionCard({
     <Link
       href={href ?? `/auction/${auction.id}`}
       className={cn(
-        "group relative flex flex-col overflow-hidden rounded-lg border bg-card transition-[transform,box-shadow,border-color] duration-200 ease-out",
-        "hover:-translate-y-1 hover:border-primary/35 hover:shadow-lg hover:shadow-primary/5",
+        "group relative flex flex-col overflow-hidden rounded-xl border bg-card shadow-sm transition-[transform,box-shadow,border-color] duration-200 ease-out",
+        "hover:-translate-y-1 hover:border-primary/35 hover:shadow-xl hover:shadow-primary/5",
         "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
         className
       )}
@@ -78,7 +78,7 @@ export function AuctionCard({
         <div className="absolute left-2 top-2 flex flex-wrap gap-1.5">
           <LiveStatus status={auction.status} endsAt={auction.endsAt} />
           {auction.featured && (
-            <span className="rounded-full bg-primary px-2 py-0.5 text-[11px] font-semibold text-primary-foreground shadow-sm">
+            <span className="rounded-md bg-primary px-2 py-0.5 text-[11px] font-semibold text-primary-foreground shadow-sm">
               Featured
             </span>
           )}
@@ -86,22 +86,22 @@ export function AuctionCard({
         </div>
 
         {auction.endsAt && !clockStopped && (
-          <span className="absolute bottom-2 right-2 rounded-md bg-background/90 px-2 py-1 backdrop-blur-sm">
+          <span className="absolute bottom-2 right-2 rounded-lg border border-border/70 bg-background/95 px-2.5 py-1.5 shadow-sm backdrop-blur-sm">
             <Countdown endsAt={auction.endsAt} status={auction.status} className="text-xs" />
           </span>
         )}
       </div>
 
-      <div className="flex flex-1 flex-col gap-2 p-3.5">
+      <div className="flex flex-1 flex-col gap-2.5 p-4">
         <div className="flex items-start justify-between gap-2">
-          <Heading className="line-clamp-2 text-sm font-medium leading-snug transition-colors group-hover:text-primary">
+          <Heading className="line-clamp-2 text-[0.95rem] font-semibold leading-snug transition-colors group-hover:text-primary">
             {auction.title}
           </Heading>
         </div>
 
         <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
           {auction.categoryName && (
-            <span className="rounded bg-muted px-1.5 py-0.5">{auction.categoryName}</span>
+            <span className="rounded-md bg-muted px-1.5 py-0.5">{auction.categoryName}</span>
           )}
           <ConditionBadge condition={auction.condition} className="px-1.5 py-0 text-[11px]" />
         </div>
@@ -114,7 +114,7 @@ export function AuctionCard({
             <p
               data-testid="card-price"
               className={cn(
-                "truncate text-base font-semibold",
+                "truncate text-lg font-bold tracking-tight",
                 auction.bidCount > 0 ? "text-foreground" : "text-muted-foreground"
               )}
             >
@@ -134,12 +134,20 @@ export function AuctionCard({
 
         {meta && <div className="border-t pt-2 text-[11px]">{meta}</div>}
 
-        {auction.location && (
-          <p className="flex items-center gap-1 text-[11px] text-muted-foreground">
-            <MapPin className="size-3" aria-hidden />
-            <span className="truncate">{auction.location}</span>
-          </p>
-        )}
+        <div className="mt-0.5 flex items-center justify-between gap-3 border-t pt-2.5 text-xs">
+          {auction.location ? (
+            <p className="flex min-w-0 items-center gap-1 text-muted-foreground">
+              <MapPin className="size-3.5 shrink-0" aria-hidden />
+              <span className="truncate">{auction.location}</span>
+            </p>
+          ) : (
+            <span />
+          )}
+          <span className="inline-flex shrink-0 items-center gap-1 font-semibold text-primary">
+            View auction
+            <ArrowUpRight className="size-3.5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" aria-hidden />
+          </span>
+        </div>
       </div>
     </Link>
   );

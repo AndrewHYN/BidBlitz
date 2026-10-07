@@ -170,7 +170,7 @@ export function BrowseFilters({
     <section
       data-testid="browse-filters"
       aria-label="Filter auctions"
-      className="space-y-4 rounded-xl border bg-card p-4"
+      className="space-y-4 rounded-xl border bg-card p-4 shadow-sm sm:p-5"
     >
       <form
       onSubmit={submitSearch}
@@ -190,11 +190,11 @@ export function BrowseFilters({
               data-testid="browse-search"
               value={values.q}
               onChange={(event) => setValues((v) => ({ ...v, q: event.target.value }))}
-              placeholder="Search by keyword…"
+              placeholder="What are you looking for?"
               autoComplete="off"
             />
           </div>
-          <Button type="submit" variant="secondary">
+          <Button type="submit">
             <Search aria-hidden />
             Search
           </Button>

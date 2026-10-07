@@ -118,8 +118,18 @@ export default async function DashboardOverviewPage() {
   return (
     <div className="space-y-8">
       <PageHeader
-        title="Dashboard"
-        description="Everything you’re bidding on, selling and watching."
+        title="Your BidBlitz"
+        description="See what needs attention first, then jump back into bidding or selling."
+        actions={
+          <>
+            <Button asChild variant="outline">
+              <Link href="/browse">Browse auctions</Link>
+            </Button>
+            <Button asChild>
+              <Link href="/sell">Sell an item</Link>
+            </Button>
+          </>
+        }
       />
 
       {outbid.length > 0 && (
@@ -134,11 +144,11 @@ export default async function DashboardOverviewPage() {
           >
             <Gavel className="size-4 text-ending" aria-hidden />
             {outbid.length === 1
-              ? "You have been outbid"
-              : `You have been outbid on ${outbid.length} auctions`}
+              ? "You’ve been outbid. The auction is still live"
+              : `You’ve been outbid on ${outbid.length} live auctions`}
           </h2>
           <Button asChild size="sm" variant="outline" data-testid="dashboard-bid-again">
-            <Link href="/dashboard/buying">Bid again</Link>
+            <Link href="/dashboard/buying">Review my bids</Link>
           </Button>
         </section>
       )}
@@ -148,7 +158,7 @@ export default async function DashboardOverviewPage() {
           data-testid="dashboard-stats"
           className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
         >
-          <Stat label="Bids placed" value={buying.length} href="/dashboard/buying" icon={Gavel} />
+          <Stat label="My bids" value={buying.length} href="/dashboard/buying" icon={Gavel} />
           <Stat
             label="Ending soon"
             value={endingSoon.length}
@@ -192,7 +202,7 @@ export default async function DashboardOverviewPage() {
         <SectionHeading
           title={
             <span id="dashboard-settle-heading" className="inline-flex items-center gap-2">
-              Needs settlement
+              Seller actions
               {dueSettle.length > 0 && (
                 <span
                   className="rounded-full bg-ending px-2 py-0.5 text-xs font-medium text-ending-foreground"
@@ -207,7 +217,7 @@ export default async function DashboardOverviewPage() {
 
         {dueSettle.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            No auctions are waiting on a result right now.
+            Nothing needs a seller action right now.
           </p>
         ) : (
           <ul className="space-y-3">
@@ -237,7 +247,7 @@ export default async function DashboardOverviewPage() {
       <section aria-labelledby="dashboard-transactions-heading" className="space-y-4">
         <SectionHeading
           title={
-            <span id="dashboard-transactions-heading">Latest transactions</span>
+            <span id="dashboard-transactions-heading">Recent activity</span>
           }
           action={
             <Link

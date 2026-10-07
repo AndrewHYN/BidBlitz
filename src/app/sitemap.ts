@@ -59,12 +59,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         .from("auctions")
         .select("id, updated_at")
         .in("status", [...OPEN_STATUSES])
+        .is("archived_at", null)
         .order("updated_at", { ascending: false })
         .limit(MAX_OPEN),
       supabase
         .from("auctions")
         .select("id, updated_at, bid_count")
         .in("status", [...COMPLETED_STATUSES])
+        .is("archived_at", null)
         .order("updated_at", { ascending: false })
         .limit(MAX_COMPLETED),
     ]);
