@@ -39,7 +39,7 @@ export type AuctionCardData = {
 
 const CARD_SELECT = `
   id, title, current_bid_minor, starting_bid_minor, bid_count,
-  ends_at, status, location, condition, featured,
+  ends_at, status, location, condition, featured, featured_until,
   categories:category_id(slug, name),
   auction_images(position, storage_path)
 `;
@@ -55,6 +55,7 @@ type CardJoin = {
   location: string;
   condition: string;
   featured: boolean;
+  featured_until: string | null;
   /**
    * PostgREST returns an object for a to-one relation and an array for a
    * to-many one, and which it is depends on the schema introspection — so we
@@ -99,7 +100,10 @@ function toCard(row: CardJoin): AuctionCardData {
     status: row.status,
     location: row.location,
     condition: row.condition,
-    featured: row.featured,
+    featured:
+      row.featured &&
+      row.featured_until !== null &&
+      new Date(row.featured_until).getTime() > Date.now(),
     categorySlug: category?.slug ?? null,
     categoryName: category?.name ?? null,
   };
@@ -115,7 +119,16 @@ export const getHomeFeed = cache(async () => {
   // in this server query, and the client receives only the result.
   const recentCutoffIso = recentlyListedCutoffIso(Date.now());
 
-  const [live, ending, recent, categories] = await Promise.all([
+  const [promoted, live, ending, recent, categories] = await Promise.all([
+    supabase
+      .from("auctions")
+      .select(CARD_SELECT)
+      .in("status", ["LIVE", "SCHEDULED"])
+      .eq("featured", true)
+      .gt("featured_until", new Date().toISOString())
+      .is("archived_at", null)
+      .order("featured_until", { ascending: true })
+      .limit(8),
     supabase
       .from("auctions")
       .select(CARD_SELECT)
@@ -146,6 +159,7 @@ export const getHomeFeed = cache(async () => {
   ]);
 
   return {
+    promoted: (promoted.data ?? []).map(toCard),
     live: (live.data ?? []).map(toCard),
     endingSoon: (ending.data ?? []).map(toCard),
     recent: (recent.data ?? []).map(toCard),
