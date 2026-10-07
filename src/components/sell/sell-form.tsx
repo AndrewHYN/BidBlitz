@@ -338,6 +338,7 @@ export function SellForm({
             />
             <p className="text-xs text-muted-foreground">
               Optional. Add collection area, delivery limits or who covers delivery costs.
+              For in-person collection, prefer a busy public place during daylight when practical.
             </p>
             <FieldError messages={errors.fulfilmentNotes} />
           </div>
