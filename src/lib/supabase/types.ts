@@ -324,12 +324,25 @@ export interface Database {
         Insert: never;
         Update: never;
       };
+      promotion_settings: {
+        Row: {
+          days: number;
+          price_minor: number;
+          currency: string;
+          enabled: boolean;
+          updated_at: string;
+        };
+        Insert: never;
+        Update: never;
+      };
       promotion_requests: {
         Row: {
           id: string;
           auction_id: string;
           seller_id: string;
           requested_days: number;
+          quoted_price_minor: number;
+          currency: string;
           status: "PENDING" | "APPROVED" | "REJECTED";
           requested_at: string;
           decided_at: string | null;
@@ -364,6 +377,10 @@ export interface Database {
       };
       admin_decide_promotion: {
         Args: { p_request_id: string; p_approve: boolean; p_note?: string | null };
+        Returns: Json;
+      };
+      admin_update_promotion_pricing: {
+        Args: { p_days: number; p_price_minor: number; p_enabled: boolean };
         Returns: Json;
       };
       cancel_auction: { Args: { p_auction_id: string }; Returns: Json };
