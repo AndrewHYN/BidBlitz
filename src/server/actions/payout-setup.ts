@@ -53,7 +53,7 @@ export async function setupSellerPayoutAction(input: unknown): Promise<
   }
 
   const admin = createAdminClient();
-  await admin.from("seller_payout_recipients").upsert(
+  const { error: setupError } = await admin.from("seller_payout_recipients").upsert(
     {
       seller_id: user.id,
       provider: "linkwa",
@@ -66,6 +66,12 @@ export async function setupSellerPayoutAction(input: unknown): Promise<
     },
     { onConflict: "seller_id" }
   );
+  if (setupError) {
+    return {
+      ok: false,
+      message: "BidBlitz could not save your payout details. Please try again before linking your wallet.",
+    };
+  }
 
   try {
     const linked = await linkLinkwaUser(

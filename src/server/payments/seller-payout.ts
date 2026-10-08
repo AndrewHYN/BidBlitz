@@ -241,7 +241,13 @@ export async function releaseSellerPayout(
     null,
     "Claimed for automatic Linkwa payout."
   );
-  if (due.error) {
+  if (
+    due.error ||
+    due.data?.ok !== true ||
+    due.data?.already !== false ||
+    due.data?.status !== "PAYOUT_DUE" ||
+    due.data?.payout_id !== payout.id
+  ) {
     return {
       ok: false,
       code: "manual_reconciliation_required",
