@@ -34,6 +34,8 @@ const PROTECTED_ROUTES = [
   "/admin/marketing",
   "/admin/disputes",
   "/admin/finance",
+  "/admin/finance/payouts",
+  "/admin/finance/payments",
   "/admin/guide",
   "/admin/team",
   "/admin/team/accept?token=bidblitz-release-smoke-invalid-token",
