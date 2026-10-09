@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { AlertTriangle, ArrowLeft, ArrowRight, BadgeCheck, Banknote, CircleCheck2, Clock3, LockKeyhole, ShieldAlert, Wallet } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ArrowRight, BadgeCheck, Banknote, CircleCheck, Clock3, LockKeyhole, ShieldAlert, Wallet } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { hasPermission } from "@/server/permissions";
 import { readFinanceOperations } from "@/server/finance/operations";
@@ -169,7 +169,7 @@ export default async function FinancePayoutsPage() {
                       )}
                       {triage === "paid" && (
                         <p className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <CircleCheck2 className="size-4" aria-hidden /> Recorded paid in BidBlitz. This status is an internal ledger event, not a bank statement.
+                          <CircleCheck className="size-4" aria-hidden /> Recorded paid in BidBlitz. This status is an internal ledger event, not a bank statement.
                         </p>
                       )}
                       <div className="flex flex-wrap items-center gap-3">
