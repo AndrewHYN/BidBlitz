@@ -194,11 +194,14 @@ export function LoginForm({
       method="post"
       data-testid="login-form"
       data-hydrated={hydrated ? "true" : undefined}
-      className="auth-card space-y-5 rounded-2xl border bg-card p-6 sm:p-8"
+      className="space-y-5"
     >
-      <div className="space-y-1.5 text-center">
-        <BrandMark size={40} alt="BidBlitz" className="mx-auto" />
-        <h1 className="text-xl font-semibold tracking-tight text-balance">
+      <div className="mb-7 space-y-2">
+        <Link href="/" aria-label="BidBlitz home" className="mb-5 flex w-fit items-center gap-2 rounded-md focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring md:hidden">
+          <BrandMark size={32} />
+          <span className="text-lg font-bold">BidBlitz</span>
+        </Link>
+        <h1 className="text-3xl font-bold tracking-tight text-balance">
           Welcome back
         </h1>
         <p className="text-sm text-muted-foreground">
@@ -222,7 +225,7 @@ export function LoginForm({
 
           <div className="flex items-center gap-3" aria-hidden="true">
             <span className="h-px flex-1 bg-border" />
-            <span className="text-xs text-muted-foreground">OR</span>
+            <span className="text-xs text-muted-foreground">or sign in with email</span>
             <span className="h-px flex-1 bg-border" />
           </div>
 
@@ -261,12 +264,6 @@ export function LoginForm({
           >
             {submitting ? "Signing in…" : "Sign in"}
           </Button>
-
-          <div className="flex items-center gap-3" aria-hidden="true">
-            <span className="h-px flex-1 bg-border" />
-            <span className="text-xs text-muted-foreground">OR</span>
-            <span className="h-px flex-1 bg-border" />
-          </div>
 
           <Button
             type="button"

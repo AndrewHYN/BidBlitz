@@ -36,9 +36,10 @@ export default async function LoginPage({
 
   return (
     <AuthShell
-      eyebrow="Welcome back"
-      title="Your next bid, sale or win is one sign-in away."
-      description="Pick up exactly where you left off: live bids, watched items, seller activity and post-sale handovers."
+      variant="login"
+      eyebrow="Zimbabwe’s auction marketplace"
+      title="Bid on what you love. Sell what’s next."
+      description="Join live auctions, follow your bids and arrange handovers with buyers and sellers."
     >
       <LoginForm redirectTo={redirectTo} initialError={callbackFailed} />
     </AuthShell>
