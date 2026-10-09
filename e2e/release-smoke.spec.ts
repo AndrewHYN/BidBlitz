@@ -30,6 +30,8 @@ const PROTECTED_ROUTES = [
   "/settings/business",
   "/notifications",
   "/admin",
+  "/admin/command",
+  "/admin/marketing",
   "/admin/disputes",
   "/admin/finance",
   "/admin/guide",
