@@ -76,10 +76,11 @@ export default async function FinancePage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login?next=/admin/finance");
 
-  const [canPayments, canPayouts, canManageTeam] = await Promise.all([
+  const [canPayments, canPayouts, canManageTeam, canMarketing] = await Promise.all([
     hasPermission(user.id, "payments.view"),
     hasPermission(user.id, "payouts.view"),
     hasPermission(user.id, "admin.manage_team"),
+    hasPermission(user.id, "marketing.view"),
   ]);
   if (!canPayments && !canPayouts) redirect("/");
 
@@ -135,7 +136,7 @@ export default async function FinancePage() {
       <AdminNav
         active="finance"
         showTeam={canManageTeam}
-        showMarketing
+        showMarketing={canMarketing}
         disputeCount={activeDisputes}
       />
 
