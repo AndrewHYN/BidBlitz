@@ -109,14 +109,15 @@ async function post<T>(
   if (!response.ok) {
     // An explicit registration demand is actionable even on HTTP 422.
     // Never classify arbitrary provider text or expose it to the seller.
-    if (path === "/api/v1/third-party/wallets" && response.status === 422) {
-      const reply = await response.json().catch(() => null);
-      if (reply?.requires_registration === true) {
-        throw new PaymentPayloadError("wallet_registration_required", "SmileCash registration is required.");
-      }
+    const reply = await response.json().catch(() => null);
+    if (path === "/api/v1/third-party/wallets" && response.status === 422 && reply?.requires_registration === true) {
+      throw new PaymentPayloadError("wallet_registration_required", "SmileCash registration is required.");
     }
+    const permittedFields = ["phone_number", "first_name", "last_name", "external_user_id", "date_of_birth", "id_number", "gender", "id_picture"];
+    const validationFields = reply?.errors && typeof reply.errors === "object"
+      ? Object.keys(reply.errors).filter((field) => permittedFields.includes(field)) : [];
     throw new PaymentProviderRequestError(
-      `Linkwa answered HTTP ${response.status} for the payout request.`, response.status
+      `Linkwa answered HTTP ${response.status} for the payout request.`, response.status, validationFields
     );
   }
   try {
@@ -153,7 +154,7 @@ export async function linkLinkwaUser(
   }>(config, "/api/v1/third-party/users", {
     first_name: input.firstName.trim(),
     last_name: input.lastName.trim(),
-    phone_number: input.phoneNumber.trim(),
+    phone_number: input.phoneNumber.trim().replace(/^\+/, ""),
     ...(input.email?.trim() ? { email: input.email.trim() } : {}),
   });
   const externalUserId = reply.user?.external_user_id ?? "";
@@ -187,7 +188,7 @@ export async function registerLinkwaWallet(
     requires_registration?: boolean;
   }>(config, "/api/v1/third-party/wallets", {
     external_user_id: input.externalUserId.trim(),
-    phone_number: input.phoneNumber.trim(),
+    phone_number: input.phoneNumber.trim().replace(/^\+/, ""),
     ...(input.firstName?.trim() ? { first_name: input.firstName.trim() } : {}),
     ...(input.lastName?.trim() ? { last_name: input.lastName.trim() } : {}),
     ...(input.dateOfBirth?.trim() ? { date_of_birth: input.dateOfBirth.trim() } : {}),

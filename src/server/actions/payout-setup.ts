@@ -139,6 +139,7 @@ export async function setupSellerPayoutAction(input: unknown): Promise<
       error instanceof PaymentPayloadError &&
       error.reason === "wallet_registration_required";
 
+    const validationFields = error instanceof PaymentProviderRequestError ? error.validationFields : [];
     await admin.from("seller_payout_recipients").upsert(
       {
         seller_id: user.id,
@@ -147,7 +148,7 @@ export async function setupSellerPayoutAction(input: unknown): Promise<
         legal_first_name: parsed.data.firstName,
         legal_last_name: parsed.data.lastName,
         setup_status: needsWallet ? "NEEDS_WALLET" : "ERROR",
-        setup_error: needsWallet ? "SmileCash wallet required" : `Linkwa ${stage} failed${error instanceof PaymentProviderRequestError && error.httpStatus ? ` (HTTP ${error.httpStatus})` : ""}`,
+        setup_error: needsWallet ? "SmileCash wallet required" : `Linkwa ${stage} failed${error instanceof PaymentProviderRequestError && error.httpStatus ? ` (HTTP ${error.httpStatus}${validationFields.length ? `; fields: ${validationFields.join(", ")}` : ""})` : ""}`,
         updated_at: new Date().toISOString(),
       },
       { onConflict: "seller_id" }
@@ -168,7 +169,7 @@ export async function setupSellerPayoutAction(input: unknown): Promise<
     if (error instanceof PaymentProviderError) {
       return {
         ok: false,
-        message: "Linkwa could not link this payout wallet. Check the details and try again.",
+        message: "Linkwa could not verify this payout wallet. Your details have been saved. BidBlitz support needs to check the provider response before you retry.",
       };
     }
     return { ok: false, message: "Payout setup failed. Nothing was paid or charged." };

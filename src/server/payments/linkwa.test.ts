@@ -605,3 +605,19 @@ describe("Linkwa payouts (unwired helpers)", () => {
   const fetchImpl = (async () => new Response(JSON.stringify({ requires_registration: true, message: "private provider details" }), { status: 422 })) as typeof fetch;
   await expect(registerLinkwaWallet({ apiKey: "test-key", baseUrl: "https://linkwa.co.zw", fetchImpl }, { externalUserId: "user-id", phoneNumber: "+263771234567" })).rejects.toMatchObject({ reason: "wallet_registration_required" });
 });
+
+it("sends the documented digits-only international phone to both Linkwa recipient and wallet endpoints", async () => {
+  const bodies: Record<string, unknown>[] = [];
+  const fetchImpl = (async (_url: unknown, init?: RequestInit) => {
+    bodies.push(JSON.parse(String(init?.body)));
+    return new Response(JSON.stringify(bodies.length === 1 ? { user: { external_user_id: "linked-user" } } : { wallet: { external_wallet_id: "wallet", provider: "smilecash" } }), { status: 200 });
+  }) as typeof fetch;
+  const config = { apiKey: "test-key", baseUrl: "https://linkwa.co.zw", fetchImpl };
+  await linkLinkwaUser(config, { firstName: "Test", lastName: "Seller", phoneNumber: "+263771234567" });
+  await registerLinkwaWallet(config, { externalUserId: "linked-user", phoneNumber: "+263771234567" });
+  expect(bodies.map(body => body.phone_number)).toEqual(["263771234567", "263771234567"]);
+});
+it("keeps only known validation field names from a provider refusal", async () => {
+  const fetchImpl = (async () => new Response(JSON.stringify({ message: "private identity", errors: { phone_number: ["private phone"], secret: ["private secret"] } }), { status: 422 })) as typeof fetch;
+  await expect(registerLinkwaWallet({ apiKey: "test-key", baseUrl: "https://linkwa.co.zw", fetchImpl }, { externalUserId: "linked-user", phoneNumber: "+263771234567" })).rejects.toMatchObject({ httpStatus: 422, validationFields: ["phone_number"] });
+});

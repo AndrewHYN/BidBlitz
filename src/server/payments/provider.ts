@@ -194,7 +194,7 @@ export class PaymentPayloadError extends PaymentProviderError {
 
 /** The provider's own API refused or failed the request (initiate, poll). */
 export class PaymentProviderRequestError extends PaymentProviderError {
-  constructor(message: string, readonly httpStatus?: number) {
+  constructor(message: string, readonly httpStatus?: number, readonly validationFields: readonly string[] = []) {
     super("PAYMENT_PROVIDER_REQUEST_FAILED", message);
     this.name = "PaymentProviderRequestError";
   }
