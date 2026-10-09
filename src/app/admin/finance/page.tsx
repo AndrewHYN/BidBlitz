@@ -18,6 +18,7 @@ import { Money } from "@/components/auction/money";
 import { Button } from "@/components/ui/button";
 import { readLinkwaEnvironment } from "@/server/payments/config";
 import { fetchLinkwaBalance } from "@/server/payments/linkwa-payouts";
+import { describeLinkwaBalance, type BalanceDisplay } from "@/server/payments/balance-display";
 import { PaymentProviderRequestError } from "@/server/payments/provider";
 
 export const metadata: Metadata = {
@@ -85,11 +86,7 @@ export default async function FinancePage() {
   const snapshot = error ? null : asSnapshot(data);
 
   let linkwa:
-    | {
-        state: "ready";
-        availableMinor: bigint;
-        pendingMinor: bigint;
-      }
+    | BalanceDisplay
     | { state: "unavailable"; message: string } = {
     state: "unavailable",
     message: "Linkwa balance could not be read.",
@@ -102,14 +99,7 @@ export default async function FinancePage() {
         apiKey: env.config.apiKey,
         baseUrl: env.config.baseUrl,
       });
-      const usd = balances.find((entry) => entry.currency === "USD");
-      if (usd) {
-        linkwa = {
-          state: "ready",
-          availableMinor: usd.availableMinor,
-          pendingMinor: usd.pendingMinor,
-        };
-      }
+      linkwa = describeLinkwaBalance(balances);
     } catch (error) {
       const status = error instanceof PaymentProviderRequestError ? error.httpStatus : undefined;
       const detail = status === 401
