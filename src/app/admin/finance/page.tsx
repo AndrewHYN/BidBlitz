@@ -18,6 +18,7 @@ import { Money } from "@/components/auction/money";
 import { Button } from "@/components/ui/button";
 import { readLinkwaEnvironment } from "@/server/payments/config";
 import { fetchLinkwaBalance } from "@/server/payments/linkwa-payouts";
+import { PaymentProviderRequestError } from "@/server/payments/provider";
 
 export const metadata: Metadata = {
   title: "Finance",
@@ -109,10 +110,20 @@ export default async function FinancePage() {
           pendingMinor: usd.pendingMinor,
         };
       }
-    } catch {
+    } catch (error) {
+      const status = error instanceof PaymentProviderRequestError ? error.httpStatus : undefined;
+      const detail = status === 401
+        ? "Linkwa rejected API authentication (HTTP 401). Check the deployed production app key."
+        : status === 403
+          ? "Linkwa denied API access (HTTP 403). Check production app activation and API permissions with Linkwa."
+          : status
+            ? `Linkwa balance request failed (HTTP ${status}). Check the provider’s availability and endpoint access.`
+            : error instanceof PaymentProviderRequestError && error.message === "Could not reach Linkwa balance/statement endpoint."
+              ? "Linkwa could not be reached within the request window. Check connectivity or provider availability."
+              : "Linkwa returned an unexpected or unreadable balance response. Provider response compatibility needs investigation.";
       linkwa = {
         state: "unavailable",
-        message: "Linkwa did not return a readable balance. No money was moved.",
+        message: `${detail} No money was moved.`,
       };
     }
   } else {

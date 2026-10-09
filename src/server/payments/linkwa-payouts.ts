@@ -101,9 +101,9 @@ async function post<T>(
       `${config.baseUrl.trim().replace(/\/+$/, "")}${path}`,
       { method: "POST", headers: headers(config.apiKey), body: JSON.stringify(body), signal: AbortSignal.timeout(15_000) }
     );
-  } catch (err) {
+  } catch {
     throw new PaymentProviderRequestError(
-      `Could not reach Linkwa: ${err instanceof Error ? err.message : String(err)}`
+      "Could not reach Linkwa."
     );
   }
   if (!response.ok) {
@@ -258,14 +258,15 @@ async function get<T>(
       `${config.baseUrl.trim().replace(/\/+$/, "")}${path}`,
       { method: "GET", headers: headers(config.apiKey), signal: AbortSignal.timeout(15_000) }
     );
-  } catch (err) {
+  } catch {
     throw new PaymentProviderRequestError(
-      `Could not reach Linkwa: ${err instanceof Error ? err.message : String(err)}`
+      "Could not reach Linkwa balance/statement endpoint."
     );
   }
   if (!response.ok) {
     throw new PaymentProviderRequestError(
-      `Linkwa answered HTTP ${response.status} for the balance/statement request.`
+      `Linkwa answered HTTP ${response.status} for the balance/statement request.`,
+      response.status
     );
   }
   try {

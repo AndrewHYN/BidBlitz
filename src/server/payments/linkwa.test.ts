@@ -621,3 +621,14 @@ it("keeps only known validation field names from a provider refusal", async () =
   const fetchImpl = (async () => new Response(JSON.stringify({ message: "private identity", errors: { phone_number: ["private phone"], secret: ["private secret"] } }), { status: 422 })) as typeof fetch;
   await expect(registerLinkwaWallet({ apiKey: "test-key", baseUrl: "https://linkwa.co.zw", fetchImpl }, { externalUserId: "linked-user", phoneNumber: "+263771234567" })).rejects.toMatchObject({ httpStatus: 422, validationFields: ["phone_number"] });
 });
+
+
+it.each([401, 403, 429, 500])("retains safe balance HTTP status %s without exposing response payload", async (status) => {
+  const fetchImpl = (async () => new Response("private provider payload", { status })) as typeof fetch;
+  await expect(fetchLinkwaBalance({ apiKey: "test", baseUrl: "https://linkwa.co.zw", fetchImpl })).rejects.toMatchObject({ httpStatus: status });
+});
+
+it("keeps balance transport errors free of credentials and provider text", async () => {
+  const fetchImpl = (async () => { throw new Error("private API key"); }) as typeof fetch;
+  await expect(fetchLinkwaBalance({ apiKey: "test", baseUrl: "https://linkwa.co.zw", fetchImpl })).rejects.toThrow("Could not reach Linkwa balance/statement endpoint.");
+});
