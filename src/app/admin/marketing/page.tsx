@@ -23,11 +23,13 @@ export default async function MarketingPage() {
     supabase.rpc("has_permission", { p_user_id: user.id, p_permission: "settings.manage_marketplace" }),
     supabase.rpc("has_permission", { p_user_id: user.id, p_permission: "admin.manage_team" }),
   ]);
-  if (access.error || access.data !== true || marketing.error || marketing.data !== true) redirect("/");
+  if (access.error || access.data !== true) redirect("/");
+  const canReviewPromotions = !marketing.error && marketing.data === true;
 
-  const { count, error } = await supabase.from("promotion_requests")
-    .select("id", { count: "exact", head: true }).eq("status", "PENDING");
-  const promotionCount = countFromQuery({ count, error });
+  const promotionCount = canReviewPromotions
+    ? countFromQuery(await supabase.from("promotion_requests")
+        .select("id", { count: "exact", head: true }).eq("status", "PENDING"))
+    : null;
 
   return (
     <div className="page-container space-y-8 py-8 sm:py-12" data-testid="admin-marketing-page">
@@ -49,7 +51,7 @@ export default async function MarketingPage() {
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(16rem,1fr)]">
         <CampaignLinkBuilder />
         <div className="space-y-4">
-          <Link href="/admin#admin-promotions" className="group block rounded-2xl border bg-card p-5 shadow-sm transition hover:border-primary/40 hover:shadow-md">
+          {canReviewPromotions && <Link href="/admin#admin-promotions" className="group block rounded-2xl border bg-card p-5 shadow-sm transition hover:border-primary/40 hover:shadow-md">
             <div className="flex items-center justify-between gap-3">
               <span className="grid size-11 place-items-center rounded-xl bg-primary/10 text-primary">
                 <ClipboardCheck className="size-5" aria-hidden />
@@ -63,7 +65,7 @@ export default async function MarketingPage() {
             <span className="mt-4 inline-flex items-center gap-2 text-xs font-bold text-primary">
               Open approval queue <ArrowRight className="size-4 transition-transform group-hover:translate-x-1" aria-hidden />
             </span>
-          </Link>
+          </Link>}
           <section className="rounded-2xl border bg-card p-5 shadow-sm">
             <h2 className="flex items-center gap-2 font-extrabold"><ShieldCheck className="size-5 text-primary" aria-hidden /> Publishing standards</h2>
             <p className="mt-3 text-sm leading-6 text-muted-foreground">
