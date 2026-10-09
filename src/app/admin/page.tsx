@@ -608,9 +608,10 @@ export default async function AdminPage() {
             payment. It freezes the seller&apos;s proceeds and then follows its own
             workflow. It is <strong className="text-foreground">not</strong> the payment
             status. <em>Record seller payout</em> means the transfer was already made
-            outside BidBlitz and you are recording its reference; <em>Pay seller with
-            Linkwa</em> is the explicit in-app payout path, and it only appears once a
-            payout is pending.
+            outside BidBlitz and you are recording its reference. <em>Instruct seller payout
+            with Linkwa</em> is available in the Finance payout desk only after all
+            payment, wallet and handover checks pass and payments are enabled.
+            Provider acknowledgement still requires independent reconciliation.
           </p>
 
           <div data-testid="admin-payouts">
