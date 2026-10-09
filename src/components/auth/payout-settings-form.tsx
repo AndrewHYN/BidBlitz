@@ -57,6 +57,19 @@ export function PayoutSettingsForm({
         </div>
       </div>
 
+      {!ready && (
+        <section className="space-y-3 rounded-xl border bg-muted/30 p-4" aria-labelledby="wallet-steps">
+          <h3 id="wallet-steps" className="font-semibold">Before you sell: connect your SmileCash wallet</h3>
+          <p className="text-sm leading-6 text-muted-foreground">Only sellers need a payout wallet. Buyers can use the payment methods offered at Linkwa checkout without opening a SmileCash account.</p>
+          <ol className="list-decimal space-y-2 pl-5 text-sm leading-6">
+            <li>Already have SmileCash? Use your existing wallet and its registered mobile number. You do not need another identity or wallet for testing.</li>
+            <li>Need a wallet? Follow <a href="https://linkwa.co.zw/faqs" target="_blank" rel="noopener noreferrer" className="font-semibold text-primary underline">Linkwa’s official registration guidance</a>. Complete registration with the provider using your own identity; BidBlitz does not collect your ID or wallet PIN.</li>
+            <li>Enter the wallet holder’s registered name and number below, then connect. Wait for “Ready to receive payouts” before publishing.</li>
+          </ol>
+          <p className="text-xs leading-5 text-muted-foreground">Do not open a second wallet just to use another email address. If your existing wallet cannot be linked, contact support rather than registering another identity.</p>
+        </section>
+      )}
+
       {ready && (
         <div className="flex gap-2 rounded-xl border border-primary/20 bg-primary/5 p-3 text-sm">
           <CircleCheck className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />

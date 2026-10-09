@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCategories, getFeeBps } from "@/server/queries";
@@ -40,6 +41,12 @@ export default async function SellPage() {
         description="Four short steps for the item, handover, bidding price and timing. You’ll add photos and review everything before it goes live."
       />
       <div className="mt-8 max-w-3xl">
+        <aside className="mb-6 space-y-2 rounded-xl border bg-muted/30 p-4 text-sm leading-6">
+          <h2 className="font-semibold">How you receive your money</h2>
+          <p>Seller payouts currently require a verified SmileCash wallet through Linkwa. Connect your existing wallet before publishing. Buyers do not need SmileCash: they choose a supported method at checkout.</p>
+          <p>BidBlitz keeps 5%; your 95% becomes eligible for payout after buyer-confirmed handover and the payment safety checks. Provider charges and wallet transfer or withdrawal fees may also apply.</p>
+          <Link href="/settings/payouts" className="font-semibold text-primary underline">Check or connect your seller wallet</Link>
+        </aside>
         <SellForm
           feeBps={feeBps}
           providerName={providerName}

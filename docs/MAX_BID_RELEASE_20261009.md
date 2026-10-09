@@ -38,3 +38,14 @@ The Vercel management connector returned HTTP 403 for the existing team; no CLI 
 After the account holder submitted the real setup form, the recipient link succeeded but the wallet link returned HTTP 422, with no wallet ID. The Developer API documentation was inspected directly in the browser: both /users and /wallets show phone_number as digits-only international format (263…), while the app was sending its stored E.164 value (+263…). The provider adapter now strips the leading plus from outbound recipient/wallet phone fields only; database storage stays canonical E.164. This is a contract correction, not yet evidence of a successful real wallet link.
 
 On provider refusal, the adapter retains only allowlisted validation field names, never raw error messages, identity values, phone values or provider payloads. Generic wallet failures no longer blame the seller's details or recommend repeated retries. The registration-required HTTP 422 path still gives NEEDS_WALLET. Checkpoint: 590 tests, 53 files, lint, TypeScript and production build pass. The live wallet response after this correction must still be verified before activating payments.
+
+
+## Payment practicality checkpoint — 9 October 2026
+
+Linkwa official FAQ and payments explainer confirm buyers need no Linkwa account or SmileCash wallet; checkout offers supported wallets/cards. Current seller payout rail is SmileCash. Other payout wallets are roadmap items, not available promises. This adds seller onboarding friction: launch is conditional on successful wallet setup, real settlement proof and clear disclosure before listing. Onward transfers may carry provider fees and limits.
+
+Added seller-only requirements, existing-wallet instructions, official registration guidance and privacy boundaries to payout setup, listing entry and FAQ. Never collect identity documents or PINs on BidBlitz.
+
+The owner has one identity and cannot create another verified wallet. Stop the second-wallet test. Use the already verified hyndrrx0 seller wallet and another legitimate BidBlitz account as buyer (buyers need no new wallet). Do not change the seller or recipient of the old $1 transaction, clone wallet IDs, or manufacture success. A new controlled sale must have its amount explicitly agreed; the existing $1.20 sale exceeds the earlier $1 test cap. Real payout remains unproved; general payments stay paused.
+
+Sources: https://linkwa.co.zw/faqs and https://linkwa.co.zw/blog/linkwa-payments-explained. Free sandbox is available, but Linkwa advertises a Developer subscription for live API use: verify the merchant's existing live entitlement and commercial costs before general activation. A polished onboarding flow cannot remove the provider's identity/account limits.
