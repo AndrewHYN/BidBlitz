@@ -39,6 +39,8 @@ export async function initiateLinkwaPayoutAction(input: unknown): Promise<Result
   if (!released.ok) return { ok: false, message: released.message };
 
   revalidatePath("/admin");
+  revalidatePath("/admin/finance");
+  revalidatePath("/admin/finance/payouts");
   revalidatePath("/dashboard/transactions");
   revalidatePath("/dashboard/selling");
   return { ok: true, payoutReference: released.payoutReference };
