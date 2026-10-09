@@ -4,6 +4,8 @@ import { notFound } from "next/navigation";
 import { MapPin, ShieldCheck } from "lucide-react";
 
 import { getAuctionDetail, imageUrlFor } from "@/server/queries";
+import { MaxBidPanel } from "@/components/auction/max-bid-panel";
+import { getMaxBidOffers } from "@/server/max-bid-queries";
 import { isPaymentProviderConfigured } from "@/server/payments/config";
 import { nextMinimumBid } from "@/lib/money";
 import { SITE_URL } from "@/lib/site-url";
@@ -76,7 +78,7 @@ function FactRow({ label, children }: { label: string; children: React.ReactNode
 
 export default async function AuctionPage({ params }: Props) {
   const { id } = await params;
-  const detail = await getAuctionDetail(id);
+  const [detail, maxBidOffers] = await Promise.all([getAuctionDetail(id), getMaxBidOffers(id)]);
   if (!detail) notFound();
 
   const { auction, bids, viewerId, watched, myHighestBidMinor, transaction } = detail;
@@ -187,6 +189,8 @@ export default async function AuctionPage({ params }: Props) {
             transactionStatus={transaction?.status ?? null}
             paymentConfigured={isPaymentProviderConfigured()}
           />
+
+          <MaxBidPanel auctionId={auction.id} sellerId={auction.seller_id} viewerId={viewerId} status={auction.status} endsAt={auction.ends_at} currentBidMinor={auction.current_bid_minor} currentBidderId={auction.current_bidder_id} minimumMinor={nextMinMinor} offers={maxBidOffers} />
 
           <div className="flex flex-wrap items-center gap-2">
             <WatchButton

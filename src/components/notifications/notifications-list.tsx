@@ -57,9 +57,10 @@ function describe(
   switch (type) {
     case "NEW_BID":
       return {
-        headline: `New bid on ${headline}`,
+        headline: `${p.max_bid === true ? "Max Bid purchase offer" : "New bid"} on ${headline}`,
         detail: (
           <>
+            {p.max_bid === true && <>Review this offer to sell early. </>}
             The bid is now{" "}
             <Money minor={amountOf(p.current_bid_minor)} currency={currency} />.
             {typeof p.bid_count === "number" && (

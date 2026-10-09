@@ -13,6 +13,7 @@ import {
 import {
   PaymentPayloadError,
   PaymentProviderError,
+  PaymentProviderRequestError,
 } from "@/server/payments/provider";
 
 const setupSchema = z.object({
@@ -73,6 +74,7 @@ export async function setupSellerPayoutAction(input: unknown): Promise<
     };
   }
 
+  let stage = "recipient link";
   try {
     const linked = await linkLinkwaUser(
       { apiKey: linkwa.config.apiKey, baseUrl: linkwa.config.baseUrl },
@@ -84,6 +86,12 @@ export async function setupSellerPayoutAction(input: unknown): Promise<
       }
     );
 
+    const { error: linkSaveError } = await admin.from("seller_payout_recipients").upsert(
+      { seller_id: user.id, external_user_id: linked.externalUserId, setup_status: "LINKING", updated_at: new Date().toISOString() },
+      { onConflict: "seller_id" }
+    );
+    if (linkSaveError) return { ok: false, message: "The recipient linked, but BidBlitz could not save it. Contact support before retrying." };
+    stage = "wallet link";
     const wallet = await registerLinkwaWallet(
       { apiKey: linkwa.config.apiKey, baseUrl: linkwa.config.baseUrl },
       {
@@ -139,7 +147,7 @@ export async function setupSellerPayoutAction(input: unknown): Promise<
         legal_first_name: parsed.data.firstName,
         legal_last_name: parsed.data.lastName,
         setup_status: needsWallet ? "NEEDS_WALLET" : "ERROR",
-        setup_error: needsWallet ? "SmileCash wallet required" : "Linkwa setup failed",
+        setup_error: needsWallet ? "SmileCash wallet required" : `Linkwa ${stage} failed${error instanceof PaymentProviderRequestError && error.httpStatus ? ` (HTTP ${error.httpStatus})` : ""}`,
         updated_at: new Date().toISOString(),
       },
       { onConflict: "seller_id" }
@@ -154,6 +162,9 @@ export async function setupSellerPayoutAction(input: unknown): Promise<
       };
     }
 
+    if (error instanceof PaymentProviderRequestError && (error.httpStatus === 401 || error.httpStatus === 403)) {
+      return { ok: false, message: "Linkwa refused this deployment’s payout access. BidBlitz support must resolve the provider configuration before you retry." };
+    }
     if (error instanceof PaymentProviderError) {
       return {
         ok: false,

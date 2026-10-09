@@ -99,7 +99,7 @@ async function post<T>(
   try {
     response = await (config.fetchImpl ?? fetch)(
       `${config.baseUrl.trim().replace(/\/+$/, "")}${path}`,
-      { method: "POST", headers: headers(config.apiKey), body: JSON.stringify(body) }
+      { method: "POST", headers: headers(config.apiKey), body: JSON.stringify(body), signal: AbortSignal.timeout(15_000) }
     );
   } catch (err) {
     throw new PaymentProviderRequestError(
@@ -107,8 +107,16 @@ async function post<T>(
     );
   }
   if (!response.ok) {
+    // An explicit registration demand is actionable even on HTTP 422.
+    // Never classify arbitrary provider text or expose it to the seller.
+    if (path === "/api/v1/third-party/wallets" && response.status === 422) {
+      const reply = await response.json().catch(() => null);
+      if (reply?.requires_registration === true) {
+        throw new PaymentPayloadError("wallet_registration_required", "SmileCash registration is required.");
+      }
+    }
     throw new PaymentProviderRequestError(
-      `Linkwa answered HTTP ${response.status} for the payout request.`
+      `Linkwa answered HTTP ${response.status} for the payout request.`, response.status
     );
   }
   try {
@@ -247,7 +255,7 @@ async function get<T>(
   try {
     response = await (config.fetchImpl ?? fetch)(
       `${config.baseUrl.trim().replace(/\/+$/, "")}${path}`,
-      { method: "GET", headers: headers(config.apiKey) }
+      { method: "GET", headers: headers(config.apiKey), signal: AbortSignal.timeout(15_000) }
     );
   } catch (err) {
     throw new PaymentProviderRequestError(

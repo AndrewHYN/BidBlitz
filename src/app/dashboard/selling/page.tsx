@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { Tag } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getMySellerPayouts, getSelling, getTransactions } from "@/server/queries";
+import { getMaxBidOffers } from "@/server/max-bid-queries";
+import { Money } from "@/components/auction/money";
 import { AuctionCard } from "@/components/auction/auction-card";
 import { EmptyState, PageHeader } from "@/components/auction/page-header";
 import { Button } from "@/components/ui/button";
@@ -26,10 +28,11 @@ export default async function SellingPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login?next=/dashboard/selling");
 
-  const [items, transactions, payouts] = await Promise.all([
+  const [items, transactions, payouts, maxBidOffers] = await Promise.all([
     getSelling(user.id),
     getTransactions(user.id),
     getMySellerPayouts(),
+    getMaxBidOffers(),
   ]);
   // This seller's own pending business, keyed by auction. Both tables are
   // readable by the requester/seller, so missing rows simply mean nothing
@@ -97,6 +100,15 @@ export default async function SellingPage() {
           </Button>
         }
       />
+
+      {maxBidOffers.length > 0 && <section className="rounded-xl border p-5 space-y-3" aria-labelledby="max-offers-heading">
+        <h2 id="max-offers-heading" className="font-semibold">Max Bid purchase offers</h2>
+        <p className="text-sm text-muted-foreground">Review the current highest offer to sell early. Accepting ends the auction and asks the buyer to pay.</p>
+        <ul className="space-y-2">{maxBidOffers.map((offer) => <li key={offer.id} className="flex flex-wrap items-center justify-between gap-2 text-sm">
+          <span>{items.find((item) => item.id === offer.auction_id)?.title ?? "Your auction"} · <Money minor={offer.amount_minor} /></span>
+          <Link className="font-medium underline" href={`/auction/${offer.auction_id}`}>Review offer</Link>
+        </li>)}</ul>
+      </section>}
 
       <div data-testid="selling-list">
         {items.length === 0 ? (

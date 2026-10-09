@@ -173,7 +173,7 @@ export default async function TermsPage() {
 
         <TermsSection id="settlement" title="5. Winning and settlement">
           <p>
-            When the clock runs out, the highest bidder wins the auction. An
+            A Max Bid is a binding bid and a request to buy early. The seller may accept it only while it is the current highest bid in a live auction. Acceptance ends the auction and creates a sale awaiting payment; it does not confirm payment or handover. Declined or unanswered Max Bids remain normal binding bids. When the clock runs out, the highest bidder wins the auction. An
             auction with no bids simply closes unsold.
           </p>
           <p>

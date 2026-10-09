@@ -600,3 +600,8 @@ describe("Linkwa payouts (unwired helpers)", () => {
     });
   });
 });
+
+ it("recognises an explicit wallet registration demand on HTTP 422 without exposing provider text", async () => {
+  const fetchImpl = (async () => new Response(JSON.stringify({ requires_registration: true, message: "private provider details" }), { status: 422 })) as typeof fetch;
+  await expect(registerLinkwaWallet({ apiKey: "test-key", baseUrl: "https://linkwa.co.zw", fetchImpl }, { externalUserId: "user-id", phoneNumber: "+263771234567" })).rejects.toMatchObject({ reason: "wallet_registration_required" });
+});

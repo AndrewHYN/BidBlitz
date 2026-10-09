@@ -13,6 +13,11 @@ export const metadata: Metadata = {
 
 const RULES = [
   {
+    icon: Timer,
+    title: "Max Bid lets the seller confirm an early sale",
+    body: "A Max Bid is a real binding bid plus a request to buy early. Only the seller can accept, and only while it remains the current highest bid in a live auction. Acceptance stops the timer and creates a sale awaiting payment. A declined or ignored request remains a normal bid. The 5% fee, buyer payment, handover confirmation and dispute protections still apply.",
+  },
+  {
     icon: Lock,
     title: "Bids are final and binding",
     body: "Placing a bid is a commitment to buy at that price if you win. There are no retracts. Bid only what you're willing to pay.",
@@ -50,7 +55,7 @@ const RULES = [
   {
     icon: Lock,
     title: "Deal terms are locked at publish",
-    body: "Once an auction is published, its starting price, bid increment, duration and closing time are frozen. Nobody, not even the seller, can quietly change them. Bids and the anti-snipe extension are the only things that can move the price or the clock.",
+    body: "Once an auction is published, its starting price, bid increment, duration and closing time are frozen. Nobody, not even the seller, can quietly change them. Bids and the anti-snipe extension can move the price or clock. Seller acceptance of the current highest Max Bid ends the auction immediately.",
   },
 ] as const;
 
@@ -73,7 +78,7 @@ const MARKETPLACE_RULES = [
   },
   {
     title: "Ending an auction early follows the rules",
-    body: "A seller can end an auction with no bids, giving a reason. Once bids exist, the auction can only be ended through a reviewed cancellation request: it stays live until the team decides, approval ends it with no winner and no payment, and rejection changes nothing.",
+    body: "A seller can end an auction with no bids, giving a reason. A seller may accept the current highest Max Bid to create an early sale. Cancelling an auction after bids exist requires a reviewed cancellation request: it stays live until the team decides, approval ends it with no winner and no payment, and rejection changes nothing.",
   },
   {
     title: "Some things may never be listed",

@@ -99,7 +99,8 @@ export function AuctionDetailLive({
 
   const handleEvent = useCallback(
     (event: AuctionEvent) => {
-      if (event.type === "auction.ended") router.refresh();
+      // Reload private Max Bid offers as well as the public auction mirror.
+      if (event.type === "auction.ended" || event.type === "bid.accepted") router.refresh();
     },
     [router]
   );
