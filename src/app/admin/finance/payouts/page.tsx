@@ -79,7 +79,7 @@ export default async function FinancePayoutsPage() {
         </p>
       </header>
 
-      <AdminNav active="finance" showTeam={canManageTeam} showMarketing disputeCount={0} />
+      <AdminNav active="finance" showTeam={canManageTeam} disputeCount={0} />
       <div className="flex flex-wrap gap-3 text-sm font-bold">
         <Link href="/admin/finance" className="inline-flex items-center gap-1 text-primary hover:underline">
           <ArrowLeft className="size-4" aria-hidden /> Finance overview
