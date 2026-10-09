@@ -80,6 +80,7 @@ export function GoogleSignInButton({ next }: { next?: string }) {
     <div className="space-y-2">
       <Button
         type="button"
+        variant="outline"
         size="lg"
         className="w-full shadow-sm"
         disabled={submitting}

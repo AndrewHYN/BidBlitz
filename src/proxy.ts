@@ -46,6 +46,7 @@ const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
 const AUCTION_PATH_RE = /^\/auction\/([^/]+)$/;
 const PROFILE_PATH_RE = /^\/profile\/([^/]+)$/;
+const BUSINESS_PATH_RE = /^\/business\/([^/]+)$/;
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -66,7 +67,7 @@ type ProxyClient = ReturnType<typeof createServerClient>;
 async function missingResourceKind(
   request: NextRequest,
   supabase: ProxyClient
-): Promise<"auction" | "profile" | null> {
+): Promise<"auction" | "profile" | "business" | null> {
   const auction = AUCTION_PATH_RE.exec(request.nextUrl.pathname);
   if (auction) {
     // A malformed id can never match a uuid column: rewrite without a round trip.
@@ -97,6 +98,23 @@ async function missingResourceKind(
       return null;
     }
     return data === null ? "profile" : null;
+  }
+
+  const business = BUSINESS_PATH_RE.exec(request.nextUrl.pathname);
+  if (business) {
+    // Match getBusinessStorefront, including RLS and ACTIVE status. A missing
+    // or suspended storefront must return 404 before the loading shell streams.
+    const { data, error } = await supabase
+      .from("business_sellers")
+      .select("id")
+      .eq("slug", business[1])
+      .eq("status", "ACTIVE")
+      .maybeSingle();
+    if (error) {
+      console.error("[proxy/business]", error.message);
+      return null;
+    }
+    return data === null ? "business" : null;
   }
 
   return null;

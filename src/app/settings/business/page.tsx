@@ -49,7 +49,7 @@ export default async function BusinessSettingsPage() {
         <div className="flex gap-3 rounded-xl border bg-muted/30 p-4 text-sm">
           <Building2 className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
           <p className="leading-6 text-muted-foreground">
-            This is intentionally simple for now: one owner, one storefront identity, and no employee seats, branches, ERP sync or verification claim.
+            Choose your business name and logo. Buyers can browse your public auctions together on your storefront.
           </p>
         </div>
 

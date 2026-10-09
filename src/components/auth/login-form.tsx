@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useRef, useState, useTransition } from "react";
 import { signInAction, requestEmailLoginCodeAction, verifyEmailLoginCodeAction } from "@/server/actions/auth";
 import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
-import { BrandMark } from "@/components/brand-mark";
 import { useMounted } from "@/hooks/use-mounted";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -197,10 +196,6 @@ export function LoginForm({
       className="space-y-5"
     >
       <div className="mb-7 space-y-2">
-        <Link href="/" aria-label="BidBlitz home" className="mb-5 flex w-fit items-center gap-2 rounded-md focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring md:hidden">
-          <BrandMark size={32} />
-          <span className="text-lg font-bold">BidBlitz</span>
-        </Link>
         <h1 className="text-3xl font-bold tracking-tight text-balance">
           Welcome back
         </h1>

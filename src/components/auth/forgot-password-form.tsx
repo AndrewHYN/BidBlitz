@@ -4,7 +4,6 @@ import { useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { MailCheck } from "lucide-react";
 import { requestPasswordResetAction } from "@/server/actions/auth";
-import { BrandMark } from "@/components/brand-mark";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -76,7 +75,7 @@ export function ForgotPasswordForm() {
           <h1 className="text-xl font-semibold tracking-tight">Check your email</h1>
           <p className="text-sm leading-relaxed text-muted-foreground text-pretty">
             If an account exists for{" "}
-            <span className="font-medium text-foreground">{sentTo}</span>, a
+            <span className="break-all font-medium text-foreground">{sentTo}</span>, a
             reset link is on its way. It expires after a short time, so use it
             soon.
           </p>
@@ -113,9 +112,8 @@ export function ForgotPasswordForm() {
       data-testid="forgot-password-form"
       noValidate
     >
-      <div className="space-y-1.5">
-        <BrandMark size={40} alt="BidBlitz" />
-        <h1 className="text-xl font-semibold tracking-tight">Reset your password</h1>
+      <div className="mb-6 space-y-2">
+        <h1 className="text-3xl font-bold tracking-tight">Reset your password</h1>
         <p className="text-sm leading-relaxed text-muted-foreground text-pretty">
           Enter the email you signed up with and we&apos;ll send you a link to
           choose a new password.

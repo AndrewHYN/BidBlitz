@@ -14,6 +14,7 @@ const PUBLIC_ROUTES = [
   "/login",
   "/signup",
   "/forgot-password",
+  "/reset-password",
 ] as const;
 
 const PROTECTED_ROUTES = [
@@ -32,6 +33,12 @@ const PROTECTED_ROUTES = [
   "/admin/disputes",
   "/admin/finance",
   "/admin/guide",
+  "/admin/team",
+  "/admin/team/accept?token=bidblitz-release-smoke-invalid-token",
+  "/sell/00000000-0000-0000-0000-000000000000",
+  "/dashboard/transactions/00000000-0000-0000-0000-000000000000",
+  "/dashboard/disputes/00000000-0000-0000-0000-000000000000",
+  "/admin/disputes/00000000-0000-0000-0000-000000000000",
 ] as const;
 
 test.describe("release visual smoke", () => {
@@ -79,6 +86,7 @@ test.describe("release visual smoke", () => {
     for (const route of [
       "/auction/not-a-valid-uuid",
       "/profile/bidblitz-release-smoke-user-that-does-not-exist",
+      "/business/bidblitz-release-smoke-storefront-that-does-not-exist",
     ]) {
       const fatal: string[] = [];
       page.on("pageerror", (error) => fatal.push(error.message));

@@ -15,17 +15,17 @@ export function PageHeader({
   return (
     <div
       className={cn(
-        "flex flex-col gap-4 border-b border-border/70 pb-5 sm:flex-row sm:items-end sm:justify-between",
+        "flex min-w-0 flex-col gap-4 border-b border-border/70 pb-5 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between",
         className
       )}
     >
-      <div className="space-y-1">
-        <h1 className="text-2xl font-bold tracking-[-0.02em] text-balance sm:text-3xl">{title}</h1>
+      <div className="min-w-0 space-y-1 sm:flex-1">
+        <h1 className="break-words text-2xl font-bold tracking-[-0.02em] text-balance sm:text-3xl">{title}</h1>
         {description && (
           <p className="max-w-2xl text-sm leading-6 text-muted-foreground text-balance">{description}</p>
         )}
       </div>
-      {actions && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}
+      {actions && <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2">{actions}</div>}
     </div>
   );
 }
@@ -133,8 +133,8 @@ export function SectionHeading({
   className?: string;
 }) {
   return (
-    <div className={cn("flex items-end justify-between gap-4", className)}>
-      <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
+    <div className={cn("flex min-w-0 flex-wrap items-end justify-between gap-4", className)}>
+      <h2 className="min-w-0 break-words text-lg font-semibold tracking-tight">{title}</h2>
       {action}
     </div>
   );

@@ -7,7 +7,6 @@ import { resendConfirmationAction, signUpAction } from "@/server/actions/auth";
 import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
 import { useMounted } from "@/hooks/use-mounted";
 import { MIN_PASSWORD_LENGTH } from "@/lib/validation";
-import { BrandMark } from "@/components/brand-mark";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -115,13 +114,13 @@ export function SignupForm() {
     return (
       <div
         data-testid="check-email-message"
-        className="space-y-4 rounded-xl border bg-card p-6 text-center shadow-sm sm:p-8"
+        className="space-y-5 text-center"
       >
         <span className="mx-auto grid size-11 place-items-center rounded-full bg-accent text-accent-foreground">
           <MailCheck className="size-5" aria-hidden />
         </span>
         <div className="space-y-1.5">
-          <h1 className="text-xl font-semibold tracking-tight text-balance">
+          <h1 className="text-3xl font-bold tracking-tight text-balance">
             Confirm your email
           </h1>
           <p className="text-sm text-muted-foreground">
@@ -174,21 +173,16 @@ export function SignupForm() {
       method="post"
       data-testid="signup-form"
       data-hydrated={hydrated ? "true" : undefined}
-      className="auth-card space-y-5 rounded-2xl border bg-card p-6 sm:p-8"
+      className="space-y-4"
     >
-      <div className="space-y-1.5 text-center">
-        <BrandMark size={40} alt="BidBlitz" className="mx-auto" />
-        <h1 className="text-xl font-semibold tracking-tight text-balance">
+      <div className="mb-6 space-y-2">
+        <h1 className="text-3xl font-bold tracking-tight text-balance">
           Create your account
         </h1>
         <p className="text-sm text-muted-foreground">
-          Bid on live auctions or list something of your own.
+          One account to bid, sell and follow your auctions.
         </p>
       </div>
-
-      <aside className="rounded-xl border bg-muted/30 p-3 text-sm leading-6">
-        <strong>Planning to sell?</strong> You’ll connect a SmileCash wallet before creating a listing. Register on your phone with <span className="whitespace-nowrap font-mono font-semibold">*225*1#</span>, or use your existing wallet. Buyers do not need SmileCash.
-      </aside>
 
       {error && (
         <div
@@ -204,7 +198,7 @@ export function SignupForm() {
 
       <div className="flex items-center gap-3" aria-hidden="true">
         <span className="h-px flex-1 bg-border" />
-        <span className="text-xs text-muted-foreground">OR</span>
+        <span className="text-xs text-muted-foreground">or join with email</span>
         <span className="h-px flex-1 bg-border" />
       </div>
 
@@ -215,7 +209,7 @@ export function SignupForm() {
           name="name"
           type="text"
           autoComplete="name"
-          placeholder="Alex Rivera"
+          placeholder="Your name"
           required
           maxLength={60}
           data-testid="name-field"

@@ -232,7 +232,7 @@ export default async function FinancePage() {
             </div>
           </section>
 
-          <section className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+          <section className="grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
             <div className="rounded-2xl border bg-card p-5 shadow-sm sm:p-6">
               <div className="flex items-center gap-2">
                 <WalletCards className="size-5 text-primary" aria-hidden />

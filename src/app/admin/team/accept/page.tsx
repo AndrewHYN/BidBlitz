@@ -6,6 +6,7 @@ import { AcceptInviteForm } from "@/components/dashboard/accept-invite-form";
 
 export const metadata: Metadata = {
   title: "Team invitation",
+  description: "Review and accept an invitation to the BidBlitz team with the matching account.",
   robots: { index: false, follow: false },
 };
 

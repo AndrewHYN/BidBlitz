@@ -13,16 +13,18 @@ export default function SignupPage() {
   return (
     <AuthShell
       eyebrow="Join BidBlitz"
-      title="Turn browsing into bidding in a few minutes."
-      description="Create one account to bid, sell, watch auctions and manage every transaction from one place."
+      title="Your first bid starts here."
+      description="Find live auctions, save items you like and sell to other buyers in Zimbabwe. Buying? You don’t need a SmileCash account."
     >
       <SignupForm />
-      <aside className="mt-5 rounded-xl border bg-muted/40 p-4 text-sm" aria-label="Seller payout requirements">
-        <h2 className="font-semibold">Planning to sell? Here’s how you get paid</h2>
-        <p className="mt-2 text-muted-foreground">Register for SmileCash if you don’t already have a wallet, then connect it in BidBlitz payout settings before publishing your first item. Seller payouts are processed through Linkwa into your SmileCash wallet.</p>
-        <p className="mt-2 text-muted-foreground">BidBlitz keeps 5% of the sale; your 95% becomes eligible for payout after the buyer confirms handover and payment checks pass. Provider and wallet fees may also apply. Buyers don’t need a SmileCash account.</p>
-        <Link href="/help/fees" className="mt-3 inline-block font-medium text-primary underline underline-offset-4">See payment and seller setup guidance</Link>
-      </aside>
+      <details className="mt-6 rounded-xl border bg-muted/30 px-4 text-sm">
+        <summary className="cursor-pointer py-3 font-semibold leading-6 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring">Selling? Connect SmileCash before listing</summary>
+        <div className="space-y-3 pb-4 leading-6 text-muted-foreground">
+          <p>Register on your phone with <span className="whitespace-nowrap font-mono font-semibold text-foreground">*225*1#</span>, or use your existing wallet. Connect it in payout settings before creating a listing. Buyers don’t need a SmileCash account.</p>
+          <p>You receive 95% of the sale after buyer-confirmed handover and payment checks; BidBlitz keeps 5%. Provider and wallet fees may also apply.</p>
+          <Link href="/help/fees" className="inline-flex min-h-11 items-center font-medium text-primary underline underline-offset-4">Payment and seller setup guide</Link>
+        </div>
+      </details>
     </AuthShell>
   );
 }

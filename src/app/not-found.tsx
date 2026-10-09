@@ -35,7 +35,9 @@ export async function generateMetadata(): Promise<Metadata> {
       ? "Auction not found"
       : missing === "profile"
         ? "Profile not found"
-        : "Page not found";
+        : missing === "business"
+          ? "Business not found"
+          : "Page not found";
 
   return {
     title,

@@ -122,7 +122,7 @@ export function ProfileHeader({ profile, isSelf }: { profile: Profile; isSelf: b
               about the person. */}
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
             {profile.location && (
-              <span className="flex items-center gap-1.5">
+              <span className="flex min-w-0 items-center gap-1.5 break-words">
                 <MapPin className="size-3.5 shrink-0" aria-hidden />
                 {profile.location}
               </span>
@@ -144,7 +144,7 @@ export function ProfileHeader({ profile, isSelf }: { profile: Profile; isSelf: b
       </div>
 
       {profile.bio && (
-        <p className="max-w-2xl border-t border-border/70 pt-5 text-[0.9375rem] leading-[1.7] text-muted-foreground text-pretty">
+        <p className="max-w-2xl break-words border-t border-border/70 pt-5 text-[0.9375rem] leading-[1.7] text-muted-foreground text-pretty">
           {profile.bio}
         </p>
       )}

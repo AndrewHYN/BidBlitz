@@ -36,7 +36,6 @@ export default async function LoginPage({
 
   return (
     <AuthShell
-      variant="login"
       eyebrow="Zimbabwe’s auction marketplace"
       title="Bid on what you love. Sell what’s next."
       description="Join live auctions, follow your bids and arrange handovers with buyers and sellers."

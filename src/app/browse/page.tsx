@@ -120,7 +120,7 @@ export default async function BrowsePage({
     <div className="page-container py-10 sm:py-14">
       <PageHeader
         title="Browse auctions"
-        description="Filter live and upcoming listings. Every change lands in the URL, so results are shareable."
+        description="Find live and upcoming auctions by category, condition and price."
       />
 
       <div className="mt-6">

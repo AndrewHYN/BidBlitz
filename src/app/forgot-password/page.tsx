@@ -12,12 +12,10 @@ export default function ForgotPasswordPage() {
   return (
     <AuthShell
       eyebrow="Account recovery"
-      title="Get back into your BidBlitz account securely."
-      description="Reset access without exposing whether an email address is registered on the marketplace."
+      title="Back to your bids."
+      description="Request a password reset link, check your inbox and choose a new password."
     >
-      <div className="auth-card rounded-2xl border bg-card p-6 sm:p-8">
-        <ForgotPasswordForm />
-      </div>
+      <ForgotPasswordForm />
     </AuthShell>
   );
 }

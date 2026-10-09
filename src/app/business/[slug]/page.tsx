@@ -21,7 +21,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!data) return { title: "Business not found", robots: { index: false } };
 
   const description =
-    data.business.description?.slice(0, 160) ??
+    data.business.description?.trim().slice(0, 160) ||
     `Browse auctions from ${data.business.display_name} on BidBlitz.`;
 
   return {
@@ -80,19 +80,19 @@ export default async function BusinessStorefrontPage({ params }: Props) {
               <Store className="size-3.5" aria-hidden />
               Business seller
             </span>
-            <h1 className="mt-3 text-3xl font-bold tracking-[-0.035em] sm:text-4xl">
+            <h1 className="mt-3 break-words text-3xl font-bold tracking-[-0.035em] sm:text-4xl">
               {business.display_name}
             </h1>
             {business.description && (
-              <p className="mt-3 max-w-3xl whitespace-pre-line text-sm leading-7 text-muted-foreground sm:text-base">
+              <p className="mt-3 max-w-3xl break-words whitespace-pre-line text-sm leading-7 text-muted-foreground sm:text-base">
                 {business.description}
               </p>
             )}
 
             <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-sm text-muted-foreground">
               {business.location && (
-                <span className="inline-flex items-center gap-1.5">
-                  <MapPin className="size-4" aria-hidden />
+                <span className="inline-flex min-w-0 items-center gap-1.5 break-words">
+                  <MapPin className="size-4 shrink-0" aria-hidden />
                   {business.location}
                 </span>
               )}

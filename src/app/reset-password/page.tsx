@@ -28,12 +28,10 @@ export default async function ResetPasswordPage() {
   return (
     <AuthShell
       eyebrow="Secure reset"
-      title="Choose a new password and get back to your auctions."
-      description="Recovery links are single-use and time-limited so an old link cannot keep opening your account."
+      title="A fresh start for your account."
+      description="Choose a strong password. If your recovery link has expired, request a new one to continue."
     >
-      <div className="auth-card rounded-2xl border bg-card p-6 sm:p-8">
-        <ResetPasswordForm linkState={user ? "valid" : "invalid"} />
-      </div>
+      <ResetPasswordForm linkState={user ? "valid" : "invalid"} />
     </AuthShell>
   );
 }
