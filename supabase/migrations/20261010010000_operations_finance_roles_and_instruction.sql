@@ -159,3 +159,57 @@ $$;
 
 revoke all on function public.service_record_payout_instruction(uuid,text) from public, anon, authenticated;
 grant execute on function public.service_record_payout_instruction(uuid,text) to service_role;
+
+
+-- A truthful live HQ for every department, including staff whose RLS does NOT
+-- allow reading raw moderator/payment tables. A null is "not authorized" and
+-- a failed RPC is "unavailable", never falsely counted as an empty queue.
+create or replace function public.admin_operations_queue_counts()
+returns jsonb
+language plpgsql
+stable security definer
+set search_path = ''
+as $$
+declare
+ v_uid uuid := auth.uid();
+ v_reviews integer;
+ v_cancellations integer;
+ v_paused integer;
+ v_reports integer;
+ v_disputes integer;
+ v_promotions integer;
+ v_payouts integer;
+begin
+ if v_uid is null or not public.has_permission(v_uid,'admin.access') then
+   raise exception 'not_authorised' using errcode='42501';
+ end if;
+ if public.has_permission(v_uid,'listings.review') then
+   select count(*)::integer into v_reviews from public.listing_reviews where status='PENDING';
+ end if;
+ if public.has_permission(v_uid,'auctions.review_cancellation') then
+   select count(*)::integer into v_cancellations from public.auction_cancellation_requests where status='PENDING';
+ end if;
+ if public.has_permission(v_uid,'auctions.view') then
+   select count(*)::integer into v_paused from public.auctions where status='PAUSED';
+ end if;
+ if public.has_permission(v_uid,'reports.view') then
+   select count(*)::integer into v_reports from public.reports where status in ('OPEN','REVIEWING');
+ end if;
+ if public.has_permission(v_uid,'disputes.view') then
+   select count(*)::integer into v_disputes from public.transaction_disputes where status <> 'RESOLVED';
+ end if;
+ if public.has_permission(v_uid,'settings.manage_marketplace') then
+   select count(*)::integer into v_promotions from public.promotion_requests where status='PENDING';
+ end if;
+ if public.has_permission(v_uid,'payouts.view') then
+   select count(*)::integer into v_payouts from public.seller_payouts
+     where status in ('PAYOUT_DUE','PAYOUT_PENDING');
+ end if;
+ return jsonb_build_object(
+   'reviews',v_reviews,'cancellations',v_cancellations,'paused',v_paused,
+   'reports',v_reports,'disputes',v_disputes,'promotions',v_promotions,
+   'payouts',v_payouts,'asOf',statement_timestamp());
+end
+$$;
+revoke all on function public.admin_operations_queue_counts() from public, anon;
+grant execute on function public.admin_operations_queue_counts() to authenticated, service_role;
