@@ -64,7 +64,7 @@ function isAuthorized(request: Request): boolean {
 
 async function retryReadySellerPayouts(
   admin: ReturnType<typeof createAdminClient>
-): Promise<number> {
+): Promise<{ sellerPayoutsReleased: number; sellerPayoutsInstructed: number }> {
   try {
     const { releaseSellerPayout } = await import("@/server/payments/seller-payout");
     const { data: payoutRows, error } = await admin
@@ -77,18 +77,20 @@ async function retryReadySellerPayouts(
 
     if (error) {
       console.error("[cron/settle] seller payout scan failed", error.message);
-      return 0;
+      return { sellerPayoutsReleased: 0, sellerPayoutsInstructed: 0 };
     }
 
-    let released = 0;
+    let sellerPayoutsReleased = 0;
+    let sellerPayoutsInstructed = 0;
     for (const row of payoutRows ?? []) {
       const result = await releaseSellerPayout(row.id);
-      if (result.ok) released += 1;
+      if (result.ok && result.status === "PAYOUT_DUE") sellerPayoutsInstructed += 1;
+      if (result.ok && result.status === "PAID_OUT") sellerPayoutsReleased += 1;
     }
-    return released;
+    return { sellerPayoutsReleased, sellerPayoutsInstructed };
   } catch (err) {
     console.error("[cron/settle] seller payout retry threw", err);
-    return 0;
+    return { sellerPayoutsReleased: 0, sellerPayoutsInstructed: 0 };
   }
 }
 
@@ -103,7 +105,7 @@ export async function GET(request: Request): Promise<Response> {
   }
 
   const admin = createAdminClient();
-  const sellerPayoutsReleased = await retryReadySellerPayouts(admin);
+  const { sellerPayoutsReleased, sellerPayoutsInstructed } = await retryReadySellerPayouts(admin);
 
   // 0. Ending-soon notices. Independent of settlement (an auction can sit in
   //    its final window long before anything is due to close) and fully best
@@ -146,6 +148,7 @@ export async function GET(request: Request): Promise<Response> {
       announced: 0,
       endingSoon,
       sellerPayoutsReleased,
+      sellerPayoutsInstructed,
       durationMs: Date.now() - started,
     });
   }
@@ -330,6 +333,7 @@ export async function GET(request: Request): Promise<Response> {
     expired,
     endingSoon,
     sellerPayoutsReleased,
+    sellerPayoutsInstructed,
     durationMs: Date.now() - started,
   });
 }
