@@ -22,7 +22,7 @@ export default async function OperationsHQPage() {
 
   const keys = [
     "admin.access", "admin.manage_team", "payments.view",
-    "payouts.view", "disputes.view", "settings.manage_marketplace",
+    "payouts.view", "disputes.view", "settings.manage_marketplace", "marketing.view",
   ] as const;
   const grants = await Promise.all(keys.map((key) =>
     supabase.rpc("has_permission", { p_user_id: user.id, p_permission: key })
@@ -32,7 +32,8 @@ export default async function OperationsHQPage() {
 
   const canFinance = Boolean(permissions.get("payments.view") || permissions.get("payouts.view"));
   const canDisputes = Boolean(permissions.get("disputes.view"));
-  const canMarketing = Boolean(permissions.get("settings.manage_marketplace"));
+  const canManagePromotions = Boolean(permissions.get("settings.manage_marketplace"));
+  const canMarketing = canManagePromotions || Boolean(permissions.get("marketing.view"));
   const canTeam = Boolean(permissions.get("admin.manage_team"));
 
   // Read under the caller's session. No service-role client or sensitive exports.
@@ -46,7 +47,7 @@ export default async function OperationsHQPage() {
       canDisputes
         ? supabase.from("transaction_disputes").select("id", { count: "exact", head: true }).neq("status", "RESOLVED")
         : Promise.resolve(null),
-      canMarketing
+      canManagePromotions
         ? supabase.from("promotion_requests").select("id", { count: "exact", head: true }).eq("status", "PENDING")
         : Promise.resolve(null),
       canFinance
@@ -68,7 +69,7 @@ export default async function OperationsHQPage() {
     ...(canFinance
       ? [{ title: "Pending seller payouts", description: "Reconcile provider settlement before payout actions.", count: countFromQuery(payouts), href: "/admin/finance", icon: Banknote, category: "Finance" }]
       : []),
-    ...(canMarketing
+    ...(canManagePromotions
       ? [{ title: "Promotion requests", description: "Review paid placements and quoted prices.", count: countFromQuery(promotions), href: "/admin#admin-promotions", icon: Megaphone, category: "Marketing" }]
       : []),
   ];
@@ -105,7 +106,7 @@ export default async function OperationsHQPage() {
         </div>
       </header>
 
-      <AdminNav active="command" showTeam={canTeam} showMarketing
+      <AdminNav active="command" showTeam={canTeam} showMarketing={canMarketing}
         disputeCount={canDisputes ? countFromQuery(disputes) ?? 0 : 0} />
 
       <section aria-label="Workload overview" className="grid gap-3 sm:grid-cols-3">
