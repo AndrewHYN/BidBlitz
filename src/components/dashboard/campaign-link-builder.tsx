@@ -54,7 +54,7 @@ export function CampaignLinkBuilder() {
           <p className="text-xs text-muted-foreground">Create shareable, labeled links for real BidBlitz pages.</p>
         </div>
       </div>
-      <form className="grid gap-4 sm:grid-cols-2" onSubmit={generate}>
+      <form method="post" className="grid gap-4 sm:grid-cols-2" onSubmit={generate}>
         <label className="space-y-1.5 text-sm font-bold">
           <span>Destination</span>
           <select value={destination} onChange={(e) => setDestination(e.target.value as CampaignDestination)}
