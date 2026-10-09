@@ -105,7 +105,7 @@ export default async function OperationsHQPage() {
         </div>
       </header>
 
-      <AdminNav active="command" showTeam={canTeam} showMarketing={canMarketing}
+      <AdminNav active="command" showTeam={canTeam} showMarketing
         disputeCount={canDisputes ? countFromQuery(disputes) ?? 0 : 0} />
 
       <section aria-label="Workload overview" className="grid gap-3 sm:grid-cols-3">
@@ -179,8 +179,8 @@ export default async function OperationsHQPage() {
             href="/admin/disputes" cta="Case queue" />}
           {canFinance && <Department icon={Banknote} title="Finance & settlement" detail="Separate recorded fees, provider funds, seller liabilities and paid transfers."
             href="/admin/finance" cta="Finance desk" />}
-          {canMarketing && <Department icon={Megaphone} title="Marketing & growth" detail="Prepare honest share campaigns; review real listing promotions."
-            href="/admin/marketing" cta="Growth studio" />}
+          <Department icon={Megaphone} title="Marketing & growth" detail="Prepare honest share campaigns; authorized staff review paid placements."
+            href="/admin/marketing" cta="Growth studio" />
           {canTeam && <Department icon={Users} title="People & access" detail="Assign staff roles, suspend access and inspect the authorization audit."
             href="/admin/team" cta="Team roster" />}
           <Department icon={Headset} title="Seller & customer operations" detail="Help buyers and sellers complete safe, accurate auctions."
