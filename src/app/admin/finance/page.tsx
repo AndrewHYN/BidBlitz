@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
   AlertTriangle,
+  ArrowRight,
   Banknote,
   CircleCheck,
   Clock3,
@@ -134,8 +135,44 @@ export default async function FinancePage() {
       <AdminNav
         active="finance"
         showTeam={canManageTeam}
+        showMarketing
         disputeCount={activeDisputes}
       />
+
+      <section aria-label="Finance workspaces" className="grid gap-4 md:grid-cols-2">
+        {canPayments && (
+          <Link href="/admin/finance/payments"
+            className="group relative overflow-hidden rounded-2xl border border-orange-400/20 bg-[#161719] p-6 text-white shadow-lg transition hover:-translate-y-0.5 hover:shadow-xl">
+            <div className="flex items-center justify-between gap-3">
+              <span className="grid size-12 place-items-center rounded-xl bg-white/10 text-orange-300">
+                <Banknote className="size-6" aria-hidden />
+              </span>
+              <ArrowRight className="size-5 text-orange-300 transition group-hover:translate-x-1" aria-hidden />
+            </div>
+            <h2 className="mt-5 text-xl font-black tracking-tight">Buyer payment ledger</h2>
+            <p className="mt-2 text-sm leading-6 text-zinc-300">
+              Every collection, frozen 5% fee, seller liability, payment status and provider reference.
+            </p>
+            <span className="mt-4 block text-xs font-bold uppercase tracking-wider text-orange-300">Open payments desk</span>
+          </Link>
+        )}
+        {canPayouts && (
+          <Link href="/admin/finance/payouts"
+            className="group relative overflow-hidden rounded-2xl border border-orange-400/20 bg-[#161719] p-6 text-white shadow-lg transition hover:-translate-y-0.5 hover:shadow-xl">
+            <div className="flex items-center justify-between gap-3">
+              <span className="grid size-12 place-items-center rounded-xl bg-white/10 text-orange-300">
+                <WalletCards className="size-6" aria-hidden />
+              </span>
+              <ArrowRight className="size-5 text-orange-300 transition group-hover:translate-x-1" aria-hidden />
+            </div>
+            <h2 className="mt-5 text-xl font-black tracking-tight">Seller payout desk</h2>
+            <p className="mt-2 text-sm leading-6 text-zinc-300">
+              Review payouts, seller wallet readiness, disputes and the read-only Linkwa statement.
+            </p>
+            <span className="mt-4 block text-xs font-bold uppercase tracking-wider text-orange-300">Open payout operations</span>
+          </Link>
+        )}
+      </section>
 
       {!snapshot ? (
         <section className="rounded-2xl border border-destructive/20 bg-destructive/5 p-5">
