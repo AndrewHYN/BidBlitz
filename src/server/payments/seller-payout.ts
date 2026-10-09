@@ -10,7 +10,7 @@ import { paymentsRuntimeEnabled } from "@/server/payments/runtime";
 import { PaymentProviderRequestError } from "@/server/payments/provider";
 
 export type SellerPayoutReleaseResult =
-  | { ok: true; status: "PAID_OUT"; payoutReference: string }
+  | { ok: true; status: "PAID_OUT" | "PAYOUT_DUE"; payoutReference: string }
   | {
       ok: false;
       code:
@@ -269,34 +269,26 @@ export async function releaseSellerPayout(
       }
     );
 
-    const recorded = await transition(
-      payout.id,
-      "PAID_OUT",
-      result.payoutId,
-      `Automatic Linkwa payout instructed after buyer-confirmed handover: ${result.payoutId}.`
-    );
-
-    if (recorded.error) {
+    // Linkwa's POST confirms an INSTRUCTION, not that money reached SmileCash.
+    // Keep the row in PAYOUT_DUE until a human verifies the provider debit and
+    // destination receipt. Do not claim PAID_OUT or notify the seller as paid.
+    // This purpose-built RPC persists the reference atomically while the row
+    // remains un-retryable. An unknown DB outcome still blocks any retry.
+    const recorded = await admin.rpc("service_record_payout_instruction", {
+      p_payout_id: payout.id,
+      p_provider_reference: result.payoutId,
+    });
+    if (recorded.error || recorded.data?.ok !== true
+        || recorded.data?.status !== "PAYOUT_DUE") {
       return {
         ok: false,
         code: "manual_reconciliation_required",
         message:
-          "Linkwa accepted the payout but BidBlitz could not finish recording it. Do not retry automatically.",
+          "Linkwa accepted the payout instruction but BidBlitz could not verify its record. Do not retry; reconcile with the provider.",
       };
     }
 
-    await admin.from("notifications").insert({
-      user_id: payout.seller_id,
-      type: "PAYOUT_SENT",
-      payload: {
-        payoutId: payout.id,
-        amountMinor: payout.amount_minor,
-        currency: payout.currency,
-        wallet: recipient.wallet_provider ?? "smilecash",
-      },
-    });
-
-    return { ok: true, status: "PAID_OUT", payoutReference: result.payoutId };
+    return { ok: true, status: "PAYOUT_DUE", payoutReference: result.payoutId };
   } catch (error) {
     // Once PAYOUT_DUE was claimed we do not auto-return to a retryable money
     // state: an ambiguous provider failure could still have moved funds.
