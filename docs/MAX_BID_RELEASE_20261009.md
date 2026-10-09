@@ -26,3 +26,9 @@ The prior 64/64 Playwright release smoke is historical evidence for the earlier 
 ## Remaining production activation gate
 
 A real seller must link an active SmileCash wallet through `/settings/payouts`. Then complete the controlled real Linkwa buyer payment, confirm buyer handover, and reconcile exactly one payout against the provider reference/statement with the stored 5% fee and 95% proceeds. No automated refunds were added. General payments stay paused until this real-world proof is complete. Account sign-in, real wallet identity and payment approval are not available to the agent in this session; they require the account holder's participation. Never invent READY IDs or mark money paid to bypass the gate.
+
+## Deployment verification
+
+The feature checkpoint was published through the GitHub connector as `a0af4e003e1a60e2d87bd39a270f70f9f2100397`; its tree SHA `30b78a161d43a0e2ea1238bb8b126b835106e74f` exactly matched the tested local checkpoint. GitHub's Vercel status succeeded. The production auction page visibly renders Max Bid, the help/terms explain early acceptance, and the public homepage, browse, auction, help, terms, payout entry and time routes returned HTTP 200 without application errors.
+
+The Vercel management connector returned HTTP 403 for the existing team; no CLI authentication is available. `/api/version` therefore exposes only the deployment's public 40-character `VERCEL_GIT_COMMIT_SHA`, with `Cache-Control: no-store`, so the production domain can be compared directly with GitHub HEAD. It exposes no credentials or payment configuration. Public visual verification found no horizontal overflow at the observed desktop viewport. Authenticated seller/buyer UI and fresh Playwright coverage still require an available authenticated/browser test environment.
