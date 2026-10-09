@@ -1,11 +1,13 @@
 import Link from "next/link";
-import { Banknote, BookOpen, Gauge, Megaphone, Scale, Users } from "lucide-react";
+import { Activity, Banknote, BookOpen, Gauge, Megaphone, Scale, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const ITEMS = [
+  { href: "/admin/command", label: "HQ", icon: Activity, key: "command" },
   { href: "/admin", label: "Overview", icon: Gauge, key: "overview" },
   { href: "/admin/disputes", label: "Disputes", icon: Scale, key: "disputes" },
   { href: "/admin/finance", label: "Finance", icon: Banknote, key: "finance" },
+  { href: "/admin/marketing", label: "Marketing", icon: Megaphone, key: "marketing" },
   { href: "/admin#admin-promotions-heading", label: "Promotions", icon: Megaphone, key: "promotions" },
   { href: "/admin/guide", label: "Guide", icon: BookOpen, key: "guide" },
   { href: "/admin/team", label: "Team", icon: Users, key: "team" },
@@ -14,10 +16,12 @@ const ITEMS = [
 export function AdminNav({
   active = "overview",
   showTeam = false,
+  showMarketing = false,
   disputeCount = 0,
 }: {
-  active?: "overview" | "disputes" | "finance" | "guide" | "team";
+  active?: "command" | "overview" | "disputes" | "finance" | "marketing" | "promotions" | "guide" | "team";
   showTeam?: boolean;
+  showMarketing?: boolean;
   disputeCount?: number;
 }) {
   return (
@@ -25,7 +29,10 @@ export function AdminNav({
       aria-label="Admin sections"
       className="flex gap-2 overflow-x-auto rounded-xl border bg-muted/40 p-1.5 shadow-sm"
     >
-      {ITEMS.filter((item) => showTeam || item.key !== "team").map(
+      {ITEMS.filter((item) =>
+        (showTeam || item.key !== "team") &&
+        (showMarketing || item.key !== "marketing")
+      ).map(
         ({ href, label, icon: Icon, key }) => {
           const selected = active === key;
           return (
