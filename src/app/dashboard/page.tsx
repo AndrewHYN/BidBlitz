@@ -134,6 +134,13 @@ export default async function DashboardOverviewPage() {
         }
       />
 
+      <section aria-labelledby="dashboard-payout-guide" className="rounded-xl border bg-card p-4 shadow-sm sm:p-5">
+        <h2 id="dashboard-payout-guide" className="flex items-center gap-2 font-semibold"><Wallet className="size-5 text-primary" aria-hidden />How you get paid when you sell</h2>
+        <p className="mt-2 text-sm text-muted-foreground">Your seller payouts go to your SmileCash wallet through Linkwa. Register with SmileCash if you don’t have a wallet, then connect your existing wallet before publishing an item.</p>
+        <p className="mt-2 text-sm text-muted-foreground">You receive 95% of the sale after buyer-confirmed handover and payment checks; BidBlitz keeps 5%. Provider and wallet fees may also apply. Buying only? You don’t need SmileCash.</p>
+        <Button asChild variant="outline" className="mt-4"><Link href="/settings/payouts">Set up or review my payout wallet</Link></Button>
+      </section>
+
       {outbid.length > 0 && (
         <section
           aria-labelledby="dashboard-outbid"

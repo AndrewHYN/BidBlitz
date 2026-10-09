@@ -186,6 +186,10 @@ export function SignupForm() {
         </p>
       </div>
 
+      <aside className="rounded-xl border bg-muted/30 p-3 text-sm leading-6">
+        <strong>Planning to sell?</strong> You’ll connect a SmileCash wallet before creating a listing. Register on your phone with <span className="whitespace-nowrap font-mono font-semibold">*225*1#</span>, or use your existing wallet. Buyers do not need SmileCash.
+      </aside>
+
       {error && (
         <div
           data-testid="auth-error"

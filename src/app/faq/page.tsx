@@ -117,7 +117,7 @@ export default function FaqPage() {
         <DocumentSection id="money" title="Paying and getting paid">
           <Question q="Do I need SmileCash to use BidBlitz?">
             <p>To buy: no. Choose a supported payment method on Linkwa’s checkout page; you do not need a Linkwa account or a SmileCash wallet just to pay.</p>
-            <p>To sell: currently yes. Linkwa sends seller payouts to SmileCash. <Link href="/settings/payouts">Connect your existing wallet</Link> before publishing, using its registered name and mobile number. If you need to register, follow <a href="https://linkwa.co.zw/faqs" target="_blank" rel="noopener noreferrer">Linkwa’s official guidance</a>. Never send your ID or wallet PIN to BidBlitz support.</p>
+            <p>To sell: currently yes. Linkwa sends seller payouts to SmileCash. <Link href="/settings/payouts">Connect your existing wallet</Link> before publishing, using its registered name and mobile number. To register, dial <strong className="whitespace-nowrap">*225*1#</strong> on your phone and follow <a href="https://www.zb.co.zw/banking/smilecash" target="_blank" rel="noopener noreferrer">ZB’s official SmileCash guidance</a>. Never send your ID or wallet PIN to BidBlitz support.</p>
             <p>SmileCash supports onward transfers, including to EcoCash, subject to the wallet provider’s fees and limits. BidBlitz does not promise free transfers or instant seller payouts.</p>
           </Question>
           <Question q="What does BidBlitz cost?">

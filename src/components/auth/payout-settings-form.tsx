@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import { CircleCheck, Smartphone, WalletCards } from "lucide-react";
 import { setupSellerPayoutAction } from "@/server/actions/payout-setup";
 import { Button } from "@/components/ui/button";
@@ -62,8 +63,8 @@ export function PayoutSettingsForm({
           <h3 id="wallet-steps" className="font-semibold">Before you sell: connect your SmileCash wallet</h3>
           <p className="text-sm leading-6 text-muted-foreground">Only sellers need a payout wallet. Buyers can use the payment methods offered at Linkwa checkout without opening a SmileCash account.</p>
           <ol className="list-decimal space-y-2 pl-5 text-sm leading-6">
-            <li>Already have SmileCash? Use your existing wallet and its registered mobile number. You do not need another identity or wallet for testing.</li>
-            <li>Need a wallet? Follow <a href="https://linkwa.co.zw/faqs" target="_blank" rel="noopener noreferrer" className="font-semibold text-primary underline">Linkwa’s official registration guidance</a>. Complete registration with the provider using your own identity; BidBlitz does not collect your ID or wallet PIN.</li>
+            <li>Already have SmileCash? Use your existing wallet and its registered mobile number.</li>
+            <li>Need a wallet? Dial <strong className="whitespace-nowrap font-mono text-lg">*225*1#</strong> on your phone and follow the registration steps. See <a href="https://www.zb.co.zw/banking/smilecash" target="_blank" rel="noopener noreferrer" className="font-semibold text-primary underline">ZB’s official SmileCash guide</a>. Register directly with ZB; BidBlitz never asks for your ID or wallet PIN.</li>
             <li>Enter the wallet holder’s registered name and number below, then connect. Wait for “Ready to receive payouts” before publishing.</li>
           </ol>
           <p className="text-xs leading-5 text-muted-foreground">Do not open a second wallet just to use another email address. If your existing wallet cannot be linked, contact support rather than registering another identity.</p>
@@ -76,6 +77,7 @@ export function PayoutSettingsForm({
           <span><strong>Ready to receive payouts.</strong> Linkwa currently settles marketplace payouts to SmileCash.</span>
         </div>
       )}
+      {ready && <Link href="/sell" className="inline-flex min-h-11 items-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90">Continue to create a listing</Link>}
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">

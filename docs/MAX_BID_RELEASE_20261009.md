@@ -49,3 +49,10 @@ Added seller-only requirements, existing-wallet instructions, official registrat
 The owner has one identity and cannot create another verified wallet. Stop the second-wallet test. Use the already verified hyndrrx0 seller wallet and another legitimate BidBlitz account as buyer (buyers need no new wallet). Do not change the seller or recipient of the old $1 transaction, clone wallet IDs, or manufacture success. A new controlled sale must have its amount explicitly agreed; the existing $1.20 sale exceeds the earlier $1 test cap. Real payout remains unproved; general payments stay paused.
 
 Sources: https://linkwa.co.zw/faqs and https://linkwa.co.zw/blog/linkwa-payments-explained. Free sandbox is available, but Linkwa advertises a Developer subscription for live API use: verify the merchant's existing live entitlement and commercial costs before general activation. A polished onboarding flow cannot remove the provider's identity/account limits.
+
+
+## Seller onboarding refinement
+
+Signup stays open to buyers without a payout wallet. It discloses the seller requirement early. The Sell page checks the authenticated seller's private recipient state server-side: READY plus both provider IDs is required to render the listing form; otherwise a wallet setup card appears. Existing database publication protection remains the authoritative gate. The payout form returns verified sellers to Sell. Unknown/query-error wallet state fails closed in the UI.
+
+Official ZB SmileCash registration code is *225*1#, per https://www.zb.co.zw/banking/smilecash (verified 9 October 2026). Registration happens on the seller's phone, not through a BidBlitz identity/PIN form. Links do not auto-dial or register a financial account. Production API credentials and real payout validation are deferred at the owner's request; the payment safety switch is unchanged.
