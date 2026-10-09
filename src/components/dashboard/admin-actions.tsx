@@ -629,6 +629,12 @@ export async function sellerPayoutAction(input: unknown): Promise<
     };
   }
 
+  // Only the payout service may claim PAYOUT_DUE before a real provider call.
+  // A manual click must never create a provider-ambiguous payout state.
+  if (parsed.data.status === "PAYOUT_DUE") {
+    return { ok: false, message: "Payout due is reserved for the automated provider instruction claim." };
+  }
+
   const supabase = await createClient();
   const {
     data: { user },
