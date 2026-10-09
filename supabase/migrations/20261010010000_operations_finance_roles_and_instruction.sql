@@ -147,12 +147,13 @@ begin
  if v_payout.payout_reference is not null then
    raise exception 'different_provider_reference' using errcode = 'P0001';
  end if;
- update public.seller_payouts set payout_reference=v_reference
+ -- The existing seller_payouts_audit trigger writes the immutable event
+ -- exactly once for the reference change. Do not insert a duplicate event.
+ update public.seller_payouts
+   set payout_reference=v_reference,
+       internal_note=concat_ws(E'\\n', nullif(internal_note,''),
+         'Linkwa accepted an instruction; seller receipt is NOT verified.')
    where id=p_payout_id;
- insert into public.seller_payout_events
-  (payout_id, from_status, to_status, payout_reference, note)
- values (p_payout_id, 'PAYOUT_DUE','PAYOUT_DUE',v_reference,
-  'Provider accepted payout instruction; final settlement NOT independently verified.');
  return jsonb_build_object('ok',true,'already',false,'status','PAYOUT_DUE');
 end
 $$;
