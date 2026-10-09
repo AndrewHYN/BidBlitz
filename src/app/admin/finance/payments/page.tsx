@@ -42,7 +42,7 @@ export default async function PaymentsPage() {
           The stored gross amount, BidBlitz fee, and seller liability never change with later fee settings.
         </p>
       </header>
-      <AdminNav active="finance" showTeam={team} showMarketing />
+      <AdminNav active="finance" showTeam={team} />
       <div className="flex flex-wrap gap-3 text-sm font-bold">
         <Link href="/admin/finance" className="inline-flex items-center gap-1 text-primary hover:underline">
           <ArrowLeft className="size-4" aria-hidden /> Finance overview
