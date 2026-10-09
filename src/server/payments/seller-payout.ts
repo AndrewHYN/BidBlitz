@@ -7,6 +7,7 @@ import {
   instructLinkwaPayout,
 } from "@/server/payments/linkwa-payouts";
 import { paymentsRuntimeEnabled } from "@/server/payments/runtime";
+import { PaymentProviderRequestError } from "@/server/payments/provider";
 
 export type SellerPayoutReleaseResult =
   | { ok: true; status: "PAID_OUT"; payoutReference: string }
@@ -299,6 +300,21 @@ export async function releaseSellerPayout(
   } catch (error) {
     // Once PAYOUT_DUE was claimed we do not auto-return to a retryable money
     // state: an ambiguous provider failure could still have moved funds.
+    // Preserve only a bounded diagnostic, never provider text (which can
+    // contain credentials or personal data). A rejection still needs manual
+    // reconciliation: it is not permission to send a second instruction.
+    const status = error instanceof PaymentProviderRequestError
+      && Number.isInteger(error.httpStatus)
+      && error.httpStatus! >= 100 && error.httpStatus! <= 599
+      ? error.httpStatus : null;
+    await admin.from("seller_payout_events").insert({
+      payout_id: payout.id,
+      from_status: "PAYOUT_DUE",
+      to_status: "PAYOUT_DUE",
+      note: status
+        ? `Linkwa payout attempt failed with HTTP ${status}. Reconcile the provider statement before any retry.`
+        : "Linkwa payout attempt did not complete cleanly. Provider outcome is unconfirmed; reconcile before any retry.",
+    });
     await admin.from("notifications").insert({
       user_id: payout.seller_id,
       type: "PAYOUT_ATTENTION",

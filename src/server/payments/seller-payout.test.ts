@@ -4,6 +4,7 @@ import { readLinkwaEnvironment } from "./config";
 import { fetchLinkwaBalance, instructLinkwaPayout } from "./linkwa-payouts";
 import { paymentsRuntimeEnabled } from "./runtime";
 import { releaseSellerPayout } from "./seller-payout";
+import { PaymentProviderRequestError } from "./provider";
 
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: vi.fn() }));
 vi.mock("./config", () => ({ readLinkwaEnvironment: vi.fn() }));
@@ -14,6 +15,7 @@ vi.mock("./runtime", () => ({ paymentsRuntimeEnabled: vi.fn() }));
 
 const payoutId = "11111111-1111-4111-8111-111111111111";
 const rpc = vi.fn();
+const inserted = vi.fn();
 
 function installDatabase() {
   const rows: Record<string, unknown> = {
@@ -38,7 +40,7 @@ function installDatabase() {
         select: vi.fn(() => query), eq: vi.fn(() => query),
         neq: vi.fn(() => query), limit: vi.fn(() => query),
         maybeSingle: vi.fn(async () => result),
-        insert: vi.fn(async () => ({ error: null })),
+        insert: vi.fn(async (value) => { inserted(table, value); return { error: null }; }),
         then: (resolve: (value: typeof result) => unknown) => Promise.resolve(result).then(resolve),
       };
       return query;
@@ -67,6 +69,26 @@ beforeEach(() => {
 });
 
 describe("seller payout atomic claim", () => {
+  it("records a sanitized rejection and never makes the claim retryable", async () => {
+    vi.mocked(instructLinkwaPayout).mockRejectedValue(new PaymentProviderRequestError("private provider response", 422));
+    expect(await releaseSellerPayout(payoutId)).toMatchObject({ ok: false, code: "provider_failed" });
+    expect(inserted).toHaveBeenCalledWith("seller_payout_events", {
+      payout_id: payoutId, from_status: "PAYOUT_DUE", to_status: "PAYOUT_DUE",
+      note: "Linkwa payout attempt failed with HTTP 422. Reconcile the provider statement before any retry.",
+    });
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(instructLinkwaPayout).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(inserted.mock.calls)).not.toContain("private provider response");
+  });
+
+  it("never stores arbitrary exception messages or secrets", async () => {
+    vi.mocked(instructLinkwaPayout).mockRejectedValue(new Error("Bearer SECRET-KEY private phone"));
+    expect(await releaseSellerPayout(payoutId)).toMatchObject({ ok: false, code: "provider_failed" });
+    expect(inserted).toHaveBeenCalledWith("seller_payout_events", expect.objectContaining({
+      to_status: "PAYOUT_DUE", note: expect.stringContaining("Provider outcome is unconfirmed"),
+    }));
+    expect(JSON.stringify(inserted.mock.calls)).not.toContain("SECRET-KEY");
+  });
   it("sends exactly the frozen 95% after a newly acquired claim", async () => {
     expect(await releaseSellerPayout(payoutId)).toMatchObject({ ok: true, status: "PAID_OUT" });
     expect(instructLinkwaPayout).toHaveBeenCalledExactlyOnceWith(
