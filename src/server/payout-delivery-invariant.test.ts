@@ -233,7 +233,7 @@ describe("the admin console mirrors the enforced state machine", () => {
     return out;
   }
 
-  it("offers exactly the transitions the database accepts", () => {
+  it("offers only legal manual transitions; PAYOUT_DUE requires the provider-only claim", () => {
     const offered = consoleMap();
     expect(Object.keys(offered).sort()).toEqual([
       "DELIVERY_CONFIRMED",
@@ -244,9 +244,19 @@ describe("the admin console mirrors the enforced state machine", () => {
       "PAYOUT_PENDING",
       "WAITING_FOR_FULFILMENT",
     ]);
+    // The SQL transition map includes PAYOUT_DUE for the backend's exclusive
+    // service claim, but that is intentionally NOT a manual staff control.
+    // The migration creates a trigger to reject browser claims at DB level.
     for (const [state, targets] of Object.entries(offered)) {
-      expect(targets).toEqual(map[state] ?? []);
+      expect(targets).toEqual((map[state] ?? []).filter((to) => to !== "PAYOUT_DUE"));
     }
+    const migration = readFileSync(join(process.cwd(),
+      "supabase/migrations/20261010000122_operations_finance_roles_and_instruction_20261010.sql"), "utf8");
+    expect(migration).toContain("provider_payout_due_only");
+    expect(migration).toContain("auth.role() <> 'service_role'");
+    const adminActions = readFileSync(join(process.cwd(),
+      "src/components/dashboard/admin-actions.tsx"), "utf8");
+    expect(adminActions).toContain('parsed.data.status === "PAYOUT_DUE"');
   });
 
   it("never offers \"Mark payout due\" before delivery is confirmed", () => {
