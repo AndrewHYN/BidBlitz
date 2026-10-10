@@ -12,7 +12,7 @@ create table if not exists public.external_seller_payout_claims (
   amount_minor bigint not null check (amount_minor > 0),
   currency text not null check (currency='USD'),
   seller_id uuid not null references public.profiles(id) on delete restrict,
-  destination_phone_e164 text not null check (destination_phone_e164 ~ '^\\+[1-9][0-9]{8,14}$'),
+  destination_phone_e164 text not null check (destination_phone_e164 ~ '^[+][1-9][0-9]{8,14}$'),
   rail text not null check (rail in ('SMILECASH','ECOCASH','BANK_TRANSFER')),
   status text not null default 'RESERVED'
     check (status in ('RESERVED','RECEIPT_CONFIRMED','CANCELLED')),
@@ -226,7 +226,7 @@ begin
  end if;
  select r.phone_e164 into v_phone from public.seller_payout_recipients r
    where r.seller_id=v_payout.seller_id;
- if v_phone is null or v_phone !~ '^\\+[1-9][0-9]{8,14}$' then
+ if v_phone is null or v_phone !~ '^[+][1-9][0-9]{8,14}$' then
    raise exception 'recipient_phone_unavailable' using errcode='42501';
  end if;
  -- One claim per payout forever; cancelled claims remain evidence of an attempt.
@@ -299,7 +299,7 @@ begin
  where payout_id=p_payout_id;
  update public.seller_payouts set
     status='PAID_OUT',payout_reference=v_ref,paid_at=clock_timestamp(),
-    internal_note=concat_ws(E'\\n',nullif(internal_note,''),
+    internal_note=concat_ws(chr(10),nullif(internal_note,''),
       'External payment receipt confirmed by authorized finance staff.')
  where id=p_payout_id;
  insert into public.external_seller_payout_events(payout_id,actor_id,event_type,note)
