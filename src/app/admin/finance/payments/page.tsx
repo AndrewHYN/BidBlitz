@@ -8,6 +8,7 @@ import { readFinanceOperations } from "@/server/finance/operations";
 import { safeMinor, paymentEquation } from "@/lib/finance/operations";
 import { AdminNav } from "@/components/dashboard/admin-nav";
 import { Money } from "@/components/auction/money";
+import { CopyFinanceReference } from "@/components/dashboard/copy-finance-reference";
 
 export const metadata: Metadata = {
   title: "Buyer Payment Ledger",
@@ -28,6 +29,8 @@ export default async function PaymentsPage() {
   const result = await readFinanceOperations(100);
   const payments = result.ok ? result.data.transactions : [];
   const invalid = payments.filter((p) => !paymentEquation(p));
+  const awaiting = payments.filter((p) => p.status === "AWAITING_PAYMENT").length;
+  const paid = payments.filter((p) => ["PAID", "SETTLED"].includes(p.status)).length;
   return (
     <div className="page-container space-y-7 py-8 sm:py-12" data-testid="admin-finance-payments">
       <header className="relative overflow-hidden rounded-[1.75rem] border border-orange-500/20 bg-[#161719] p-6 text-white shadow-xl sm:p-9">
@@ -51,6 +54,14 @@ export default async function PaymentsPage() {
           Seller payout desk <ArrowRight className="size-4" aria-hidden />
         </Link>}
       </div>
+      <section aria-label="Payment desk workflow" className="grid gap-3 sm:grid-cols-3">
+        <div className="rounded-xl border bg-card p-4"><h2 className="text-sm font-extrabold">1. Buyer pays</h2>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">Buyers start their own checkout after winning. Staff never mark a sale paid from this desk.</p></div>
+        <div className="rounded-xl border bg-card p-4"><h2 className="text-sm font-extrabold">2. Provider verifies</h2>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">Authenticated Linkwa events record the immutable gross amount, 5% fee and 95% seller liability.</p></div>
+        <div className="rounded-xl border bg-card p-4"><h2 className="text-sm font-extrabold">3. Seller settlement</h2>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">After buyer handover, Finance uses the separate payout desk to reserve or reconcile seller money.</p></div>
+      </section>
       {!result.ok ? (
         <p role="alert" className="rounded-xl border border-destructive/35 bg-destructive/10 p-5 text-sm font-bold text-destructive">{result.message}</p>
       ) : (
@@ -59,10 +70,11 @@ export default async function PaymentsPage() {
             <div className="rounded-2xl border bg-card p-5">
               <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Recent transactions</p>
               <p className="mt-2 text-4xl font-black tabular-nums">{payments.length}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{awaiting} awaiting buyer checkout; do not transfer from this desk</p>
             </div>
             <div className="rounded-2xl border bg-card p-5">
               <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Paid / settled in ledger</p>
-              <p className="mt-2 text-4xl font-black tabular-nums">{payments.filter((p) => ["PAID", "SETTLED"].includes(p.status)).length}</p>
+              <p className="mt-2 text-4xl font-black tabular-nums">{paid}</p>
             </div>
             <div className={invalid.length ? "rounded-2xl border border-red-500/30 bg-red-500/5 p-5" : "rounded-2xl border bg-card p-5"}>
               <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Equation mismatches</p>
@@ -81,7 +93,7 @@ export default async function PaymentsPage() {
                   <tr>
                     <th className="p-4">Sale / parties</th><th className="p-4">Collection state</th>
                     <th className="p-4">Gross</th><th className="p-4">BidBlitz fee</th><th className="p-4">Seller liability</th>
-                    <th className="p-4">Provider reference</th><th className="p-4">Recorded at</th>
+                    <th className="p-4">Provider reference</th><th className="p-4">Next finance step</th><th className="p-4">Recorded at</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -101,7 +113,18 @@ export default async function PaymentsPage() {
                       <td className="p-4 font-bold tabular-nums">{safeMinor(p.grossMinor) === null ? "Unavailable" : <Money minor={safeMinor(p.grossMinor)!} currency={p.currency} />}</td>
                       <td className="p-4 font-bold tabular-nums">{safeMinor(p.feeMinor) === null ? "Unavailable" : <Money minor={safeMinor(p.feeMinor)!} currency={p.currency} />}</td>
                       <td className="p-4 font-bold tabular-nums">{safeMinor(p.sellerMinor) === null ? "Unavailable" : <Money minor={safeMinor(p.sellerMinor)!} currency={p.currency} />}</td>
-                      <td className="max-w-40 break-all p-4 font-mono text-muted-foreground">{p.providerReference ?? "Not confirmed"}</td>
+                      <td className="max-w-40 break-all p-4 font-mono text-muted-foreground">
+                        <span>{p.providerReference ?? "Not confirmed"}</span>
+                        {p.providerReference && <div className="mt-2"><CopyFinanceReference value={p.providerReference}/></div>}
+                      </td>
+                      <td className="min-w-44 p-4">
+                        {["PAID", "SETTLED"].includes(p.status)
+                          ? payouts
+                            ? <Link href={`/admin/finance/payouts#transaction-${p.id}`} className="inline-flex min-h-10 items-center rounded-lg border px-3 font-bold text-primary hover:bg-muted">Review seller settlement <ArrowRight className="ml-1 size-3" aria-hidden /></Link>
+                            : <p className="text-muted-foreground">Hand off to authorized payout staff after buyer handover.</p>
+                          : <p className="text-muted-foreground">Await authenticated buyer payment. Never infer PAID from an opened checkout.</p>}
+                        <div className="mt-2"><CopyFinanceReference value={p.id} label="Copy transaction ID"/></div>
+                      </td>
                       <td className="whitespace-nowrap p-4 text-muted-foreground">{new Date(p.createdAt).toLocaleString("en-US")}</td>
                     </tr>
                   ))}
