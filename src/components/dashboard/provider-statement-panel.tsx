@@ -87,7 +87,7 @@ export function ProviderStatementPanel({ payoutReferences }: {
           </p>
           <h2 id="linkwa-statement-heading" className="mt-2 text-xl font-black tracking-tight">Linkwa statement reconciliation</h2>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-            Read the provider's first USD statement page and compare references with BidBlitz's
+            Read the provider&apos;s first USD statement page and compare references with BidBlitz&apos;s
             payout ledger. This never sends a payout or changes a payout status.
           </p>
         </div>
