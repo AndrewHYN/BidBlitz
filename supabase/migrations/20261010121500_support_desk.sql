@@ -196,3 +196,26 @@ begin
 end $$;
 revoke all on function public.staff_add_support_note(uuid,text) from public,anon;
 grant execute on function public.staff_add_support_note(uuid,text) to authenticated;
+
+create or replace function public.staff_support_agents()
+returns jsonb language plpgsql stable security definer set search_path=''
+as $$
+declare v_uid uuid:=auth.uid(); v_list jsonb;
+begin
+ if v_uid is null or not public.has_permission(v_uid,'support.manage') then
+  raise exception 'not_authorised' using errcode='42501';
+ end if;
+ select coalesce(jsonb_agg(to_jsonb(q)),'[]'::jsonb) into v_list
+ from (
+  select p.id,coalesce(nullif(p.display_name,''),p.username,'Support agent') as name
+  from public.profiles p
+  where public.has_permission(p.id,'support.manage')
+    and exists(select 1 from public.staff_assignments a
+      where a.user_id=p.id and a.status='ACTIVE')
+  order by p.id
+  limit 100
+ ) q;
+ return v_list;
+end $$;
+revoke all on function public.staff_support_agents() from public,anon;
+grant execute on function public.staff_support_agents() to authenticated;
