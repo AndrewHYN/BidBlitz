@@ -13,7 +13,7 @@ create table if not exists public.external_seller_payout_claims (
   currency text not null check (currency='USD'),
   seller_id uuid not null references public.profiles(id) on delete restrict,
   destination_phone_e164 text not null check (destination_phone_e164 ~ '^[+][1-9][0-9]{8,14}$'),
-  rail text not null check (rail in ('SMILECASH','ECOCASH','BANK_TRANSFER')),
+  rail text not null check (rail in ('SMILECASH','ECOCASH')),
   status text not null default 'RESERVED'
     check (status in ('RESERVED','RECEIPT_CONFIRMED','CANCELLED')),
   reserved_by uuid not null references public.profiles(id) on delete restrict,
@@ -195,7 +195,7 @@ begin
  if v_uid is null or not public.has_permission(v_uid,'payouts.transition') then
    raise exception 'not_authorised' using errcode='42501';
  end if;
- if p_rail not in ('SMILECASH','ECOCASH','BANK_TRANSFER')
+ if p_rail not in ('SMILECASH','ECOCASH')
   or char_length(btrim(coalesce(p_reason,''))) not between 20 and 1000 then
    raise exception 'invalid_reservation' using errcode='22023';
  end if;
