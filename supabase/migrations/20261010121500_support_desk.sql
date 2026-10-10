@@ -76,3 +76,66 @@ using(auth.uid() is not null and public.has_permission(auth.uid(),'support.manag
 drop policy if exists support_ticket_events_scope on public.support_ticket_events;
 create policy support_ticket_events_scope on public.support_ticket_events for select to authenticated
 using(auth.uid() is not null and public.has_permission(auth.uid(),'support.manage'));
+
+-- Login-required ticket creation, bounded to five tickets per customer/hour.
+create or replace function public.open_support_ticket(
+ p_category text,p_subject text,p_body text
+) returns jsonb language plpgsql security definer set search_path=''
+as $$
+declare v_uid uuid:=auth.uid(); v_id uuid;
+begin
+ if v_uid is null then raise exception 'not_authenticated' using errcode='42501'; end if;
+ if p_category is null or p_category not in
+   ('ACCOUNT','AUCTION','LISTING','PAYMENT','PAYOUT','SAFETY','OTHER')
+   or char_length(btrim(coalesce(p_subject,''))) not between 5 and 160
+   or char_length(btrim(coalesce(p_body,''))) not between 10 and 4000 then
+   raise exception 'invalid_ticket' using errcode='22023';
+ end if;
+ if (select count(*) from public.support_tickets where customer_id=v_uid
+   and created_at > clock_timestamp()-interval '1 hour') >=5 then
+   raise exception 'ticket_rate_limited' using errcode='42900';
+ end if;
+ insert into public.support_tickets(customer_id,category,subject)
+   values(v_uid,p_category,btrim(p_subject)) returning id into v_id;
+ insert into public.support_ticket_messages(ticket_id,author_id,body)
+   values(v_id,v_uid,btrim(p_body));
+ insert into public.support_ticket_events(ticket_id,actor_id,action)
+   values(v_id,v_uid,'OPENED');
+ return jsonb_build_object('ok',true,'id',v_id);
+end $$;
+revoke all on function public.open_support_ticket(text,text,text) from public,anon;
+grant execute on function public.open_support_ticket(text,text,text) to authenticated;
+
+-- Only the customer or an active authorized support operator may add
+-- publicly visible responses. Closed and resolved tickets are immutable.
+create or replace function public.reply_support_ticket(
+ p_ticket_id uuid,p_body text
+) returns jsonb language plpgsql security definer set search_path=''
+as $$
+declare v_uid uuid:=auth.uid(); v_ticket public.support_tickets%rowtype; v_staff boolean;
+begin
+ if v_uid is null then raise exception 'not_authenticated' using errcode='42501'; end if;
+ if char_length(btrim(coalesce(p_body,''))) not between 2 and 4000 then
+   raise exception 'invalid_message' using errcode='22023';
+ end if;
+ select * into v_ticket from public.support_tickets where id=p_ticket_id for update;
+ if not found then raise exception 'ticket_not_found' using errcode='P0002'; end if;
+ v_staff:=public.has_permission(v_uid,'support.manage');
+ if not v_staff and v_ticket.customer_id<>v_uid then
+   raise exception 'not_authorised' using errcode='42501';
+ end if;
+ if v_ticket.status in ('CLOSED','RESOLVED') then
+   raise exception 'ticket_closed' using errcode='22023';
+ end if;
+ insert into public.support_ticket_messages(ticket_id,author_id,body)
+   values(v_ticket.id,v_uid,btrim(p_body));
+ update public.support_tickets set updated_at=clock_timestamp(),
+    status=case when v_staff then 'WAITING_CUSTOMER' else 'OPEN' end
+    where id=v_ticket.id;
+ insert into public.support_ticket_events(ticket_id,actor_id,action)
+   values(v_ticket.id,v_uid,'REPLIED');
+ return jsonb_build_object('ok',true,'status',
+    case when v_staff then 'WAITING_CUSTOMER' else 'OPEN' end);
+end $$;
+revoke all on function public.reply_support_ticket(uuid,text) from public,anon;
+grant execute on function public.reply_support_ticket(uuid,text) to authenticated;
