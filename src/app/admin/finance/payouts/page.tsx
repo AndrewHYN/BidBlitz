@@ -199,7 +199,7 @@ export default async function FinancePayoutsPage() {
                     && payout.linkwaWalletReady === true
                     && !externalRes.error && externalClaim === null;
                   return (
-                    <li key={payout.id} className="space-y-4 rounded-2xl border bg-card p-5 shadow-sm" data-testid="finance-payout-row">
+                    <li id={`transaction-${payout.transactionId}`} key={payout.id} className="scroll-mt-24 space-y-4 rounded-2xl border bg-card p-5 shadow-sm" data-testid="finance-payout-row">
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>
                           <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">{payout.sellerName}</p>
