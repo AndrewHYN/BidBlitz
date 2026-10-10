@@ -162,6 +162,36 @@ revoke all on function public.service_record_payout_instruction(uuid,text) from 
 grant execute on function public.service_record_payout_instruction(uuid,text) to service_role;
 
 
+
+-- A provider reference cannot account for two different seller payouts.
+-- Verified there are no duplicate pre-existing non-null payout references.
+create unique index if not exists seller_payouts_reference_unique
+  on public.seller_payouts(payout_reference)
+  where payout_reference is not null;
+
+-- Preserve the exclusive provider claim: no authenticated browser RPC may
+-- switch a payout into provider-sensitive PAYOUT_DUE without the service
+-- instruction path. This is a database gate, not merely a hidden button.
+create or replace function private.seller_payouts_guard_due_actor()
+returns trigger
+language plpgsql
+set search_path = ''
+as $
+begin
+  if new.status = 'PAYOUT_DUE' and old.status is distinct from new.status
+     and auth.role() <> 'service_role' then
+    raise exception 'provider_payout_due_only' using errcode='42501';
+  end if;
+  return new;
+end
+$;
+
+drop trigger if exists zz_seller_payouts_guard_due_actor on public.seller_payouts;
+create trigger zz_seller_payouts_guard_due_actor
+  before update on public.seller_payouts
+  for each row execute function private.seller_payouts_guard_due_actor();
+
+
 -- A truthful live HQ for every department, including staff whose RLS does NOT
 -- allow reading raw moderator/payment tables. A null is "not authorized" and
 -- a failed RPC is "unavailable", never falsely counted as an empty queue.
