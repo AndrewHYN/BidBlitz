@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Activity, Banknote, BookOpen, Gauge, Megaphone, Scale, Users } from "lucide-react";
+import { Activity, Banknote, BookOpen, Gauge, Megaphone, Scale, Users, Headset } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const ITEMS = [
@@ -8,6 +8,7 @@ const ITEMS = [
   { href: "/admin/disputes", label: "Disputes", icon: Scale, key: "disputes" },
   { href: "/admin/finance", label: "Finance", icon: Banknote, key: "finance" },
   { href: "/admin/marketing", label: "Marketing", icon: Megaphone, key: "marketing" },
+  { href: "/admin/support", label: "Support", icon: Headset, key: "support" },
   { href: "/admin#admin-promotions-heading", label: "Promotions", icon: Megaphone, key: "promotions" },
   { href: "/admin/guide", label: "Guide", icon: BookOpen, key: "guide" },
   { href: "/admin/team", label: "Team", icon: Users, key: "team" },
@@ -17,11 +18,13 @@ export function AdminNav({
   active = "overview",
   showTeam = false,
   showMarketing = false,
+  showSupport = false,
   disputeCount = 0,
 }: {
-  active?: "command" | "overview" | "disputes" | "finance" | "marketing" | "promotions" | "guide" | "team";
+  active?: "command" | "overview" | "disputes" | "finance" | "marketing" | "support" | "promotions" | "guide" | "team";
   showTeam?: boolean;
   showMarketing?: boolean;
+  showSupport?: boolean;
   disputeCount?: number;
 }) {
   return (
@@ -31,7 +34,8 @@ export function AdminNav({
     >
       {ITEMS.filter((item) =>
         (showTeam || item.key !== "team") &&
-        (showMarketing || item.key !== "marketing")
+        (showMarketing || item.key !== "marketing") &&
+        (showSupport || item.key !== "support")
       ).map(
         ({ href, label, icon: Icon, key }) => {
           const selected = active === key;
