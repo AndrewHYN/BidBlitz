@@ -206,7 +206,7 @@ export default async function FinancePayoutsPage() {
       <footer className="flex gap-3 rounded-xl border border-primary/20 bg-primary/5 p-4 text-xs leading-6 text-muted-foreground">
         <BadgeCheck className="mt-1 size-4 shrink-0 text-primary" aria-hidden />
         <span>BidBlitz owes each seller the net recorded on their transaction, not its gross receipt.
-          The platform's 5% is a recorded fee; provider charges and real settlement must be verified separately.</span>
+          The platform&apos;s 5% is a recorded fee; provider charges and real settlement must be verified separately.</span>
       </footer>
     </div>
   );
