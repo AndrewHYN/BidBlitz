@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { Activity, Banknote, BookOpen, Gauge, Megaphone, Scale, Users, Headset } from "lucide-react";
+import { Activity, Banknote, BookOpen, Gauge, Megaphone, Scale, Users, Headset, ClipboardCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const ITEMS = [
   { href: "/admin/command", label: "HQ", icon: Activity, key: "command" },
+  { href: "/admin/listings", label: "Listings", icon: ClipboardCheck, key: "listings" },
   { href: "/admin", label: "Overview", icon: Gauge, key: "overview" },
   { href: "/admin/disputes", label: "Disputes", icon: Scale, key: "disputes" },
   { href: "/admin/finance", label: "Finance", icon: Banknote, key: "finance" },
@@ -19,12 +20,14 @@ export function AdminNav({
   showTeam = false,
   showMarketing = false,
   showSupport = false,
+  showListings = false,
   disputeCount = 0,
 }: {
-  active?: "command" | "overview" | "disputes" | "finance" | "marketing" | "support" | "promotions" | "guide" | "team";
+  active?: "listings" | "command" | "overview" | "disputes" | "finance" | "marketing" | "support" | "promotions" | "guide" | "team";
   showTeam?: boolean;
   showMarketing?: boolean;
   showSupport?: boolean;
+  showListings?: boolean;
   disputeCount?: number;
 }) {
   return (
@@ -35,7 +38,8 @@ export function AdminNav({
       {ITEMS.filter((item) =>
         (showTeam || item.key !== "team") &&
         (showMarketing || item.key !== "marketing") &&
-        (showSupport || item.key !== "support")
+        (showSupport || item.key !== "support") &&
+        (showListings || item.key !== "listings")
       ).map(
         ({ href, label, icon: Icon, key }) => {
           const selected = active === key;
