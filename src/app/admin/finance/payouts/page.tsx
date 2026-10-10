@@ -10,6 +10,7 @@ import { AdminNav } from "@/components/dashboard/admin-nav";
 import { Money } from "@/components/auction/money";
 import { PayoutControls } from "@/components/dashboard/payout-controls";
 import { LinkwaPayoutButton } from "@/components/dashboard/linkwa-payout-button";
+import { ExternalPayoutPanel, type ExternalPayoutClaim } from "@/components/dashboard/external-payout-panel";
 import { PayoutApprovalPanel, type PayoutApproval } from "@/components/dashboard/payout-approval-panel";
 import { ProviderStatementPanel } from "@/components/dashboard/provider-statement-panel";
 import type { SellerPayoutStatus } from "@/lib/supabase/types";
@@ -40,12 +41,13 @@ export default async function FinancePayoutsPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login?next=/admin/finance/payouts");
 
-  const [canViewPayouts, canManageTeam, canDisputes, canMutate, canReview, profileRes, paymentRes] =
+  const [canViewPayouts, canManageTeam, canDisputes, canMutate, canMarkPaid, canReview, profileRes, paymentRes] =
     await Promise.all([
       hasPermission(user.id, "payouts.view"),
       hasPermission(user.id, "admin.manage_team"),
       hasPermission(user.id, "disputes.view"),
       hasPermission(user.id, "payouts.transition"),
+      hasPermission(user.id, "payouts.mark_paid"),
       hasPermission(user.id, "payouts.review"),
       supabase.from("profiles").select("is_admin").eq("id", user.id).maybeSingle(),
       supabase.from("payment_settings").select("payments_enabled").maybeSingle(),
@@ -62,6 +64,17 @@ export default async function FinancePayoutsPage() {
         .in("payout_id", payouts.map((p) => p.id))
         .in("status", ["REQUESTED", "APPROVED"])
     : { data: [], error: null };
+  // External claims are finance-only. A failed read blocks all external actions
+  // rather than treating a pending transfer as if nobody had initiated one.
+  const externalRes = payouts.length > 0
+    ? await supabase.from("external_seller_payout_claims")
+        .select("payout_id, amount_minor, currency, rail, status, destination_phone_e164, receipt_reference, reserved_at")
+        .in("payout_id", payouts.map(p => p.id))
+    : { data: [], error: null };
+  const externalClaims = new Map<string, ExternalPayoutClaim>();
+  for (const row of (externalRes.data ?? []) as ExternalPayoutClaim[]) {
+    externalClaims.set(row.payout_id, row);
+  }
   const approvals = new Map<string, PayoutApproval>();
   for (const row of (approvalRes.data ?? []) as Array<PayoutApproval & { payout_id: string }>) {
     approvals.set(row.payout_id, row);
@@ -147,10 +160,16 @@ export default async function FinancePayoutsPage() {
                   const triage = payoutTriage(payout);
                   const amount = safeMinor(payout.amountMinor);
                   const approval = approvals.get(payout.id) ?? null;
+                  const externalClaim = externalClaims.get(payout.id) ?? null;
                   const highValue = amount !== null && amount >= 10000 && payout.status !== "PAID_OUT";
                   const highValueCleared = !highValue || (!approvalRes.error && approval?.status === "APPROVED");
+                  const eligibleExternal = !externalRes.error && amount !== null && amount > 0
+                    && payout.currency === "USD" && payout.deliveryConfirmedAt !== null
+                    && ["DELIVERY_CONFIRMED", "PAYOUT_PENDING"].includes(payout.status)
+                    && !payout.hasOpenDispute && ["PAID", "SETTLED"].includes(payout.paymentStatus);
                   const eligibleToInstruct = canOperate && paymentsEnabled && triage === "ready"
-                    && payout.currency === "USD" && amount !== null && amount > 0 && highValueCleared;
+                    && payout.currency === "USD" && amount !== null && amount > 0 && highValueCleared
+                    && !externalRes.error && externalClaim === null;
                   return (
                     <li key={payout.id} className="space-y-4 rounded-2xl border bg-card p-5 shadow-sm" data-testid="finance-payout-row">
                       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -209,8 +228,21 @@ export default async function FinancePayoutsPage() {
                           />
                         )
                       )}
+                      {externalRes.error && amount !== null && (
+                        <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive">
+                          External payout reservation records are unavailable. All new transfer actions are temporarily blocked.
+                        </p>
+                      )}
+                      {!externalRes.error && amount !== null && (
+                        <ExternalPayoutPanel
+                          payoutId={payout.id} amountMinor={amount} currency={payout.currency}
+                          claim={externalClaim} eligible={eligibleExternal}
+                          canReserve={canMutate} canConfirm={canMarkPaid}
+                          highValueApproved={highValueCleared}
+                        />
+                      )}
                       {eligibleToInstruct && <LinkwaPayoutButton payoutId={payout.id} amountMinor={amount!} currency={payout.currency} />}
-                      {canOperate && amount !== null && (
+                      {canOperate && amount !== null && externalClaim?.status !== "RESERVED" && (
                         <details className="rounded-xl border bg-muted/15 p-3">
                           <summary className="cursor-pointer text-sm font-bold">Owner-only manual status review</summary>
                           <p className="mb-3 mt-2 text-xs leading-5 text-muted-foreground">
