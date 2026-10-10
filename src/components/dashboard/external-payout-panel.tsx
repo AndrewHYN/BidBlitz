@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { AlertTriangle, CheckCircle2, ClipboardCheck, LockKeyhole, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Money } from "@/components/auction/money";
+import { FinanceTransferSlip } from "@/components/dashboard/finance-transfer-slip";
 import {
   reserveExternalPayoutAction,
   confirmExternalPayoutAction,
@@ -126,6 +127,10 @@ export function ExternalPayoutPanel({
               <p className="text-xs font-semibold">{claim.rail} · saved at reservation</p>
             </div>
           </div>
+          <FinanceTransferSlip amountMinor={claim.amount_minor} currency={claim.currency}
+            recipient="Seller of this BidBlitz transaction"
+            destination={claim.destination_phone_e164} rail={claim.rail} reference={claim.payout_id}
+            reason="Seller proceeds after independently confirmed auction handover" />
           <p role="status" className="flex items-start gap-2 rounded-lg bg-amber-500/10 p-3 text-xs leading-6">
             <AlertTriangle className="mt-1 size-4 shrink-0 text-amber-700 dark:text-amber-300" aria-hidden />
             This sale is RESERVED for a manual wallet transfer. Automatic Linkwa payout instructions are blocked by the database.
