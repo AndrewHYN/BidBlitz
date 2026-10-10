@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { readLinkwaEnvironment } from "@/server/payments/config";
 import { linkLinkwaUser, registerLinkwaWallet } from "@/server/payments/linkwa-payouts";
-import { setupSellerPayoutAction } from "./payout-setup";
+import { saveManualPayoutContactAction, setupSellerPayoutAction } from "./payout-setup";
 
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }));
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: vi.fn() }));
@@ -62,4 +62,44 @@ it("records the safe provider failure stage and refuses repeated seller retries 
   expect(result).toMatchObject({ ok: false, message: expect.stringContaining("deployment’s payout access") });
   expect(upsert.mock.calls[2]?.[0]).toMatchObject({ setup_status: "ERROR", setup_error: "Linkwa wallet link failed (HTTP 403)" });
   expect(JSON.stringify(result)).not.toContain("private provider details");
+});
+
+it("registers manual EcoCash/SmileCash details without contacting Linkwa or an admin service-role client", async () => {
+  const rpc = vi.fn(async () => ({ data: { ok: true, status: "MANUAL_READY", masked_phone: "+263•••••567" }, error: null }));
+  vi.mocked(createClient).mockResolvedValue({
+    auth: { getUser: vi.fn(async () => ({ data: { user: { id: "seller-1" } } })) },
+    rpc,
+  } as unknown as Awaited<ReturnType<typeof createClient>>);
+  expect(await saveManualPayoutContactAction({
+    firstName: "Test", lastName: "Seller", phone: "0771234567",
+  })).toMatchObject({ ok: true, status: "MANUAL_READY" });
+  expect(rpc).toHaveBeenCalledWith("set_manual_payout_contact", {
+    p_first_name: "Test", p_last_name: "Seller", p_phone_e164: "+263771234567",
+  });
+  expect(createAdminClient).not.toHaveBeenCalled();
+  expect(linkLinkwaUser).not.toHaveBeenCalled();
+  expect(registerLinkwaWallet).not.toHaveBeenCalled();
+});
+
+it("rejects manual payout setup without sign-in or a valid Zimbabwe number", async () => {
+  vi.mocked(createClient).mockResolvedValue({
+    auth: { getUser: vi.fn(async () => ({ data: { user: null } })) },
+  } as unknown as Awaited<ReturnType<typeof createClient>>);
+  expect(await saveManualPayoutContactAction({ firstName: "Test", lastName: "Seller", phone: "0771234567" }))
+    .toMatchObject({ ok: false, message: "Sign in again." });
+  expect(await saveManualPayoutContactAction({ firstName: "Test", lastName: "Seller", phone: "123" }))
+    .toMatchObject({ ok: false });
+  expect(createAdminClient).not.toHaveBeenCalled();
+});
+
+it("fails closed and hides database details when manual contact registration fails", async () => {
+  const rpc = vi.fn(async () => ({ data: null, error: { message: "secret database information" } }));
+  vi.mocked(createClient).mockResolvedValue({
+    auth: { getUser: vi.fn(async () => ({ data: { user: { id: "seller-1" } } })) },
+    rpc,
+  } as unknown as Awaited<ReturnType<typeof createClient>>);
+  const result = await saveManualPayoutContactAction({ firstName: "Test", lastName: "Seller", phone: "0771234567" });
+  expect(result.ok).toBe(false);
+  expect(JSON.stringify(result)).not.toContain("secret database information");
+  expect(linkLinkwaUser).not.toHaveBeenCalled();
 });

@@ -138,14 +138,19 @@ export function minorToLinkwaAmount(minor: bigint): string {
  * refused rather than rounded into agreement.
  */
 export function linkwaAmountToMinor(amount: unknown): bigint {
-  const text =
-    typeof amount === "number"
-      ? Number.isFinite(amount)
-        ? amount.toFixed(2)
-        : ""
-      : typeof amount === "string"
-        ? amount.trim()
-        : "";
+  // Refuse fractions of a cent instead of rounding a provider amount into
+  // agreement with the frozen sale. A reported 1.234 is never 1.23.
+  const numberText = typeof amount === "number" && Number.isFinite(amount)
+    && amount >= 0 && amount <= Number.MAX_SAFE_INTEGER / 100
+    ? amount.toString()
+    : "";
+  const text = typeof amount === "number"
+    ? /^\d+(?:\.\d{1,2})?$/.test(numberText)
+      ? numberText.includes(".")
+        ? numberText.replace(/\.(\d)$/, ".$10")
+        : numberText + ".00"
+      : ""
+    : typeof amount === "string" ? amount.trim() : "";
   if (!/^\d+\.\d{2}$/.test(text)) {
     throw new PaymentPayloadError(
       "amount_mismatch",

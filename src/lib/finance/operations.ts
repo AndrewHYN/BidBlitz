@@ -35,6 +35,7 @@ const payout = z.object({
   auctionTitle: z.string().nullable(),
   sellerName: z.string(),
   walletReady: z.boolean(),
+  linkwaWalletReady: z.boolean().optional(),
   hasOpenDispute: z.boolean(),
 });
 const response = z.object({
