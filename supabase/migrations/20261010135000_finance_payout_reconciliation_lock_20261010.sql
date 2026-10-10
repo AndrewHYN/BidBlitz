@@ -72,6 +72,11 @@ begin
  if not found or v_payout.status<>'PAYOUT_DUE' then
    raise exception 'payout_not_under_reconciliation' using errcode='42501';
  end if;
+ -- Serialize evidence writers for the same provider reference across cases.
+ -- A read-then-insert alone cannot prevent concurrent cross-payout reuse.
+ if v_ref is not null then
+   perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(v_ref, 0));
+ end if;
  if v_ref is not null and
   (exists(select 1 from public.seller_payouts p where p.id<>p_payout_id
           and p.payout_reference=v_ref)
