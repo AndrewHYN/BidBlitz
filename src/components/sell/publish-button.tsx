@@ -182,7 +182,7 @@ export function PublishButton({
           className="text-sm text-muted-foreground"
         >
           {blockedByPayout
-            ? "Set up your seller payout wallet before publishing."
+            ? "Save a seller payout destination before publishing."
             : blockedByImage && blockedByFulfilment
               ? "Add at least one photo and choose fulfilment before publishing."
               : blockedByImage
