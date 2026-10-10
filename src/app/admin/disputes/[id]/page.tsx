@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getStaffDisputeCase } from "@/server/disputes";
 import { AdminNav } from "@/components/dashboard/admin-nav";
 import { DisputeCaseView } from "@/components/dashboard/dispute-case-view";
+import { DisputeOperationsPanel } from "@/components/dashboard/dispute-operations-panel";
 import { Button } from "@/components/ui/button";
 import { hasPermission } from "@/server/permissions";
 
@@ -49,6 +50,32 @@ export default async function AdminDisputeDetailPage({
     );
   }
 
+  const [operatorsRes, assignmentRes, activityRes] = canManageDisputes
+    ? await Promise.all([
+        supabase.rpc("staff_dispute_operators"),
+        supabase.from("dispute_ops_cases")
+          .select("assigned_to, priority, next_action_at, updated_at")
+          .eq("dispute_id", id).maybeSingle(),
+        supabase.from("dispute_ops_events")
+          .select("id, actor_id, event_type, description, created_at")
+          .eq("dispute_id", id).order("created_at", { ascending: false }).limit(60),
+      ])
+    : [null, null, null] as const;
+  const opsUnavailable = canManageDisputes &&
+    (Boolean(operatorsRes?.error) || Boolean(assignmentRes?.error) || Boolean(activityRes?.error));
+  type Operator = { id: string; name: string };
+  const operators: Operator[] = Array.isArray(operatorsRes?.data)
+    ? (operatorsRes.data as Operator[]).filter((person) =>
+      typeof person?.id === "string" && typeof person.name === "string") : [];
+  type Assignment = {
+    assigned_to: string; priority: "NORMAL" | "HIGH" | "URGENT";
+    next_action_at: string; updated_at: string;
+  };
+  type Activity = {
+    id: string; actor_id: string; event_type: "ASSIGNED" | "REASSIGNED" | "INTERNAL_NOTE";
+    description: string; created_at: string;
+  };
+
   return (
     <div className="page-container space-y-5 py-8 sm:py-12">
       <AdminNav active="disputes" showTeam={canManageTeam} />
@@ -59,6 +86,23 @@ export default async function AdminDisputeDetailPage({
           staff={canManageDisputes}
           canContribute={canManageDisputes}
         />
+        {canManageDisputes && (
+          <div className="mt-7">
+            {opsUnavailable ? (
+              <p role="alert" className="rounded-xl border border-destructive/25 bg-destructive/5 p-4 text-sm font-semibold text-destructive">
+                Internal dispute operations could not be verified. Reload before making staff changes.
+              </p>
+            ) : (
+              <DisputeOperationsPanel
+                disputeId={id}
+                status={caseData.status}
+                operators={operators}
+                assignment={(assignmentRes?.data ?? null) as Assignment | null}
+                activity={(activityRes?.data ?? []) as Activity[]}
+              />
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
