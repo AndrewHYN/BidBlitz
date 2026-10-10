@@ -3,9 +3,9 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const referralSql = readFileSync(join(process.cwd(),
-  "supabase/migrations/20261010100000_referral_attribution_no_rewards.sql"), "utf8");
+  "supabase/migrations/20261010082512_referral_attribution_no_rewards_20261010.sql"), "utf8");
 const consentSql = readFileSync(join(process.cwd(),
-  "supabase/migrations/20261010110000_marketing_consent_audit.sql"), "utf8");
+  "supabase/migrations/20261010082515_marketing_consent_audit_20261010.sql"), "utf8");
 const actions = readFileSync(join(process.cwd(), "src/server/actions/referrals.ts"), "utf8");
 const publicPage = readFileSync(join(process.cwd(), "src/app/referrals/page.tsx"), "utf8");
 const marketingPage = readFileSync(join(process.cwd(), "src/app/admin/marketing/page.tsx"), "utf8");
