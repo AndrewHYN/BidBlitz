@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const sql = readFileSync(join(process.cwd(),
-  "supabase/migrations/20261010120000_manual_seller_wallet_settlement.sql"), "utf8");
+  "supabase/migrations/20261010082518_manual_seller_wallet_settlement_20261010.sql"), "utf8");
 const actions = readFileSync(join(process.cwd(),"src/server/actions/external-payouts.ts"),"utf8");
 const payout = readFileSync(join(process.cwd(),"src/server/payments/seller-payout.ts"),"utf8");
 const cron = readFileSync(join(process.cwd(),"src/app/api/cron/settle/route.ts"),"utf8");
