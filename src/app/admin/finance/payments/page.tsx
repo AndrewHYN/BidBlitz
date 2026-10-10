@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowLeft, ArrowRight, Banknote, BadgeCheck, CircleAlert, ReceiptText } from "lucide-react";
+import { ArrowLeft, ArrowRight, BadgeCheck, CircleAlert, ReceiptText } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { hasPermission } from "@/server/permissions";
 import { readFinanceOperations } from "@/server/finance/operations";
