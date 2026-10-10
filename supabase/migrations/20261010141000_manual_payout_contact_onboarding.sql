@@ -97,3 +97,108 @@ $publish$;
 
 comment on table public.seller_payout_recipients is
  'Seller payout destination contact, restricted to service role writes or the own-account manual contact RPC. MANUAL_READY does not constitute a linked Linkwa wallet; external payouts still require independent staff verification.';
+
+-- Finance triage recognises a saved manual contact without pretending it
+-- is a Linkwa-linked wallet. The boolean means destination on file only.
+CREATE OR REPLACE FUNCTION public.admin_finance_operations(p_limit integer DEFAULT 75)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+ v_uid uuid := auth.uid();
+ v_can_payments boolean;
+ v_can_payouts boolean;
+ v_transactions jsonb := '[]'::jsonb;
+ v_payouts jsonb := '[]'::jsonb;
+begin
+ if v_uid is null then
+   raise exception 'not_authenticated' using errcode = '42501';
+ end if;
+ v_can_payments := public.has_permission(v_uid, 'payments.view');
+ v_can_payouts := public.has_permission(v_uid, 'payouts.view');
+ if not (v_can_payments or v_can_payouts) then
+   raise exception 'not_authorised' using errcode = '42501';
+ end if;
+ if p_limit is null or p_limit < 1 or p_limit > 100 then
+   raise exception 'invalid_limit' using errcode = '22023';
+ end if;
+
+ if v_can_payments then
+   select coalesce(jsonb_agg(to_jsonb(q)), '[]'::jsonb) into v_transactions
+   from (
+     select t.id, t.status, t.provider,
+            t.provider_reference as "providerReference",
+            t.gross_minor::text as "grossMinor",
+            t.fee_minor::text as "feeMinor",
+            t.net_minor::text as "sellerMinor",
+            t.currency, t.created_at as "createdAt",
+            t.updated_at as "updatedAt",
+            a.title as "auctionTitle",
+            coalesce(s.display_name, s.username, 'Seller') as "sellerName",
+            coalesce(b.display_name, b.username, 'Buyer') as "buyerName"
+     from public.transactions t
+     left join public.auctions a on a.id = t.auction_id
+     left join public.profiles s on s.id = t.seller_id
+     left join public.profiles b on b.id = t.buyer_id
+     order by t.created_at desc, t.id desc
+     limit p_limit
+   ) q;
+ end if;
+
+ if v_can_payouts then
+   select coalesce(jsonb_agg(to_jsonb(q)), '[]'::jsonb) into v_payouts
+   from (
+     select p.id, p.transaction_id as "transactionId", p.status,
+            p.amount_minor::text as "amountMinor", p.currency,
+            p.payout_reference as "payoutReference", p.paid_at as "paidAt",
+            p.delivery_confirmed_at as "deliveryConfirmedAt",
+            p.updated_at as "updatedAt",
+            t.status as "paymentStatus", t.gross_minor::text as "grossMinor",
+            t.fee_minor::text as "feeMinor",
+            a.title as "auctionTitle",
+            coalesce(s.display_name, s.username, 'Seller') as "sellerName",
+            ((r.setup_status = 'READY' and r.external_wallet_id is not null and r.external_user_id is not null) or (r.setup_status = 'MANUAL_READY' and r.phone_e164 ~ '^[+]263[0-9]{9} as "walletReady",
+            exists (select 1 from public.transaction_disputes d
+              where d.transaction_id = p.transaction_id and d.status <> 'RESOLVED') as "hasOpenDispute"
+     from public.seller_payouts p
+     join public.transactions t on t.id = p.transaction_id
+     left join public.auctions a on a.id = t.auction_id
+     left join public.profiles s on s.id = p.seller_id
+     left join public.seller_payout_recipients r on r.seller_id = p.seller_id
+     order by case p.status when 'PAYOUT_DUE' then 0 when 'DISPUTED' then 1
+       when 'HELD' then 2 when 'PAYOUT_PENDING' then 3
+       when 'DELIVERY_CONFIRMED' then 4 when 'WAITING_FOR_FULFILMENT' then 5
+       else 6 end, p.created_at desc, p.id desc
+     limit p_limit
+   ) q;
+ end if;
+ return jsonb_build_object(
+    'asOf', clock_timestamp(), 'limit', p_limit,
+    'canViewPayments', v_can_payments, 'canViewPayouts', v_can_payouts,
+    'transactions', v_transactions, 'payouts', v_payouts);
+end
+$function$
+)) is true as "walletReady",
+            exists (select 1 from public.transaction_disputes d
+              where d.transaction_id = p.transaction_id and d.status <> 'RESOLVED') as "hasOpenDispute"
+     from public.seller_payouts p
+     join public.transactions t on t.id = p.transaction_id
+     left join public.auctions a on a.id = t.auction_id
+     left join public.profiles s on s.id = p.seller_id
+     left join public.seller_payout_recipients r on r.seller_id = p.seller_id
+     order by case p.status when 'PAYOUT_DUE' then 0 when 'DISPUTED' then 1
+       when 'HELD' then 2 when 'PAYOUT_PENDING' then 3
+       when 'DELIVERY_CONFIRMED' then 4 when 'WAITING_FOR_FULFILMENT' then 5
+       else 6 end, p.created_at desc, p.id desc
+     limit p_limit
+   ) q;
+ end if;
+ return jsonb_build_object(
+    'asOf', clock_timestamp(), 'limit', p_limit,
+    'canViewPayments', v_can_payments, 'canViewPayouts', v_can_payouts,
+    'transactions', v_transactions, 'payouts', v_payouts);
+end
+$function$
+;
