@@ -132,10 +132,10 @@ test.describe("release visual smoke", () => {
 
   test("login has strong visible entry actions", async ({ page }) => {
     await page.goto("/login", { waitUntil: "domcontentloaded" });
-    await expect(page.getByTestId("login-form")).toBeVisible();
-    await expect(page.getByTestId("google-sign-in-button")).toBeVisible();
-    await expect(page.getByTestId("sign-in-button")).toBeVisible();
-    await expect(page.getByTestId("otp-toggle-button")).toBeVisible();
+    await expect(page.locator('[data-testid="login-form"]:visible')).toBeVisible();
+    await expect(page.locator('[data-testid="google-sign-in-button"]:visible')).toBeVisible();
+    await expect(page.locator('[data-testid="sign-in-button"]:visible')).toBeVisible();
+    await expect(page.locator('[data-testid="otp-toggle-button"]:visible')).toBeVisible();
   });
 
   test("signup keeps payout phone guidance visible before account creation", async ({ page }) => {
