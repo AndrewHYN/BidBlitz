@@ -199,8 +199,7 @@ export default async function AdminDisputesPage() {
             );
           })}
         </div>
-      )}
-      )}
+      ))}
     </div>
   );
 }
