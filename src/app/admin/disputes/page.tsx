@@ -168,10 +168,9 @@ export default async function AdminDisputesPage() {
                         </span>
                       )}
                       {canManageDisputes && dispute.status !== "RESOLVED"
-                        && opsById.get(dispute.id)?.next_action_at
-                        && new Date(opsById.get(dispute.id)!.next_action_at).getTime() < Date.now() && (
-                          <span className="rounded-md border border-destructive/25 bg-destructive/10 px-2 py-1 text-[11px] font-bold text-destructive">
-                            Staff review overdue
+                        && opsById.get(dispute.id)?.next_action_at && (
+                          <span className="rounded-md border bg-muted px-2 py-1 text-[11px] font-bold text-muted-foreground">
+                            Next review: {new Date(opsById.get(dispute.id)!.next_action_at).toLocaleString("en-US")}
                           </span>
                         )}
                       {dispute.payout_frozen && (
