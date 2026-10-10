@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const sql = readFileSync(join(process.cwd(),
-  "supabase/migrations/20261010070000_high_value_payout_dual_approval.sql"), "utf8");
+  "supabase/migrations/20261010052614_high_value_payout_dual_approval_20261010.sql"), "utf8");
 const component = readFileSync(join(process.cwd(),
   "src/components/dashboard/payout-approval-panel.tsx"), "utf8");
 const payoutDesk = readFileSync(join(process.cwd(),
