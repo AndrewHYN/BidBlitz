@@ -164,7 +164,7 @@ export function ExternalPayoutPanel({
           </p>}
           {canReserve && (
             <details className="border-t pt-3">
-              <summary className="cursor-pointer text-xs font-bold">Cancel reservation — only if absolutely no money was transferred</summary>
+              <summary className="cursor-pointer text-xs font-bold">Cancel reservation (only if absolutely no money was transferred)</summary>
               <div className="mt-3 space-y-3">
                 <label className="block space-y-1.5 text-xs font-bold">
                   <span>Reason for cancellation</span>
