@@ -126,3 +126,23 @@ begin
 end $$;
 revoke all on function public.staff_transition_company_cost(uuid,text,text,text) from public,anon;
 grant execute on function public.staff_transition_company_cost(uuid,text,text,text) to authenticated;
+
+create or replace function public.staff_company_cost_summary()
+returns jsonb language plpgsql stable security definer set search_path=''
+as $$
+declare v_uid uuid:=auth.uid(); v_planned bigint; v_incurred bigint; v_paid bigint; v_count bigint;
+begin
+ if v_uid is null or not public.has_permission(v_uid,'finance.costs.view') then
+  raise exception 'not_authorised' using errcode='42501';
+ end if;
+ select coalesce(sum(amount_minor) filter(where status='PLANNED'),0),
+        coalesce(sum(amount_minor) filter(where status='INCURRED'),0),
+        coalesce(sum(amount_minor) filter(where status='PAID'),0),count(*)
+  into v_planned,v_incurred,v_paid,v_count
+  from public.company_operating_costs;
+ return jsonb_build_object('currency','USD','plannedMinor',v_planned::text,
+  'incurredMinor',v_incurred::text,'paidMinor',v_paid::text,
+  'records',v_count,'asOf',statement_timestamp());
+end $$;
+revoke all on function public.staff_company_cost_summary() from public,anon;
+grant execute on function public.staff_company_cost_summary() to authenticated;
