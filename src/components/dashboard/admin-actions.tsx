@@ -578,7 +578,10 @@ const payoutActionSchema = z.object({
 /** Map the database's own refusal codes to copy an operator can act on. */
 function payoutErrorMessage(raw: string): string {
   const m = raw.toLowerCase();
-  if (m.includes("payout_reference_required")) {
+  if (m.includes("payout_second_approval_required")) {
+    return "A second independent staff member must approve this high-value payout in the Finance payout desk first.";
+  }
+    if (m.includes("payout_reference_required")) {
     return "Add the payout reference first. A payout can only be recorded with it.";
   }
   if (m.includes("payout_admin_only")) return "Admins only.";
