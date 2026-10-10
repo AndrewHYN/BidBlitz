@@ -5,8 +5,6 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/server/permissions";
 
-export const HIGH_VALUE_PAYOUT_MINOR = 10_000;
-
 type ApprovalResult = { ok: true; status: string } | { ok: false; message: string };
 
 const requestSchema = z.object({
