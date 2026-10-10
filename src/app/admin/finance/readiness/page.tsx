@@ -36,34 +36,37 @@ export default async function PaymentReadinessPage(){
   }catch(e){
    const status=e instanceof PaymentProviderRequestError?e.httpStatus:undefined;
    provider={status:"failed",detail:status===401?
-    "Linkwa rejected the production API key (HTTP 401). This also failed in independent Postman testing. Provider support must fix key recognition/activation.":
+    "The production Linkwa API rejected the currently deployed key (HTTP 401). Check that the new app credentials were included in this deployment.":
     status===403?"Linkwa denied the production API (HTTP 403). Confirm app entitlement with Linkwa.":
     status? `The provider returned HTTP ${status}. No transaction was attempted.`:
     "The read-only Linkwa API check was unreachable or invalid. No transaction was attempted."};
   }
  }
  const [settings,feeSettings,unreconciled,transactions]=await Promise.all([
-  supabase.from("payment_settings").select("payments_enabled").maybeSingle(),
+  supabase.from("payment_settings").select("payments_enabled, automatic_payouts_enabled").maybeSingle(),
   supabase.from("fee_settings").select("fee_bps").maybeSingle(),
   supabase.from("seller_payouts").select("id",{count:"exact",head:true}).eq("status","PAYOUT_DUE"),
   supabase.from("transactions").select("id",{count:"exact",head:true}).in("status",["PAID","SETTLED"])
  ]);
  const enabled=!settings.error&&settings.data?.payments_enabled===true;
+ const autoPayoutEnabled=!settings.error&&settings.data?.automatic_payouts_enabled===true;
  const due=unreconciled.error?null:unreconciled.count;
  const fee=feeSettings.error?null:feeSettings.data?.fee_bps;
  const checks=[
   {title:"Production API authorization",status:provider.status,detail:provider.detail},
   {title:"5% platform fee",status:fee===500?"passed":"failed",detail:fee===null?"Live fee configuration could not be read.":fee===500?"Live fee remains 500 basis points (5%).":"Live fee does not match the agreed 5%."},
-  {title:"Unreconciled seller payouts",status:due===0?"passed":due===null?"unverified":"failed",
-   detail:due===null?"Payout status query unavailable.":due===0?"No payout is currently marked PAYOUT_DUE.":"There are "+due+" payouts whose provider status or receipt needs manual reconciliation. Never auto-retry."},
-  {title:"Verified seller receipt",status:"unverified" as const,
-   detail:"Linkwa has not supplied an authoritative payout status/receipt verification process. A successful POST is only an instruction."},
-  {title:"Business & custody permission",status:"unverified" as const,
-   detail:"Company registration, the payment-provider contract and applicable Zimbabwean marketplace-funds requirements require business-side confirmation."},
-  {title:"Webhook settlement proof",status:"unverified" as const,
-   detail:"Credential presence is not enough. Production webhook delivery, signed replay safety and a distinct buyer/seller transaction need controlled real-world proof."},
+  {title:"Payouts needing reconciliation",status:due===0?"passed":due===null?"unverified":"failed",
+   detail:due===null?"Payout status query unavailable.":due===0?"No payout is currently marked PAYOUT_DUE.":"There are "+due+" payout(s) whose provider status or receipt needs reconciliation. These stay blocked individually and do not require pausing all new buyer checkouts."},
+  {title:"Automatic Linkwa seller disbursements",status:autoPayoutEnabled?"passed":"unverified",
+   detail:autoPayoutEnabled?"Automatic seller payouts are permitted, subject to live balance and delivery/dispute safety checks.":"Automatic seller payouts remain disabled. Finance staff can explicitly initiate an eligible Linkwa payout or reserve a separate SmileCash/EcoCash external wallet transfer."},
+  {title:"Seller payout proof",status:"unverified" as const,
+   detail:"Successful provider POST means instruction accepted, not seller receipt. External wallet transfers can only be closed with independently verified receipt evidence."},
+  {title:"Webhook and buyer settlement",status:"unverified" as const,
+   detail:"A signed production payment webhook and completed transaction are the final proof. API authentication alone is not proof a buyer payment has settled."},
  ];
- const blocked=checks.some(c=>c.status!=="passed");
+ // Do not block unrelated NEW buyer collections because one OLD payout still
+ // needs manual reconciliation. The seller payout itself remains blocked.
+ const checkoutOperational=enabled && provider.status==="passed" && fee===500;
  return <main className="page-container space-y-7 py-8 sm:py-12" data-testid="payment-readiness">
   <header className="relative overflow-hidden rounded-[1.75rem] border border-orange-500/20 bg-[#151719] p-7 text-white shadow-xl sm:p-10">
    <p className="flex items-center gap-2 text-xs font-black uppercase tracking-[.18em] text-orange-300"><Activity className="size-4" aria-hidden/> BidBlitz / Launch safety</p>
@@ -73,7 +76,7 @@ export default async function PaymentReadinessPage(){
     <span className={enabled?"rounded-lg bg-emerald-400/15 px-3 py-2 text-xs font-bold text-emerald-300":"rounded-lg bg-amber-400/15 px-3 py-2 text-xs font-bold text-amber-300"}>
      Payments: {enabled?"enabled":"paused"}
     </span>
-    <span className="rounded-lg bg-white/10 px-3 py-2 text-xs font-bold">Release: {blocked?"blocked by unverified checks":"candidate for controlled approval"}</span>
+    <span className="rounded-lg bg-white/10 px-3 py-2 text-xs font-bold">Release: {checkoutOperational?"buyer checkout live, verify real receipts":"checkout needs attention"}</span>
    </div>
   </header>
   <AdminNav active="finance" showTeam={canTeam}/>
@@ -96,7 +99,8 @@ export default async function PaymentReadinessPage(){
   {available&&<p className="rounded-xl border bg-card p-5 text-sm">Linkwa-reported available USD: <strong>{available}</strong>. This is not proof of SmileCash settlement or payout to the seller.</p>}
   <section className="space-y-3 rounded-2xl border bg-muted/20 p-5 sm:p-7">
    <h2 className="flex items-center gap-2 text-xl font-black"><KeyRound className="size-5 text-primary" aria-hidden/> Final activation rule</h2>
-   <p className="text-sm leading-7">Do not enable real-money transactions until Linkwa authenticates, reconciles old payouts, confirms the marketplace payout method and the business has satisfied legal requirements. Then run a controlled purchase between distinct buyer, seller and platform accounts, verify 5%/95% in the ledger <strong>and</strong> actual account statements, and retain evidence.</p>
+   <p className="text-sm leading-7">The owner has confirmed that business and legal arrangements are handled outside BidBlitz; this page does not independently verify them. Buyer checkout and seller disbursement have separate controls. Even with checkout enabled, reconcile every actual buyer collection against Linkwa and SmileCash statements, then pay the frozen seller proceeds through an eligible Linkwa API payout or an independently verified external SmileCash/EcoCash transfer. Old ambiguous payouts must not be retried automatically.</p>
+   <p className="text-xs leading-6 text-muted-foreground">Linkwa reports payments may settle to the merchant SmileCash wallet rather than the Developer API balance. A zero Developer balance is not proof there was no buyer payment. Use the payout desk to reserve and record external seller transfers where appropriate.</p>
    <p className="flex items-center gap-2 text-xs font-bold text-muted-foreground"><ShieldCheck className="size-4" aria-hidden/> Live records are read-only on this page. Failed queries never imply a zero balance.</p>
   </section>
   <p className="text-xs text-muted-foreground">This page does not expose API keys or webhook secrets. Buyer transactions currently recorded in the selected database: {transactions.error?"unavailable":transactions.count??"unavailable"}.</p>
