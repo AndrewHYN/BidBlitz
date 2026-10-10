@@ -33,6 +33,7 @@ const COLUMNS = [
       { label: "Terms of use", href: "/terms" },
       { label: "Privacy policy", href: "/privacy" },
       { label: "Help & contact", href: "/help" },
+      { label: "Support tickets", href: "/support/tickets" },
       { label: "About BidBlitz", href: "/about" },
     ],
   },
