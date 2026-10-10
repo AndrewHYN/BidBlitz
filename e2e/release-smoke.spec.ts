@@ -11,6 +11,8 @@ const PUBLIC_ROUTES = [
   "/about",
   "/terms",
   "/privacy",
+  "/referrals",
+  "/referrals?code=BB0123456789",
   "/login",
   "/signup",
   "/forgot-password",
@@ -118,6 +120,14 @@ test.describe("release visual smoke", () => {
     await expect(
       page.getByRole("link", { name: /sell an item|sell/i }).first()
     ).toBeVisible();
+  });
+
+  test("invite page explains consent and has a working login entry", async ({ page }) => {
+    await page.goto("/referrals?code=BB0123456789", { waitUntil: "domcontentloaded" });
+    await expect(page.getByTestId("referral-program")).toBeVisible();
+    await expect(page.getByRole("heading", { name: /bring the crowd/i })).toBeVisible();
+    await expect(page.getByRole("link", { name: /sign in to continue/i })).toHaveAttribute("href", /\/login\?next=/);
+    await expect(page.getByText(/no automatic cash rewards/i).first()).toBeVisible();
   });
 
   test("login has strong visible entry actions", async ({ page }) => {
