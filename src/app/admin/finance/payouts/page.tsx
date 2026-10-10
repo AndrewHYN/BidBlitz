@@ -10,6 +10,7 @@ import { AdminNav } from "@/components/dashboard/admin-nav";
 import { Money } from "@/components/auction/money";
 import { PayoutControls } from "@/components/dashboard/payout-controls";
 import { LinkwaPayoutButton } from "@/components/dashboard/linkwa-payout-button";
+import { PayoutApprovalPanel, type PayoutApproval } from "@/components/dashboard/payout-approval-panel";
 import { ProviderStatementPanel } from "@/components/dashboard/provider-statement-panel";
 import type { SellerPayoutStatus } from "@/lib/supabase/types";
 
@@ -39,12 +40,13 @@ export default async function FinancePayoutsPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login?next=/admin/finance/payouts");
 
-  const [canViewPayouts, canManageTeam, canDisputes, canMutate, profileRes, paymentRes] =
+  const [canViewPayouts, canManageTeam, canDisputes, canMutate, canReview, profileRes, paymentRes] =
     await Promise.all([
       hasPermission(user.id, "payouts.view"),
       hasPermission(user.id, "admin.manage_team"),
       hasPermission(user.id, "disputes.view"),
       hasPermission(user.id, "payouts.transition"),
+      hasPermission(user.id, "payouts.review"),
       supabase.from("profiles").select("is_admin").eq("id", user.id).maybeSingle(),
       supabase.from("payment_settings").select("payments_enabled").maybeSingle(),
     ]);
@@ -53,6 +55,17 @@ export default async function FinancePayoutsPage() {
   const paymentsEnabled = !paymentRes.error && paymentRes.data?.payments_enabled === true;
   const data = await readFinanceOperations(90);
   const payouts = data.ok ? data.data.payouts : [];
+  // Read under the staff session; failed reads block high-value actions.
+  const approvalRes = payouts.length > 0
+    ? await supabase.from("payout_approval_requests")
+        .select("id, payout_id, requested_by, reviewed_by, status, requested_at, reviewed_at")
+        .in("payout_id", payouts.map((p) => p.id))
+        .in("status", ["REQUESTED", "APPROVED"])
+    : { data: [], error: null };
+  const approvals = new Map<string, PayoutApproval>();
+  for (const row of (approvalRes.data ?? []) as Array<PayoutApproval & { payout_id: string }>) {
+    approvals.set(row.payout_id, row);
+  }
   const counts = {
     reconcile: payouts.filter((x) => payoutTriage(x) === "reconcile").length,
     hold: payouts.filter((x) => payoutTriage(x) === "hold").length,
@@ -133,8 +146,11 @@ export default async function FinancePayoutsPage() {
                 {payouts.map((payout) => {
                   const triage = payoutTriage(payout);
                   const amount = safeMinor(payout.amountMinor);
+                  const approval = approvals.get(payout.id) ?? null;
+                  const highValue = amount !== null && amount >= 10000 && payout.status !== "PAID_OUT";
+                  const highValueCleared = !highValue || (!approvalRes.error && approval?.status === "APPROVED");
                   const eligibleToInstruct = canOperate && paymentsEnabled && triage === "ready"
-                    && payout.currency === "USD" && amount !== null && amount > 0;
+                    && payout.currency === "USD" && amount !== null && amount > 0 && highValueCleared;
                   return (
                     <li key={payout.id} className="space-y-4 rounded-2xl border bg-card p-5 shadow-sm" data-testid="finance-payout-row">
                       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -178,6 +194,21 @@ export default async function FinancePayoutsPage() {
                         )}
                         <p className="text-xs text-muted-foreground">Updated: {new Date(payout.updatedAt).toLocaleString("en-US")}</p>
                       </div>
+                      {highValue && (
+                        approvalRes.error ? (
+                          <p role="alert" className="rounded-lg border border-destructive/30 p-3 text-xs text-destructive">
+                            Approval status unavailable. High-value payout actions are blocked.
+                          </p>
+                        ) : (
+                          <PayoutApprovalPanel
+                            payoutId={payout.id}
+                            approval={approval}
+                            viewerId={user.id}
+                            canRequest={canMutate}
+                            canReview={canReview}
+                          />
+                        )
+                      )}
                       {eligibleToInstruct && <LinkwaPayoutButton payoutId={payout.id} amountMinor={amount!} currency={payout.currency} />}
                       {canOperate && amount !== null && (
                         <details className="rounded-xl border bg-muted/15 p-3">
