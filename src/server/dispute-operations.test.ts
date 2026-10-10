@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-const sql = readFileSync(join(process.cwd(),"supabase/migrations/20261010080000_dispute_staff_case_ops.sql"),"utf8");
+const sql = readFileSync(join(process.cwd(),"supabase/migrations/20261010053520_dispute_staff_case_ops_20261010.sql"),"utf8");
 const actions = readFileSync(join(process.cwd(),"src/server/actions/dispute-operations.ts"),"utf8");
 const panel = readFileSync(join(process.cwd(),"src/components/dashboard/dispute-operations-panel.tsx"),"utf8");
 const staffPage = readFileSync(join(process.cwd(),"src/app/admin/disputes/[id]/page.tsx"),"utf8");
