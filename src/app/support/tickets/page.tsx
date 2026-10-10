@@ -16,7 +16,7 @@ export default async function SupportTicketsPage(){
  return <main className="page-container space-y-7 py-8 sm:py-12" data-testid="customer-support-tickets">
   <header className="relative overflow-hidden rounded-[1.75rem] border border-orange-500/20 bg-[#16181b] p-7 text-white shadow-xl sm:p-10">
    <p className="flex items-center gap-2 text-xs font-black uppercase tracking-[.16em] text-orange-300"><LifeBuoy className="size-4" aria-hidden/> BidBlitz / Customer care</p>
-   <h1 className="mt-4 text-4xl font-black tracking-[-.055em] sm:text-6xl">We're here to help<span className="text-orange-400">.</span></h1>
+   <h1 className="mt-4 text-4xl font-black tracking-[-.055em] sm:text-6xl">We&apos;re here to help<span className="text-orange-400">.</span></h1>
    <p className="mt-3 max-w-xl text-sm leading-7 text-zinc-300">Keep your auction questions, payments concerns and account assistance in one private, trackable conversation.</p>
   </header>
   <div className="grid gap-4 lg:grid-cols-[1.3fr_1fr]">
@@ -40,7 +40,7 @@ export default async function SupportTicketsPage(){
     </section>
     <aside className="flex gap-3 rounded-2xl border border-orange-500/20 bg-orange-500/5 p-5 text-xs leading-6">
      <ShieldCheck className="mt-1 size-5 shrink-0 text-orange-600" aria-hidden/>
-     Staff will never ask for your login password, EcoCash PIN, API key or one-time code. For a dispute about a completed sale, continue through the transaction's formal dispute controls too.
+     Staff will never ask for your login password, EcoCash PIN, API key or one-time code. For a dispute about a completed sale, continue through the transaction&apos;s formal dispute controls too.
     </aside>
    </div>
   </div>
