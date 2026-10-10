@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 function file(path: string) {
   return readFileSync(join(process.cwd(), path), "utf8");
 }
-const migration = file("supabase/migrations/20261010135000_finance_payout_reconciliation_lock_20261010.sql");
+const migration = file("supabase/migrations/20261010133624_finance_payout_reconciliation_lock_20261010.sql");
 const service = file("src/server/payments/seller-payout.ts");
 const runtime = file("src/server/payments/runtime.ts");
 const desk = file("src/app/admin/finance/payouts/page.tsx");
