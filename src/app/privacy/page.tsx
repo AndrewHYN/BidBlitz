@@ -16,7 +16,7 @@ export const metadata: Metadata = {
   alternates: { canonical: "/privacy" },
 };
 
-const LAST_UPDATED = "7 October 2026";
+const LAST_UPDATED = "10 October 2026";
 
 /** Declared once, used for both the headings and the table of contents. */
 const SECTIONS = [
@@ -82,6 +82,18 @@ export default function PrivacyPage() {
               and username. Your password is stored by our authentication
               service in a protected form. It can never be read back, by us or
               anyone else.
+            </li>
+            <li>
+              <strong>Community invitations:</strong> if you choose to use a
+              referral code, we record the inviter and a one-time connection to
+              your account. This is used to understand genuine community growth,
+              not to award automatic money or discounts. We do not publish the
+              identity of people you invited.
+            </li>
+            <li>
+              <strong>Optional email choices:</strong> we store your preference
+              to receive marketplace updates and the time it was enabled or
+              disabled, so employees can respect your choice.
             </li>
             <li>
               <strong>Profile data:</strong> the bio, location and any profile
@@ -160,8 +172,10 @@ export default function PrivacyPage() {
             </li>
             <li>to show listings, profiles and bid history to visitors;</li>
             <li>
-              to send you the essential account emails: sign-up confirmation and
-              password reset. There are no marketing emails.
+              to send essential account emails (sign-up confirmation,
+              security, transactions and password reset), and optional marketplace
+              updates only when you choose to enable them in Settings. You can
+              turn optional emails off at any time.
             </li>
             <li>to handle reports and keep the marketplace safe from abuse;</li>
             <li>
@@ -220,6 +234,15 @@ export default function PrivacyPage() {
                 Settings
               </Link>
               .
+            </li>
+            <li>
+              You can turn optional marketplace email updates on or off in
+              <Link href="/settings" className="font-medium text-primary underline-offset-2 hover:underline"> account settings</Link>.
+              The essential security and transaction notices still apply.
+            </li>
+            <li>
+              Invitations are optional. If you accept a referral invitation,
+              the one-time attribution is retained as a marketplace audit record.
             </li>
             <li>
               Ask for a copy of your data, or its deletion, by contacting us.
