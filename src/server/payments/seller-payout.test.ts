@@ -17,7 +17,7 @@ const payoutId = "11111111-1111-4111-8111-111111111111";
 const rpc = vi.fn();
 const inserted = vi.fn();
 
-function installDatabase() {
+function installDatabase(externalClaim: { status: string } | null = null, externalError = false) {
   const rows: Record<string, unknown> = {
     seller_payouts: {
       id: payoutId, transaction_id: "sale-1", seller_id: "seller-1",
@@ -35,7 +35,10 @@ function installDatabase() {
   const database = {
     rpc,
     from: vi.fn((table: string) => {
-      const result = { data: rows[table], error: null };
+      const result = {
+        data: table === "external_seller_payout_claims" ? externalClaim : rows[table],
+        error: table === "external_seller_payout_claims" && externalError ? { message: "connection lost" } : null,
+      };
       const query = {
         select: vi.fn(() => query), eq: vi.fn(() => query),
         neq: vi.fn(() => query), limit: vi.fn(() => query),
@@ -156,6 +159,23 @@ describe("seller payout atomic claim", () => {
     expect(rpc).not.toHaveBeenCalledWith("service_transition_seller_payout", expect.objectContaining({
       p_to_status: "PAID_OUT",
     }));
+  });
+
+  it("rejects an external SmileCash/EcoCash reservation without calling Linkwa", async () => {
+    installDatabase({ status: "RESERVED" });
+    expect(await releaseSellerPayout(payoutId)).toMatchObject({
+      ok: false, code: "manual_reconciliation_required",
+    });
+    expect(instructLinkwaPayout).not.toHaveBeenCalled();
+    expect(fetchLinkwaBalance).not.toHaveBeenCalled();
+  });
+
+  it("does not send money when the external claim lookup fails", async () => {
+    installDatabase(null, true);
+    expect(await releaseSellerPayout(payoutId)).toMatchObject({
+      ok: false, code: "manual_reconciliation_required",
+    });
+    expect(instructLinkwaPayout).not.toHaveBeenCalled();
   });
 
   it("keeps the kill switch ahead of all provider calls", async () => {
