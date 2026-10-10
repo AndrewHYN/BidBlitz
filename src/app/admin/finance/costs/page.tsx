@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { hasPermission } from "@/server/permissions";
 import { AdminNav } from "@/components/dashboard/admin-nav";
 import { RecordCompanyCost,CompanyCostAction } from "@/components/dashboard/company-costs";
+import { FinanceTransferSlip } from "@/components/dashboard/finance-transfer-slip";
 import { formatMoney,money } from "@/lib/money";
 
 export const metadata:Metadata={title:"Company costs | BidBlitz",robots:{index:false,follow:false}};
@@ -57,6 +58,17 @@ export default async function CompanyCostsPage(){
    <ShieldCheck className="mt-1 size-5 shrink-0 text-amber-600" aria-hidden/>
    These records are <strong>company expenses, not seller liabilities</strong>. Marking paid records outside payment evidence; it never withdraws cash or pays an employee.
   </p>
+  <section className="grid gap-3 sm:grid-cols-3" aria-label="Expense payment steps">
+    {[
+      {step:"01",title:"Record liability",detail:"Create the planned or incurred cost in your company ledger."},
+      {step:"02",title:"Transfer externally",detail:"Copy the exact worksheet and send from company-owned funds after verifying the recipient."},
+      {step:"03",title:"Attach proof",detail:"Only after the payee receives funds, record the actual provider reference as PAID."},
+    ].map(item=><div key={item.step} className="rounded-xl border bg-card p-4">
+      <p className="text-xs font-black text-primary">{item.step}</p>
+      <h3 className="mt-2 font-extrabold">{item.title}</h3>
+      <p className="mt-1 text-xs leading-5 text-muted-foreground">{item.detail}</p>
+    </div>)}
+  </section>
   {mayWrite&&<RecordCompanyCost/>}
   <section className="space-y-4" aria-labelledby="cost-list-heading">
    <div className="flex items-end justify-between gap-4">
@@ -78,6 +90,13 @@ export default async function CompanyCostsPage(){
          <span className={row.status==="PAID"?"text-xs font-bold text-emerald-700 dark:text-emerald-300":"text-xs font-bold text-muted-foreground"}>{statuses.includes(row.status)?row.status:"UNKNOWN"}</span></div>
        </div>
        {row.external_reference&&<p className="mt-3 break-all text-xs text-muted-foreground">External proof: {row.external_reference}</p>}
+       {mayWrite&&row.status==="INCURRED"&&Number.isSafeInteger(Number(row.amount_minor))&&
+          <div className="mt-4 border-t pt-4">
+            <FinanceTransferSlip amountMinor={Number(row.amount_minor)} currency="USD"
+              recipient={row.payee_label??"Payee verification required"}
+              editableDestination rail="External EcoCash / SmileCash / bank"
+              reference={row.id} reason={row.description} />
+          </div>}
        {mayWrite&&<div className="mt-4 border-t pt-4"><CompanyCostAction id={row.id} status={row.status}/></div>}
       </li>)}
      </ul>}
