@@ -11,6 +11,8 @@ const PUBLIC_ROUTES = [
   "/about",
   "/terms",
   "/privacy",
+  "/referrals",
+  "/referrals?code=BB0123456789",
   "/login",
   "/signup",
   "/forgot-password",
@@ -120,12 +122,20 @@ test.describe("release visual smoke", () => {
     ).toBeVisible();
   });
 
+  test("invite page explains consent and has a working login entry", async ({ page }) => {
+    await page.goto("/referrals?code=BB0123456789", { waitUntil: "domcontentloaded" });
+    await expect(page.getByTestId("referral-program")).toBeVisible();
+    await expect(page.getByRole("heading", { name: /bring the crowd/i })).toBeVisible();
+    await expect(page.getByRole("link", { name: /sign in to continue/i })).toHaveAttribute("href", /\/login\?next=/);
+    await expect(page.getByText(/automatic cash rewards/i).first()).toBeVisible();
+  });
+
   test("login has strong visible entry actions", async ({ page }) => {
     await page.goto("/login", { waitUntil: "domcontentloaded" });
-    await expect(page.getByTestId("login-form")).toBeVisible();
-    await expect(page.getByTestId("google-sign-in-button")).toBeVisible();
-    await expect(page.getByTestId("sign-in-button")).toBeVisible();
-    await expect(page.getByTestId("otp-toggle-button")).toBeVisible();
+    await expect(page.locator('[data-testid="login-form"]:visible')).toBeVisible();
+    await expect(page.locator('[data-testid="google-sign-in-button"]:visible')).toBeVisible();
+    await expect(page.locator('[data-testid="sign-in-button"]:visible')).toBeVisible();
+    await expect(page.locator('[data-testid="otp-toggle-button"]:visible')).toBeVisible();
   });
 
   test("signup keeps payout phone guidance visible before account creation", async ({ page }) => {

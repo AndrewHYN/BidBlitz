@@ -23,13 +23,11 @@ const GROSS_MINOR = 2500n; // $25.00 winning bid
 const FEE_MINOR = previewFeeMinor(GROSS_MINOR, FEE_BPS); // $1.25
 const NET_MINOR = GROSS_MINOR - FEE_MINOR; // $23.75
 /**
- * A made-up payment-provider charge, used ONLY to show the shape of the
- * buyer's total. BidBlitz does not set, know or quote the provider's rates —
- * the provider calculates the real charge and displays it on its own payment
- * page. Publishing a specific figure here as though it were the provider's
- * would be a fabricated rate.
+ * Linkwa publicly currently lists 1% platform + 2% payment cost paid by the
+ * BUYER. The hosted checkout is authoritative if those rates ever change;
+ * this example is never used for actual billing.
  */
-const EXAMPLE_PROVIDER_CHARGE_MINOR = 150n; // illustrative only
+const EXAMPLE_PROVIDER_CHARGE_MINOR = 75n; // $25.00 × 3%, illustrative only
 
 /**
  * A prose block on an explanation page.
@@ -154,6 +152,19 @@ export default async function HelpFeesPage() {
             the seller receives the winning bid <em>minus</em>{" "}
             BidBlitz&apos;s 5%.
           </p>
+          {providerName === "Linkwa" && (
+            <p>
+              Linkwa currently publishes a buyer-paid <strong>3% payment cost</strong>
+              (1% Linkwa platform fee and 2% processing cost). This is separate
+              from BidBlitz&apos;s seller-side 5%, and the final amount is always
+              displayed by Linkwa before payment.{" "}
+              <Link href="https://linkwa.co.zw/faqs" target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium text-primary underline-offset-2 hover:underline">
+                Linkwa&apos;s current fees
+              </Link>.
+            </p>
+          )}
         </Explain>
 
         <section className="space-y-4">
@@ -199,10 +210,10 @@ export default async function HelpFeesPage() {
           </p>
 
           <p className="text-sm text-muted-foreground">
-            For the buyer, <em>illustration only</em>: the provider charge below
-            is an example amount, not a published rate. The provider calculates
-            the real charge and shows it on its own payment page before the
-            buyer authorises anything.
+            For the buyer, <em>illustration only</em>: this example uses
+            Linkwa&apos;s currently published 3% buyer-side fee. Linkwa may
+            change its fees; the actual payment page shows the authoritative
+            total before the buyer authorises anything.
           </p>
           <div className="divide-y rounded-xl border bg-card px-5 py-1 sm:px-6">
             <ExampleRow

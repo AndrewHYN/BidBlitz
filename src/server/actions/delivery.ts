@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { releaseSellerPayout } from "@/server/payments/seller-payout";
+import { automaticSellerPayoutsEnabled } from "@/server/payments/runtime";
 
 const schema = z.object({
   transactionId: z.string().uuid("Invalid transaction"),
@@ -42,18 +43,34 @@ export async function confirmDeliveryAction(input: unknown): Promise<
     return { ok: false, message: "Handover was recorded, but the seller payout could not be found." };
   }
 
-  const release = await releaseSellerPayout(payoutId);
+  // Buyer confirmation is NEVER an implicit instruction to move real funds
+  // unless the distinct automatic-payout switch is explicitly enabled.
+  // This allows checkout to operate while Finance handles SmileCash settlement.
+  const mayAutoDisburse = await automaticSellerPayoutsEnabled();
 
   revalidatePath("/dashboard/transactions");
   revalidatePath(`/dashboard/transactions/${parsed.data.transactionId}`);
   revalidatePath("/dashboard/selling");
   revalidatePath("/admin");
+  revalidatePath("/admin/finance/payouts");
+
+  if (!mayAutoDisburse) {
+    return {
+      ok: true,
+      payoutReleased: false,
+      message: "Handover confirmed. BidBlitz Finance will process the seller's frozen proceeds through an eligible Linkwa or SmileCash/EcoCash payout.",
+    };
+  }
+
+  const release = await releaseSellerPayout(payoutId);
 
   if (release.ok) {
     return {
       ok: true,
-      payoutReleased: true,
-      message: "Handover confirmed. The seller payout was sent through Linkwa.",
+      payoutReleased: release.status === "PAID_OUT",
+      message: release.status === "PAID_OUT"
+        ? "Handover confirmed. Seller payout is already recorded as completed."
+        : "Handover confirmed. Linkwa accepted a payout instruction, but seller receipt still requires independent reconciliation.",
     };
   }
 

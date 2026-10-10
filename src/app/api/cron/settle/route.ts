@@ -66,6 +66,10 @@ async function retryReadySellerPayouts(
   admin: ReturnType<typeof createAdminClient>
 ): Promise<{ sellerPayoutsReleased: number; sellerPayoutsInstructed: number }> {
   try {
+    const { automaticSellerPayoutsEnabled } = await import("@/server/payments/runtime");
+    if (!(await automaticSellerPayoutsEnabled())) {
+      return { sellerPayoutsReleased: 0, sellerPayoutsInstructed: 0 };
+    }
     const { releaseSellerPayout } = await import("@/server/payments/seller-payout");
     const { data: payoutRows, error } = await admin
       .from("seller_payouts")

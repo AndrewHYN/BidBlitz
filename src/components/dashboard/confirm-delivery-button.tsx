@@ -32,7 +32,7 @@ export function ConfirmDeliveryButton({
         size="sm"
         disabled={pending}
         onClick={() => {
-          if (!window.confirm("Confirm you received the item and are satisfied with the handover? This releases the seller's payout if their wallet is ready.")) {
+          if (!window.confirm("Confirm you received the item and are satisfied with the handover? This makes the seller's proceeds eligible for Finance to process; receipt of money is verified separately.")) {
             return;
           }
           setMessage(null);

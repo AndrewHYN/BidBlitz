@@ -52,6 +52,15 @@ export default async function MarketingPage() {
     planned_start: string | null; status: string; created_at: string;
   };
   const campaigns = (campaignsRes.data ?? []) as CampaignRow[];
+  const consentRes = await supabase.rpc("staff_marketing_opt_in_summary");
+  const referralRes = await supabase.rpc("staff_referral_summary");
+  const referralData = !referralRes.error && referralRes.data && typeof referralRes.data === "object"
+    ? referralRes.data as Record<string, unknown> : null;
+  const marketingOptIns = !consentRes.error && typeof consentRes.data?.optedIn === "number"
+    ? consentRes.data.optedIn as number : null;
+  const issuedCodes = typeof referralData?.issuedCodes === "number" ? referralData.issuedCodes : null;
+  const redeemedInvitations = typeof referralData?.redeemedInvitations === "number"
+    ? referralData.redeemedInvitations : null;
 
   return (
     <div className="page-container space-y-8 py-8 sm:py-12" data-testid="admin-marketing-page">
@@ -70,6 +79,40 @@ export default async function MarketingPage() {
       </header>
 
       <AdminNav active="marketing" showMarketing showTeam={team.data === true && !team.error} />
+      <section aria-label="Marketing consent" className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-primary/20 bg-primary/5 p-5">
+        <div className="max-w-2xl">
+          <h2 className="text-base font-extrabold">Consent-controlled marketing audience</h2>
+          <p className="mt-1 text-sm leading-6 text-muted-foreground">
+            Only verified accounts that explicitly enabled optional marketplace emails and have an
+            opt-in audit timestamp count. This is an audience estimate, not an email export.
+          </p>
+        </div>
+        <div className="rounded-xl border bg-card px-5 py-4">
+          <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Confirmed opt-ins</p>
+          <p className="mt-1 text-3xl font-black tabular-nums">{marketingOptIns === null ? "Unavailable" : marketingOptIns}</p>
+        </div>
+      </section>
+
+      <section aria-label="Referral growth" className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.3fr)]">
+        <div className="rounded-2xl border bg-card p-5 shadow-sm">
+          <p className="text-xs font-extrabold uppercase tracking-widest text-muted-foreground">Generated invite codes</p>
+          <p className="mt-3 text-4xl font-black tabular-nums">{issuedCodes === null ? "Unavailable" : issuedCodes}</p>
+          <p className="mt-2 text-xs text-muted-foreground">Real, verified accounts only</p>
+        </div>
+        <div className="rounded-2xl border bg-card p-5 shadow-sm">
+          <p className="text-xs font-extrabold uppercase tracking-widest text-muted-foreground">Accepted invitations</p>
+          <p className="mt-3 text-4xl font-black tabular-nums">{redeemedInvitations === null ? "Unavailable" : redeemedInvitations}</p>
+          <p className="mt-2 text-xs text-muted-foreground">Not sales, revenue, or paid conversions</p>
+        </div>
+        <Link href="/referrals" className="group flex flex-col justify-between rounded-2xl border border-orange-500/20 bg-[#17191a] p-5 text-white shadow-sm transition hover:shadow-lg">
+          <div>
+            <h2 className="text-lg font-black">BidBlitz invitations</h2>
+            <p className="mt-2 text-sm leading-6 text-zinc-300">A genuine community sharing channel, without automatic cash rewards or manipulated performance.</p>
+          </div>
+          <span className="mt-4 flex items-center gap-2 text-xs font-bold text-orange-300">See public referral experience <ArrowRight className="size-4 transition group-hover:translate-x-1" aria-hidden /></span>
+        </Link>
+      </section>
+
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(16rem,1fr)]">
         <CampaignLinkBuilder />
         <div className="space-y-4">

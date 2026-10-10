@@ -73,3 +73,28 @@ Do not assume staff departments imply all future action workflows are implemente
 - A finance approval is **not a payment instruction** and does **not prove receipt**; the existing payment kill switch, dispute checks, Linkwa balance verification and provider-side reconciliation still apply.
 - The initial threshold is **$100.00 USD (10,000 cents)**. It is intentionally conservative. Changing it requires a migration, reviewed tests, and documented finance policy.
 - Existing payments and historical completed payouts were left intact; this policy applies to future state transitions and does not retroactively claim old payouts were vetted.
+
+
+## EcoCash and SmileCash settlement when Linkwa Developer balance is zero
+
+Buyer collection through Linkwa does **not** automatically split 5% to BidBlitz and 95% into a seller wallet. The transaction records the gross, the frozen platform fee and the seller's exact liability. Cash may settle into the merchant's SmileCash wallet even when the Linkwa Developer API's available USD balance is zero. It is unsafe to assume the Developer balance represents the SmileCash wallet.
+
+### Two actual payout routes
+
+**Route A — Linkwa Developer API:** Only for confirmed buyer handovers, undisputed PAID/SETTLED transactions, enrolled seller wallets and sufficient Developer available USD. Finance can explicitly instruct Linkwa using the protected payout flow. When the provider accepts the instruction, the payout remains PAYOUT_DUE until the seller's actual wallet receipt is verified. Retrying PAYOUT_DUE is forbidden, even if no reference exists.
+
+**Route B — External EcoCash / SmileCash wallet transfer:** Finance opens the payout desk and reserves the seller's frozen **95%** using the **Reserve external payout** action. The database snapshots the seller's registered phone, transfer rail and amount. This reservation blocks a competing Linkwa API disbursement at the SQL state-change boundary, even if the cron read a stale status. The platform does **not** send wallet money itself. An authorized operator transfers that exact amount through SmileCash/ZIPIT/EcoCash, keeps the actual provider transaction reference, and obtains evidence that the seller received it. An authorized payout-recording employee then confirms receipt with the exact reference and a written evidence note. The database atomically closes the payout as PAID_OUT, prevents duplicate transfer references, and records an audit event.
+
+- Do not claim a transfer was sent merely because the reservation was saved.
+- Do not type a made-up payment reference. The server verifies authorization but can only trust truthful external receipt evidence supplied by the operator.
+- Never reserve an existing PAYOUT_DUE transaction or one with historical provider attempts.
+- Do not cancel a reservation if a transfer was sent or its outcome is unknown. Cancel requires an explicit attestation that **no transfer was sent**.
+- Existing payouts that were already recorded PAID_OUT or have an unknown provider outcome remain untouched. They require reconciliation, not replay.
+
+### Separate financial kill switches
+
+`payment_settings.payments_enabled`: permits buyer checkout and manual eligible seller payout instructions; owner may deactivate the entire payment system when necessary.
+
+`payment_settings.automatic_payouts_enabled`: defaults to **false**. The recurring settlement cron will not automatically initiate Linkwa seller payouts while false, even if buyer checkout is live. Owner-authorized staff can still deliberately initiate an eligible Linkwa payout from Finance, or reserve an external transfer. Enable automatic payouts only after developer-wallet funding and verified wallet delivery have been demonstrated with distinct buyer and seller accounts. This prevents older ready-for-payout records from unexpectedly sending funds as soon as checkout goes live.
+
+For every sale, gross = frozen fee + frozen seller proceeds. The 5% is BidBlitz's book revenue **before provider charges and taxes**, not cash automatically settled into a separate company account. Do not spend seller liabilities as company funds.

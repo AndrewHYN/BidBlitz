@@ -133,6 +133,25 @@ export async function releaseSellerPayout(
     };
   }
 
+  // Seller may have reserved an external SmileCash/EcoCash transfer because
+  // Linkwa's Developer payout balance is separate from collected wallet funds.
+  // A reserved transfer must never ALSO be sent by the Linkwa cron or an admin.
+  const { data: externalClaim, error: externalError } = await admin
+    .from("external_seller_payout_claims")
+    .select("status")
+    .eq("payout_id", payout.id)
+    .maybeSingle();
+  if (externalError) return {
+    ok: false, code: "manual_reconciliation_required",
+    message: "The external payout reservation state could not be verified.",
+  };
+  if (externalClaim?.status === "RESERVED" ||
+      externalClaim?.status === "RECEIPT_CONFIRMED") return {
+    ok: false, code: "manual_reconciliation_required",
+    message: "This payout has an external wallet transfer reserved or recorded. Do not send it again.",
+  };
+
+
   if (
     !payout.delivery_confirmed_at ||
     !["DELIVERY_CONFIRMED", "PAYOUT_PENDING"].includes(payout.status)
