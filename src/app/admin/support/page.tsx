@@ -60,7 +60,7 @@ export default async function AdminSupportPage(){
          </div>
          <h3 className="mt-3 text-lg font-extrabold">{t.subject}</h3>
          <p className="mt-2 text-xs text-muted-foreground">Status: {t.status.replaceAll("_"," ")} · Customer #{t.customer_id.slice(0,8)}</p>
-         <p className="mt-1 text-xs text-muted-foreground">Assigned {t.assigned_to?"to staff":"— nobody yet"} · Updated {new Date(t.updated_at).toLocaleString("en-US")}</p>
+         <p className="mt-1 text-xs text-muted-foreground">Assigned {t.assigned_to?"to staff":"Unassigned"} · Updated {new Date(t.updated_at).toLocaleString("en-US")}</p>
          <span className="mt-4 flex items-center gap-1 text-xs font-bold text-primary">Work this case <ArrowRight className="size-4 transition group-hover:translate-x-1" aria-hidden/></span>
         </Link>
        </li>)}
