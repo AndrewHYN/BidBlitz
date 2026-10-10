@@ -152,6 +152,16 @@ describe("Linkwa amounts", () => {
     expect(linkwaAmountToMinor("10.50")).toBe(1050n);
   });
 
+  it("never rounds JSON numbers with fractional cents into a matching sale", () => {
+    for (const bad of [1.234, 1.235, 0.001, 19.999, 12.34567, -1.01]) {
+      expect(() => linkwaAmountToMinor(bad)).toThrow(PaymentPayloadError);
+    }
+    expect(linkwaAmountToMinor(1.2)).toBe(120n);
+    expect(linkwaAmountToMinor(19.99)).toBe(1999n);
+    expect(linkwaAmountToMinor(25)).toBe(2500n);
+    expect(linkwaAmountToMinor(0)).toBe(0n);
+  });
+
   it("refuses amounts that are not exact cents instead of rounding", () => {
     for (const bad of ["25", "25.0", "25.001", "abc", "", null, undefined, NaN, Infinity]) {
       expect(() => linkwaAmountToMinor(bad), JSON.stringify(bad)).toThrow(PaymentPayloadError);
