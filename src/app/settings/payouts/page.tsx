@@ -34,7 +34,7 @@ export default async function PayoutSettingsPage() {
       <div className="mx-auto w-full max-w-2xl space-y-6">
         <PageHeader
           title="Seller payouts"
-          description="Set up the wallet that receives your seller proceeds after a buyer confirms handover."
+          description="Choose a seller payout contact or Linkwa wallet for transfers after buyer-confirmed handover."
           actions={
             <Link href="/settings" className="inline-flex items-center gap-1 text-sm font-semibold text-primary hover:underline">
               <ArrowLeft className="size-4" aria-hidden />
@@ -46,7 +46,7 @@ export default async function PayoutSettingsPage() {
         <div className="flex gap-3 rounded-xl border bg-muted/30 p-4 text-sm">
           <ShieldCheck className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
           <p className="leading-6 text-muted-foreground">
-            BidBlitz keeps the platform fee recorded on the sale. The seller payout is the frozen remainder. Your phone and Linkwa wallet identifiers are private and are never shown on your public profile.
+            BidBlitz keeps the platform fee recorded on the sale. The seller payout is the frozen remainder. Your payout phone and any Linkwa wallet identifiers stay private and are never displayed on your public profile.
           </p>
         </div>
 
