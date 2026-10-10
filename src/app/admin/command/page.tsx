@@ -22,7 +22,7 @@ export default async function OperationsHQPage() {
 
   const keys = [
     "admin.access", "admin.manage_team", "payments.view",
-    "payouts.view", "disputes.view", "settings.manage_marketplace", "marketing.view",
+    "payouts.view", "disputes.view", "settings.manage_marketplace", "marketing.view", "support.manage", "finance.costs.view",
   ] as const;
   const grants = await Promise.all(keys.map((key) =>
     supabase.rpc("has_permission", { p_user_id: user.id, p_permission: key })
@@ -35,15 +35,18 @@ export default async function OperationsHQPage() {
   const canManagePromotions = Boolean(permissions.get("settings.manage_marketplace"));
   const canMarketing = canManagePromotions || Boolean(permissions.get("marketing.view"));
   const canTeam = Boolean(permissions.get("admin.manage_team"));
+  const canSupport = Boolean(permissions.get("support.manage"));
+  const canCosts = Boolean(permissions.get("finance.costs.view"));
 
   // Security-definer count projection enforces live per-department grants;
   // raw RLS queries gave false "0" for non-owner staff. Failed reads are
   // unavailable, NEVER a successful empty queue.
-  const [countResult, paymentSettings] = await Promise.all([
+  const [countResult, paymentSettings, supportCount] = await Promise.all([
     supabase.rpc("admin_operations_queue_counts"),
     canFinance
       ? supabase.from("payment_settings").select("payments_enabled").maybeSingle()
       : Promise.resolve(null),
+    canSupport ? supabase.from("support_tickets").select("id",{count:"exact",head:true}).in("status",["OPEN","IN_REVIEW","WAITING_CUSTOMER"]) : Promise.resolve(null),
   ]);
   const rawCounts = !countResult.error && countResult.data && typeof countResult.data === "object"
     ? countResult.data as Record<string, unknown> : null;
@@ -66,6 +69,12 @@ export default async function OperationsHQPage() {
     ...(canManagePromotions
       ? [{ title: "Promotion requests", description: "Review paid placements and quoted prices.", count: queueCount("promotions"), href: "/admin#admin-promotions", icon: Megaphone, category: "Marketing" }]
       : []),
+    ...(canSupport ? [{
+      title:"Open support tickets",description:"Reply, assign support agents and track customer issues.",
+      count:supportCount && !supportCount.error && Number.isSafeInteger(supportCount.count)
+        ? supportCount.count : supportCount?.count===0 && !supportCount.error ? 0 : null,
+      href:"/admin/support",icon:Headset,category:"Customer care"
+    }] : []),
   ];
 
   const displayed = lanes.filter((lane) => lane.count !== null);
@@ -100,7 +109,7 @@ export default async function OperationsHQPage() {
         </div>
       </header>
 
-      <AdminNav active="command" showTeam={canTeam} showMarketing={canMarketing}
+      <AdminNav active="command" showTeam={canTeam} showMarketing={canMarketing} showSupport={canSupport}
         disputeCount={canDisputes ? queueCount("disputes") ?? 0 : 0} />
 
       <section aria-label="Workload overview" className="grid gap-3 sm:grid-cols-3">
@@ -174,12 +183,14 @@ export default async function OperationsHQPage() {
             href="/admin/disputes" cta="Case queue" />}
           {canFinance && <Department icon={Banknote} title="Finance & settlement" detail="Separate recorded fees, provider funds, seller liabilities and paid transfers."
             href="/admin/finance" cta="Finance desk" />}
+          {canCosts && <Department icon={Banknote} title="Company cost control" detail="Track payroll provisions, marketing spend and hosting separately from seller money."
+            href="/admin/finance/costs" cta="Expense register" />}
           <Department icon={Megaphone} title="Marketing & growth" detail="Prepare honest share campaigns; authorized staff review paid placements."
             href="/admin/marketing" cta="Growth studio" />
           {canTeam && <Department icon={Users} title="People & access" detail="Assign staff roles, suspend access and inspect the authorization audit."
             href="/admin/team" cta="Team roster" />}
           <Department icon={Headset} title="Seller & customer operations" detail="Help buyers and sellers complete safe, accurate auctions."
-            href="/admin#admin-reviews" cta="Listing desk" />
+            href={canSupport?"/admin/support":"/admin#admin-reviews"} cta={canSupport?"Customer support desk":"Listing desk"} />
         </div>
       </section>
 
