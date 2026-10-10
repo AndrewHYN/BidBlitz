@@ -25,7 +25,7 @@ describe("unified BidBlitz operations security contracts",()=>{
  it("company costs require external proof for PAID and exact cents",()=>{
   expect(expenseSql).toContain("paid_reference_required");
   expect(expenseSql).toContain("amount_minor bigint");
-  expect(finance).toContain("company-operating");
+  expect(finance).toContain("company-costs-page");
   expect(read("src/lib/finance/costs.ts")).toContain("parseMoneyToMinor");
  });
  it("support staff notes are separate from customer-visible replies",()=>{
