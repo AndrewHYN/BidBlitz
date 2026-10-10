@@ -38,7 +38,7 @@ export default async function CompanyCostsPage(){
   <header className="relative overflow-hidden rounded-[1.75rem] border border-orange-500/20 bg-[#17191b] p-7 text-white shadow-xl sm:p-10">
    <p className="text-xs font-extrabold uppercase tracking-[.2em] text-orange-300">BidBlitz / Executive finance</p>
    <h1 className="mt-4 text-4xl font-black tracking-[-.055em] sm:text-6xl">Cost control<span className="text-orange-400">.</span></h1>
-   <p className="mt-3 max-w-2xl text-sm leading-7 text-zinc-300">Payroll provisions, marketing expenses, provider charges and running costs—kept completely separate from customer collections and seller money.</p>
+   <p className="mt-3 max-w-2xl text-sm leading-7 text-zinc-300">Payroll provisions, marketing expenses, provider charges and running costs, kept completely separate from customer collections and seller money.</p>
   </header>
   <AdminNav active="finance" showTeam={mayTeam}/>
   <nav className="flex flex-wrap gap-3 text-sm font-bold">
