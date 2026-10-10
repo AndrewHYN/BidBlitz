@@ -185,6 +185,8 @@ export interface Database {
           id: number;
           payment_window_seconds: number;
           payments_enabled: boolean;
+          automatic_payouts_enabled: boolean;
+          linkwa_payout_instructions_enabled: boolean;
           updated_at: string;
         };
         Insert: never;
@@ -312,6 +314,20 @@ export interface Database {
         Insert: never;
         Update: never;
       };
+      seller_payout_reconciliation_evidence: {
+        Row: {
+          id: string;
+          payout_id: string;
+          evidence_kind: "INVESTIGATION" | "PROVIDER_REFERENCE" | "SELLER_RECEIPT";
+          provider_reference: string | null;
+          evidence_note: string;
+          seller_receipt_verified: boolean;
+          recorded_by: string;
+          recorded_at: string;
+        };
+        Insert: never;
+        Update: never;
+      };
       seller_payout_events: {
         Row: {
           id: string;
@@ -428,6 +444,16 @@ export interface Database {
       set_manual_payout_contact: {
         Args: { p_first_name: string; p_last_name: string; p_phone_e164: string };
         Returns: { ok: true; status: "MANUAL_READY"; masked_phone: string };
+      };
+      staff_record_payout_reconciliation: {
+        Args: {
+          p_payout_id: string;
+          p_kind: "INVESTIGATION" | "PROVIDER_REFERENCE" | "SELLER_RECEIPT";
+          p_reference: string | null;
+          p_note: string;
+          p_seller_receipt_verified: boolean;
+        };
+        Returns: Json;
       };
       my_payout_setup: {
         Args: Record<string, never>;
