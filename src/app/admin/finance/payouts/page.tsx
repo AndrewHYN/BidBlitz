@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { AlertTriangle, ArrowLeft, ArrowRight, BadgeCheck, Banknote, CircleCheck, Clock3, LockKeyhole, ShieldAlert, Wallet } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ArrowRight, BadgeCheck, CircleCheck, LockKeyhole, ShieldAlert, Wallet } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { hasPermission } from "@/server/permissions";
 import { readFinanceOperations } from "@/server/finance/operations";
@@ -69,7 +69,7 @@ export default async function FinancePayoutsPage() {
           Seller payout desk<span className="text-orange-400">.</span>
         </h1>
         <p className="mt-3 max-w-3xl text-sm leading-6 text-zinc-300">
-          Verify handover, recipient readiness, dispute safety, and the provider's evidence
+          Verify handover, recipient readiness, dispute safety, and the provider&apos;s evidence
           before instructing or recording seller transfers. Provider acknowledgement is not final settlement.
         </p>
         <p className="mt-4 text-xs font-bold uppercase tracking-wider text-zinc-400">
