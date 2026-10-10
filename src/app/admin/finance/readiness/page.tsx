@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Activity,ArrowLeft,AlertTriangle,CheckCircle2,KeyRound,ShieldCheck,Wallet } from "lucide-react";
+import { Activity,ArrowLeft,AlertTriangle,CheckCircle2,KeyRound,ShieldCheck } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { hasPermission } from "@/server/permissions";
 import { AdminNav } from "@/components/dashboard/admin-nav";
