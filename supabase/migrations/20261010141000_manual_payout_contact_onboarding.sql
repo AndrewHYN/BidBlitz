@@ -99,7 +99,8 @@ comment on table public.seller_payout_recipients is
  'Seller payout destination contact, restricted to service role writes or the own-account manual contact RPC. MANUAL_READY does not constitute a linked Linkwa wallet; external payouts still require independent staff verification.';
 
 -- Finance triage recognises a saved manual contact without pretending it
--- is a Linkwa-linked wallet. The boolean means destination on file only.
+-- is a Linkwa-linked wallet. The Linkwa-ready flag remains distinct and
+-- never authorizes a provider payout for MANUAL_READY recipients.
 CREATE OR REPLACE FUNCTION public.admin_finance_operations(p_limit integer DEFAULT 75)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -159,7 +160,8 @@ begin
             t.fee_minor::text as "feeMinor",
             a.title as "auctionTitle",
             coalesce(s.display_name, s.username, 'Seller') as "sellerName",
-            ((r.setup_status = 'READY' and r.external_wallet_id is not null and r.external_user_id is not null) or (r.setup_status = 'MANUAL_READY' and r.phone_e164 ~ '^[+]263[0-9]{9} as "walletReady",
+            ((r.setup_status = 'READY' and r.external_wallet_id is not null and r.external_user_id is not null)
+             or (r.setup_status = 'MANUAL_READY' and r.phone_e164 ~ '^[+]263[0-9]{9}
             exists (select 1 from public.transaction_disputes d
               where d.transaction_id = p.transaction_id and d.status <> 'RESOLVED') as "hasOpenDispute"
      from public.seller_payouts p
@@ -181,6 +183,8 @@ begin
 end
 $function$
 )) is true as "walletReady",
+            (r.setup_status = 'READY' and r.external_wallet_id is not null
+              and r.external_user_id is not null) is true as "linkwaWalletReady",
             exists (select 1 from public.transaction_disputes d
               where d.transaction_id = p.transaction_id and d.status <> 'RESOLVED') as "hasOpenDispute"
      from public.seller_payouts p
@@ -200,5 +204,4 @@ $function$
     'canViewPayments', v_can_payments, 'canViewPayouts', v_can_payouts,
     'transactions', v_transactions, 'payouts', v_payouts);
 end
-$function$
-;
+$function$;
