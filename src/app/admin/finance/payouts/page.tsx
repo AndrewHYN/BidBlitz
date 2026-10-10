@@ -169,6 +169,7 @@ export default async function FinancePayoutsPage() {
                     && !payout.hasOpenDispute && ["PAID", "SETTLED"].includes(payout.paymentStatus);
                   const eligibleToInstruct = canOperate && paymentsEnabled && triage === "ready"
                     && payout.currency === "USD" && amount !== null && amount > 0 && highValueCleared
+                    && payout.linkwaWalletReady === true
                     && !externalRes.error && externalClaim === null;
                   return (
                     <li key={payout.id} className="space-y-4 rounded-2xl border bg-card p-5 shadow-sm" data-testid="finance-payout-row">
@@ -186,7 +187,7 @@ export default async function FinancePayoutsPage() {
                         <div><p className="text-xs font-semibold text-muted-foreground">Seller proceeds</p><p className="mt-1 text-xl font-black">{amount === null ? "Unavailable" : <Money minor={amount} currency={payout.currency} />}</p></div>
                         <div><p className="text-xs font-semibold text-muted-foreground">Buyer payment</p><p className="mt-1 font-bold">{payout.paymentStatus}</p></div>
                         <div><p className="text-xs font-semibold text-muted-foreground">Buyer handover</p><p className="mt-1 font-bold">{payout.deliveryConfirmedAt ? "Confirmed" : "Not confirmed"}</p></div>
-                        <div><p className="text-xs font-semibold text-muted-foreground">Seller wallet</p><p className="mt-1 font-bold">{payout.walletReady ? "Ready" : "Setup required"}</p></div>
+                        <div><p className="text-xs font-semibold text-muted-foreground">Payout destination</p><p className="mt-1 font-bold">{payout.walletReady ? "Saved" : "Setup required"}</p></div>
                       </div>
                       {payout.hasOpenDispute && (
                         <p role="status" className="flex gap-2 rounded-lg bg-red-500/10 p-3 text-xs font-bold text-red-700 dark:text-red-300">
