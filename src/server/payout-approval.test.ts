@@ -47,7 +47,7 @@ describe("high-value payout controls", () => {
     expect(action).toContain('requirePermission("payouts.transition")');
     expect(action).not.toContain("releaseSellerPayout");
     expect(action).not.toContain("instructLinkwaPayout");
-    expect(component).toContain("You cannot approve");
+    expect(component).toContain("you cannot review it yourself");
   });
 
   it("hides the payout instruction until high-value approval is verified", () => {
