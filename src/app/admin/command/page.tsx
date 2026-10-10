@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { AdminNav } from "@/components/dashboard/admin-nav";
-import { countFromQuery, queueLabel, queueState } from "@/lib/operations/queue-health";
+import { queueLabel, queueState } from "@/lib/operations/queue-health";
 
 export const metadata: Metadata = {
   title: "Operations HQ",
@@ -22,7 +22,7 @@ export default async function OperationsHQPage() {
 
   const keys = [
     "admin.access", "admin.manage_team", "payments.view",
-    "payouts.view", "disputes.view", "settings.manage_marketplace",
+    "payouts.view", "disputes.view", "settings.manage_marketplace", "marketing.view",
   ] as const;
   const grants = await Promise.all(keys.map((key) =>
     supabase.rpc("has_permission", { p_user_id: user.id, p_permission: key })
@@ -32,44 +32,39 @@ export default async function OperationsHQPage() {
 
   const canFinance = Boolean(permissions.get("payments.view") || permissions.get("payouts.view"));
   const canDisputes = Boolean(permissions.get("disputes.view"));
-  const canMarketing = Boolean(permissions.get("settings.manage_marketplace"));
+  const canManagePromotions = Boolean(permissions.get("settings.manage_marketplace"));
+  const canMarketing = canManagePromotions || Boolean(permissions.get("marketing.view"));
   const canTeam = Boolean(permissions.get("admin.manage_team"));
 
-  // Read under the caller's session. No service-role client or sensitive exports.
-  // An error is unavailable, NEVER an empty work queue.
-  const [reviews, cancellations, paused, reports, disputes, promotions, payouts, paymentSettings] =
-    await Promise.all([
-      supabase.from("listing_reviews").select("id", { count: "exact", head: true }).eq("status", "PENDING"),
-      supabase.from("auction_cancellation_requests").select("id", { count: "exact", head: true }).eq("status", "PENDING"),
-      supabase.from("auctions").select("id", { count: "exact", head: true }).eq("status", "PAUSED"),
-      supabase.from("reports").select("id", { count: "exact", head: true }).in("status", ["OPEN", "REVIEWING"]),
-      canDisputes
-        ? supabase.from("transaction_disputes").select("id", { count: "exact", head: true }).neq("status", "RESOLVED")
-        : Promise.resolve(null),
-      canMarketing
-        ? supabase.from("promotion_requests").select("id", { count: "exact", head: true }).eq("status", "PENDING")
-        : Promise.resolve(null),
-      canFinance
-        ? supabase.from("seller_payouts").select("id", { count: "exact", head: true }).in("status", ["PAYOUT_DUE", "PAYOUT_PENDING"])
-        : Promise.resolve(null),
-      canFinance
-        ? supabase.from("payment_settings").select("payments_enabled").maybeSingle()
-        : Promise.resolve(null),
-    ]);
+  // Security-definer count projection enforces live per-department grants;
+  // raw RLS queries gave false "0" for non-owner staff. Failed reads are
+  // unavailable, NEVER a successful empty queue.
+  const [countResult, paymentSettings] = await Promise.all([
+    supabase.rpc("admin_operations_queue_counts"),
+    canFinance
+      ? supabase.from("payment_settings").select("payments_enabled").maybeSingle()
+      : Promise.resolve(null),
+  ]);
+  const rawCounts = !countResult.error && countResult.data && typeof countResult.data === "object"
+    ? countResult.data as Record<string, unknown> : null;
+  function queueCount(key: string): number | null {
+    const raw = rawCounts?.[key];
+    return typeof raw === "number" && Number.isSafeInteger(raw) && raw >= 0 ? raw : null;
+  }
 
   const lanes = [
-    { title: "Listing reviews", description: "Approve safe, complete listings before they go live.", count: countFromQuery(reviews), href: "/admin#admin-reviews", icon: ClipboardList, category: "Operations" },
-    { title: "Cancellation requests", description: "Check bids and policy before cancelling auctions.", count: countFromQuery(cancellations), href: "/admin#admin-cancellations", icon: Gavel, category: "Operations" },
-    { title: "Paused auctions", description: "Investigate or resume auctions held for safety.", count: countFromQuery(paused), href: "/admin#admin-paused", icon: PauseCircle, category: "Trust & safety" },
-    { title: "Open reports", description: "Review user and listing reports with an audit trail.", count: countFromQuery(reports), href: "/admin#admin-reports", icon: Flag, category: "Trust & safety" },
+    { title: "Listing reviews", description: "Approve safe, complete listings before they go live.", count: queueCount("reviews"), href: "/admin#admin-reviews", icon: ClipboardList, category: "Operations" },
+    { title: "Cancellation requests", description: "Check bids and policy before cancelling auctions.", count: queueCount("cancellations"), href: "/admin#admin-cancellations", icon: Gavel, category: "Operations" },
+    { title: "Paused auctions", description: "Investigate or resume auctions held for safety.", count: queueCount("paused"), href: "/admin#admin-paused", icon: PauseCircle, category: "Trust & safety" },
+    { title: "Open reports", description: "Review user and listing reports with an audit trail.", count: queueCount("reports"), href: "/admin#admin-reports", icon: Flag, category: "Trust & safety" },
     ...(canDisputes
-      ? [{ title: "Unresolved disputes", description: "Keep payouts frozen while cases are under review.", count: countFromQuery(disputes), href: "/admin/disputes", icon: Scale, category: "Disputes" }]
+      ? [{ title: "Unresolved disputes", description: "Keep payouts frozen while cases are under review.", count: queueCount("disputes"), href: "/admin/disputes", icon: Scale, category: "Disputes" }]
       : []),
     ...(canFinance
-      ? [{ title: "Pending seller payouts", description: "Reconcile provider settlement before payout actions.", count: countFromQuery(payouts), href: "/admin/finance", icon: Banknote, category: "Finance" }]
+      ? [{ title: "Pending seller payouts", description: "Reconcile provider settlement before payout actions.", count: queueCount("payouts"), href: "/admin/finance/payouts", icon: Banknote, category: "Finance" }]
       : []),
-    ...(canMarketing
-      ? [{ title: "Promotion requests", description: "Review paid placements and quoted prices.", count: countFromQuery(promotions), href: "/admin#admin-promotions", icon: Megaphone, category: "Marketing" }]
+    ...(canManagePromotions
+      ? [{ title: "Promotion requests", description: "Review paid placements and quoted prices.", count: queueCount("promotions"), href: "/admin#admin-promotions", icon: Megaphone, category: "Marketing" }]
       : []),
   ];
 
@@ -105,8 +100,8 @@ export default async function OperationsHQPage() {
         </div>
       </header>
 
-      <AdminNav active="command" showTeam={canTeam} showMarketing
-        disputeCount={canDisputes ? countFromQuery(disputes) ?? 0 : 0} />
+      <AdminNav active="command" showTeam={canTeam} showMarketing={canMarketing}
+        disputeCount={canDisputes ? queueCount("disputes") ?? 0 : 0} />
 
       <section aria-label="Workload overview" className="grid gap-3 sm:grid-cols-3">
         <div className="rounded-2xl border bg-card p-5 shadow-sm">

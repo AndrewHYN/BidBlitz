@@ -18,13 +18,15 @@ export default async function MarketingPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login?next=/admin/marketing");
 
-  const [access, marketing, team] = await Promise.all([
+  const [access, marketing, team, marketingView] = await Promise.all([
     supabase.rpc("has_permission", { p_user_id: user.id, p_permission: "admin.access" }),
     supabase.rpc("has_permission", { p_user_id: user.id, p_permission: "settings.manage_marketplace" }),
     supabase.rpc("has_permission", { p_user_id: user.id, p_permission: "admin.manage_team" }),
+    supabase.rpc("has_permission", { p_user_id: user.id, p_permission: "marketing.view" }),
   ]);
-  if (access.error || access.data !== true) redirect("/");
   const canReviewPromotions = !marketing.error && marketing.data === true;
+  const canViewCampaigns = !marketingView.error && marketingView.data === true;
+  if (access.error || access.data !== true || (!canViewCampaigns && !canReviewPromotions)) redirect("/");
 
   const promotionCount = canReviewPromotions
     ? countFromQuery(await supabase.from("promotion_requests")

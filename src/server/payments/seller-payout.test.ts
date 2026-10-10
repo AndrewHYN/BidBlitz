@@ -63,8 +63,11 @@ beforeEach(() => {
   vi.mocked(instructLinkwaPayout).mockResolvedValue({
     payoutId: "provider-payout-1", amountMinor: 950n, currency: "USD",
   });
-  rpc.mockImplementation(async (_name: string, input: { p_to_status: string }) => ({
-    data: { ok: true, already: false, status: input.p_to_status, payout_id: payoutId }, error: null,
+  rpc.mockImplementation(async (name: string, input: { p_to_status?: string }) => ({
+    data: name === "service_record_payout_instruction"
+      ? { ok: true, already: false, status: "PAYOUT_DUE" }
+      : { ok: true, already: false, status: input.p_to_status, payout_id: payoutId },
+    error: null,
   }));
 });
 
@@ -90,7 +93,11 @@ describe("seller payout atomic claim", () => {
     expect(JSON.stringify(inserted.mock.calls)).not.toContain("SECRET-KEY");
   });
   it("sends exactly the frozen 95% after a newly acquired claim", async () => {
-    expect(await releaseSellerPayout(payoutId)).toMatchObject({ ok: true, status: "PAID_OUT" });
+    expect(await releaseSellerPayout(payoutId)).toMatchObject({ ok: true, status: "PAYOUT_DUE", payoutReference: "provider-payout-1" });
+    expect(rpc).toHaveBeenCalledWith("service_record_payout_instruction", {
+      p_payout_id: payoutId, p_provider_reference: "provider-payout-1",
+    });
+    expect(inserted).not.toHaveBeenCalledWith("notifications", expect.objectContaining({ type: "PAYOUT_SENT" }));
     expect(instructLinkwaPayout).toHaveBeenCalledExactlyOnceWith(
       { apiKey: "test-key", baseUrl: "https://linkwa.co.zw" },
       { externalUserId: "user-1", externalWalletId: "wallet-1", amountMinor: 950n },
@@ -122,7 +129,10 @@ describe("seller payout atomic claim", () => {
       return [{ currency: "USD", availableMinor: 1000n, pendingMinor: 0n }];
     });
     let claimed = false;
-    rpc.mockImplementation(async (_name: string, input: { p_to_status: string }) => {
+    rpc.mockImplementation(async (name: string, input: { p_to_status?: string }) => {
+      if (name === "service_record_payout_instruction") {
+        return { data: { ok: true, already: false, status: "PAYOUT_DUE" }, error: null };
+      }
       const already = input.p_to_status === "PAYOUT_DUE" && claimed;
       if (input.p_to_status === "PAYOUT_DUE") claimed = true;
       return { data: { ok: true, already, status: input.p_to_status, payout_id: payoutId }, error: null };
@@ -131,6 +141,21 @@ describe("seller payout atomic claim", () => {
     expect(results.filter((r) => r.ok)).toHaveLength(1);
     expect(results.filter((r) => !r.ok)).toHaveLength(1);
     expect(instructLinkwaPayout).toHaveBeenCalledTimes(1);
+  });
+
+  it("refuses to report success when the provider accepted a payout but recording failed", async () => {
+    rpc.mockImplementation(async (name: string, input: { p_to_status?: string }) =>
+      name === "service_record_payout_instruction"
+        ? { data: null, error: { message: "DB unavailable" } }
+        : { data: { ok: true, already: false, status: input.p_to_status, payout_id: payoutId }, error: null }
+    );
+    expect(await releaseSellerPayout(payoutId)).toMatchObject({
+      ok: false, code: "manual_reconciliation_required",
+    });
+    expect(instructLinkwaPayout).toHaveBeenCalledTimes(1);
+    expect(rpc).not.toHaveBeenCalledWith("service_transition_seller_payout", expect.objectContaining({
+      p_to_status: "PAID_OUT",
+    }));
   });
 
   it("keeps the kill switch ahead of all provider calls", async () => {

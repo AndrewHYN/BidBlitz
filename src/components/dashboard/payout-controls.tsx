@@ -21,21 +21,19 @@ import type { SellerPayoutStatus } from "@/lib/supabase/types";
 /** What each status is allowed to move to. Mirrors the SQL transition map. */
 const NEXT_ACTIONS: Record<SellerPayoutStatus, SellerPayoutStatus[]> = {
   WAITING_FOR_FULFILMENT: ["DELIVERY_CONFIRMED", "HELD", "DISPUTED"],
-  DELIVERY_CONFIRMED: ["PAYOUT_PENDING", "PAYOUT_DUE", "HELD", "DISPUTED"],
-  PAYOUT_PENDING: ["DELIVERY_CONFIRMED", "PAYOUT_DUE", "HELD", "DISPUTED"],
+  DELIVERY_CONFIRMED: ["PAYOUT_PENDING", "HELD", "DISPUTED"],
+  PAYOUT_PENDING: ["DELIVERY_CONFIRMED", "HELD", "DISPUTED"],
   PAYOUT_DUE: ["PAID_OUT", "HELD", "DISPUTED"],
   HELD: [
     "WAITING_FOR_FULFILMENT",
     "DELIVERY_CONFIRMED",
     "PAYOUT_PENDING",
-    "PAYOUT_DUE",
     "DISPUTED",
   ],
   DISPUTED: [
     "WAITING_FOR_FULFILMENT",
     "DELIVERY_CONFIRMED",
     "PAYOUT_PENDING",
-    "PAYOUT_DUE",
     "HELD",
   ],
   PAID_OUT: [],
@@ -45,7 +43,7 @@ const ACTION_LABELS: Record<SellerPayoutStatus, string> = {
   WAITING_FOR_FULFILMENT: "Restart fulfilment",
   DELIVERY_CONFIRMED: "Mark delivery confirmed",
   PAYOUT_PENDING: "Mark payout pending",
-  PAYOUT_DUE: "Mark payout due",
+  PAYOUT_DUE: "Reserved for provider instruction",
   PAID_OUT: "Record seller payout",
   HELD: "Hold payout",
   DISPUTED: "Record dispute",
