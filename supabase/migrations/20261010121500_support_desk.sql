@@ -139,3 +139,60 @@ begin
 end $$;
 revoke all on function public.reply_support_ticket(uuid,text) from public,anon;
 grant execute on function public.reply_support_ticket(uuid,text) to authenticated;
+
+create or replace function public.staff_update_support_ticket(
+ p_ticket_id uuid,p_status text,p_priority text,p_assigned_to uuid default null
+) returns jsonb language plpgsql security definer set search_path=''
+as $$
+declare v_uid uuid:=auth.uid(); v_ticket public.support_tickets%rowtype;
+begin
+ if v_uid is null or not public.has_permission(v_uid,'support.manage') then
+   raise exception 'not_authorised' using errcode='42501';
+ end if;
+ if p_status is null or p_status not in
+  ('OPEN','IN_REVIEW','WAITING_CUSTOMER','RESOLVED','CLOSED')
+  or p_priority is null or p_priority not in ('NORMAL','HIGH','URGENT')
+  or (p_assigned_to is not null and not public.has_permission(p_assigned_to,'support.manage')) then
+   raise exception 'invalid_ticket_update' using errcode='22023';
+ end if;
+ select * into v_ticket from public.support_tickets where id=p_ticket_id for update;
+ if not found then raise exception 'ticket_not_found' using errcode='P0002'; end if;
+ if v_ticket.status='CLOSED' and p_status<>'CLOSED' then
+   raise exception 'ticket_closed' using errcode='22023';
+ end if;
+ update public.support_tickets
+   set status=p_status,priority=p_priority,assigned_to=p_assigned_to,
+       updated_at=clock_timestamp()
+   where id=p_ticket_id;
+ insert into public.support_ticket_events(ticket_id,actor_id,action)
+ values(p_ticket_id,v_uid,
+   case when v_ticket.assigned_to is distinct from p_assigned_to then 'ASSIGNED'
+        else 'STATUS_CHANGED' end);
+ return jsonb_build_object('ok',true,'status',p_status);
+end $$;
+revoke all on function public.staff_update_support_ticket(uuid,text,text,uuid) from public,anon;
+grant execute on function public.staff_update_support_ticket(uuid,text,text,uuid) to authenticated;
+
+create or replace function public.staff_add_support_note(
+ p_ticket_id uuid,p_note text
+) returns jsonb language plpgsql security definer set search_path=''
+as $$
+declare v_uid uuid:=auth.uid(); v_id uuid;
+begin
+ if v_uid is null or not public.has_permission(v_uid,'support.manage') then
+   raise exception 'not_authorised' using errcode='42501';
+ end if;
+ if char_length(btrim(coalesce(p_note,''))) not between 10 and 3000 then
+   raise exception 'invalid_note' using errcode='22023';
+ end if;
+ if not exists(select 1 from public.support_tickets where id=p_ticket_id) then
+   raise exception 'ticket_not_found' using errcode='P0002';
+ end if;
+ insert into public.support_staff_notes(ticket_id,author_id,body)
+ values(p_ticket_id,v_uid,btrim(p_note)) returning id into v_id;
+ insert into public.support_ticket_events(ticket_id,actor_id,action)
+ values(p_ticket_id,v_uid,'PRIVATE_NOTE');
+ return jsonb_build_object('ok',true,'id',v_id);
+end $$;
+revoke all on function public.staff_add_support_note(uuid,text) from public,anon;
+grant execute on function public.staff_add_support_note(uuid,text) to authenticated;
