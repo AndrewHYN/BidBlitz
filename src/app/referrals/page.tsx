@@ -31,7 +31,7 @@ export default async function ReferralsPage({ searchParams }: {
     : [null, null];
   const yourCode = !codeResult?.error && typeof codeResult?.data?.code === "string"
     ? codeResult.data.code as string : null;
-  const count = !summaryResult?.error && Number.isSafeInteger(summaryResult?.data?.signups)
+  const count = summaryResult && !summaryResult.error && Number.isSafeInteger(summaryResult.data?.signups)
     ? summaryResult.data.signups as number : null;
   const redeemed = !summaryResult?.error && summaryResult?.data?.hasRedeemed === true;
 
