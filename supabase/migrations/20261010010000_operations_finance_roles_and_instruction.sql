@@ -176,7 +176,7 @@ create or replace function private.seller_payouts_guard_due_actor()
 returns trigger
 language plpgsql
 set search_path = ''
-as $
+as $$
 begin
   if new.status = 'PAYOUT_DUE' and old.status is distinct from new.status
      and auth.role() <> 'service_role' then
@@ -184,7 +184,7 @@ begin
   end if;
   return new;
 end
-$;
+$$;
 
 drop trigger if exists zz_seller_payouts_guard_due_actor on public.seller_payouts;
 create trigger zz_seller_payouts_guard_due_actor
