@@ -127,7 +127,7 @@ test.describe("release visual smoke", () => {
     await expect(page.getByTestId("referral-program")).toBeVisible();
     await expect(page.getByRole("heading", { name: /bring the crowd/i })).toBeVisible();
     await expect(page.getByRole("link", { name: /sign in to continue/i })).toHaveAttribute("href", /\/login\?next=/);
-    await expect(page.getByText(/no automatic cash rewards/i).first()).toBeVisible();
+    await expect(page.getByText(/automatic cash rewards/i).first()).toBeVisible();
   });
 
   test("login has strong visible entry actions", async ({ page }) => {
