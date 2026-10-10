@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowRight,ClipboardCheck,FileSearch,ShieldCheck,TriangleAlert } from "lucide-react";
+import { ArrowRight,ClipboardCheck,FileSearch,TriangleAlert } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { hasPermission } from "@/server/permissions";
 import { AdminNav } from "@/components/dashboard/admin-nav";
@@ -70,7 +70,7 @@ export default async function AdminListingReviews(){
    </>}
   <p className="flex gap-2 rounded-xl border border-amber-500/20 bg-amber-500/5 p-4 text-xs leading-5">
    <TriangleAlert className="size-4 shrink-0 text-amber-700 dark:text-amber-300" aria-hidden/>
-   Never approve your own listing or misrepresent an item's condition. Listing approval does not bypass auction rules, payment settlement or dispute holds.
+   Never approve your own listing or misrepresent an item&apos;s condition. Listing approval does not bypass auction rules, payment settlement or dispute holds.
   </p>
  </main>;
 }
