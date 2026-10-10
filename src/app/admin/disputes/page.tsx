@@ -33,20 +33,31 @@ export default async function AdminDisputesPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login?next=/admin/disputes");
 
-  const [canView, canManageTeam] = await Promise.all([
+  const [canView, canManageTeam, canManageDisputes] = await Promise.all([
     hasPermission(user.id, "disputes.view"),
     hasPermission(user.id, "admin.manage_team"),
+    hasPermission(user.id, "disputes.manage"),
   ]);
   if (!canView) redirect("/");
 
   const admin = createAdminClient();
-  const { data: disputes } = await admin
+  const { data: disputes, error: disputeQueryError } = await admin
     .from("transaction_disputes")
     .select(
       "id, transaction_id, opened_by, reason, status, payout_status_at_open, payout_frozen, created_at, updated_at"
     )
     .order("updated_at", { ascending: false })
     .limit(100);
+
+  const opsRes = canManageDisputes && (disputes ?? []).length > 0
+    ? await supabase.from("dispute_ops_cases")
+        .select("dispute_id, assigned_to, priority, next_action_at")
+        .in("dispute_id", (disputes ?? []).map((d) => d.id))
+    : { data: [], error: null };
+  type OpsRow = { dispute_id: string; assigned_to: string; priority: string; next_action_at: string };
+  const opsById = new Map<string, OpsRow>(
+    ((opsRes.data ?? []) as OpsRow[]).map((row) => [row.dispute_id, row])
+  );
 
   const rows = disputes ?? [];
   const activeCount = rows.filter((row) => row.status !== "RESOLVED").length;
@@ -117,7 +128,18 @@ export default async function AdminDisputesPage() {
         </div>
       </section>
 
-      {rows.length === 0 ? (
+      {disputeQueryError && (
+        <p role="alert" className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm font-semibold text-destructive">
+          The dispute worklist could not be loaded. Do not interpret this as a cleared queue.
+        </p>
+      )}
+      {canManageDisputes && opsRes.error && (
+        <p role="alert" className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm font-semibold text-destructive">
+          Private staff assignments are currently unavailable. Case status data is shown without ownership details.
+        </p>
+      )}
+
+      {!disputeQueryError && (rows.length === 0 ? (
         <EmptyState
           icon={Scale}
           title="No disputes"
@@ -140,6 +162,18 @@ export default async function AdminDisputesPage() {
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <DisputeStatusBadge status={dispute.status as DisputeStatus} />
+                      {canManageDisputes && opsById.has(dispute.id) && (
+                        <span className="rounded-md border border-orange-500/25 bg-orange-500/10 px-2 py-1 text-[11px] font-bold text-orange-700 dark:text-orange-300">
+                          {opsById.get(dispute.id)?.priority} priority
+                        </span>
+                      )}
+                      {canManageDisputes && dispute.status !== "RESOLVED"
+                        && opsById.get(dispute.id)?.next_action_at
+                        && new Date(opsById.get(dispute.id)!.next_action_at).getTime() < Date.now() && (
+                          <span className="rounded-md border border-destructive/25 bg-destructive/10 px-2 py-1 text-[11px] font-bold text-destructive">
+                            Staff review overdue
+                          </span>
+                        )}
                       {dispute.payout_frozen && (
                         <span className="rounded-md bg-primary/10 px-2 py-1 text-[11px] font-bold text-primary">
                           Payout frozen
@@ -165,6 +199,7 @@ export default async function AdminDisputesPage() {
             );
           })}
         </div>
+      )}
       )}
     </div>
   );
