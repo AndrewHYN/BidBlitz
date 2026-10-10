@@ -301,7 +301,7 @@ export interface Database {
           legal_first_name: string | null;
           legal_last_name: string | null;
           wallet_provider: string | null;
-          setup_status: "UNLINKED" | "LINKING" | "READY" | "NEEDS_WALLET" | "ERROR";
+          setup_status: "UNLINKED" | "LINKING" | "READY" | "MANUAL_READY" | "NEEDS_WALLET" | "ERROR";
           setup_error: string | null;
           linked_at: string | null;
           created_at: string;
@@ -424,6 +424,10 @@ export interface Database {
           p_internal_note?: string | null;
         };
         Returns: Json;
+      };
+      set_manual_payout_contact: {
+        Args: { p_first_name: string; p_last_name: string; p_phone_e164: string };
+        Returns: { ok: true; status: "MANUAL_READY"; masked_phone: string };
       };
       my_payout_setup: {
         Args: Record<string, never>;
