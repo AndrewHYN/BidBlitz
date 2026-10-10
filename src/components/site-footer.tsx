@@ -22,6 +22,7 @@ const COLUMNS = [
       { label: "Watchlist", href: "/dashboard/watchlist" },
       { label: "My bids", href: "/dashboard/buying" },
       { label: "My selling", href: "/dashboard/selling" },
+      { label: "Invite friends", href: "/referrals" },
       { label: "Activity & payments", href: "/dashboard/transactions" },
     ],
   },
