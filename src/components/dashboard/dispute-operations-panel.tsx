@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarClock, ClipboardList, LockKeyhole, MessageSquareText, ShieldAlert } from "lucide-react";
+import { CalendarClock, ClipboardList, LockKeyhole, MessageSquareText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { assignDisputeAgentAction, addPrivateDisputeNoteAction } from "@/server/actions/dispute-operations";
@@ -94,11 +94,7 @@ export function DisputeOperationsPanel({
               <p><strong>Assigned:</strong> {assignedName}</p>
               <p><strong>Priority:</strong> {assignment.priority}</p>
               <p><strong>Next review:</strong> {new Date(assignment.next_action_at).toLocaleString("en-US")}</p>
-              {status !== "RESOLVED" && new Date(assignment.next_action_at).getTime() < Date.now() && (
-                <p role="status" className="flex items-center gap-1 font-extrabold text-destructive">
-                  <ShieldAlert className="size-3.5" aria-hidden /> Overdue staff review
-                </p>
-              )}
+
             </div>
           )}
           {resolved ? (
