@@ -5,6 +5,7 @@ import { AlertTriangle, ArrowLeft, ArrowRight, BadgeCheck, CircleCheck, LockKeyh
 import { createClient } from "@/lib/supabase/server";
 import { hasPermission } from "@/server/permissions";
 import { readFinanceOperations } from "@/server/finance/operations";
+import { linkwaPayoutInstructionsEnabled } from "@/server/payments/runtime";
 import { payoutTriage, safeMinor, type PayoutTriage } from "@/lib/finance/operations";
 import { AdminNav } from "@/components/dashboard/admin-nav";
 import { Money } from "@/components/auction/money";
@@ -13,6 +14,7 @@ import { LinkwaPayoutButton } from "@/components/dashboard/linkwa-payout-button"
 import { ExternalPayoutPanel, type ExternalPayoutClaim } from "@/components/dashboard/external-payout-panel";
 import { PayoutApprovalPanel, type PayoutApproval } from "@/components/dashboard/payout-approval-panel";
 import { ProviderStatementPanel } from "@/components/dashboard/provider-statement-panel";
+import { PayoutReconciliationPanel, type ReconciliationEvidence } from "@/components/dashboard/payout-reconciliation-panel";
 import type { SellerPayoutStatus } from "@/lib/supabase/types";
 
 export const metadata: Metadata = {
@@ -55,6 +57,7 @@ export default async function FinancePayoutsPage() {
   if (!canViewPayouts) redirect("/");
   const canOperate = Boolean(canMutate && profileRes.data?.is_admin === true);
   const paymentsEnabled = !paymentRes.error && paymentRes.data?.payments_enabled === true;
+  const linkwaDirectEnabled = await linkwaPayoutInstructionsEnabled();
   const data = await readFinanceOperations(90);
   const payouts = data.ok ? data.data.payouts : [];
   // Read under the staff session; failed reads block high-value actions.
@@ -71,6 +74,16 @@ export default async function FinancePayoutsPage() {
         .select("payout_id, amount_minor, currency, rail, status, destination_phone_e164, receipt_reference, reserved_at")
         .in("payout_id", payouts.map(p => p.id))
     : { data: [], error: null };
+  const evidenceRes = payouts.length > 0
+    ? await supabase.from("seller_payout_reconciliation_evidence")
+      .select("id,payout_id,evidence_kind,provider_reference,evidence_note,seller_receipt_verified,recorded_at")
+      .in("payout_id", payouts.map(p => p.id))
+      .order("recorded_at", { ascending: false }).limit(100)
+    : { data: [], error: null };
+  const reconciliation = new Map<string, ReconciliationEvidence[]>();
+  for (const item of (evidenceRes.data ?? []) as ReconciliationEvidence[]) {
+    reconciliation.set(item.payout_id, [...(reconciliation.get(item.payout_id) ?? []), item]);
+  }
   const externalClaims = new Map<string, ExternalPayoutClaim>();
   for (const row of (externalRes.data ?? []) as ExternalPayoutClaim[]) {
     externalClaims.set(row.payout_id, row);
@@ -106,6 +119,18 @@ export default async function FinancePayoutsPage() {
       </header>
 
       <AdminNav active="finance" showTeam={canManageTeam} disputeCount={0} />
+      <section className="grid gap-3 sm:grid-cols-2" aria-label="Transfer routes">
+        <div className="rounded-xl border border-emerald-500/20 bg-card p-4">
+          <p className="text-xs font-black uppercase tracking-widest text-emerald-700 dark:text-emerald-300">Recommended · External wallet</p>
+          <h2 className="mt-1 text-base font-extrabold">Reserve → transfer → verify</h2>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">Freeze the exact 95% and destination before an authorized operator sends money externally. Copy the transfer slip, then record actual receipt.</p>
+        </div>
+        <div className="rounded-xl border bg-card p-4">
+          <p className="text-xs font-black uppercase tracking-widest text-muted-foreground">Linkwa API payouts · {linkwaDirectEnabled ? "Enabled" : "Locked"}</p>
+          <h2 className="mt-1 text-base font-extrabold">{linkwaDirectEnabled ? "Provider instructions available" : "No provider payout POSTs"}</h2>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">Provider instructions stay locked until an explicitly reviewed rollout. Buyer checkout remains separate; unknown prior payouts cannot be resent.</p>
+        </div>
+      </section>
       <div className="flex flex-wrap gap-3 text-sm font-bold">
         <Link href="/admin/finance" className="inline-flex items-center gap-1 text-primary hover:underline">
           <ArrowLeft className="size-4" aria-hidden /> Finance overview
@@ -161,18 +186,20 @@ export default async function FinancePayoutsPage() {
                   const amount = safeMinor(payout.amountMinor);
                   const approval = approvals.get(payout.id) ?? null;
                   const externalClaim = externalClaims.get(payout.id) ?? null;
+                  const evidence = reconciliation.get(payout.id) ?? [];
+                  const hasVerifiedReceipt = evidence.some(e => e.evidence_kind === "SELLER_RECEIPT" && e.seller_receipt_verified);
                   const highValue = amount !== null && amount >= 10000 && payout.status !== "PAID_OUT";
                   const highValueCleared = !highValue || (!approvalRes.error && approval?.status === "APPROVED");
                   const eligibleExternal = !externalRes.error && amount !== null && amount > 0
                     && payout.currency === "USD" && payout.deliveryConfirmedAt !== null
                     && ["DELIVERY_CONFIRMED", "PAYOUT_PENDING"].includes(payout.status)
                     && !payout.hasOpenDispute && ["PAID", "SETTLED"].includes(payout.paymentStatus);
-                  const eligibleToInstruct = canOperate && paymentsEnabled && triage === "ready"
+                  const eligibleToInstruct = canOperate && paymentsEnabled && linkwaDirectEnabled && triage === "ready"
                     && payout.currency === "USD" && amount !== null && amount > 0 && highValueCleared
                     && payout.linkwaWalletReady === true
                     && !externalRes.error && externalClaim === null;
                   return (
-                    <li key={payout.id} className="space-y-4 rounded-2xl border bg-card p-5 shadow-sm" data-testid="finance-payout-row">
+                    <li id={`transaction-${payout.transactionId}`} key={payout.id} className="scroll-mt-24 space-y-4 rounded-2xl border bg-card p-5 shadow-sm" data-testid="finance-payout-row">
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>
                           <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">{payout.sellerName}</p>
@@ -242,8 +269,15 @@ export default async function FinancePayoutsPage() {
                           highValueApproved={highValueCleared}
                         />
                       )}
+                      {payout.status === "PAYOUT_DUE" && (
+                        evidenceRes.error
+                          ? <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive">Payout evidence is unavailable. Do not mark paid or retry.</p>
+                          : <PayoutReconciliationPanel payoutId={payout.id} savedReference={payout.payoutReference}
+                            entries={evidence} canRecord={canMarkPaid}/>
+                      )}
                       {eligibleToInstruct && <LinkwaPayoutButton payoutId={payout.id} amountMinor={amount!} currency={payout.currency} />}
-                      {canOperate && amount !== null && externalClaim?.status !== "RESERVED" && (
+                      {canOperate && amount !== null && externalClaim?.status !== "RESERVED" &&
+                        (payout.status !== "PAYOUT_DUE" || (!evidenceRes.error && hasVerifiedReceipt)) && (
                         <details className="rounded-xl border bg-muted/15 p-3">
                           <summary className="cursor-pointer text-sm font-bold">Owner-only manual status review</summary>
                           <p className="mb-3 mt-2 text-xs leading-5 text-muted-foreground">

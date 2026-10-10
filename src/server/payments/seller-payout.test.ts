@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { readLinkwaEnvironment } from "./config";
 import { fetchLinkwaBalance, instructLinkwaPayout } from "./linkwa-payouts";
-import { paymentsRuntimeEnabled } from "./runtime";
+import { paymentsRuntimeEnabled, linkwaPayoutInstructionsEnabled } from "./runtime";
 import { releaseSellerPayout } from "./seller-payout";
 import { PaymentProviderRequestError } from "./provider";
 
@@ -11,7 +11,7 @@ vi.mock("./config", () => ({ readLinkwaEnvironment: vi.fn() }));
 vi.mock("./linkwa-payouts", () => ({
   fetchLinkwaBalance: vi.fn(), instructLinkwaPayout: vi.fn(),
 }));
-vi.mock("./runtime", () => ({ paymentsRuntimeEnabled: vi.fn() }));
+vi.mock("./runtime", () => ({ paymentsRuntimeEnabled: vi.fn(), linkwaPayoutInstructionsEnabled: vi.fn() }));
 
 const payoutId = "11111111-1111-4111-8111-111111111111";
 const rpc = vi.fn();
@@ -56,6 +56,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   installDatabase();
   vi.mocked(paymentsRuntimeEnabled).mockResolvedValue(true);
+  vi.mocked(linkwaPayoutInstructionsEnabled).mockResolvedValue(true);
   vi.mocked(readLinkwaEnvironment).mockReturnValue({
     state: "ready", missing: [],
     config: { apiKey: "test-key", baseUrl: "https://linkwa.co.zw", webhookSecret: "test-secret" },
@@ -75,6 +76,16 @@ beforeEach(() => {
 });
 
 describe("seller payout atomic claim", () => {
+  it("blocks the Linkwa POST, claim and balance request when direct provider payouts are locked", async () => {
+    vi.mocked(linkwaPayoutInstructionsEnabled).mockResolvedValue(false);
+    expect(await releaseSellerPayout(payoutId)).toMatchObject({
+      ok: false, code: "provider_instructions_disabled",
+    });
+    expect(rpc).not.toHaveBeenCalled();
+    expect(fetchLinkwaBalance).not.toHaveBeenCalled();
+    expect(instructLinkwaPayout).not.toHaveBeenCalled();
+  });
+
   it("records a sanitized rejection and never makes the claim retryable", async () => {
     vi.mocked(instructLinkwaPayout).mockRejectedValue(new PaymentProviderRequestError("private provider response", 422));
     expect(await releaseSellerPayout(payoutId)).toMatchObject({ ok: false, code: "provider_failed" });
