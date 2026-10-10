@@ -1,8 +1,9 @@
 name: Prebuilt Preview
 
 on:
-  pull_request:
-    branches: [main]
+  # Run a preview only on explicit request. Routine PRs use the local production
+  # build + browser smoke in Quality, avoiding duplicate Vercel notifications.
+  workflow_dispatch:
 
 permissions:
   contents: read

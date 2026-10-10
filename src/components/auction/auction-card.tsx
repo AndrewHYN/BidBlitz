@@ -54,8 +54,8 @@ export function AuctionCard({
     <Link
       href={href ?? `/auction/${auction.id}`}
       className={cn(
-        "group relative flex flex-col overflow-hidden rounded-xl border bg-card shadow-sm transition-[transform,box-shadow,border-color] duration-200 ease-out",
-        "hover:-translate-y-1 hover:border-primary/35 hover:shadow-xl hover:shadow-primary/5",
+        "group relative flex flex-col overflow-hidden rounded-[1.15rem] border bg-card shadow-[0_3px_12px_rgba(0,0,0,.04)] transition-[transform,box-shadow,border-color] duration-300 ease-[cubic-bezier(.16,1,.3,1)]",
+        "hover:-translate-y-[3px] hover:border-primary/40 hover:shadow-[0_20px_50px_-23px_rgba(0,0,0,.35)]",
         "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
         className
       )}
@@ -68,13 +68,15 @@ export function AuctionCard({
           src={auction.imageUrl}
           alt=""
           loading="lazy"
-          className="size-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.03]"
+          className="size-full object-cover transition-[transform,filter] duration-700 ease-[cubic-bezier(.16,1,.3,1)] group-hover:scale-[1.055]"
           fallback={
             <div className="grid size-full place-items-center bg-muted">
               <ImageIcon className="size-8 text-muted-foreground/60" aria-hidden />
             </div>
           }
         />
+
+        <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/25 to-transparent" />
 
         <div className="absolute left-2 top-2 flex flex-wrap gap-1.5">
           <LiveStatus status={auction.status} endsAt={auction.endsAt} />
@@ -95,7 +97,7 @@ export function AuctionCard({
 
       <div className="flex flex-1 flex-col gap-2.5 p-4">
         <div className="flex items-start justify-between gap-2">
-          <Heading className="line-clamp-2 text-[0.95rem] font-semibold leading-snug transition-colors group-hover:text-primary">
+          <Heading className="line-clamp-2 text-[0.98rem] font-extrabold leading-snug tracking-[-.015em] transition-colors group-hover:text-primary">
             {auction.title}
           </Heading>
         </div>
@@ -113,7 +115,7 @@ export function AuctionCard({
           )}
         </div>
 
-        <div className="mt-auto flex items-end justify-between gap-2 pt-1">
+        <div className="mt-auto flex items-end justify-between gap-2 pt-3">
           <div className="min-w-0">
             <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
               {hasBids ? "Current bid" : "Starting bid"}

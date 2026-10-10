@@ -43,6 +43,12 @@ const TOPICS = [
     description: "What happens after the clock runs out: winner, transaction and reviews.",
   },
   {
+    href: "/support/tickets",
+    icon: Mail,
+    title: "My support tickets",
+    description: "Send a question or track replies from the BidBlitz customer-care team.",
+  },
+  {
     href: "/faq",
     icon: HelpCircle,
     title: "Frequently asked questions",

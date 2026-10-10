@@ -76,11 +76,12 @@ export default async function FinancePage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login?next=/admin/finance");
 
-  const [canPayments, canPayouts, canManageTeam, canMarketing] = await Promise.all([
+  const [canPayments, canPayouts, canManageTeam, canMarketing, canCosts] = await Promise.all([
     hasPermission(user.id, "payments.view"),
     hasPermission(user.id, "payouts.view"),
     hasPermission(user.id, "admin.manage_team"),
     hasPermission(user.id, "marketing.view"),
+    hasPermission(user.id, "finance.costs.view"),
   ]);
   if (!canPayments && !canPayouts) redirect("/");
 
@@ -140,7 +141,20 @@ export default async function FinancePage() {
         disputeCount={activeDisputes}
       />
 
+      <Link href="/admin/finance/readiness" className="group flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-500/25 bg-amber-500/5 px-5 py-4 text-sm transition hover:border-amber-500/50" data-testid="finance-readiness-link">
+        <span className="flex items-center gap-2 font-extrabold"><AlertTriangle className="size-5 text-amber-700 dark:text-amber-300" aria-hidden /> Live payment provider and settlement readiness</span>
+        <span className="flex items-center gap-1 text-xs font-bold text-primary">Check required signoffs <ArrowRight className="size-4 transition group-hover:translate-x-1" aria-hidden /></span>
+      </Link>
+
       <section aria-label="Finance workspaces" className="grid gap-4 md:grid-cols-2">
+        {canCosts && (
+          <Link href="/admin/finance/costs" className="group rounded-2xl border border-orange-400/20 bg-[#151719] p-6 text-white shadow-lg transition hover:-translate-y-0.5 hover:shadow-xl">
+            <div className="flex items-center justify-between"><span className="grid size-12 place-items-center rounded-xl bg-white/10 text-orange-300"><Banknote className="size-6" aria-hidden /></span><ArrowRight className="size-5 text-orange-300 transition group-hover:translate-x-1" aria-hidden /></div>
+            <h2 className="mt-5 text-xl font-black tracking-tight">Company costs & payroll</h2>
+            <p className="mt-2 text-sm leading-6 text-zinc-300">Staff pay, hosting, marketing and operating expenses recorded separately from seller money.</p>
+            <span className="mt-4 block text-xs font-bold uppercase tracking-wider text-orange-300">Open cost control</span>
+          </Link>
+        )}
         {canPayments && (
           <Link href="/admin/finance/payments"
             className="group relative overflow-hidden rounded-2xl border border-orange-400/20 bg-[#161719] p-6 text-white shadow-lg transition hover:-translate-y-0.5 hover:shadow-xl">
