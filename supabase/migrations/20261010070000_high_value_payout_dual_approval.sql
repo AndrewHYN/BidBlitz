@@ -82,6 +82,11 @@ begin
    where t.id=v_payout.transaction_id and t.status in ('PAID','SETTLED')) then
    raise exception 'payment_not_confirmed' using errcode='22023';
  end if;
+ if v_uid = v_payout.seller_id or exists(
+   select 1 from public.transactions t where t.id=v_payout.transaction_id
+   and t.buyer_id=v_uid) then
+   raise exception 'conflicted_reviewer' using errcode='42501';
+ end if;
  if exists (select 1 from public.payout_approval_requests a
    where a.payout_id=p_payout_id and a.status in ('REQUESTED','APPROVED')) then
     raise exception 'approval_already_active' using errcode='23505';
@@ -139,6 +144,11 @@ begin
   where t.id=v_payout.transaction_id and t.status in ('PAID','SETTLED')) then
    raise exception 'payment_not_confirmed' using errcode='22023';
  end if;
+ if v_uid=v_payout.seller_id or exists(
+   select 1 from public.transactions t where t.id=v_payout.transaction_id
+   and t.buyer_id=v_uid) then
+   raise exception 'conflicted_reviewer' using errcode='42501';
+ end if;
  v_new:=case when p_approve then 'APPROVED' else 'VOIDED' end;
  update public.payout_approval_requests set
    status=v_new, reviewed_by=v_uid, reviewed_at=case when p_approve then clock_timestamp() else null end,
@@ -169,6 +179,11 @@ begin
          and public.has_permission(a.requested_by,'payouts.transition')
          and public.has_permission(a.reviewed_by,'payouts.review')
          and a.requested_by<>a.reviewed_by
+         and a.requested_by<>new.seller_id
+         and a.reviewed_by<>new.seller_id
+         and not exists(select 1 from public.transactions t
+           where t.id=new.transaction_id and
+           (t.buyer_id=a.requested_by or t.buyer_id=a.reviewed_by))
    ) then
      raise exception 'payout_second_approval_required' using errcode='42501';
    end if;
