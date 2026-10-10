@@ -3,9 +3,9 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const read=(path:string)=>readFileSync(join(process.cwd(),path),"utf8");
-const expenseSql=read("supabase/migrations/20261010121000_company_costs_staff_ledger.sql");
-const supportSql=read("supabase/migrations/20261010121500_support_desk.sql");
-const reviewSql=read("supabase/migrations/20261010122000_staff_listing_approval.sql");
+const expenseSql=read("supabase/migrations/20261010062455_company_costs_staff_ledger_20261010.sql");
+const supportSql=read("supabase/migrations/20261010062458_support_desk_20261010.sql");
+const reviewSql=read("supabase/migrations/20261010062502_staff_listing_approval_20261010.sql");
 const supportAction=read("src/server/actions/support-tickets.ts");
 const reviewAction=read("src/server/actions/staff-listing-review.ts");
 const readiness=read("src/app/admin/finance/readiness/page.tsx");
