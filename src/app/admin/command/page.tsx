@@ -22,7 +22,7 @@ export default async function OperationsHQPage() {
 
   const keys = [
     "admin.access", "admin.manage_team", "payments.view",
-    "payouts.view", "disputes.view", "settings.manage_marketplace", "marketing.view", "support.manage", "finance.costs.view",
+    "payouts.view", "disputes.view", "settings.manage_marketplace", "marketing.view", "support.manage", "finance.costs.view", "listings.review",
   ] as const;
   const grants = await Promise.all(keys.map((key) =>
     supabase.rpc("has_permission", { p_user_id: user.id, p_permission: key })
@@ -37,6 +37,7 @@ export default async function OperationsHQPage() {
   const canTeam = Boolean(permissions.get("admin.manage_team"));
   const canSupport = Boolean(permissions.get("support.manage"));
   const canCosts = Boolean(permissions.get("finance.costs.view"));
+  const canListings = Boolean(permissions.get("listings.review"));
 
   // Security-definer count projection enforces live per-department grants;
   // raw RLS queries gave false "0" for non-owner staff. Failed reads are
@@ -56,7 +57,7 @@ export default async function OperationsHQPage() {
   }
 
   const lanes = [
-    { title: "Listing reviews", description: "Approve safe, complete listings before they go live.", count: queueCount("reviews"), href: "/admin#admin-reviews", icon: ClipboardList, category: "Operations" },
+    { title: "Listing reviews", description: "Approve safe, complete listings before they go live.", count: queueCount("reviews"), href: canListings?"/admin/listings":"/admin#admin-reviews", icon: ClipboardList, category: "Operations" },
     { title: "Cancellation requests", description: "Check bids and policy before cancelling auctions.", count: queueCount("cancellations"), href: "/admin#admin-cancellations", icon: Gavel, category: "Operations" },
     { title: "Paused auctions", description: "Investigate or resume auctions held for safety.", count: queueCount("paused"), href: "/admin#admin-paused", icon: PauseCircle, category: "Trust & safety" },
     { title: "Open reports", description: "Review user and listing reports with an audit trail.", count: queueCount("reports"), href: "/admin#admin-reports", icon: Flag, category: "Trust & safety" },
@@ -109,7 +110,7 @@ export default async function OperationsHQPage() {
         </div>
       </header>
 
-      <AdminNav active="command" showTeam={canTeam} showMarketing={canMarketing} showSupport={canSupport}
+      <AdminNav active="command" showTeam={canTeam} showMarketing={canMarketing} showSupport={canSupport} showListings={canListings}
         disputeCount={canDisputes ? queueCount("disputes") ?? 0 : 0} />
 
       <section aria-label="Workload overview" className="grid gap-3 sm:grid-cols-3">
@@ -177,6 +178,8 @@ export default async function OperationsHQPage() {
           <h2 id="departments-heading" className="mt-1 text-2xl font-black tracking-tight sm:text-3xl">Departments</h2>
         </div>
         <div className="grid gap-3 md:grid-cols-2">
+          {canListings && <Department icon={ClipboardList} title="Listing operations" detail="Approve, reject or request seller corrections under your delegated staff role."
+            href="/admin/listings" cta="Review submissions" />}
           <Department icon={ShieldCheck} title="Trust & safety" detail="Protect listings, review flagged activity, and document staff decisions."
             href="/admin#admin-reports" cta="Moderation desk" />
           {canDisputes && <Department icon={Scale} title="Dispute resolution" detail="Evidence-first case handling and payout holds."
