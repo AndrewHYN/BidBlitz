@@ -175,3 +175,41 @@ export async function setupSellerPayoutAction(input: unknown): Promise<
     return { ok: false, message: "Payout setup failed. Nothing was paid or charged." };
   }
 }
+
+/**
+ * Register an EcoCash/SmileCash contact for staff-managed settlement.
+ * No Linkwa API call, provider registration, payment, or payout is made.
+ * The database RPC derives the seller identity from the authenticated user.
+ */
+export async function saveManualPayoutContactAction(input: unknown): Promise<
+  | { ok: true; status: "MANUAL_READY"; maskedPhone: string }
+  | { ok: false; message: string }
+> {
+  const parsed = setupSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, message: parsed.error.issues[0]?.message ?? "Invalid payout details." };
+  }
+  const phone = normalizeZimbabwePhone(parsed.data.phone);
+  if (!phone) {
+    return { ok: false, message: "Use a Zimbabwe mobile number such as 0771234567." };
+  }
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, message: "Sign in again." };
+
+  const { data, error } = await supabase.rpc("set_manual_payout_contact", {
+    p_first_name: parsed.data.firstName,
+    p_last_name: parsed.data.lastName,
+    p_phone_e164: phone,
+  });
+  if (error || data?.ok !== true || data?.status !== "MANUAL_READY") {
+    return { ok: false, message: "Could not securely save your transfer contact. Nothing was sent; please retry after checking your details." };
+  }
+  revalidatePath("/settings/payouts");
+  revalidatePath("/sell");
+  revalidatePath("/dashboard/selling");
+  return {
+    ok: true, status: "MANUAL_READY",
+    maskedPhone: typeof data.masked_phone === "string" ? data.masked_phone : phone.slice(0,4) + "•••••" + phone.slice(-3),
+  };
+}
