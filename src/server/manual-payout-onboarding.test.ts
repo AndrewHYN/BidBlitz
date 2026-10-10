@@ -6,7 +6,7 @@ function source(path: string) {
   return readFileSync(join(process.cwd(), path), "utf8");
 }
 
-const sql = source("supabase/migrations/20261010141000_manual_payout_contact_onboarding.sql");
+const sql = source("supabase/migrations/20261010121900_manual_payout_contact_onboarding_20261010.sql");
 const action = source("src/server/actions/payout-setup.ts");
 const sell = source("src/app/sell/page.tsx");
 const settings = source("src/components/auth/payout-settings-form.tsx");
