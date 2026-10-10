@@ -6,7 +6,7 @@ import {
   fetchLinkwaBalance,
   instructLinkwaPayout,
 } from "@/server/payments/linkwa-payouts";
-import { paymentsRuntimeEnabled } from "@/server/payments/runtime";
+import { paymentsRuntimeEnabled, linkwaPayoutInstructionsEnabled } from "@/server/payments/runtime";
 import { PaymentProviderRequestError } from "@/server/payments/provider";
 
 export type SellerPayoutReleaseResult =
@@ -18,6 +18,7 @@ export type SellerPayoutReleaseResult =
         | "not_ready"
         | "recipient_not_ready"
         | "provider_not_ready"
+        | "provider_instructions_disabled"
         | "provider_failed"
         | "provider_funds_pending"
         | "manual_reconciliation_required";
@@ -46,6 +47,16 @@ export async function releaseSellerPayout(
       ok: false,
       code: "payments_paused",
       message: "Payments are temporarily paused. No seller payout was sent.",
+    };
+  }
+
+  // A buyer checkout may be active while provider payout POSTs remain locked.
+  // This check runs before changing payout states or contacting Linkwa.
+  if (!(await linkwaPayoutInstructionsEnabled())) {
+    return {
+      ok: false,
+      code: "provider_instructions_disabled",
+      message: "Direct Linkwa payout instructions are disabled. Reserve an eligible EcoCash/SmileCash transfer through Finance instead.",
     };
   }
 
