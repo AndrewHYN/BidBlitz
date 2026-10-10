@@ -62,3 +62,14 @@ The release gate is **not** the success of automated tests alone. Confirm separa
 - OWNER/ADMIN: existing privileged workflows, subject to unchanged DB and transaction safeguards.
 
 Do not assume staff departments imply all future action workflows are implemented. Further owner-only/admin-only RPC migrations are required before listing reviewers and finance operators can independently complete every action.
+
+
+## High-value double authorization (October 2026)
+
+- Seller transfers of **USD $100 or more** are blocked by a database trigger before the application can create a `PAYOUT_DUE` provider claim or record `PAID_OUT` unless a matching approved request exists.
+- An authorized staff member must request approval in **Finance → Seller payout desk** with a specific reason. A **different** active authorized finance reviewer must record the independent approval and evidence note. Self-review is prohibited.
+- The buyer and seller in the underlying transaction may not be either approver, even if they hold staff roles.
+- Reviews that were valid but later lose their relevant staff permissions do **not** satisfy the live gate. Holds, disputes and fulfillment restarts invalidate approval.
+- A finance approval is **not a payment instruction** and does **not prove receipt**; the existing payment kill switch, dispute checks, Linkwa balance verification and provider-side reconciliation still apply.
+- The initial threshold is **$100.00 USD (10,000 cents)**. It is intentionally conservative. Changing it requires a migration, reviewed tests, and documented finance policy.
+- Existing payments and historical completed payouts were left intact; this policy applies to future state transitions and does not retroactively claim old payouts were vetted.
