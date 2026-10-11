@@ -26,6 +26,14 @@ import { paymentsRuntimeEnabled } from "@/server/payments/runtime";
  * in — no provider configured.
  */
 
+const { readIntentMock } = vi.hoisted(() => ({
+  readIntentMock: vi.fn(),
+}));
+
+vi.mock("@/server/payments/ledger", () => ({
+  supabasePaymentLedger: () => ({ readIntent: readIntentMock }),
+}));
+
 vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn(),
 }));
@@ -115,6 +123,8 @@ async function read(response: Response): Promise<Record<string, unknown>> {
 }
 
 beforeEach(() => {
+  readIntentMock.mockReset();
+  readIntentMock.mockResolvedValue(null);
   resetRateLimits();
   vi.mocked(createClient).mockReset();
   vi.mocked(paymentsRuntimeEnabled).mockResolvedValue(true);
@@ -275,6 +285,25 @@ describe("POST /api/payments/checkout — authorisation and state", () => {
 });
 
 describe("POST /api/payments/checkout — starting a payment", () => {
+  it("does not start a second gateway charge for an unpaid Linkwa session", async () => {
+    let requests = 0;
+    session({ id: BUYER }, row());
+    readIntentMock.mockResolvedValue({
+      transactionId: TX, provider: "linkwa",
+      pollUrl: "https://linkwa.co.zw/attempt/1", browserUrl: null, providerReference: "old",
+    });
+    setPaymentProvider(providerWith(async () => {
+      requests++;
+      throw new Error("must not create another charge");
+    }));
+    const response = await postJson({ transactionId: TX });
+    expect(response.status).toBe(409);
+    expect(await read(response)).toEqual({
+      ok: false, error: "existing_provider_payment_pending",
+    });
+    expect(requests).toBe(0);
+  });
+
   it("returns the provider's payment page and claims nothing else", async () => {
     const seen: CreateIntentInput[] = [];
     session({ id: BUYER }, row());
