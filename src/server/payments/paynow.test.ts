@@ -122,6 +122,13 @@ function stubLedger(): StubLedger {
   return ledger;
 }
 
+/** A new sale has no prior externally payable session. */
+function freshCheckoutLedger(): StubLedger {
+  const ledger = stubLedger();
+  ledger.intent = null;
+  return ledger;
+}
+
 /** Build a message exactly as Paynow would receive it: fields + hash. */
 function signed(
   fields: Array<[string, string]>,
@@ -525,7 +532,7 @@ describe("PaynowPaymentProvider.createIntent", () => {
       return new Response(reply, { status: 200 });
     };
 
-    const intent = await providerWith(stubLedger(), fetchImpl).createIntent({
+    const intent = await providerWith(freshCheckoutLedger(), fetchImpl).createIntent({
       transactionId: TX,
       amountMinor: 1000n,
       currency: "USD",
@@ -566,8 +573,46 @@ describe("PaynowPaymentProvider.createIntent", () => {
     expect(intent.id).toContain("CheckPayment");
   });
 
+  it("resumes the same recorded checkout URL without contacting Paynow again", async () => {
+    const ledger = freshCheckoutLedger();
+    ledger.intent = {
+      transactionId: TX, provider: "paynow",
+      pollUrl: POLL_URL,
+      browserUrl: "https://www.paynow.co.zw/Payment/ConfirmPayment/9510",
+      providerReference: "9510",
+    };
+    let calls = 0;
+    const provider = providerWith(ledger, async () => {
+      calls++;
+      throw new Error("The existing payment must be reused");
+    });
+    const result = await provider.createIntent({
+      transactionId: TX, amountMinor: 1000n, currency: "USD",
+      idempotencyKey: "checkout:" + TX,
+    });
+    expect(result.redirectUrl).toBe(ledger.intent?.browserUrl);
+    expect(calls).toBe(0);
+    expect(ledger.intents).toHaveLength(0);
+  });
+
+  it("blocks switching an outstanding Linkwa payment into Paynow", async () => {
+    const ledger = freshCheckoutLedger();
+    ledger.intent = {
+      transactionId: TX, provider: "linkwa",
+      pollUrl: "https://linkwa.co.zw/payment/abc",
+      browserUrl: "https://linkwa.co.zw/payment/abc",
+      providerReference: "abc",
+    };
+    await expect(
+      providerWith(ledger).createIntent({
+        transactionId: TX, amountMinor: 1000n, currency: "USD",
+        idempotencyKey: "checkout:" + TX,
+      })
+    ).rejects.toMatchObject({ reason: "existing_provider_payment_pending" });
+  });
+
   it("stores the poll address before the buyer leaves for Paynow", async () => {
-    const ledger = stubLedger();
+    const ledger = freshCheckoutLedger();
     const replyFields: Array<[string, string]> = [
       ["Status", "Ok"],
       ["BrowserUrl", "https://www.paynow.co.zw/Payment/ConfirmPayment/9510"],
@@ -601,7 +646,7 @@ describe("PaynowPaymentProvider.createIntent", () => {
   it("refuses to start a payment whose session cannot be stored", async () => {
     // A payment we could never reconcile must not be handed to the buyer as
     // if it were fine: the fallback path is part of the checkout contract.
-    const ledger = stubLedger();
+    const ledger = freshCheckoutLedger();
     ledger.recordIntent = async () => {
       throw new PaymentProviderError("PAYMENT_LEDGER_FAILED", "insert failed");
     };
@@ -638,7 +683,7 @@ describe("PaynowPaymentProvider.createIntent", () => {
     const fetchImpl: typeof fetch = async () => new Response(reply, { status: 200 });
 
     await expect(
-      providerWith(stubLedger(), fetchImpl).createIntent({
+      providerWith(freshCheckoutLedger(), fetchImpl).createIntent({
         transactionId: TX,
         amountMinor: 1000n,
         currency: "USD",
@@ -652,7 +697,7 @@ describe("PaynowPaymentProvider.createIntent", () => {
       new Response("Status=Error&Error=Invalid+amount+field", { status: 200 });
 
     await expect(
-      providerWith(stubLedger(), fetchImpl).createIntent({
+      providerWith(freshCheckoutLedger(), fetchImpl).createIntent({
         transactionId: TX,
         amountMinor: 1000n,
         currency: "USD",
@@ -667,7 +712,7 @@ describe("PaynowPaymentProvider.createIntent", () => {
     };
 
     await expect(
-      providerWith(stubLedger(), fetchImpl).createIntent({
+      providerWith(freshCheckoutLedger(), fetchImpl).createIntent({
         transactionId: TX,
         amountMinor: 1000n,
         currency: "USD",
@@ -677,7 +722,7 @@ describe("PaynowPaymentProvider.createIntent", () => {
 
     const failing: typeof fetch = async () => new Response("nope", { status: 503 });
     await expect(
-      providerWith(stubLedger(), failing).createIntent({
+      providerWith(freshCheckoutLedger(), failing).createIntent({
         transactionId: TX,
         amountMinor: 1000n,
         currency: "USD",
@@ -688,7 +733,7 @@ describe("PaynowPaymentProvider.createIntent", () => {
 
   it("refuses a currency Paynow cannot settle", async () => {
     await expect(
-      providerWith(stubLedger()).createIntent({
+      providerWith(freshCheckoutLedger()).createIntent({
         transactionId: TX,
         amountMinor: 1000n,
         currency: "EUR",
@@ -699,7 +744,7 @@ describe("PaynowPaymentProvider.createIntent", () => {
 
   it("refuses a reference that is not one of our transactions", async () => {
     await expect(
-      providerWith(stubLedger()).createIntent({
+      providerWith(freshCheckoutLedger()).createIntent({
         transactionId: "invoice-1",
         amountMinor: 1000n,
         currency: "USD",
@@ -716,7 +761,7 @@ describe("PaynowPaymentProvider.createIntent", () => {
           integrationKey: INTEGRATION_KEY,
           resultUrl: "https://example.test/webhook",
           returnUrl: "https://example.test/return",
-          ledger: stubLedger(),
+          ledger: freshCheckoutLedger(),
         })
     ).toThrow(PaymentProviderError);
   });
