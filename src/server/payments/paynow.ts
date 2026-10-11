@@ -405,8 +405,11 @@ export class PaynowPaymentProvider implements PaymentProvider {
 
     const browserUrl = paynowField(fields, "browserurl");
     const pollUrl = paynowField(fields, "pollurl");
-    if (status.toLowerCase() !== "ok" || !browserUrl) {
-      throw new PaymentProviderRequestError("Paynow did not return a payment page.");
+    if (status.toLowerCase() !== "ok" || !browserUrl ||
+        !pollUrl || !isPaynowPollUrl(browserUrl) || !isPaynowPollUrl(pollUrl)) {
+      throw new PaymentProviderRequestError(
+        "Paynow did not return both a safe payment page and a status address."
+      );
     }
 
     const providerReference = paynowField(fields, "paynowreference") ?? null;
@@ -418,15 +421,13 @@ export class PaynowPaymentProvider implements PaymentProvider {
     // replaces it rather than accumulating abandoned sessions. Failing to
     // store it fails the checkout on purpose — a payment we could never
     // reconcile is worse than one the buyer starts again a second later.
-    if (pollUrl) {
-      await this.config.ledger.recordIntent({
-        transactionId: input.transactionId,
-        provider: PAYNOW_PROVIDER_ID,
-        pollUrl,
-        browserUrl,
-        providerReference,
-      });
-    }
+    await this.config.ledger.recordIntent({
+      transactionId: input.transactionId,
+      provider: PAYNOW_PROVIDER_ID,
+      pollUrl,
+      browserUrl,
+      providerReference,
+    });
 
     return {
       id: pollUrl ?? browserUrl,
