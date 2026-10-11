@@ -43,6 +43,7 @@ describe("readPaynowEnvironment", () => {
     const result = readPaynowEnvironment({
       PAYNOW_INTEGRATION_ID: "  1201\t",
       PAYNOW_INTEGRATION_KEY: " key \n",
+      PAYNOW_INTEGRATION_CURRENCY: " usd ",
     });
     expect(result.state).toBe("ready");
     expect(result.config).toEqual({
