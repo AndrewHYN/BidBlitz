@@ -21,6 +21,8 @@ const KEYS = [
   "SUPABASE_SECRET_KEY",
   "PAYNOW_INTEGRATION_ID",
   "PAYNOW_INTEGRATION_KEY",
+  "PAYNOW_INTEGRATION_CURRENCY",
+  "PAYMENT_PROVIDER",
   "LINKWA_API_KEY",
   "LINKWA_BASE_URL",
   "LINKWA_WEBHOOK_SECRET",
@@ -82,6 +84,7 @@ const LINKWA = {
 const PAYNOW = {
   PAYNOW_INTEGRATION_ID: "1201",
   PAYNOW_INTEGRATION_KEY: "integration-key-unit-test",
+  PAYNOW_INTEGRATION_CURRENCY: "USD",
 };
 
 describe("ensurePaymentProvider", () => {
@@ -123,6 +126,25 @@ describe("ensurePaymentProvider", () => {
     expect(registry.getPaymentProvider().capabilities.configured).toBe(true);
     expect(config.paymentProviderDisplayName()).toBe("Linkwa");
     expect(config.paymentBootError()).toBeNull();
+  });
+
+  it("selects Paynow explicitly even while Linkwa remains configured", async () => {
+    setEnv({ ...ADMIN, ...LINKWA, ...PAYNOW, PAYMENT_PROVIDER: "paynow" });
+    const { config, registry } = await boot();
+    expect(registry.getPaymentProvider().capabilities.configured).toBe(true);
+    expect(config.paymentProviderDisplayName()).toBe("Paynow");
+    expect(config.paymentBootError()).toBeNull();
+  });
+
+  it("fails closed if Paynow is selected but currency has not been confirmed", async () => {
+    setEnv({
+      ...ADMIN, ...LINKWA, ...PAYNOW,
+      PAYMENT_PROVIDER: "paynow",
+      PAYNOW_INTEGRATION_CURRENCY: "ZWG",
+    });
+    const { config, registry } = await boot();
+    expect(registry.getPaymentProvider().capabilities.configured).toBe(false);
+    expect(config.paymentBootError()).toContain("PAYNOW_INTEGRATION_CURRENCY");
   });
 
   it("fails closed on a half-set Linkwa instead of silently using Paynow", async () => {
