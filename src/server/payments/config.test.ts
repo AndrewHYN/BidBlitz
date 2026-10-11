@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { readLinkwaEnvironment, readPaynowEnvironment } from "./config";
+import {
+  readCheckoutProviderPreference,
+  readLinkwaEnvironment,
+  readPaynowEnvironment,
+  webhookProviderKind,
+} from "./config";
 
 /**
  * Credential reading only — no provider is constructed here.
@@ -132,5 +137,34 @@ describe("readLinkwaEnvironment", () => {
         LINKWA_WEBHOOK_SECRET: "REPLACE_ME",
       }).state
     ).toBe("unset");
+  });
+});
+
+describe("checkout provider selection", () => {
+  it("preserves the legacy default unless deliberately configured", () => {
+    expect(readCheckoutProviderPreference({})).toBe("auto");
+    expect(readCheckoutProviderPreference({ PAYMENT_PROVIDER: " auto " })).toBe("auto");
+  });
+
+  it("selects Paynow or Linkwa by an explicit flag, never by key priority", () => {
+    expect(readCheckoutProviderPreference({ PAYMENT_PROVIDER: "PayNow" })).toBe("paynow");
+    expect(readCheckoutProviderPreference({ PAYMENT_PROVIDER: "LINKWA" })).toBe("linkwa");
+  });
+
+  it("fails closed on an unknown value", () => {
+    expect(readCheckoutProviderPreference({ PAYMENT_PROVIDER: "any" })).toBe("invalid");
+    expect(readCheckoutProviderPreference({ PAYMENT_PROVIDER: "pay-now" })).toBe("invalid");
+  });
+});
+
+describe("historical webhook routing hints", () => {
+  it("routes Linkwa JSON and Paynow form-encoded bodies separately", () => {
+    expect(webhookProviderKind('{"event":"payment.completed"}')).toBe("linkwa");
+    expect(webhookProviderKind("reference=abc&hash=ABCDEF")).toBe("paynow");
+  });
+
+  it("does not infer provider on unsupported bodies", () => {
+    expect(webhookProviderKind("")).toBeNull();
+    expect(webhookProviderKind("not-a-webhook")).toBeNull();
   });
 });
