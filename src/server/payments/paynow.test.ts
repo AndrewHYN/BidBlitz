@@ -643,6 +643,25 @@ describe("PaynowPaymentProvider.createIntent", () => {
     expect(ledger.intent?.pollUrl).toContain("CheckPayment");
   });
 
+  it("refuses to redirect a buyer when Paynow supplies no poll address", async () => {
+    const ledger = freshCheckoutLedger();
+    const replyFields: Array<[string, string]> = [
+      ["Status", "Ok"],
+      ["BrowserUrl", "https://www.paynow.co.zw/Payment/ConfirmPayment/9510"],
+    ];
+    const reply = new URLSearchParams([
+      ...replyFields, ["Hash", paynowHash(replyFields, INTEGRATION_KEY)],
+    ]).toString();
+    await expect(
+      providerWith(ledger, async () => new Response(reply, { status: 200 }))
+        .createIntent({
+          transactionId: TX, amountMinor: 1000n, currency: "USD",
+          idempotencyKey: "checkout:" + TX,
+        })
+    ).rejects.toBeInstanceOf(PaymentProviderRequestError);
+    expect(ledger.intents).toHaveLength(0);
+  });
+
   it("refuses to start a payment whose session cannot be stored", async () => {
     // A payment we could never reconcile must not be handed to the buyer as
     // if it were fine: the fallback path is part of the checkout contract.
