@@ -29,12 +29,18 @@ The existing `src/server/payments/paynow.ts` is more appropriate: signed initiat
 * `src/app/admin/finance/payouts/page.tsx` — manual wallet transfer reservation, staff controls and provider evidence.
 * `src/server/payments/runtime.ts` — independent flags for buyer checkout, auto payout and direct Linkwa payout instructions.
 
+## Critical currency mismatch observed
+
+A Paynow email on 5 October 2026 labeled transaction reference `7d6e7d05-cf41-475c-80b3-5dc17b840223` / provider reference `64017577` as **ZWG 0.50 (TESTING: Faked Success)**, while the production BidBlitz ledger recorded that same transaction as **USD 0.50 PAID**. No real funds moved in Paynow test mode and the database has no related seller payout record. Preserve this discrepancy for forensic reconciliation and do not count it as a genuine USD sale.
+
+The standard Paynow initiation/status API does not explicitly carry a currency field. The merchant payment-method configuration determines currency, so `PAYNOW_INTEGRATION_CURRENCY=USD` is required as a **manual attestation** after verifying the exact Paynow integration is configured for USD. This app-side guard does NOT prove the provider's configuration; merchant verification and an actual USD settlement are still necessary.
+
 ## Safest setup
 
 1. Sign in to the Paynow merchant account. Confirm the account is controlled by BidBlitz and the settlement bank destination is suitable for holding marketplace seller proceeds. Do not use a third party's merchant credentials as though they were BidBlitz's.
 2. In Paynow **Other Ways To Get Paid → Create/Manage Shopping Carts → Create Advanced Integration**, create a new merchant integration in test mode, with selected payment methods. Copy Integration ID and request the secret Integration Key by Paynow's secure delivery method. Keep the key out of source code, email threads and browser bundles. See [official integration setup](https://developers.paynow.co.zw/docs/paynow/integration_generation/).
 3. Verify that the Preview environment and its database contain **non-production test transactions only** before doing simulated Paynow test payments. A Paynow test-mode confirmation can still mark rows paid in whichever Supabase database Preview points to.
-4. In Vercel Preview only, configure `PAYNOW_INTEGRATION_ID`, `PAYNOW_INTEGRATION_KEY`, and `PAYMENT_PROVIDER=paynow`. Do not remove the old `LINKWA_*` secrets while pending historical Linkwa payments need reconciliation.
+4. In Vercel Preview only, configure `PAYNOW_INTEGRATION_ID`, `PAYNOW_INTEGRATION_KEY`, verified `PAYNOW_INTEGRATION_CURRENCY=USD`, and `PAYMENT_PROVIDER=paynow`. Do not set the attestation for the historically ZWG-labelled integration until Paynow confirms it is USD. Do not remove the old `LINKWA_*` secrets while pending historical Linkwa payments need reconciliation.
 5. Run unit/type/lint/build and desktop/mobile release smoke. Verify signed callback, polling, repeat clicks, different-provider collision, altered amount/reference, invalid signature, duplicate events, interruptions and insufficient funds. Paynow test-mode payments move **no real funds**. Read [official test mode](https://developers.paynow.co.zw/docs/paynow/test_mode/).
 6. On completion, Paynow says a merchant can request to **Set Live**; settle banking/commercial approval and verify applicable fees before moving live. Rotate the test key when moving live and set production keys through Vercel (never GitHub).
 7. Before activating buyer checkout in production, prove one controlled transaction all the way through Paynow confirmed payment, provider statement, merchant settlement account, seller payout reservation and recipient confirmation, plus fee reconciliation. Do not infer settlement from Paynow's Paid status alone.
