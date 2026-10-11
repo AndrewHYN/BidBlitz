@@ -342,6 +342,35 @@ export class PaynowPaymentProvider implements PaymentProvider {
       );
     }
 
+    // One external checkout per sale. A repeated buyer click must reopen
+    // the existing Paynow page, not start a second payable transaction.
+    // Switching from an outstanding Linkwa intent also fails closed.
+    const prior = await this.config.ledger.readIntent(input.transactionId);
+    if (prior) {
+      if (prior.provider !== PAYNOW_PROVIDER_ID) {
+        throw new PaymentPayloadError(
+          "existing_provider_payment_pending",
+          "This sale has a payment attempt with another provider. Reconcile it first."
+        );
+      }
+      if (!prior.browserUrl || !isPaynowPollUrl(prior.browserUrl) ||
+          !isPaynowPollUrl(prior.pollUrl)) {
+        throw new PaymentPayloadError(
+          "existing_payment_requires_reconciliation",
+          "The existing Paynow session cannot safely be resumed."
+        );
+      }
+      return {
+        id: prior.pollUrl,
+        transactionId: input.transactionId,
+        amountMinor: input.amountMinor,
+        currency: input.currency,
+        status: "requires_action",
+        redirectUrl: prior.browserUrl,
+        providerReference: prior.providerReference ?? undefined,
+      };
+    }
+
     const outbound: Array<[string, string]> = [
       ["id", this.config.integrationId],
       ["reference", input.transactionId],
