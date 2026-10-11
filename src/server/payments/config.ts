@@ -209,15 +209,21 @@ export function ensurePaymentProvider(): PaymentProvider {
     ? linkwa.state === "unset" ? "paynow" : "linkwa"
     : preference;
   const target = selected === "linkwa" ? linkwa : paynow;
+  if (target.state === "unset" && preference === "auto") {
+    // No payment provider is a normal launch state, not a boot error.
+    return getPaymentProvider();
+  }
   if (target.state !== "ready" || !target.config) {
-    bootError = selected + " checkout is " + target.state
-      + (target.state === "incomplete" ? ": missing " + target.missing.join(", ") : "")
-      + "; leaving payment provider unconfigured.";
+    const label = selected === "linkwa" ? "Linkwa" : "Paynow";
+    bootError = target.state === "incomplete"
+      ? label + " configuration incomplete: missing " + target.missing.join(", ") + "."
+      : label + " checkout is not configured; leaving payment provider disabled.";
     return getPaymentProvider();
   }
 
   if (!hasAdminCredentials()) {
-    bootError = "SUPABASE_SECRET_KEY is not configured, so payment events cannot be recorded. Checkout disabled.";
+    const label = selected === "linkwa" ? "Linkwa" : "Paynow";
+    bootError = label + " credentials are present but SUPABASE_SECRET_KEY is not configured. Checkout disabled.";
     return getPaymentProvider();
   }
 
