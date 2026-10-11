@@ -17,6 +17,7 @@ import { supabasePaymentLedger } from "./ledger";
 
 const INTEGRATION_ID = "PAYNOW_INTEGRATION_ID";
 const INTEGRATION_KEY = "PAYNOW_INTEGRATION_KEY";
+const PAYNOW_CURRENCY_CONFIRMATION = "PAYNOW_INTEGRATION_CURRENCY";
 
 const LINKWA_API_KEY = "LINKWA_API_KEY";
 const LINKWA_BASE_URL = "LINKWA_BASE_URL";
@@ -50,14 +51,19 @@ export function readPaynowEnvironment(
 ): PaynowEnvironmentState {
   const integrationId = credential(env, INTEGRATION_ID);
   const integrationKey = credential(env, INTEGRATION_KEY);
+  // Paynow's regular initiate/status messages DO NOT carry a currency field.
+  // The currency is defined in merchant integration payment methods. This
+  // explicit attestation is mandatory before permitting USD-denominated sales.
+  const verifiedCurrency = credential(env, PAYNOW_CURRENCY_CONFIRMATION).toUpperCase();
 
-  if (!integrationId && !integrationKey) {
+  if (!integrationId && !integrationKey && !verifiedCurrency) {
     return { state: "unset", missing: [], config: null };
   }
 
   const missing: string[] = [];
   if (!integrationId) missing.push(INTEGRATION_ID);
   if (!integrationKey) missing.push(INTEGRATION_KEY);
+  if (verifiedCurrency !== "USD") missing.push(PAYNOW_CURRENCY_CONFIRMATION);
   if (missing.length > 0) {
     return { state: "incomplete", missing, config: null };
   }
