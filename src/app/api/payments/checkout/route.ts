@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { rateLimit } from "@/server/rate-limit";
 import { ensurePaymentProvider, paymentBootError } from "@/server/payments/config";
 import { paymentsRuntimeEnabled } from "@/server/payments/runtime";
+import { supabasePaymentLedger } from "@/server/payments/ledger";
 import {
   PaymentPayloadError,
   PaymentProviderError,
@@ -113,6 +114,14 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   try {
+    // An existing provider payment page may still be payable even after the
+    // merchant switches the default gateway. Never mint a second-provider
+    // checkout for the same sale until the previous attempt is reconciled.
+    const previousIntent = await supabasePaymentLedger().readIntent(row.id);
+    if (previousIntent && previousIntent.provider !== provider.capabilities.id) {
+      return json({ ok: false, error: "existing_provider_payment_pending" }, 409);
+    }
+
     const intent = await provider.createIntent({
       transactionId: row.id,
       amountMinor: BigInt(row.gross_minor),
