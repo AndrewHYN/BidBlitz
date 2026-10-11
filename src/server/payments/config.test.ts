@@ -27,6 +27,7 @@ describe("readPaynowEnvironment", () => {
     const env = {
       PAYNOW_INTEGRATION_ID: "1201",
       PAYNOW_INTEGRATION_KEY: "a-real-looking-key",
+      PAYNOW_INTEGRATION_CURRENCY: "USD",
     };
     expect(readPaynowEnvironment(env)).toEqual({
       state: "ready",
@@ -55,7 +56,7 @@ describe("readPaynowEnvironment", () => {
       readPaynowEnvironment({ PAYNOW_INTEGRATION_ID: "1201" })
     ).toEqual({
       state: "incomplete",
-      missing: ["PAYNOW_INTEGRATION_KEY"],
+      missing: ["PAYNOW_INTEGRATION_KEY", "PAYNOW_INTEGRATION_CURRENCY"],
       config: null,
     });
 
@@ -63,7 +64,7 @@ describe("readPaynowEnvironment", () => {
       readPaynowEnvironment({ PAYNOW_INTEGRATION_KEY: "only-a-key" })
     ).toEqual({
       state: "incomplete",
-      missing: ["PAYNOW_INTEGRATION_ID"],
+      missing: ["PAYNOW_INTEGRATION_ID", "PAYNOW_INTEGRATION_CURRENCY"],
       config: null,
     });
   });
@@ -91,6 +92,29 @@ describe("readPaynowEnvironment", () => {
         PAYNOW_INTEGRATION_KEY: "REPLACE_ME",
       }).state
     ).toBe("unset");
+  });
+});
+
+describe("Paynow USD currency attestation", () => {
+  it("refuses Paynow credentials without verified integration currency", () => {
+    expect(readPaynowEnvironment({
+      PAYNOW_INTEGRATION_ID: "1201",
+      PAYNOW_INTEGRATION_KEY: "test-key",
+    })).toMatchObject({
+      state: "incomplete",
+      missing: ["PAYNOW_INTEGRATION_CURRENCY"],
+    });
+  });
+
+  it("refuses ZWG integration credentials for USD-denominated auctions", () => {
+    expect(readPaynowEnvironment({
+      PAYNOW_INTEGRATION_ID: "1201",
+      PAYNOW_INTEGRATION_KEY: "test-key",
+      PAYNOW_INTEGRATION_CURRENCY: "ZWG",
+    })).toMatchObject({
+      state: "incomplete",
+      missing: ["PAYNOW_INTEGRATION_CURRENCY"],
+    });
   });
 });
 
