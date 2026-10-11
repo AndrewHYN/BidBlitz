@@ -3,7 +3,7 @@ import {
   PaymentProviderNotConfiguredError,
   PaymentSignatureError,
 } from "@/server/payments/provider";
-import { ensurePaymentProvider } from "@/server/payments/config";
+import { webhookPaymentProvider } from "@/server/payments/config";
 import { precheckWebhookBody } from "@/server/payments/webhook-body";
 
 /**
@@ -73,16 +73,18 @@ export function GET(): Response {
 }
 
 export async function POST(request: Request): Promise<Response> {
-  const provider = ensurePaymentProvider();
-
-  if (!provider.capabilities.configured) {
-    return json({ ok: false, error: "no_payment_provider" }, 503);
-  }
-
   const rawBody = await request.text();
   const checked = precheckWebhookBody(rawBody);
   if (!checked.ok) {
     return json({ ok: false, error: checked.error }, 400);
+  }
+
+  // Both historical Linkwa (JSON) and new Paynow (form) callbacks must be
+  // accepted independently of which rail serves new checkout. Body shape
+  // selects ONLY the verifier; its signature/hash still authenticates events.
+  const provider = webhookPaymentProvider(rawBody);
+  if (!provider.capabilities.configured) {
+    return json({ ok: false, error: "no_payment_provider" }, 503);
   }
 
   try {
