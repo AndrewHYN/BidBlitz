@@ -342,6 +342,35 @@ export class PaynowPaymentProvider implements PaymentProvider {
       );
     }
 
+    // One external checkout per sale. A repeated buyer click must reopen
+    // the existing Paynow page, not start a second payable transaction.
+    // Switching from an outstanding Linkwa intent also fails closed.
+    const prior = await this.config.ledger.readIntent(input.transactionId);
+    if (prior) {
+      if (prior.provider !== PAYNOW_PROVIDER_ID) {
+        throw new PaymentPayloadError(
+          "existing_provider_payment_pending",
+          "This sale has a payment attempt with another provider. Reconcile it first."
+        );
+      }
+      if (!prior.browserUrl || !isPaynowPollUrl(prior.browserUrl) ||
+          !isPaynowPollUrl(prior.pollUrl)) {
+        throw new PaymentPayloadError(
+          "existing_payment_requires_reconciliation",
+          "The existing Paynow session cannot safely be resumed."
+        );
+      }
+      return {
+        id: prior.pollUrl,
+        transactionId: input.transactionId,
+        amountMinor: input.amountMinor,
+        currency: input.currency,
+        status: "requires_action",
+        redirectUrl: prior.browserUrl,
+        providerReference: prior.providerReference ?? undefined,
+      };
+    }
+
     const outbound: Array<[string, string]> = [
       ["id", this.config.integrationId],
       ["reference", input.transactionId],
@@ -376,8 +405,11 @@ export class PaynowPaymentProvider implements PaymentProvider {
 
     const browserUrl = paynowField(fields, "browserurl");
     const pollUrl = paynowField(fields, "pollurl");
-    if (status.toLowerCase() !== "ok" || !browserUrl) {
-      throw new PaymentProviderRequestError("Paynow did not return a payment page.");
+    if (status.toLowerCase() !== "ok" || !browserUrl ||
+        !pollUrl || !isPaynowPollUrl(browserUrl) || !isPaynowPollUrl(pollUrl)) {
+      throw new PaymentProviderRequestError(
+        "Paynow did not return both a safe payment page and a status address."
+      );
     }
 
     const providerReference = paynowField(fields, "paynowreference") ?? null;
@@ -389,15 +421,13 @@ export class PaynowPaymentProvider implements PaymentProvider {
     // replaces it rather than accumulating abandoned sessions. Failing to
     // store it fails the checkout on purpose — a payment we could never
     // reconcile is worse than one the buyer starts again a second later.
-    if (pollUrl) {
-      await this.config.ledger.recordIntent({
-        transactionId: input.transactionId,
-        provider: PAYNOW_PROVIDER_ID,
-        pollUrl,
-        browserUrl,
-        providerReference,
-      });
-    }
+    await this.config.ledger.recordIntent({
+      transactionId: input.transactionId,
+      provider: PAYNOW_PROVIDER_ID,
+      pollUrl,
+      browserUrl,
+      providerReference,
+    });
 
     return {
       id: pollUrl ?? browserUrl,

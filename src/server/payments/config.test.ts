@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { readLinkwaEnvironment, readPaynowEnvironment } from "./config";
+import {
+  readCheckoutProviderPreference,
+  readLinkwaEnvironment,
+  readPaynowEnvironment,
+  webhookProviderKind,
+} from "./config";
 
 /**
  * Credential reading only — no provider is constructed here.
@@ -22,6 +27,7 @@ describe("readPaynowEnvironment", () => {
     const env = {
       PAYNOW_INTEGRATION_ID: "1201",
       PAYNOW_INTEGRATION_KEY: "a-real-looking-key",
+      PAYNOW_INTEGRATION_CURRENCY: "USD",
     };
     expect(readPaynowEnvironment(env)).toEqual({
       state: "ready",
@@ -37,6 +43,7 @@ describe("readPaynowEnvironment", () => {
     const result = readPaynowEnvironment({
       PAYNOW_INTEGRATION_ID: "  1201\t",
       PAYNOW_INTEGRATION_KEY: " key \n",
+      PAYNOW_INTEGRATION_CURRENCY: " usd ",
     });
     expect(result.state).toBe("ready");
     expect(result.config).toEqual({
@@ -50,7 +57,7 @@ describe("readPaynowEnvironment", () => {
       readPaynowEnvironment({ PAYNOW_INTEGRATION_ID: "1201" })
     ).toEqual({
       state: "incomplete",
-      missing: ["PAYNOW_INTEGRATION_KEY"],
+      missing: ["PAYNOW_INTEGRATION_KEY", "PAYNOW_INTEGRATION_CURRENCY"],
       config: null,
     });
 
@@ -58,7 +65,7 @@ describe("readPaynowEnvironment", () => {
       readPaynowEnvironment({ PAYNOW_INTEGRATION_KEY: "only-a-key" })
     ).toEqual({
       state: "incomplete",
-      missing: ["PAYNOW_INTEGRATION_ID"],
+      missing: ["PAYNOW_INTEGRATION_ID", "PAYNOW_INTEGRATION_CURRENCY"],
       config: null,
     });
   });
@@ -86,6 +93,29 @@ describe("readPaynowEnvironment", () => {
         PAYNOW_INTEGRATION_KEY: "REPLACE_ME",
       }).state
     ).toBe("unset");
+  });
+});
+
+describe("Paynow USD currency attestation", () => {
+  it("refuses Paynow credentials without verified integration currency", () => {
+    expect(readPaynowEnvironment({
+      PAYNOW_INTEGRATION_ID: "1201",
+      PAYNOW_INTEGRATION_KEY: "test-key",
+    })).toMatchObject({
+      state: "incomplete",
+      missing: ["PAYNOW_INTEGRATION_CURRENCY"],
+    });
+  });
+
+  it("refuses ZWG integration credentials for USD-denominated auctions", () => {
+    expect(readPaynowEnvironment({
+      PAYNOW_INTEGRATION_ID: "1201",
+      PAYNOW_INTEGRATION_KEY: "test-key",
+      PAYNOW_INTEGRATION_CURRENCY: "ZWG",
+    })).toMatchObject({
+      state: "incomplete",
+      missing: ["PAYNOW_INTEGRATION_CURRENCY"],
+    });
   });
 });
 
@@ -132,5 +162,34 @@ describe("readLinkwaEnvironment", () => {
         LINKWA_WEBHOOK_SECRET: "REPLACE_ME",
       }).state
     ).toBe("unset");
+  });
+});
+
+describe("checkout provider selection", () => {
+  it("preserves the legacy default unless deliberately configured", () => {
+    expect(readCheckoutProviderPreference({})).toBe("auto");
+    expect(readCheckoutProviderPreference({ PAYMENT_PROVIDER: " auto " })).toBe("auto");
+  });
+
+  it("selects Paynow or Linkwa by an explicit flag, never by key priority", () => {
+    expect(readCheckoutProviderPreference({ PAYMENT_PROVIDER: "PayNow" })).toBe("paynow");
+    expect(readCheckoutProviderPreference({ PAYMENT_PROVIDER: "LINKWA" })).toBe("linkwa");
+  });
+
+  it("fails closed on an unknown value", () => {
+    expect(readCheckoutProviderPreference({ PAYMENT_PROVIDER: "any" })).toBe("invalid");
+    expect(readCheckoutProviderPreference({ PAYMENT_PROVIDER: "pay-now" })).toBe("invalid");
+  });
+});
+
+describe("historical webhook routing hints", () => {
+  it("routes Linkwa JSON and Paynow form-encoded bodies separately", () => {
+    expect(webhookProviderKind('{"event":"payment.completed"}')).toBe("linkwa");
+    expect(webhookProviderKind("reference=abc&hash=ABCDEF")).toBe("paynow");
+  });
+
+  it("does not infer provider on unsupported bodies", () => {
+    expect(webhookProviderKind("")).toBeNull();
+    expect(webhookProviderKind("not-a-webhook")).toBeNull();
   });
 });

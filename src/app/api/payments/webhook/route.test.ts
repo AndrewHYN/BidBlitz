@@ -5,11 +5,18 @@ import {
   PaymentProviderRequestError,
   PaymentSignatureError,
   NoopPaymentProvider,
+  getPaymentProvider,
   setPaymentProvider,
   type ConfirmResult,
   type PaymentProvider,
   type WebhookContext,
 } from "@/server/payments/provider";
+// Route contract tests inject a fake verifier; production instead routes JSON
+// to signed Linkwa verification and form bodies to hashed Paynow verification.
+vi.mock("@/server/payments/config", () => ({
+  webhookPaymentProvider: () => getPaymentProvider(),
+}));
+
 import { GET, POST } from "./route";
 
 /**
@@ -67,10 +74,10 @@ afterEach(() => {
 });
 
 describe("POST /api/payments/webhook — no provider configured", () => {
-  it("answers 503 before it even reads the body", async () => {
+  it("answers 503 for a well-formed event when no verifier is configured", async () => {
     setPaymentProvider(new NoopPaymentProvider());
 
-    const response = await post("");
+    const response = await post("status=Paid");
     expect(response.status).toBe(503);
     expect(await read(response)).toEqual({
       ok: false,
