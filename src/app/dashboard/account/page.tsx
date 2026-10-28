@@ -52,7 +52,7 @@ export default async function SalesAccountPage() {
       </div> : <ul className="space-y-3">{account.entries.map((row) => <li key={row.id} className="rounded-xl border bg-card p-4 sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-3"><Link href={`/dashboard/transactions/${row.id}`} className="min-w-0 break-words font-bold text-primary hover:underline">{row.title ?? "Sale details"}</Link>
           <span className="rounded-md bg-muted px-2 py-1 text-xs font-semibold">{SALES_BUCKET_LABELS[row.bucket]}</span></div>
-        <dl className="mt-4 grid grid-cols-3 gap-3 text-sm"><div><dt className="text-xs text-muted-foreground">Buyer paid</dt><dd className="mt-1 font-semibold"><Money minor={row.grossMinor} /></dd></div>
+        <dl className="mt-4 grid grid-cols-3 gap-3 text-sm"><div><dt className="text-xs text-muted-foreground">Sale amount</dt><dd className="mt-1 font-semibold"><Money minor={row.grossMinor} /></dd></div>
           <div><dt className="text-xs text-muted-foreground">Sale fee</dt><dd className="mt-1 font-semibold"><Money minor={row.feeMinor} /></dd></div>
           <div><dt className="text-xs text-muted-foreground">Your proceeds</dt><dd className="mt-1 font-semibold"><Money minor={row.proceedsMinor} /></dd></div></dl>
         <p className="mt-3 text-xs text-muted-foreground">{row.collectionVerified ? "Merchant receipt verified" : "Merchant receipt awaiting verification"} · {new Date(row.createdAt).toLocaleDateString("en-ZW")}</p>
