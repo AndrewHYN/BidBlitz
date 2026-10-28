@@ -70,12 +70,14 @@ jobs:
 
       - name: Desktop and mobile release smoke
         env:
+          PLAYWRIGHT_READ_ONLY: "true"
+          PLAYWRIGHT_CANONICAL_ORIGIN: http://127.0.0.1:3000
           PLAYWRIGHT_BASE_URL: http://127.0.0.1:3000
           PLAYWRIGHT_EXTERNAL_SERVER: "true"
           NEXT_PUBLIC_SUPABASE_URL: https://zteakuiuvcikwpnkgxsn.supabase.co
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_FQDrBsoHL030r1jC4CvIaQ_Csq8cYuK
           NEXT_PUBLIC_SITE_URL: http://127.0.0.1:3000
-        run: npx playwright test e2e/release-smoke.spec.ts
+        run: npx playwright test e2e/release-smoke.spec.ts e2e/indexing.spec.ts e2e/not-found.spec.ts
 
       - name: Stop release smoke server
         if: always()

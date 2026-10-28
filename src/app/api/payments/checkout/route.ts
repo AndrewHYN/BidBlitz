@@ -3,6 +3,7 @@ import { rateLimit } from "@/server/rate-limit";
 import { ensurePaymentProvider, paymentBootError } from "@/server/payments/config";
 import { paymentsRuntimeEnabled } from "@/server/payments/runtime";
 import { supabasePaymentLedger } from "@/server/payments/ledger";
+import { claimCheckout } from "@/server/payments/checkout-claim";
 import {
   PaymentPayloadError,
   PaymentProviderError,
@@ -120,6 +121,11 @@ export async function POST(request: Request): Promise<Response> {
     const previousIntent = await supabasePaymentLedger().readIntent(row.id);
     if (previousIntent && previousIntent.provider !== provider.capabilities.id) {
       return json({ ok: false, error: "existing_provider_payment_pending" }, 409);
+    }
+
+    const claim = await claimCheckout(row.id, user.id, provider.capabilities.id);
+    if (claim === "held") {
+      return json({ ok: false, error: "existing_payment_requires_reconciliation" }, 409);
     }
 
     const intent = await provider.createIntent({

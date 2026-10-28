@@ -5,6 +5,7 @@ import {
   NoopPaymentProvider,
   PaymentProviderError,
   PaymentProviderRequestError,
+  PaymentPayloadError,
   setPaymentProvider,
   type CreateIntentInput,
   type PaymentIntent,
@@ -12,6 +13,7 @@ import {
 } from "@/server/payments/provider";
 import { POST } from "./route";
 import { paymentsRuntimeEnabled } from "@/server/payments/runtime";
+import { claimCheckout } from "@/server/payments/checkout-claim";
 
 /**
  * Checkout contract.
@@ -40,6 +42,7 @@ vi.mock("@/lib/supabase/server", () => ({
 vi.mock("@/server/payments/runtime", () => ({
   paymentsRuntimeEnabled: vi.fn(),
 }));
+vi.mock("@/server/payments/checkout-claim", () => ({ claimCheckout: vi.fn() }));
 
 const TX = "3f1d2a4c-9b8e-4f6a-8c2d-1e5b7a9c0f34";
 const BUYER = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
@@ -123,6 +126,7 @@ async function read(response: Response): Promise<Record<string, unknown>> {
 }
 
 beforeEach(() => {
+  vi.mocked(claimCheckout).mockReset().mockResolvedValue("claimed");
   readIntentMock.mockReset();
   readIntentMock.mockResolvedValue(null);
   resetRateLimits();
@@ -142,6 +146,53 @@ describe("POST /api/payments/checkout — runtime pause", () => {
     expect(response.status).toBe(503);
     expect(await read(response)).toEqual({ ok: false, error: "payments_paused" });
     expect(createClient).not.toHaveBeenCalled();
+  });
+});
+
+describe("POST /api/payments/checkout — initiation reservation", () => {
+  it("allows only one provider initiation for simultaneous buyer requests", async () => {
+    session({ id: BUYER }, row());
+    const createIntent = vi.fn(async (input: CreateIntentInput): Promise<PaymentIntent> => ({
+      id: "pi_once", transactionId: input.transactionId, amountMinor: input.amountMinor,
+      currency: input.currency, status: "requires_action", redirectUrl: "https://example.com/pay",
+    }));
+    setPaymentProvider(providerWith(createIntent));
+    vi.mocked(claimCheckout).mockResolvedValueOnce("claimed").mockResolvedValueOnce("held");
+    const responses = await Promise.all([postJson({ transactionId: TX }), postJson({ transactionId: TX })]);
+    expect(responses.map((r) => r.status).sort()).toEqual([200, 409]);
+    expect(createIntent).toHaveBeenCalledTimes(1);
+    expect(claimCheckout).toHaveBeenCalledWith(TX, BUYER, "fake");
+  });
+
+  it("does not contact a provider while a previous initiation is uncertain", async () => {
+    session({ id: BUYER }, row());
+    const createIntent = vi.fn();
+    setPaymentProvider(providerWith(createIntent));
+    vi.mocked(claimCheckout).mockResolvedValue("held");
+    const response = await postJson({ transactionId: TX });
+    expect(response.status).toBe(409);
+    expect(await read(response)).toEqual({ ok: false, error: "existing_payment_requires_reconciliation" });
+    expect(createIntent).not.toHaveBeenCalled();
+  });
+
+  it("refuses expired sales before contacting the payment service", async () => {
+    session({ id: BUYER }, row());
+    const createIntent = vi.fn();
+    setPaymentProvider(providerWith(createIntent));
+    vi.mocked(claimCheckout).mockRejectedValue(new PaymentPayloadError("payment_window_expired", "Expired"));
+    const response = await postJson({ transactionId: TX });
+    expect(response.status).toBe(400);
+    expect(await read(response)).toEqual({ ok: false, error: "payment_window_expired" });
+    expect(createIntent).not.toHaveBeenCalled();
+  });
+
+  it("fails closed if the reservation cannot be verified", async () => {
+    session({ id: BUYER }, row());
+    const createIntent = vi.fn();
+    setPaymentProvider(providerWith(createIntent));
+    vi.mocked(claimCheckout).mockRejectedValue(new PaymentProviderError("PAYMENT_LEDGER_UNAVAILABLE", "Unavailable"));
+    expect((await postJson({ transactionId: TX })).status).toBe(502);
+    expect(createIntent).not.toHaveBeenCalled();
   });
 });
 

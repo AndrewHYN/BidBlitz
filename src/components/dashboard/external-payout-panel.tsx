@@ -41,7 +41,6 @@ export function ExternalPayoutPanel({
   const [reference, setReference] = useState("");
   const [evidence, setEvidence] = useState("");
   const [receiptVerified, setReceiptVerified] = useState(false);
-  const [cancellation, setCancellation] = useState(false);
   const [noMoneySent, setNoMoneySent] = useState(false);
   const [feedback, setFeedback] = useState<{ ok: boolean; text: string } | null>(null);
   const [pending, startTransition] = useTransition();
@@ -74,7 +73,7 @@ export function ExternalPayoutPanel({
         });
         if (result.ok) {
           setReason(""); setEvidence(""); setReference("");
-          setReceiptVerified(false); setCancellation(false);
+          setReceiptVerified(false);
           router.refresh();
         }
       } catch {

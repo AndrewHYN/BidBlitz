@@ -183,6 +183,7 @@ describe("auctionStructuredData() — breadcrumbs", () => {
     const crumb = byType(auctionStructuredData(base()), "BreadcrumbList");
     const items = crumb.itemListElement as JsonLd[];
 
+    expect(items.every((item) => item["@type"] === "ListItem")).toBe(true);
     expect(items.map((i) => i.name)).toEqual([
       "BidBlitz",
       "Browse auctions",
@@ -204,6 +205,7 @@ describe("auctionStructuredData() — breadcrumbs", () => {
     const items = crumb.itemListElement as JsonLd[];
 
     expect(items).toHaveLength(3);
+    expect(items.every((item) => item["@type"] === "ListItem")).toBe(true);
     expect(items.map((i) => i.position)).toEqual([1, 2, 3]);
   });
 

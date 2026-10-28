@@ -156,11 +156,12 @@ export function auctionStructuredData(input: AuctionStructuredInput): JsonLd {
   }
 
   const crumbs: JsonLd[] = [
-    { position: 1, name: "BidBlitz", item: `${input.siteUrl}/` },
-    { position: 2, name: "Browse auctions", item: `${input.siteUrl}/browse` },
+    { "@type": "ListItem", position: 1, name: "BidBlitz", item: `${input.siteUrl}/` },
+    { "@type": "ListItem", position: 2, name: "Browse auctions", item: `${input.siteUrl}/browse` },
   ];
   if (input.categoryName) {
     crumbs.push({
+      "@type": "ListItem",
       position: 3,
       name: input.categoryName,
       item: input.categorySlug
@@ -169,6 +170,7 @@ export function auctionStructuredData(input: AuctionStructuredInput): JsonLd {
     });
   }
   crumbs.push({
+    "@type": "ListItem",
     position: crumbs.length + 1,
     name: input.title,
     item: url,

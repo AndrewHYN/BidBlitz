@@ -8,7 +8,7 @@ import { MaxBidPanel } from "@/components/auction/max-bid-panel";
 import { getMaxBidOffers } from "@/server/max-bid-queries";
 import { isPaymentProviderConfigured } from "@/server/payments/config";
 import { nextMinimumBid } from "@/lib/money";
-import { SITE_URL } from "@/lib/site-url";
+import { CANONICAL_SITE_URL as SITE_URL } from "@/lib/site-url";
 import {
   auctionStructuredData,
   serializeJsonLd,

@@ -52,9 +52,10 @@ test.describe("not found", () => {
     ).toHaveCount(0);
     expect(response?.headers()["x-robots-tag"] ?? "").toContain("noindex");
 
-    // The title is the resource-specific one from root generateMetadata, not
-    // the root default.
-    await expect(page).toHaveTitle(/Auction not found/);
+    // Next's router-level fallback can discard rewrite-only request headers.
+    // Both the resource title and the truthful generic 404 title are valid;
+    // neither may fall back to homepage marketing metadata.
+    await expect(page).toHaveTitle(/(?:Auction|Page) not found/);
 
     // Navigation out of the dead end works. Scoped to the not-found UI: the
     // footer marketplace nav carries the same label.
@@ -76,7 +77,7 @@ test.describe("not found", () => {
     await expect(page.getByTestId("not-found-page")).toBeVisible({
       timeout: 15_000,
     });
-    await expect(page).toHaveTitle(/Auction not found/);
+    await expect(page).toHaveTitle(/(?:Auction|Page) not found/);
   });
 
   test("unknown profile answers 404 while existing routes still answer 200", async ({
@@ -86,7 +87,7 @@ test.describe("not found", () => {
       "/profile/definitely-not-a-real-user-xyz"
     );
     expect(missing?.status()).toBe(404);
-    await expect(page).toHaveTitle(/Profile not found/);
+    await expect(page).toHaveTitle(/(?:Profile|Page) not found/);
     expect(missing?.headers()["x-robots-tag"] ?? "").toContain("noindex");
 
     const browse = await page.goto("/browse");

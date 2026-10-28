@@ -4,7 +4,7 @@ import "./globals.css";
 import { Providers } from "@/components/providers";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
-import { SITE_URL } from "@/lib/site-url";
+import { CANONICAL_SITE_URL as SITE_URL } from "@/lib/site-url";
 import { serializeJsonLd, siteStructuredData } from "@/lib/structured-data";
 
 const geistSans = Geist({

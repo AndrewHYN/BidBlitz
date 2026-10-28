@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Check, Copy, Share2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { absoluteUrl } from "@/lib/site-url";
+import { canonicalUrl as absoluteUrl } from "@/lib/site-url";
 import { cn } from "@/lib/utils";
 
 /**

@@ -108,7 +108,7 @@ function checkoutErrorCopy(error: string, providerName: string): string {
     return `${providerName} requires a minimum payment of $1.00 for this sale.`;
   }
   return (
-    CHECKOUT_ERRORS[error] ?? "We couldn't start the payment. Nothing was charged."
+    CHECKOUT_ERRORS[error] ?? "We couldn't confirm payment setup. Check your transaction before trying again."
   );
 }
 
@@ -122,8 +122,11 @@ const CHECKOUT_ERRORS: Record<string, string> = {
   transaction_not_found: "That sale is no longer available to pay for.",
   not_the_buyer: "Only the winning bidder can pay for this sale.",
   not_awaiting_payment: "This sale isn't waiting for payment.",
+  payment_window_expired: "The payment deadline for this sale has passed. Contact BidBlitz support.",
+  existing_provider_payment_pending: "This sale already has a payment with another service. Contact support to check it before paying again.",
+  existing_payment_requires_reconciliation: "A previous payment setup is still being checked. Contact support before trying another payment.",
   rate_limited: "Too many attempts. Wait a moment and try again.",
-  provider_error: "The payment service didn't respond. Nothing was charged.",
-  checkout_failed: "We couldn't start the payment. Nothing was charged.",
-  network: "We couldn't reach the server. Nothing was charged.",
+  provider_error: "We couldn't confirm payment setup. Contact support before trying another payment.",
+  checkout_failed: "We couldn't confirm payment setup. Check your transaction before trying again.",
+  network: "The connection was interrupted. Check your transaction before trying again.",
 };

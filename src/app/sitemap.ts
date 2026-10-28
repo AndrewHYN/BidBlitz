@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 import { createClient } from "@/lib/supabase/server";
-import { SITE_URL } from "@/lib/site-url";
+import { CANONICAL_SITE_URL as SITE_URL } from "@/lib/site-url";
 
 const siteUrl = SITE_URL;
 

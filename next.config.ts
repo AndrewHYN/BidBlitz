@@ -12,6 +12,14 @@ import type { NextConfig } from "next";
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 
 const nextConfig: NextConfig = {
+  async redirects() {
+    return ["bidblitz.co.zw", "bid-blitz-ten.vercel.app"].map((host) => ({
+      source: "/:path*",
+      has: [{ type: "host" as const, value: host }],
+      destination: "https://www.bidblitz.co.zw/:path*",
+      permanent: true,
+    }));
+  },
   images: {
     remotePatterns: supabaseUrl
       ? [

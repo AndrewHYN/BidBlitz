@@ -17,9 +17,16 @@ const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "https://bidblitz.co.zw";
 /** True when we are pointed at a remote deployment rather than a local server. */
 const isRemote = /^https?:\/\//.test(baseURL) && !/^https?:\/\/(localhost|127\.0\.0\.1)/.test(baseURL);
 const externalServer = process.env.PLAYWRIGHT_EXTERNAL_SERVER === "true";
+const readOnly = process.env.PLAYWRIGHT_READ_ONLY === "true";
 
 export default defineConfig({
   testDir: "./e2e",
+  // A release smoke run creates no fixtures and needs no privileged cleanup
+  // token. Restrict its file set here so the cleanup exemption cannot include
+  // the auction/bid/upload suites that write to the database.
+  testMatch: readOnly
+    ? ["**/release-smoke.spec.ts", "**/not-found.spec.ts", "**/indexing.spec.ts"]
+    : undefined,
   fullyParallel: false,
   // The machine has ~3.9 GB RAM: never run two browsers side by side.
   workers: 1,
@@ -53,7 +60,7 @@ export default defineConfig({
   // listings sitting on the public homepage, which is exactly what happened
   // before 2026-09-28. Best-effort by design: it warns loudly when it cannot
   // clean up, and never hides a skipped cleanup behind a green run.
-  globalTeardown: "./e2e/global-teardown.mjs",
+  globalTeardown: readOnly ? undefined : "./e2e/global-teardown.mjs",
   use: {
     baseURL,
     trace: "retain-on-failure",
