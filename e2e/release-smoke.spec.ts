@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { ACCOUNTS, signIn } from "./fixtures";
 
 const PUBLIC_ROUTES = [
   "/",
@@ -25,6 +26,7 @@ const PROTECTED_ROUTES = [
   "/dashboard/selling",
   "/dashboard/watchlist",
   "/dashboard/transactions",
+  "/dashboard/account",
   "/dashboard/disputes",
   "/sell",
   "/settings",
@@ -54,6 +56,17 @@ const PROTECTED_ROUTES = [
 ] as const;
 
 test.describe("release visual smoke", () => {
+  test("signed-in users can open their sales account without overflow", async ({ page }, testInfo) => {
+    await signIn(page, ACCOUNTS.buyer1.email);
+    await page.goto("/dashboard/account");
+    await expect(page.getByRole("heading", { name: "Your sales account", exact: true })).toBeVisible();
+    await expect(page.getByRole("region", { name: "USD sales balances" })).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "Dashboard sections" }).getByRole("link", { name: "Sales account", exact: true })).toBeInViewport({ ratio: 0.99 });
+    await expect(page.getByRole("heading", { name: "Sales account unavailable" })).toHaveCount(0);
+    const sizes = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, viewport: document.documentElement.clientWidth }));
+    expect(sizes.scroll).toBeLessThanOrEqual(sizes.viewport + 2);
+    await page.screenshot({ path: testInfo.outputPath("sales-account.png"), fullPage: true });
+  });
   for (const route of PUBLIC_ROUTES) {
     test(`${route} renders without overflow or fatal client errors`, async ({ page }) => {
       const fatal: string[] = [];

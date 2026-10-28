@@ -26,6 +26,7 @@ const cancel = z.object({
 function message(detail?: string): string {
   const value = detail?.toLowerCase() ?? "";
   if (value.includes("not_authorised")) return "Your staff role cannot perform this payout action or the seller receipt is unverified.";
+  if (value.includes("collection_settlement_unverified")) return "Verify this sale's merchant receipt in the buyer payment ledger before reserving a seller transfer.";
   if (value.includes("historical_provider_attempt_exists") || value.includes("provider_payout_attempt_exists"))
     return "A provider instruction was previously recorded. Reconcile it before considering another payout.";
   if (value.includes("payout_not_eligible") || value.includes("external_payout_not_ready") ||

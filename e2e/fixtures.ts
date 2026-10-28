@@ -2,8 +2,8 @@ import { expect, type Locator, type Page } from "@playwright/test";
 
 /**
  * Test accounts — provisioned and email-confirmed in the live Supabase
- * project. Never assert anything payment-related against these; the payment
- * provider is intentionally not configured.
+ * project. Never initiate buyer payments or seller transfers with these
+ * accounts. Read-only account checks must not create financial fixtures.
  */
 export const TEST_PASSWORD = "Bl1tzVerify!2026";
 

@@ -5,6 +5,7 @@ import { AlertTriangle, ArrowLeft, ArrowRight, BadgeCheck, CircleCheck, LockKeyh
 import { createClient } from "@/lib/supabase/server";
 import { hasPermission } from "@/server/permissions";
 import { readFinanceOperations } from "@/server/finance/operations";
+import { readCollectionChecks } from "@/server/finance/sales-account";
 import { linkwaPayoutInstructionsEnabled } from "@/server/payments/runtime";
 import { payoutTriage, safeMinor, type PayoutTriage } from "@/lib/finance/operations";
 import { AdminNav } from "@/components/dashboard/admin-nav";
@@ -60,6 +61,8 @@ export default async function FinancePayoutsPage() {
   const linkwaDirectEnabled = await linkwaPayoutInstructionsEnabled();
   const data = await readFinanceOperations(90);
   const payouts = data.ok ? data.data.payouts : [];
+  const collectionChecks = data.ok ? await readCollectionChecks(payouts.map((p) => p.transactionId)) : null;
+  const collections = new Map((collectionChecks ?? []).map((row) => [row.transactionId, row]));
   // Read under the staff session; failed reads block high-value actions.
   const approvalRes = payouts.length > 0
     ? await supabase.from("payout_approval_requests")
@@ -95,7 +98,8 @@ export default async function FinancePayoutsPage() {
   const counts = {
     reconcile: payouts.filter((x) => payoutTriage(x) === "reconcile").length,
     hold: payouts.filter((x) => payoutTriage(x) === "hold").length,
-    ready: payouts.filter((x) => payoutTriage(x) === "ready").length,
+    ready: payouts.filter((x) => payoutTriage(x) === "ready" && collections.get(x.transactionId)?.verified === true
+      && !collections.get(x.transactionId)?.nonLive).length,
   };
 
   return (
@@ -183,6 +187,8 @@ export default async function FinancePayoutsPage() {
               <ul className="space-y-3">
                 {payouts.map((payout) => {
                   const triage = payoutTriage(payout);
+                  const collection = collections.get(payout.transactionId);
+                  const collectionVerified = collection?.verified === true && !collection.nonLive;
                   const amount = safeMinor(payout.amountMinor);
                   const approval = approvals.get(payout.id) ?? null;
                   const externalClaim = externalClaims.get(payout.id) ?? null;
@@ -190,11 +196,11 @@ export default async function FinancePayoutsPage() {
                   const hasVerifiedReceipt = evidence.some(e => e.evidence_kind === "SELLER_RECEIPT" && e.seller_receipt_verified);
                   const highValue = amount !== null && amount >= 10000 && payout.status !== "PAID_OUT";
                   const highValueCleared = !highValue || (!approvalRes.error && approval?.status === "APPROVED");
-                  const eligibleExternal = !externalRes.error && amount !== null && amount > 0
+                  const eligibleExternal = collectionVerified && !externalRes.error && amount !== null && amount > 0
                     && payout.currency === "USD" && payout.deliveryConfirmedAt !== null
                     && ["DELIVERY_CONFIRMED", "PAYOUT_PENDING"].includes(payout.status)
                     && !payout.hasOpenDispute && ["PAID", "SETTLED"].includes(payout.paymentStatus);
-                  const eligibleToInstruct = canOperate && paymentsEnabled && linkwaDirectEnabled && triage === "ready"
+                  const eligibleToInstruct = collectionVerified && canOperate && paymentsEnabled && linkwaDirectEnabled && triage === "ready"
                     && payout.currency === "USD" && amount !== null && amount > 0 && highValueCleared
                     && payout.linkwaWalletReady === true
                     && !externalRes.error && externalClaim === null;
@@ -207,9 +213,13 @@ export default async function FinancePayoutsPage() {
                           <p className="mt-1 text-xs text-muted-foreground">Transaction {payout.transactionId.slice(0, 8)} · {payout.status.replaceAll("_", " ")}</p>
                         </div>
                         <span className={`rounded-lg border px-3 py-2 text-xs font-extrabold ${triageStyle[triage]}`}>
-                          {triageLabel[triage]}
+                          {collection?.nonLive ? "Historical test · excluded" : triageLabel[triage]}
                         </span>
                       </div>
+                      {!collection?.nonLive && !collectionVerified && payout.status !== "PAID_OUT" && <p className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs leading-5">
+                        {collection ? "Merchant receipt is unverified. Match this sale to received funds before arranging a new seller transfer." : "Merchant receipt checks are unavailable. New transfers are blocked."}
+                        {" "}<Link href={`/admin/finance/payments#transaction-${payout.transactionId}`} className="font-bold text-primary underline">Review collection evidence</Link>
+                      </p>}
                       <div className="grid gap-3 rounded-xl bg-muted/35 p-4 text-sm sm:grid-cols-4">
                         <div><p className="text-xs font-semibold text-muted-foreground">Seller proceeds</p><p className="mt-1 text-xl font-black">{amount === null ? "Unavailable" : <Money minor={amount} currency={payout.currency} />}</p></div>
                         <div><p className="text-xs font-semibold text-muted-foreground">Buyer payment</p><p className="mt-1 font-bold">{payout.paymentStatus}</p></div>
@@ -261,7 +271,7 @@ export default async function FinancePayoutsPage() {
                           External payout reservation records are unavailable. All new transfer actions are temporarily blocked.
                         </p>
                       )}
-                      {!externalRes.error && amount !== null && (
+                      {!collection?.nonLive && !externalRes.error && amount !== null && (
                         <ExternalPayoutPanel
                           payoutId={payout.id} amountMinor={amount} currency={payout.currency}
                           claim={externalClaim} eligible={eligibleExternal}
@@ -276,7 +286,7 @@ export default async function FinancePayoutsPage() {
                             entries={evidence} canRecord={canMarkPaid}/>
                       )}
                       {eligibleToInstruct && <LinkwaPayoutButton payoutId={payout.id} amountMinor={amount!} currency={payout.currency} />}
-                      {canOperate && amount !== null && externalClaim?.status !== "RESERVED" &&
+                      {!collection?.nonLive && canOperate && amount !== null && externalClaim?.status !== "RESERVED" &&
                         (payout.status !== "PAYOUT_DUE" || (!evidenceRes.error && hasVerifiedReceipt)) && (
                         <details className="rounded-xl border bg-muted/15 p-3">
                           <summary className="cursor-pointer text-sm font-bold">Owner-only manual status review</summary>

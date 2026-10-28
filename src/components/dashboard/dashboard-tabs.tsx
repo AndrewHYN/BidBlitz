@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 
 /**
@@ -16,14 +17,21 @@ const TABS = [
   { href: "/dashboard/selling", label: "Selling" },
   { href: "/dashboard/watchlist", label: "Watchlist" },
   { href: "/dashboard/transactions", label: "Activity" },
+  { href: "/dashboard/account", label: "Sales account" },
   { href: "/dashboard/disputes", label: "Cases" },
 ] as const;
 
 export function DashboardTabs() {
   const pathname = usePathname();
+  const nav = useRef<HTMLElement>(null);
+  useEffect(() => {
+    nav.current?.querySelector<HTMLElement>('[aria-current="page"]')
+      ?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [pathname]);
 
   return (
     <nav
+      ref={nav}
       data-testid="dashboard-tabs"
       aria-label="Dashboard sections"
       className="flex gap-1 overflow-x-auto rounded-xl border bg-muted/60 p-1.5 shadow-sm"

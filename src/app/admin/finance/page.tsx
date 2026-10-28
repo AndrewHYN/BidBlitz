@@ -132,7 +132,7 @@ export default async function FinancePage() {
     <div className="page-container space-y-7 py-10 sm:py-14">
       <PageHeader
         title="Finance"
-        description="The money view for operating BidBlitz: what buyers paid, what BidBlitz earned, what sellers are owed, and what needs attention."
+        description="Review buyer payments, recorded fees, seller liabilities and outstanding checks. Confirmed historical test payments are excluded from the totals."
       />
       <AdminNav
         active="finance"

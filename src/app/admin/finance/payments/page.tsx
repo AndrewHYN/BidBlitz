@@ -9,6 +9,8 @@ import { safeMinor, paymentEquation } from "@/lib/finance/operations";
 import { AdminNav } from "@/components/dashboard/admin-nav";
 import { Money } from "@/components/auction/money";
 import { CopyFinanceReference } from "@/components/dashboard/copy-finance-reference";
+import { CollectionEvidenceForm } from "@/components/dashboard/collection-evidence-form";
+import { readCollectionChecks } from "@/server/finance/sales-account";
 
 export const metadata: Metadata = {
   title: "Buyer Payment Ledger",
@@ -20,14 +22,17 @@ export default async function PaymentsPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login?next=/admin/finance/payments");
-  const [allowed, team, payouts] = await Promise.all([
+  const [allowed, team, payouts, canVerify] = await Promise.all([
     hasPermission(user.id, "payments.view"),
     hasPermission(user.id, "admin.manage_team"),
     hasPermission(user.id, "payouts.view"),
+    hasPermission(user.id, "payouts.mark_paid"),
   ]);
   if (!allowed) redirect("/");
   const result = await readFinanceOperations(100);
   const payments = result.ok ? result.data.transactions : [];
+  const collectionChecks = result.ok ? await readCollectionChecks(payments.map((row) => row.id)) : null;
+  const checksById = new Map((collectionChecks ?? []).map((row) => [row.transactionId, row]));
   const invalid = payments.filter((p) => !paymentEquation(p));
   const awaiting = payments.filter((p) => p.status === "AWAITING_PAYMENT").length;
   const paid = payments.filter((p) => ["PAID", "SETTLED"].includes(p.status)).length;
@@ -97,8 +102,9 @@ export default async function PaymentsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {payments.map((p) => (
-                    <tr key={p.id} className="border-t align-top transition hover:bg-muted/20" data-testid="finance-payment-row">
+                  {payments.map((p) => {
+                    const check = checksById.get(p.id);
+                    return <tr key={p.id} id={`transaction-${p.id}`} className="border-t align-top transition hover:bg-muted/20" data-testid="finance-payment-row">
                       <td className="min-w-52 p-4">
                         <p className="font-bold">{p.auctionTitle ?? "Listing removed"}</p>
                         <p className="mt-1 text-muted-foreground">Buyer: {p.buyerName}</p>
@@ -117,7 +123,11 @@ export default async function PaymentsPage() {
                         <span>{p.providerReference ?? "Not confirmed"}</span>
                         {p.providerReference && <div className="mt-2"><CopyFinanceReference value={p.providerReference}/></div>}
                       </td>
-                      <td className="min-w-44 p-4">
+                      <td className="min-w-72 p-4">
+                        {!check ? <p role="alert" className="mb-3 font-semibold">Merchant receipt checks unavailable. Do not release funds.</p>
+                          : check.nonLive ? <p className="mb-3 font-semibold">Historical test payment · excluded from real sales accounts.</p>
+                            : check.verified ? <div className="mb-3"><p className="font-semibold text-emerald-700 dark:text-emerald-300">Merchant receipt verified</p><p className="mt-1 break-all font-mono text-xs">{check.settlementReference}</p></div>
+                              : ["PAID", "SETTLED"].includes(p.status) ? <div className="mb-3"><p className="font-semibold">Merchant receipt unverified</p>{canVerify && <CollectionEvidenceForm transactionId={p.id} />}</div> : null}
                         {["PAID", "SETTLED"].includes(p.status)
                           ? payouts
                             ? <Link href={`/admin/finance/payouts#transaction-${p.id}`} className="inline-flex min-h-10 items-center rounded-lg border px-3 font-bold text-primary hover:bg-muted">Review seller settlement <ArrowRight className="ml-1 size-3" aria-hidden /></Link>
@@ -126,8 +136,8 @@ export default async function PaymentsPage() {
                         <div className="mt-2"><CopyFinanceReference value={p.id} label="Copy transaction ID"/></div>
                       </td>
                       <td className="whitespace-nowrap p-4 text-muted-foreground">{new Date(p.createdAt).toLocaleString("en-US")}</td>
-                    </tr>
-                  ))}
+                    </tr>;
+                  })}
                 </tbody>
               </table>
             </div>
