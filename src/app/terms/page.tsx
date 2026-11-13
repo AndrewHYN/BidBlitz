@@ -8,17 +8,15 @@ import {
   DocumentSection,
 } from "@/components/document-page";
 import { PageHeader } from "@/components/auction/page-header";
-import { isPaymentProviderConfigured, paymentProviderDisplayName } from "@/server/payments/config";
-import { paymentsRuntimeEnabled } from "@/server/payments/runtime";
 
 export const metadata: Metadata = {
   title: "Terms of Use",
   description:
-    "How BidBlitz works for buyers and sellers: bids are final, auctions close on the clock, platform fees are disclosed, and what both sides agree to.",
+    "Terms for fixed-price listings and existing auction transactions on BidBlitz.",
   alternates: { canonical: "/terms" },
 };
 
-const LAST_UPDATED = "7 October 2026";
+const LAST_UPDATED = "13 November 2026";
 
 /**
  * The page index.
@@ -36,7 +34,7 @@ const SECTIONS = [
   { id: "settlement", title: "5. Winning and settlement" },
   { id: "fees", title: "6. Fees" },
   { id: "payments", title: "7. Payments" },
-  { id: "payouts", title: "8. Paying the seller" },
+  { id: "settlement-payout", title: "8. Paying the seller" },
   { id: "reviews", title: "9. Reviews" },
   { id: "moderation", title: "10. Reporting and moderation" },
   { id: "ownership", title: "11. What you list is yours" },
@@ -59,13 +57,7 @@ function TermsSection({
   );
 }
 
-export default async function TermsPage() {
-  // Whether payments are wired up is a deployment fact, not a fixed promise:
-  // the section below must describe the state the site is actually in.
-  const paymentConfigured = isPaymentProviderConfigured();
-  const providerName = paymentProviderDisplayName();
-  const paymentsEnabled = paymentConfigured && (await paymentsRuntimeEnabled());
-
+export default function TermsPage() {
   return (
     <div data-testid="terms-page">
       <DocumentPage toc={SECTIONS}>
@@ -84,13 +76,9 @@ export default async function TermsPage() {
             use BidBlitz.
           </p>
           <p>
-            BidBlitz is a live auction marketplace. Every listing is a
-            competitive auction with a real closing time. These terms, together
-            with the{" "}
-            <Link href="/help/rules" className="inline-flex min-h-6 items-center font-medium text-primary underline-offset-2 hover:underline">
-              bidding rules
-            </Link>
-            , explain what that means for you.
+            BidBlitz lets sellers advertise items at an asking price. Buyers and sellers
+            agree directly on price, payment and collection or delivery. The bidding
+            and settlement provisions below apply to auction transactions.
           </p>
         </TermsSection>
 
@@ -116,6 +104,11 @@ export default async function TermsPage() {
             Do not list anything illegal, stolen, or prohibited. Listings that
             break these rules can be removed, and accounts that break them can
             be suspended.
+          </p>
+          <p>
+            For a fixed-price listing, provide a number you are authorised to share.
+            It appears publicly while the listing is available. Mark the item sold or remove
+            the listing when buyers should stop contacting you.
           </p>
           <p>
             Once you publish an auction, its starting price, bid increment,
@@ -183,6 +176,7 @@ export default async function TermsPage() {
         </TermsSection>
 
         <TermsSection id="fees" title="6. Fees">
+          <p>There is no BidBlitz transaction fee on a fixed-price sale paid directly to the seller.</p>
           <p>
             BidBlitz charges sellers a platform fee of{" "}
             <strong>5% of the winning price</strong> on sold auctions. The fee
@@ -202,112 +196,34 @@ export default async function TermsPage() {
           </p>
         </TermsSection>
 
-        <TermsSection
-          id="payments"
-          title={
-            !paymentConfigured
-              ? "7. Payments (current limitation)"
-              : paymentsEnabled
-                ? "7. Payments"
-                : "7. Payments (temporarily paused)"
-          }
-        >
-          {paymentConfigured ? (
-            <>
-              {!paymentsEnabled && (
-                <p>
-                  <strong>New payment initiation is temporarily paused.</strong>{" "}
-                  The provider is configured, but BidBlitz&apos;s runtime safety
-                  switch is off. A buyer cannot start a new checkout while that
-                  switch is off.
-                </p>
-              )}
-              <p>
-                <strong>Payments are processed by {providerName}.</strong> When an
-                auction settles, BidBlitz records the gross winning price, the
-                platform fee and the seller&apos;s proceeds, and the buyer
-                completes payment through {providerName}&apos;s checkout.
-              </p>
-              <p>
-                The transaction starts as &ldquo;Awaiting payment&rdquo; and
-                becomes &ldquo;Paid&rdquo; only when {providerName}&apos;s own
-                confirmation reaches BidBlitz and passes signature and amount
-                checks. A payment that fails or is cancelled leaves it
-                &ldquo;Failed&rdquo;. Being sent back to this site from {providerName}
-                never marks a sale paid by itself.
-              </p>
-            </>
-          ) : (
-            <>
-              <p>
-                <strong>
-                  BidBlitz does not process payments yet. No payment provider is
-                  connected to the site.
-                </strong>
-              </p>
-              <p>
-                When an auction settles, its transaction starts in a state
-                called &ldquo;Awaiting payment&rdquo; and simply waits there.
-                Nothing is charged, collected or paid out through BidBlitz
-                today. Until a payment provider is connected, do not assume
-                that money has moved through the site, and check back here
-                before payments are enabled, because these terms will be
-                updated first.
-              </p>
-            </>
-          )}
+        <TermsSection id="payments" title="7. Payments">
+          <p>
+            For fixed-price listings, the buyer pays the seller directly by cash or a
+            mobile wallet they agree on. BidBlitz does not collect or verify those payments
+            or arrange delivery. Check the item and payment recipient before paying.
+          </p>
+          <p>
+            For an existing auction transaction, use its activity page or contact BidBlitz
+            support for assistance. The transaction record reflects only payment
+            confirmations BidBlitz can verify.
+          </p>
         </TermsSection>
 
-        <TermsSection
-          id="settlement-payout"
-          title={
-            paymentConfigured
-              ? "8. Paying the seller"
-              : "8. Paying the seller (current limitation)"
-          }
-        >
-          {paymentConfigured ? (
-            <>
-              <p>
-                A sale being <strong>Paid</strong> means {providerName} confirmed the
-                buyer&apos;s payment. It does not mean the seller has been paid.
-                The two are recorded separately, and they are separate steps.
-              </p>
-              <p>
-                The seller&apos;s proceeds are fixed when the sale is created:
-                the winning price less the 5% platform fee. A confirmed buyer
-                payment does not release those proceeds by itself. After the
-                buyer confirms handover, BidBlitz can release the frozen seller
-                amount through the connected payout provider if the seller&apos;s
-                payout wallet is ready, provider settlement funds are available,
-                and no unresolved dispute blocks the transaction. Every payout
-                instruction and provider reference is recorded against the sale.
-              </p>
-              <p>
-                An unresolved dispute blocks a seller payout while the payout
-                is still safely reversible. If a payout has already reached a
-                provider-sensitive state, BidBlitz does not claim it was
-                reversed; staff must reconcile the provider record. Sellers can
-                see the current payout status for their own sales on their
-                dashboard.
-              </p>
-              <p>
-                If you are a seller, you are responsible for delivering what you
-                listed and for describing it accurately. Failing to fulfil a won
-                sale can block or hold your payout and can lead to moderation
-                action on your account. BidBlitz does not issue an automatic
-                refund from the dispute workflow; any agreed return or refund
-                is handled between buyer and seller.
-              </p>
-            </>
-          ) : (
-            <p>
-              No payment provider is connected to this deployment, so a sale
-              cannot start provider-side money movement here. A transaction is
-              still the record of the winning price, BidBlitz fee and seller
-              proceeds that would apply once payments are enabled.
-            </p>
-          )}
+        <TermsSection id="settlement-payout" title="8. Paying the seller">
+          <p>
+            For a direct sale, the seller receives payment from the buyer and verifies it
+            in their own wallet or in person.
+          </p>
+          <p>
+            For existing auction transactions, the winning price less the 5% platform fee
+            is recorded separately from the seller’s payout. After the buyer confirms handover,
+            staff can release eligible proceeds once funds and the payout destination are verified.
+            An unresolved dispute can hold the payout while it is reversible.
+          </p>
+          <p>
+            BidBlitz does not issue an automatic refund from the dispute workflow.
+            Contact support for any existing auction transaction that requires assistance.
+          </p>
         </TermsSection>
 
         <TermsSection id="reviews" title="9. Reviews">
@@ -322,10 +238,10 @@ export default async function TermsPage() {
 
         <TermsSection id="moderation" title="10. Reporting and moderation">
           <p>
-            Every auction and profile can be reported. Reports are reviewed by
+            Every listing and profile can be reported. Reports are reviewed by
             the BidBlitz team, and content that breaks these rules can be
             removed or an account suspended. When you file a report, we see your
-            account so we can follow up if needed. reports are not anonymous
+            account so we can follow up if needed. Reports are not anonymous
             to the team.
           </p>
         </TermsSection>

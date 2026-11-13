@@ -32,7 +32,7 @@ export function siteStructuredData(siteUrl: string): JsonLd {
     name: "BidBlitz",
     url: siteUrl,
     logo: `${siteUrl}/brand/bidblitz-logo-512.png`,
-    description: "BidBlitz is a Zimbabwean online auction marketplace.",
+    description: "BidBlitz is a Zimbabwean marketplace for buying and selling locally.",
   };
 
   return {
@@ -65,6 +65,7 @@ export type AuctionStructuredInput = {
   description: string;
   /** Raw auction status — the same value the bid panel receives. */
   status: string;
+  isDirect?: boolean;
   /** ISO 4217 code, e.g. "USD". */
   currency: string;
   currentBidMinor: number | null;
@@ -129,7 +130,7 @@ export function auctionStructuredData(input: AuctionStructuredInput): JsonLd {
   if (input.imageUrl) product.image = [input.imageUrl];
   if (input.categoryName) product.category = input.categoryName;
 
-  if (isBiddable(input.status, input.endsAt, nowMs)) {
+  if (input.status === "LISTED" || isBiddable(input.status, input.endsAt, nowMs)) {
     const priceMinor =
       input.currentBidMinor !== null
         ? input.currentBidMinor
@@ -157,7 +158,7 @@ export function auctionStructuredData(input: AuctionStructuredInput): JsonLd {
 
   const crumbs: JsonLd[] = [
     { "@type": "ListItem", position: 1, name: "BidBlitz", item: `${input.siteUrl}/` },
-    { "@type": "ListItem", position: 2, name: "Browse auctions", item: `${input.siteUrl}/browse` },
+    { "@type": "ListItem", position: 2, name: input.isDirect ? "Browse listings" : "Browse auctions", item: `${input.siteUrl}/browse` },
   ];
   if (input.categoryName) {
     crumbs.push({

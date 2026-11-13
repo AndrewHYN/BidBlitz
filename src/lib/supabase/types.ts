@@ -17,7 +17,7 @@ export type Json =
   | Json[];
 
 export type AuctionStatus =
-  | "DRAFT" | "SCHEDULED" | "LIVE" | "ENDED" | "SOLD" | "UNSOLD" | "CANCELLED" | "PAUSED" | "PENDING_REVIEW";
+  | "DRAFT" | "SCHEDULED" | "LIVE" | "ENDED" | "SOLD" | "UNSOLD" | "CANCELLED" | "PAUSED" | "PENDING_REVIEW" | "LISTED" | "SOLD_DIRECT";
 
 export type TransactionStatus =
   | "AWAITING_PAYMENT" | "PAID" | "SETTLED" | "REFUNDED" | "FAILED" | "EXPIRED";
@@ -99,6 +99,7 @@ export interface Database {
           fulfilment_method: "COLLECTION" | "DELIVERY" | "BOTH" | null;
           fulfilment_notes: string | null;
           currency: string;
+          is_direct: boolean;
           starting_bid_minor: number;
           bid_increment_minor: number;
           status: AuctionStatus;
@@ -145,6 +146,11 @@ export interface Database {
           image_count?: number;
         };
         Update: Partial<Database["public"]["Tables"]["auctions"]["Row"]>;
+      };
+      listing_contacts: {
+        Row: { auction_id: string; phone_e164: string };
+        Insert: never;
+        Update: never;
       };
       auction_images: {
         Row: {
@@ -393,6 +399,18 @@ export interface Database {
       };
     };
     Functions: {
+      create_direct_listing: {
+        Args: {
+          p_title: string; p_description: string; p_category_id: number; p_condition: Condition;
+          p_location: string; p_fulfilment_method: "COLLECTION" | "DELIVERY" | "BOTH";
+          p_fulfilment_notes: string | null; p_price_minor: number; p_phone: string;
+        };
+        Returns: string;
+      };
+      close_direct_listing: {
+        Args: { p_auction_id: string; p_sold: boolean };
+        Returns: "SOLD_DIRECT" | "CANCELLED";
+      };
       place_bid: {
         Args: { p_auction_id: string; p_amount_minor: number; p_request_id: string };
         Returns: Json;

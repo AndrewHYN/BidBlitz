@@ -53,9 +53,9 @@ export default async function SettingsPage() {
                 <WalletCards className="size-5" aria-hidden />
               </span>
               <div className="min-w-0 flex-1">
-                <h2 className="font-bold">Seller payouts</h2>
+                <h2 className="font-bold">Auction payout settings</h2>
                 <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                  Set the private wallet where your seller proceeds are sent after handover.
+                  Manage the private payout destination for previous auction sales.
                 </p>
                 <Button asChild variant="outline" className="mt-3">
                   <Link href="/settings/payouts">Manage payouts</Link>

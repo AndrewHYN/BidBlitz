@@ -15,6 +15,7 @@ import {
 } from "@/lib/structured-data";
 import { ImageGallery, type GalleryImage } from "@/components/auction/image-gallery";
 import { AuctionDetailLive } from "@/components/auction/auction-detail-live";
+import { DirectListingDetail } from "@/components/auction/direct-listing-detail";
 import { BidHistory } from "@/components/auction/bid-history";
 import { Money } from "@/components/auction/money";
 import { ReportDialog } from "@/components/auction/report-dialog";
@@ -34,7 +35,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     // loading boundary would otherwise stream a 200 shell first — see
     // docs/loading.md "Status codes"). This is the fail-open path: correct
     // title + noindex if the proxy check could not run.
-    return { title: "Auction not found", robots: { index: false } };
+    return { title: "Listing not found", robots: { index: false } };
   }
 
   const description = detail.auction.description.slice(0, 160);
@@ -45,6 +46,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   return {
     title: detail.auction.title,
+    ...(detail.auction.is_direct && detail.auction.status !== "LISTED" ? { robots: { index: false } } : {}),
     description,
     alternates: { canonical: `/auction/${detail.auction.id}` },
     openGraph: {
@@ -78,7 +80,7 @@ function FactRow({ label, children }: { label: string; children: React.ReactNode
 
 export default async function AuctionPage({ params }: Props) {
   const { id } = await params;
-  const [detail, maxBidOffers] = await Promise.all([getAuctionDetail(id), getMaxBidOffers(id)]);
+  const detail = await getAuctionDetail(id);
   if (!detail) notFound();
 
   const { auction, bids, viewerId, watched, myHighestBidMinor, transaction } = detail;
@@ -89,6 +91,35 @@ export default async function AuctionPage({ params }: Props) {
       const url = imageUrlFor(image.storage_path);
       return url ? [{ id: image.id, url, position: image.position }] : [];
     });
+
+
+  // Built from the same row the page renders from, so the markup can never
+  // advertise a price, an image or a state the visible page disagrees with.
+  const structuredData = auctionStructuredData({
+    siteUrl: SITE_URL,
+    isDirect: auction.is_direct,
+    id: auction.id,
+    title: auction.title,
+    description: auction.description,
+    status: auction.status,
+    currency: auction.currency,
+    currentBidMinor: auction.current_bid_minor,
+    startingBidMinor: auction.starting_bid_minor,
+    endsAt: auction.ends_at,
+    categoryName: auction.categories?.name ?? null,
+    categorySlug: auction.categories?.slug ?? null,
+    imageUrl: images[0]?.url ?? null,
+  });
+
+  if (auction.is_direct) {
+    return (
+      <>
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(structuredData) }} />
+        <DirectListingDetail detail={detail} images={images} />
+      </>
+    );
+  }
+  const maxBidOffers = await getMaxBidOffers(id);
 
   // The floor, computed once on the server with the shared bigint helper; the
   // live panel re-derives the same value for display as facts arrive.
@@ -111,22 +142,6 @@ export default async function AuctionPage({ params }: Props) {
     ? fulfilmentMethodLabels[auction.fulfilment_method]
     : "Not specified";
 
-  // Built from the same row the page renders from, so the markup can never
-  // advertise a price, an image or a state the visible page disagrees with.
-  const structuredData = auctionStructuredData({
-    siteUrl: SITE_URL,
-    id: auction.id,
-    title: auction.title,
-    description: auction.description,
-    status: auction.status,
-    currency: auction.currency,
-    currentBidMinor: auction.current_bid_minor,
-    startingBidMinor: auction.starting_bid_minor,
-    endsAt: auction.ends_at,
-    categoryName: auction.categories?.name ?? null,
-    categorySlug: auction.categories?.slug ?? null,
-    imageUrl: images[0]?.url ?? null,
-  });
 
   return (
     <div className="page-container pt-8 pb-24 sm:py-14 lg:pb-14">

@@ -2,8 +2,6 @@ import "server-only";
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { sweepDueAuctions } from "@/server/sweep";
-import { recentlyListedCutoffIso } from "@/lib/auction-status";
 import type { Database, SellerPayoutStatus, TransactionStatus } from "@/lib/supabase/types";
 import { businessLogoUrl } from "@/lib/business";
 
@@ -38,10 +36,11 @@ export type AuctionCardData = {
   categoryName: string | null;
   businessName: string | null;
   businessSlug: string | null;
+  isDirect?: boolean;
 };
 
 const CARD_SELECT = `
-  id, title, current_bid_minor, starting_bid_minor, bid_count,
+  id, title, is_direct, current_bid_minor, starting_bid_minor, bid_count,
   ends_at, status, location, condition, featured, featured_until,
   categories:category_id(slug, name),
   business:business_id(slug, display_name),
@@ -50,6 +49,7 @@ const CARD_SELECT = `
 
 type CardJoin = {
   id: string;
+  is_direct?: boolean;
   title: string;
   current_bid_minor: number | null;
   starting_bid_minor: number;
@@ -101,6 +101,7 @@ function toCard(row: CardJoin): AuctionCardData {
   return {
     id: row.id,
     title: row.title,
+    isDirect: row.is_direct === true,
     imageUrl: imageUrlFor(sorted[0]?.storage_path),
     currentBidMinor: row.current_bid_minor,
     startingBidMinor: row.starting_bid_minor,
@@ -120,63 +121,21 @@ function toCard(row: CardJoin): AuctionCardData {
   };
 }
 
-/** Home: live now + ending soon + recently listed. One round trip. */
-export const getHomeFeed = cache(async () => {
-  // Close anything overdue BEFORE we read, so a card can never show a "Live"
-  // badge next to an expired countdown. Throttled to one call per minute.
-  await sweepDueAuctions();
+export const getMarketplaceHome = cache(async () => {
   const supabase = await createClient();
-  // Server clock, never the browser's: freshness membership is decided here,
-  // in this server query, and the client receives only the result.
-  const recentCutoffIso = recentlyListedCutoffIso(Date.now());
-
-  const [promoted, live, ending, recent, categories] = await Promise.all([
-    supabase
-      .from("auctions")
+  const [{ data, error }, categories] = await Promise.all([
+    supabase.from("auctions")
       .select(CARD_SELECT)
-      .in("status", ["LIVE", "SCHEDULED"])
-      .eq("featured", true)
-      .gt("featured_until", new Date().toISOString())
+      .eq("is_direct", true)
+      .eq("status", "LISTED")
       .is("archived_at", null)
-      .order("featured_until", { ascending: true })
-      .limit(8),
-    supabase
-      .from("auctions")
-      .select(CARD_SELECT)
-      .eq("status", "LIVE")
-      .is("archived_at", null)
-      .order("ends_at", { ascending: true })
-      .limit(12),
-    supabase
-      .from("auctions")
-      .select(CARD_SELECT)
-      .eq("status", "LIVE")
-      .is("archived_at", null)
-      .order("ends_at", { ascending: true })
-      .limit(8),
-    // Recently listed is a merchandising window, not a lifecycle state:
-    // publicly discoverable (LIVE/SCHEDULED) AND stamped within the window,
-    // newest first. Leaving the window changes nothing about the auction -
-    // it stays in Browse, search and the seller's listings.
-    supabase
-      .from("auctions")
-      .select(CARD_SELECT)
-      .in("status", ["LIVE", "SCHEDULED"])
-      .is("archived_at", null)
-      .gt("listed_at", recentCutoffIso)
       .order("listed_at", { ascending: false })
+      .order("id")
       .limit(12),
-    supabase.from("categories").select("id, slug, name, emoji, sort_order").order("sort_order"),
+    getCategories(),
   ]);
 
-  return {
-    promoted: (promoted.data ?? []).map(toCard),
-    live: (live.data ?? []).map(toCard),
-    endingSoon: (ending.data ?? []).map(toCard),
-    recent: (recent.data ?? []).map(toCard),
-    categories: categories.data ?? [],
-    error: live.error?.message ?? null,
-  };
+  return { listings: (data ?? []).map(toCard), categories, error: Boolean(error) };
 });
 
 export type BrowseFilters = {
@@ -192,18 +151,20 @@ export type BrowseFilters = {
 
 const PAGE_SIZE = 24;
 
-export const browseAuctions = cache(async (filters: BrowseFilters) => {
-  // Same reconcile-on-read nudge as the home feed; the throttle inside
-  // `sweepDueAuctions` makes this free in the common case.
-  await sweepDueAuctions();
+export const browseListings = cache(async (filters: BrowseFilters) => {
   const supabase = await createClient();
   const page = Math.max(1, filters.page ?? 1);
 
   let query = supabase
     .from("auctions")
-    .select(CARD_SELECT, { count: "exact" })
-    .neq("status", "DRAFT")
-    .neq("status", "CANCELLED")
+    .select(
+      filters.category
+        ? CARD_SELECT.replace("categories:category_id(", "categories:category_id!inner(")
+        : CARD_SELECT,
+      { count: "exact" }
+    )
+    .eq("is_direct", true)
+    .eq("status", "LISTED")
     .is("archived_at", null);
 
   if (filters.q) {
@@ -214,30 +175,13 @@ export const browseAuctions = cache(async (filters: BrowseFilters) => {
   if (filters.category) query = query.eq("categories.slug", filters.category);
   if (filters.condition) query = query.eq("condition", filters.condition);
   if (filters.location) query = query.ilike("location", `%${filters.location}%`);
-  if (filters.min !== undefined) {
-    query = query.or(`current_bid_minor.gte.${filters.min},and(current_bid_minor.is.null,starting_bid_minor.gte.${filters.min})`);
-  }
-  if (filters.max !== undefined) {
-    query = query.or(`current_bid_minor.lte.${filters.max},and(current_bid_minor.is.null,starting_bid_minor.lte.${filters.max})`);
-  }
+  if (filters.min !== undefined) query = query.gte("starting_bid_minor", filters.min);
+  if (filters.max !== undefined) query = query.lte("starting_bid_minor", filters.max);
 
-  switch (filters.sort) {
-    case "newest":
-      query = query.order("created_at", { ascending: false });
-      break;
-    case "most-bids":
-      query = query.order("bid_count", { ascending: false });
-      break;
-    case "price-asc":
-      query = query.order("current_bid_minor", { ascending: true, nullsFirst: true });
-      break;
-    case "price-desc":
-      query = query.order("current_bid_minor", { ascending: false, nullsFirst: true });
-      break;
-    case "ending-soon":
-    default:
-      query = query.order("ends_at", { ascending: true });
+  if (filters.sort === "price-asc" || filters.sort === "price-desc") {
+    query = query.order("starting_bid_minor", { ascending: filters.sort === "price-asc" });
   }
+  query = query.order("listed_at", { ascending: false }).order("id");
 
   const from = (page - 1) * PAGE_SIZE;
   const { data, count, error } = await query.range(from, from + PAGE_SIZE - 1);
@@ -248,7 +192,7 @@ export const browseAuctions = cache(async (filters: BrowseFilters) => {
   }
 
   return {
-    items: (data ?? []).map(toCard),
+    items: ((data ?? []) as unknown as CardJoin[]).map(toCard),
     total: count ?? 0,
     page,
     pageSize: PAGE_SIZE,
@@ -283,7 +227,7 @@ export const getAuctionDetail = cache(async (id: string) => {
   }
   if (!data) return null;
 
-  const { data: bids } = await supabase
+  const { data: bids } = data.is_direct ? { data: [] } : await supabase
     .from("bids")
     .select(
       `id, amount_minor, currency, created_at, is_winning,
@@ -307,7 +251,7 @@ export const getAuctionDetail = cache(async (id: string) => {
         .eq("user_id", user.id)
         .eq("auction_id", id)
         .maybeSingle(),
-      supabase
+      data.is_direct ? { data: null } : supabase
         .from("bids")
         .select("amount_minor")
         .eq("auction_id", id)
@@ -321,7 +265,7 @@ export const getAuctionDetail = cache(async (id: string) => {
   }
 
   let transaction: TransactionRow | null = null;
-  if (user) {
+  if (user && !data.is_direct) {
     const { data: tx } = await supabase
       .from("transactions")
       .select("*")
@@ -330,7 +274,12 @@ export const getAuctionDetail = cache(async (id: string) => {
     transaction = tx ?? null;
   }
 
+  const contact = data.is_direct
+    ? await supabase.from("listing_contacts").select("phone_e164").eq("auction_id", id).maybeSingle()
+    : null;
+
   return {
+    contactPhone: contact?.data?.phone_e164 as string | undefined,
     auction: data as AuctionRow & {
       categories: { id: number; slug: string; name: string } | null;
       auction_images: Array<{
@@ -386,7 +335,7 @@ export const getBusinessStorefront = cache(async (slug: string) => {
       .from("auctions")
       .select(CARD_SELECT)
       .eq("business_id", business.id)
-      .in("status", ["LIVE", "SCHEDULED"])
+      .in("status", ["LISTED", "LIVE", "SCHEDULED"])
       .is("archived_at", null)
       .order("created_at", { ascending: false })
       .limit(48),
@@ -577,7 +526,7 @@ export const getSelling = cache(async (userId: string) => {
   };
 
   return ((data ?? []) as unknown as Array<
-    AuctionCardData & {
+    CardJoin & {
       winner_id: string | null;
       winning_bid_minor: number | null;
       seller_id: string;
@@ -594,6 +543,7 @@ export const getSelling = cache(async (userId: string) => {
     }
   >).map((item) => ({
     ...item,
+    ...toCard(item),
     transactions: Array.isArray(item.transactions)
       ? item.transactions
       : item.transactions
@@ -778,7 +728,7 @@ export const getProfileByUsername = cache(async (username: string) => {
       .from("auctions")
       .select(CARD_SELECT)
       .eq("seller_id", data.id)
-      .neq("status", "DRAFT")
+      .or("and(is_direct.eq.true,status.eq.LISTED),and(is_direct.eq.false,status.neq.DRAFT)")
       .is("archived_at", null)
       .order("created_at", { ascending: false })
       .limit(12),

@@ -40,6 +40,7 @@ export type BrowseFilterValues = {
   min: string;
   max: string;
   sort: string;
+  location?: string;
 };
 
 export type CategoryOption = {
@@ -61,7 +62,8 @@ export function buildBrowseUrl(values: BrowseFilterValues): string {
   if (min) params.set("min", min);
   const max = values.max.trim();
   if (max) params.set("max", max);
-  params.set("sort", values.sort || "ending-soon");
+  if (values.location?.trim()) params.set("location", values.location.trim());
+  params.set("sort", values.sort || "newest");
   // No `page` here: any filter change resets to page 1 by construction.
   return `/browse?${params.toString()}`;
 }
@@ -162,14 +164,14 @@ export function BrowseFilters({
   // Which of the secondary filters are actually set, so the collapsed panel
   // can say so instead of hiding the fact that results are narrowed.
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const activeFilterCount = [values.category, values.condition, values.min, values.max].filter(
+  const activeFilterCount = [values.category, values.condition, values.min, values.max, values.location].filter(
     Boolean
   ).length;
 
   return (
     <section
       data-testid="browse-filters"
-      aria-label="Filter auctions"
+      aria-label="Filter listings"
       className="space-y-4 rounded-xl border bg-card p-4 shadow-sm sm:p-5"
     >
       <form
@@ -186,6 +188,7 @@ export function BrowseFilters({
             <Label htmlFor="browse-q">Search</Label>
             <Input
               id="browse-q"
+              name="q"
               type="search"
               data-testid="browse-search"
               value={values.q}
@@ -302,6 +305,14 @@ export function BrowseFilters({
           </div>
 
           <div className="space-y-1.5">
+            <Label htmlFor="browse-location">Town or suburb</Label>
+            <Input id="browse-location" name="location" maxLength={80} value={values.location ?? ""} placeholder="e.g. Harare"
+              onChange={(event) => setValues((current) => ({ ...current, location: event.target.value }))}
+              onBlur={() => {
+                if (values.location?.trim() !== (initial.location ?? "")) apply(values);
+              }} />
+          </div>
+          <div className="space-y-1.5">
             <Label htmlFor="browse-sort">Sort by</Label>
             <Select value={values.sort} onValueChange={(value) => patch({ sort: value })}>
               <SelectTrigger
@@ -313,7 +324,7 @@ export function BrowseFilters({
                 <SelectValue placeholder="Sort by" />
               </SelectTrigger>
               <SelectContent>
-                {SORTS.map((option) => (
+                {SORTS.filter(({ value }) => value !== "ending-soon" && value !== "most-bids").map((option) => (
                   <SelectItem key={option.value} value={option.value}>
                     {option.label}
                   </SelectItem>
@@ -371,7 +382,7 @@ export function BrowseFilters({
         <div className="space-y-1">
           <p id="browse-price-hint" className="text-xs text-muted-foreground">
             Prices in dollars, such as 25 or 12.50. Filters by each
-            auction&apos;s current price.
+            asking price.
           </p>
           {priceError && (
             <p

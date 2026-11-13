@@ -118,13 +118,13 @@ export function AuctionCard({
         <div className="mt-auto flex items-end justify-between gap-2 pt-3">
           <div className="min-w-0">
             <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-              {hasBids ? "Current bid" : "Starting bid"}
+              {auction.isDirect ? "Asking price" : hasBids ? "Current bid" : "Starting bid"}
             </p>
             <p
               data-testid="card-price"
               className={cn(
                 "truncate text-lg font-bold tracking-tight",
-                auction.bidCount > 0 ? "text-foreground" : "text-muted-foreground"
+                auction.isDirect || auction.bidCount > 0 ? "text-foreground" : "text-muted-foreground"
               )}
             >
               <Money
@@ -134,11 +134,11 @@ export function AuctionCard({
             </p>
           </div>
 
-          <div className="flex shrink-0 items-center gap-1 text-[11px] text-muted-foreground">
+          {!auction.isDirect && <div className="flex shrink-0 items-center gap-1 text-[11px] text-muted-foreground">
             <Gavel className="size-3" aria-hidden />
             <span data-numeric>{auction.bidCount}</span>
             <span>{auction.bidCount === 1 ? "bid" : "bids"}</span>
-          </div>
+          </div>}
         </div>
 
         {meta && <div className="border-t pt-2 text-[11px]">{meta}</div>}

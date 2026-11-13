@@ -16,7 +16,7 @@ export const metadata: Metadata = {
   alternates: { canonical: "/privacy" },
 };
 
-const LAST_UPDATED = "10 October 2026";
+const LAST_UPDATED = "13 November 2026";
 
 /** Declared once, used for both the headings and the table of contents. */
 const SECTIONS = [
@@ -108,8 +108,8 @@ export default function PrivacyPage() {
             </li>
             <li>
               <strong>Your listings:</strong> item titles, descriptions,
-              category, condition, location, pricing, timing and the photos you
-              upload.
+              category, condition, location, pricing, timing, the photos you upload
+              and any number you choose to publish for buyer enquiries.
             </li>
             <li>
               <strong>Your activity:</strong> bids you place, auctions you
@@ -143,8 +143,7 @@ export default function PrivacyPage() {
 
         <PrivacySection id="public" title="3. What other people can see">
           <p>
-            An auction marketplace only works if bids are public. Other users
-            can see:
+            Marketplace visitors can see:
           </p>
           <ul className="list-disc space-y-2 pl-5">
             <li>
@@ -153,6 +152,11 @@ export default function PrivacyPage() {
             </li>
             <li>the amount and timing of each bid on an auction you can view;</li>
             <li>your public profile page, including your rating summary.</li>
+            <li>
+              The phone number you choose to publish appears on the live listing so buyers
+              can call or use WhatsApp. Marking the listing sold or removing it hides the
+              number from new visitors. People who already saw it may have saved it.
+            </li>
           </ul>
           <p>
             A business storefront&apos;s business name, logo, description and

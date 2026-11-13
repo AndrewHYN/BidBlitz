@@ -19,6 +19,7 @@ describe("isClosed()", () => {
   it("is true for every terminal status", () => {
     expect(isClosed("ENDED")).toBe(true);
     expect(isClosed("SOLD")).toBe(true);
+    expect(isClosed("SOLD_DIRECT")).toBe(true);
     expect(isClosed("UNSOLD")).toBe(true);
     expect(isClosed("CANCELLED")).toBe(true);
   });
@@ -27,6 +28,7 @@ describe("isClosed()", () => {
     expect(isClosed("DRAFT")).toBe(false);
     expect(isClosed("SCHEDULED")).toBe(false);
     expect(isClosed("LIVE")).toBe(false);
+    expect(isClosed("LISTED")).toBe(false);
     expect(isClosed("something-unknown")).toBe(false);
   });
 
@@ -35,6 +37,7 @@ describe("isClosed()", () => {
       "CANCELLED",
       "ENDED",
       "SOLD",
+      "SOLD_DIRECT",
       "UNSOLD",
     ]);
   });
@@ -42,6 +45,7 @@ describe("isClosed()", () => {
 
 describe("isBiddable()", () => {
   it("never allows bidding on DRAFT or terminal auctions", () => {
+    expect(isBiddable("LISTED", null, NOW)).toBe(false);
     expect(isBiddable("DRAFT", iso(60_000), NOW)).toBe(false);
     expect(isBiddable("ENDED", iso(60_000), NOW)).toBe(false);
     expect(isBiddable("SOLD", iso(60_000), NOW)).toBe(false);

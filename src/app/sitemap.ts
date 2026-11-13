@@ -29,7 +29,7 @@ const STATIC_ROUTES: MetadataRoute.Sitemap = [
  * are either withdrawn or held for review — none of them is a landing page a
  * buyer should be sent to.
  */
-const OPEN_STATUSES = ["LIVE", "SCHEDULED"] as const;
+const OPEN_STATUSES = ["LISTED", "LIVE", "SCHEDULED"] as const;
 const COMPLETED_STATUSES = ["SOLD", "ENDED", "UNSOLD"] as const;
 
 /** Per-priority cap: the sitemap must not become a dump of thin listings. */
