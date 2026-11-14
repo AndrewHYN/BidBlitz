@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { normalizeZimbabwePhone } from "@/lib/phone";
 
 /**
  * Every external boundary validates with Zod before it can reach the database.
@@ -143,6 +144,22 @@ export const createAuctionSchema = z.object({
   antiSnipeWindowSeconds: z.number().int().min(0).max(600).default(30),
   antiSnipeExtensionSeconds: z.number().int().min(0).max(600).default(30),
   currency: z.literal("USD").default("USD"),
+});
+
+export const directListingSchema = createAuctionSchema.pick({
+  title: true,
+  description: true,
+  categoryId: true,
+  condition: true,
+  location: true,
+  fulfilmentNotes: true,
+}).extend({
+  fulfilmentMethod: fulfilmentMethodSchema,
+  priceMinor: minorAmount.refine((value) => value >= 100n, "Minimum asking price is $1.00"),
+  contactPhone: z.string().transform(normalizeZimbabwePhone).pipe(
+    z.string({ error: "Enter a valid Zimbabwean phone number." })
+  ),
+  publishContact: z.literal(true, { error: "Allow buyers to see this contact number." }),
 });
 
 export type CreateAuctionInput = z.infer<typeof createAuctionSchema>;

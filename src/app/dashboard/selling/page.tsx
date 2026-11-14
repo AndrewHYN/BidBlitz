@@ -93,7 +93,7 @@ export default async function SellingPage() {
     <div className="space-y-6">
       <PageHeader
         title="My selling"
-        description="Manage drafts, live auctions, completed sales and seller payouts in one place."
+        description="Manage listings and review your sales."
         actions={
           <Button asChild>
             <Link href="/sell">List another item</Link>
@@ -115,7 +115,7 @@ export default async function SellingPage() {
           <EmptyState
             icon={Tag}
             title="You haven’t listed anything yet"
-            description="Create a listing, add photos and start a live auction in a couple of minutes."
+            description="Set an asking price, add photos and let buyers contact you directly."
             action={
               <Button asChild>
                 <Link href="/sell">Create a listing</Link>
@@ -141,7 +141,7 @@ export default async function SellingPage() {
                       meta={
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <span className="text-muted-foreground">
-                            {item.bidCount === 0 ? "No bids yet" : `${item.bidCount} bid${item.bidCount === 1 ? "" : "s"}`}
+                            {item.isDirect ? "Direct sale" : item.bidCount === 0 ? "No bids yet" : `${item.bidCount} bid${item.bidCount === 1 ? "" : "s"}`}
                           </span>
                           {draftHref && (
                             <span className="font-medium text-primary">Manage listing</span>

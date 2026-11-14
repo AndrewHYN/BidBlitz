@@ -344,8 +344,8 @@ export function HeaderBar({
           <Input
             value={term}
             onChange={(e) => setTerm(e.target.value)}
-            placeholder="Search auctions…"
-            aria-label="Search auctions"
+            placeholder="Search listings…"
+            aria-label="Search listings"
             className="pl-9"
           />
         </div>
@@ -471,8 +471,8 @@ export function HeaderBar({
             <Input
               value={term}
               onChange={(e) => setTerm(e.target.value)}
-              placeholder="Search auctions…"
-              aria-label="Search auctions"
+              placeholder="Search listings…"
+              aria-label="Search listings"
               className="pl-9"
             />
           </div>

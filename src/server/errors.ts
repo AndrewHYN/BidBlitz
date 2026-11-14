@@ -22,6 +22,7 @@ export type BidErrorCode =
   | "invalid_state"
   | "image_required"
   | "has_bids"
+  | "listing_contact_required"
   | "rate_limited"
   | "account_banned"
   | "below_minimum_price"
@@ -63,6 +64,7 @@ const MESSAGES: Record<BidErrorCode, string> = {
   invalid_state: "That action isn't available right now.",
   image_required: "Add at least one photo before publishing.",
   has_bids: "People have bid on this auction, so it can't be cancelled.",
+  listing_contact_required: "Add a public contact number before publishing.",
   rate_limited: "Too many attempts. Wait a moment and try again.",
   // Raised by the auctions minimum-price trigger: the payment provider
   // (Linkwa) will not process anything under $1.00, so a lower starting

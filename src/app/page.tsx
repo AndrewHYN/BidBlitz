@@ -1,130 +1,42 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { Gavel, TriangleAlert } from "lucide-react";
+import { Tag, TriangleAlert } from "lucide-react";
 
-import { getHomeFeed } from "@/server/queries";
+import { getMarketplaceHome } from "@/server/queries";
+import { AuctionGrid } from "@/components/auction/auction-card";
 import { EmptyState } from "@/components/auction/page-header";
 import { Button } from "@/components/ui/button";
 import { HomeHero } from "@/components/home/home-hero";
 import { CategoryChips } from "@/components/home/category-chips";
-import { AuctionRail } from "@/components/home/auction-rail";
 
-/**
- * The homepage carries the site's search positioning explicitly: the title is
- * absolute so the "%s · BidBlitz" template cannot append the brand twice, and
- * the description says what a searcher typed (online auctions, Zimbabwe)
- * without the visible hero having to read like a keyword list.
- */
 export const metadata: Metadata = {
-  title: { absolute: "Online Auctions in Zimbabwe | BidBlitz" },
-  description:
-    "Buy and sell through live online auctions in Zimbabwe on BidBlitz. List an item, bid in real time, and win when the clock runs out. One clear 5% seller fee on auctions that sell.",
+  title: { absolute: "Buy and Sell in Zimbabwe | BidBlitz Marketplace" },
   alternates: { canonical: "/" },
 };
 
-/**
- * Discovery home: hero + search, category chips, then the three rails the
- * buyer journey starts from — Ending soon, Live now, Recently listed. The
- * feed is one server round trip; each rail falls back to its own empty state
- * rather than leaving a blank section.
- */
 export default async function HomePage() {
-  const feed = await getHomeFeed();
-
-  const marketplaceEmpty =
-    feed.promoted.length === 0 &&
-    feed.live.length === 0 &&
-    feed.endingSoon.length === 0 &&
-    feed.recent.length === 0;
+  const { listings, categories, error } = await getMarketplaceHome();
 
   return (
-    <div className="page-container space-y-10 py-10 sm:py-14">
-      <div className="space-y-6">
+    <div className="page-container space-y-8 py-7 sm:py-12">
+      <div className="space-y-5">
         <HomeHero />
-        <CategoryChips categories={feed.categories} />
+        <CategoryChips categories={categories} />
       </div>
-
-      {feed.error ? (
-        <EmptyState
-          icon={TriangleAlert}
-          title="We couldn't load auctions right now"
-          description="The marketplace is briefly unavailable. Refresh the page to try again."
-          action={
-            <Button asChild variant="outline">
-              <Link href="/">Refresh</Link>
-            </Button>
-          }
-        />
-      ) : marketplaceEmpty ? (
-        /* A marketplace with nothing in it must not look broken, and must not
-           look like it is hiding a catalogue either. One honest panel with two
-           working ways forward, instead of three rails saying the same thing. */
-        <EmptyState
-          icon={Gavel}
-          title="No auctions are listed yet"
-          description={
-            "BidBlitz is open, but no one has listed an item yet. " +
-            "Sellers can publish an auction in a couple of minutes, and it appears here " +
-            "the moment it goes live. If you come back later, anything currently open for " +
-            "bidding is on this page and under Browse."
-          }
-          action={
-            <div className="flex flex-wrap items-center justify-center gap-3">
-              <Button asChild>
-                <Link href="/sell">List an item</Link>
-              </Button>
-              <Button asChild variant="outline">
-                <Link href="/browse">Browse auctions</Link>
-              </Button>
-            </div>
-          }
-        />
+      {error ? (
+        <EmptyState icon={TriangleAlert} title="We couldn’t load listings" description="Refresh the page to try again."
+          action={<Button asChild variant="outline"><Link href="/">Refresh</Link></Button>} />
+      ) : listings.length === 0 ? (
+        <EmptyState icon={Tag} title="No listings yet" description="Have something to sell? Post it and let buyers contact you directly."
+          action={<Button asChild><Link href="/sell">List an item</Link></Button>} />
       ) : (
-        <div className="space-y-10">
-          {feed.promoted.length > 0 && (
-            <AuctionRail
-              title="Promoted"
-              description="Extra visibility, same auction rules. Promotion affects placement, never bidding."
-              auctions={feed.promoted}
-              testid="home-promoted"
-              emptyTitle="No promoted auctions"
-            />
-          )}
-          <AuctionRail
-            title="Ending soon"
-            description="The clock is running. These close first."
-            auctions={feed.endingSoon}
-            testid="home-ending-soon"
-            emptyTitle="Nothing is ending right now"
-            emptyDescription="When auctions enter their final stretch they'll line up here."
-          />
-          <AuctionRail
-            title="Live now"
-            description="Bidding is open on these auctions."
-            auctions={feed.live}
-            testid="home-live"
-            emptyTitle="No live auctions right now"
-            emptyDescription="Nothing is open for bidding at this moment. New auctions appear here as soon as they go live."
-            emptyAction={
-              <Button asChild variant="outline">
-                <Link href="/browse">Browse everything</Link>
-              </Button>
-            }
-          />
-          <AuctionRail
-            title="Recently listed"
-            description="Fresh listings, newest first."
-            auctions={feed.recent}
-            testid="home-recent"
-            emptyTitle="No listings yet"
-            emptyDescription="Be the first to list something. It will appear here."
-            emptyAction={
-              <Button asChild>
-                <Link href="/sell">List an item</Link>
-              </Button>
-            }
-          />
-        </div>
+        <section aria-labelledby="latest-listings" className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 id="latest-listings" className="text-xl font-bold tracking-tight">Latest listings</h2>
+            <Link className="text-sm font-semibold text-primary hover:underline" href="/browse">View all listings</Link>
+          </div>
+          <AuctionGrid items={listings} />
+        </section>
       )}
     </div>
   );

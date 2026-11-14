@@ -1,15 +1,13 @@
+import Image from "next/image";
 import Link from "next/link";
-import { Mail, Phone } from "lucide-react";
+import { Banknote, Mail, Phone } from "lucide-react";
 import { BrandMark } from "@/components/brand-mark";
-import { isPaymentProviderConfigured, paymentProviderDisplayName } from "@/server/payments/config";
 
 const COLUMNS = [
   {
     title: "Marketplace",
     links: [
-      { label: "Browse auctions", href: "/browse" },
-      { label: "Ending soon", href: "/browse?sort=ending-soon" },
-      { label: "Newest", href: "/browse?sort=newest" },
+      { label: "Browse listings", href: "/browse" },
       { label: "Sell an item", href: "/sell" },
       { label: "How it works", href: "/how-it-works" },
       { label: "FAQ", href: "/faq" },
@@ -18,103 +16,55 @@ const COLUMNS = [
   {
     title: "Your account",
     links: [
-      { label: "Your home", href: "/dashboard" },
+      { label: "Dashboard", href: "/dashboard" },
       { label: "Watchlist", href: "/dashboard/watchlist" },
-      { label: "My bids", href: "/dashboard/buying" },
       { label: "My selling", href: "/dashboard/selling" },
       { label: "Invite friends", href: "/referrals" },
-      { label: "Activity & payments", href: "/dashboard/transactions" },
     ],
   },
   {
-    title: "Trust & safety",
+    title: "Support",
     links: [
-      { label: "Bidding rules", href: "/help/rules" },
-      { label: "How fees work", href: "/help/fees" },
-      { label: "Terms of use", href: "/terms" },
-      { label: "Privacy policy", href: "/privacy" },
       { label: "Help & contact", href: "/help" },
       { label: "Support tickets", href: "/support/tickets" },
+      { label: "Terms of use", href: "/terms" },
+      { label: "Privacy policy", href: "/privacy" },
       { label: "About BidBlitz", href: "/about" },
     ],
   },
 ] as const;
 
-export function SiteFooter() {
-  // Read once, server-side: the footer must never claim a state the
-  // deployment does not have. With a provider configured the old
-  // "no provider" sentence would be false, so both branches are kept honest.
-  const paymentConfigured = isPaymentProviderConfigured();
-  const providerName = paymentProviderDisplayName();
+const WALLETS = [
+  { name: "EcoCash", image: "/brand/ecocash.png", width: 225, height: 76, url: "https://ecocash.co.zw/" },
+  { name: "O’mari", image: "/brand/omari.png", width: 294, height: 171, url: "https://omari.co.zw/" },
+  { name: "InnBucks", image: "/brand/innbucks.png", width: 776, height: 312, url: "https://innbucks.co.zw/" },
+] as const;
 
+export function SiteFooter() {
   return (
     <footer className="mt-auto border-t bg-card/50">
-      <div className="page-container grid gap-10 py-12 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="space-y-4">
-          <Link href="/" aria-label="BidBlitz" className="flex items-center gap-2 font-semibold">
+      <div className="page-container grid gap-8 py-10 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="space-y-3">
+          <Link href="/" aria-label="BidBlitz" className="inline-flex items-center gap-2 font-semibold">
             <BrandMark size={28} />
             <span aria-hidden>BidBlitz</span>
           </Link>
-          <p className="max-w-xs text-sm text-muted-foreground">
-            BidBlitz is a Zimbabwean online auction marketplace. Live auctions
-            with real closing times: sellers list items, buyers compete bid by
-            bid, and the highest bidder when the clock runs out wins.
-          </p>
-
-          <div className="space-y-1.5 text-sm">
-            <p className="font-medium">Contact</p>
-            <p className="flex items-center gap-2 text-muted-foreground">
-              <Mail className="size-4 shrink-0" aria-hidden />
-              <a
-                href="mailto:support@bidblitz.co.zw"
-                className="-my-1 inline-block py-1 transition-colors hover:text-foreground"
-              >
-                support@bidblitz.co.zw
-              </a>
-            </p>
-            <p className="flex items-center gap-2 text-muted-foreground">
-              <Phone className="size-4 shrink-0" aria-hidden />
-              <a
-                href="tel:0789335669"
-                // Same target-size fix as the nav columns: these measured 20px
-                // tall on a 390px viewport. A tap target you have to hit twice is
-                // a support call.
-                className="-my-1 inline-block py-1 transition-colors hover:text-foreground"
-              >
-                0789335669
-              </a>
-            </p>
-          </div>
+          <p className="max-w-xs text-sm text-muted-foreground">Buy and sell locally across Zimbabwe.</p>
+          <a href="mailto:support@bidblitz.co.zw" className="flex items-center gap-2 py-1 text-sm text-muted-foreground hover:text-foreground">
+            <Mail className="size-4 shrink-0" aria-hidden /> support@bidblitz.co.zw
+          </a>
+          <a href="tel:+263789335669" className="flex items-center gap-2 py-1 text-sm text-muted-foreground hover:text-foreground">
+            <Phone className="size-4 shrink-0" aria-hidden /> +263 789 335 669
+          </a>
         </div>
 
-        {COLUMNS.map((col) => (
-          <nav key={col.title} aria-label={col.title} className="space-y-3">
-            {/* An `h2`, not an `h3`. The footer columns are the last section of
-                every page, and they were the only headings on the page, so every
-                single page had a level skipped: `h1` in the content, then `h3`
-                here, with no `h2` between. That was measured on all twelve
-                public pages, not spotted in one. The visual size is unchanged —
-                only the level is corrected, so a screen reader navigating by
-                heading gets a proper outline of the page. */}
-            <h2 className="text-sm font-medium">{col.title}</h2>
+        {COLUMNS.map((column) => (
+          <nav key={column.title} aria-label={column.title} className="space-y-2">
+            <h2 className="text-sm font-semibold">{column.title}</h2>
             <ul className="space-y-1">
-              {col.links.map((l) => (
-                <li key={l.href}>
-                  <Link
-                    href={l.href}
-                    // `inline-block` plus vertical padding grows the hit area to
-                    // ~30px tall for a 14px line. Measured on the live site at
-                    // 390px: these rendered 18px tall, which fails WCAG 2.5.8
-                    // Target Size (Minimum, AA: 24x24 CSS px) and is a genuine
-                    // mis-tap risk in a phone browser. The negative margin
-                    // absorbs the extra padding so the column keeps the same
-                    // visual rhythm, and the hover background is dropped
-                    // deliberately: it would paint a block behind text that
-                    // must not look like a button.
-                    className="-my-1 inline-block py-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
-                  >
-                    {l.label}
-                  </Link>
+              {column.links.map((link) => (
+                <li key={link.href}>
+                  <Link href={link.href} className="inline-block py-1 text-sm text-muted-foreground hover:text-foreground">{link.label}</Link>
                 </li>
               ))}
             </ul>
@@ -123,12 +73,31 @@ export function SiteFooter() {
       </div>
 
       <div className="border-t">
-        <div className="page-container flex flex-col gap-2 py-6 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-          <p>© {new Date().getFullYear()} BidBlitz. All prices are in US dollars.</p>
+        <div className="page-container grid gap-4 py-5 text-sm lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+          <div className="space-y-1">
+            <h2 className="font-semibold">Pay the seller directly</h2>
+            <p className="text-muted-foreground">Agree on cash or mobile money with the seller. BidBlitz does not process these payments.</p>
+          </div>
+          <ul className="flex flex-wrap items-center gap-2" aria-label="Cash and mobile-wallet options">
+            <li className="inline-flex h-10 items-center gap-2 rounded-md border px-3 font-medium"><Banknote className="size-4" aria-hidden /> Cash</li>
+            {WALLETS.map(({ name, image, width, height, url }) => (
+              <li key={name}>
+                <a href={url} className="flex h-10 w-24 items-center justify-center rounded-md border bg-white p-1.5 transition-colors hover:border-primary">
+                  <Image src={image} alt={name} width={width} height={height} className="h-auto max-h-7 w-auto max-w-full object-contain" />
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div className="page-container flex flex-wrap items-center justify-between gap-3 border-t py-4 text-xs text-muted-foreground">
+          <p>© {new Date().getFullYear()} BidBlitz. Prices are shown in US dollars.</p>
+          <a href="https://www.econet.co.zw/" className="inline-flex min-h-8 items-center gap-2 rounded-md border bg-white px-2 text-zinc-700 hover:border-primary">
+            <span>Mobile network</span>
+            <Image src="/brand/econet.png" alt="Econet Wireless" width={195} height={43} className="h-4 w-auto" />
+          </a>
           <p>
-            {paymentConfigured
-              ? `Payments are processed by ${providerName}. A sale is marked paid only once ${providerName} confirms it.`
-              : "No payment provider is connected yet, so no money changes hands through BidBlitz."}
+            <a href="https://commons.wikimedia.org/wiki/File:O%E2%80%99mari.png" className="underline underline-offset-2">O’mari artwork by Old Mutual</a>
+            {" · "}<a href="https://creativecommons.org/licenses/by-sa/4.0/" className="underline underline-offset-2">CC BY-SA 4.0</a>
           </p>
         </div>
       </div>

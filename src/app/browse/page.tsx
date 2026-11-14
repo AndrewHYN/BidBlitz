@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { SearchX, TriangleAlert } from "lucide-react";
 
-import { browseAuctions, getCategories } from "@/server/queries";
+import { browseListings, getCategories } from "@/server/queries";
 import { browseParamsSchema } from "@/lib/validation";
 import { AuctionGrid } from "@/components/auction/auction-card";
 import { EmptyState, PageHeader } from "@/components/auction/page-header";
@@ -14,9 +14,9 @@ import {
 import { BrowsePagination } from "@/components/browse/browse-pagination";
 
 export const metadata: Metadata = {
-  title: "Browse auctions",
+  title: "Browse listings",
   description:
-    "Filter live and upcoming auctions by keyword, category, condition and price. Every filter lands in the URL, so results are shareable.",
+    "Find items for sale across Zimbabwe and contact sellers directly.",
   alternates: { canonical: "/browse" },
 };
 
@@ -46,7 +46,6 @@ function parsePage(value: string | undefined): number {
  */
 function parseFilters(flat: Record<string, string>): {
   values: BrowseFilterValues;
-  location: string | undefined;
 } {
   let parsed = browseParamsSchema.safeParse(flat);
   if (!parsed.success) {
@@ -66,10 +65,9 @@ function parseFilters(flat: Record<string, string>): {
       condition: filters.condition ?? "",
       min: filters.min === undefined ? "" : String(filters.min),
       max: filters.max === undefined ? "" : String(filters.max),
-      sort: filters.sort,
+      sort: filters.sort === "ending-soon" || filters.sort === "most-bids" ? "newest" : filters.sort,
+      location: filters.location ?? "",
     },
-    // No control in the bar yet, but a shared `?location=` URL must still filter.
-    location: filters.location || undefined,
   };
 }
 
@@ -79,7 +77,7 @@ export default async function BrowsePage({
   searchParams: Promise<RawSearchParams>;
 }) {
   const flat = flatten(await searchParams);
-  const { values, location } = parseFilters(flat);
+  const { values } = parseFilters(flat);
   const page = parsePage(flat.page);
 
   /**
@@ -94,17 +92,17 @@ export default async function BrowsePage({
       values.condition ||
       values.min ||
       values.max ||
-      location
+      values.location
   );
 
   const [result, categories] = await Promise.all([
-    browseAuctions({
+    browseListings({
       q: values.q || undefined,
       category: values.category || undefined,
       condition: values.condition || undefined,
       min: values.min === "" ? undefined : Number(values.min),
       max: values.max === "" ? undefined : Number(values.max),
-      location,
+      location: values.location || undefined,
       sort: values.sort,
       page,
     }),
@@ -119,8 +117,8 @@ export default async function BrowsePage({
   return (
     <div className="page-container py-10 sm:py-14">
       <PageHeader
-        title="Browse auctions"
-        description="Find live and upcoming auctions by category, condition and price."
+        title="Browse listings"
+        description="Find items by category, location, condition and asking price."
       />
 
       <div className="mt-6">
@@ -138,7 +136,7 @@ export default async function BrowsePage({
             never seen. The count is the user's first indication of whether their
             search worked, so it is worth being grammatically correct. */}
         <p data-testid="browse-result-count" className="text-sm text-muted-foreground">
-          {result.total} {result.total === 1 ? "auction" : "auctions"}
+          {result.total} {result.total === 1 ? "listing" : "listings"}
         </p>
       </div>
 
@@ -146,7 +144,7 @@ export default async function BrowsePage({
         <div className="mt-6">
           <EmptyState
             icon={TriangleAlert}
-            title="We couldn't load auctions"
+            title="We couldn't load listings"
             description="Something went wrong fetching results. Give it another try in a moment."
             action={
               <Button asChild variant="outline">
@@ -159,11 +157,11 @@ export default async function BrowsePage({
         <div className="mt-6">
           <EmptyState
             icon={SearchX}
-            title={hasFilters ? "No auctions match those filters" : "No auctions are listed yet"}
+            title={hasFilters ? "No listings match those filters" : "No listings yet"}
             description={
               hasFilters
                 ? "Try a wider price range or a different category, or clear everything and start over."
-                : "BidBlitz is open, but no one has listed an item yet. Auctions appear here the moment a seller publishes one, and you can list the first one yourself."
+                : "Published items will appear here. You can list something to sell today."
             }
             action={
               hasFilters ? (

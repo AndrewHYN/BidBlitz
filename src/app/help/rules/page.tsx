@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/auction/page-header";
 import { DocumentPage } from "@/components/document-page";
 
 export const metadata: Metadata = {
-  title: "Bidding rules",
+  title: "Marketplace rules",
   description:
     "How bidding works on BidBlitz: bids are final, the servers decide the outcome, and anti-snipe protection guards the ending.",
   alternates: { canonical: "/help/rules" },
@@ -69,8 +69,8 @@ const MARKETPLACE_RULES = [
     body: "Photos must show the actual item, and the description must match its condition, flaws included. A listing that misleads buyers on purpose is fraud, not marketing, and it is taken down.",
   },
   {
-    title: "Keep payment on BidBlitz",
-    body: "Winning bids are paid through the sale's transaction. Asking a buyer to pay elsewhere, or offering to complete a sale off the site, ends the listing and can end the account.",
+    title: "Agree on payment and handover",
+    body: "For fixed-price listings, buyers pay sellers directly. Confirm the price and payment method before handover. For an existing auction sale, contact support through your transaction page.",
   },
   {
     title: "First listings are checked before they go public",
@@ -107,8 +107,8 @@ export default function HelpRulesPage() {
     <div data-testid="help-rules-page">
       <DocumentPage>
         <PageHeader
-          title="Bidding rules"
-          description="The rules the auction engine enforces on every single bid."
+          title="Marketplace rules"
+          description="Rules for marketplace listings and previous auctions."
         />
 
         {/*

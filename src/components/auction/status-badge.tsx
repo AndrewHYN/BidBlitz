@@ -32,6 +32,7 @@ export type BadgeTone = NonNullable<VariantProps<typeof badgeVariants>["tone"]>;
 
 export function statusTone(status: string): BadgeTone {
   switch (status) {
+    case "LISTED":
     case "LIVE":
       return "live";
     case "SCHEDULED":
@@ -44,6 +45,7 @@ export function statusTone(status: string): BadgeTone {
       return "scheduled";
     case "PENDING_REVIEW":
       return "draft";
+    case "SOLD_DIRECT":
     case "SOLD":
       return "sold";
     case "UNSOLD":
@@ -59,6 +61,8 @@ const STATUS_LABELS: Record<string, string> = {
   DRAFT: "Draft",
   SCHEDULED: "Scheduled",
   LIVE: "Live",
+  LISTED: "Available",
+  SOLD_DIRECT: "Sold",
   ENDED: "Ended",
   SOLD: "Sold",
   UNSOLD: "No bids",

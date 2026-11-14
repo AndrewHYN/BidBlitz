@@ -81,7 +81,7 @@ export default async function DashboardOverviewPage() {
   });
 
   const activeListings = selling.filter(
-    (item) => item.status === "LIVE" || item.status === "SCHEDULED"
+    (item) => item.status === "LISTED" || item.status === "LIVE" || item.status === "SCHEDULED"
   ).length;
 
   const latestTransactions = transactions.slice(0, 3);
@@ -121,11 +121,11 @@ export default async function DashboardOverviewPage() {
     <div className="space-y-8">
       <PageHeader
         title="Your BidBlitz"
-        description="See what needs attention first, then jump back into bidding or selling."
+        description="Manage listings, saved items and previous auction activity."
         actions={
           <>
             <Button asChild variant="outline">
-              <Link href="/browse">Browse auctions</Link>
+              <Link href="/browse">Browse listings</Link>
             </Button>
             <Button asChild>
               <Link href="/sell">Sell an item</Link>
@@ -135,11 +135,11 @@ export default async function DashboardOverviewPage() {
       />
 
       <section aria-labelledby="dashboard-payout-guide" className="rounded-xl border bg-card p-4 shadow-sm sm:p-5">
-        <h2 id="dashboard-payout-guide" className="flex items-center gap-2 font-semibold"><Wallet className="size-5 text-primary" aria-hidden />How you get paid when you sell</h2>
-        <p className="mt-2 text-sm text-muted-foreground">Your seller payouts go to your SmileCash wallet through Linkwa. Register with SmileCash if you don’t have a wallet, then connect your existing wallet before publishing an item.</p>
-        <p className="mt-2 text-sm text-muted-foreground">You receive 95% of the sale after buyer-confirmed handover and payment checks; BidBlitz keeps 5%. Provider and wallet fees may also apply. Buying only? You don’t need SmileCash.</p>
-        <div className="mt-4 flex flex-wrap gap-2"><Button asChild variant="outline"><Link href="/settings/payouts">Set up or review my payout wallet</Link></Button>
-          <Button asChild variant="outline"><Link href="/dashboard/account">View my sales account</Link></Button></div>
+        <h2 id="dashboard-payout-guide" className="flex items-center gap-2 font-semibold"><Wallet className="size-5 text-primary" aria-hidden />Get paid directly</h2>
+        <p className="mt-2 text-sm text-muted-foreground">For fixed-price listings, agree on cash or mobile money with the buyer and confirm payment before handover.</p>
+        <p className="mt-2 text-sm text-muted-foreground">When the item sells, mark it sold in My selling.</p>
+        <div className="mt-4 flex flex-wrap gap-2"><Button asChild variant="outline"><Link href="/dashboard/selling">Manage listings</Link></Button>
+          <Button asChild variant="outline"><Link href="/dashboard/account">Previous sales account</Link></Button></div>
       </section>
 
       {outbid.length > 0 && (
@@ -194,14 +194,14 @@ export default async function DashboardOverviewPage() {
         <EmptyState
           icon={Wallet}
           title="Nothing here yet"
-          description="List something to sell, or browse live auctions to place your first bid."
+          description="List something to sell or browse items for sale."
           action={
             <div className="flex flex-wrap justify-center gap-2">
               <Button asChild>
                 <Link href="/sell">Start selling</Link>
               </Button>
               <Button asChild variant="outline">
-                <Link href="/browse">Browse auctions</Link>
+                <Link href="/browse">Browse listings</Link>
               </Button>
             </div>
           }

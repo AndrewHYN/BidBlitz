@@ -30,6 +30,7 @@ export function PublishButton({
   imageCount,
   hasFulfilment,
   payoutReady,
+  isDirect = false,
   status,
   endsAt,
 }: {
@@ -38,6 +39,7 @@ export function PublishButton({
   imageCount: number;
   hasFulfilment: boolean;
   payoutReady: boolean;
+  isDirect?: boolean;
   status: string;
   endsAt: string | null;
 }) {
@@ -51,7 +53,7 @@ export function PublishButton({
   // share controls for a listing nobody else can see. The returned outcome is
   // the truth from the moment it arrives and survives the refresh.
   const [outcome, setOutcome] = useState<string | null>(null);
-  const effective = outcome ?? status;
+  const effective = status === "DRAFT" ? outcome ?? status : status;
 
   function handlePublish() {
     setError(null);
@@ -69,8 +71,8 @@ export function PublishButton({
             description: "The team checks first listings before they go public.",
           });
         } else {
-          toast.success("Your auction is live", {
-            description: "Share it to get your first bids in.",
+          toast.success(isDirect ? "Your listing is live" : "Your auction is live", {
+            description: isDirect ? "Buyers can now contact you directly." : "Share it to get your first bids in.",
           });
         }
         router.refresh();
@@ -100,7 +102,7 @@ export function PublishButton({
   }
 
   if (effective !== "DRAFT") {
-    const label = isClosed(effective)
+    const label = effective === "SOLD_DIRECT" ? "Marked as sold" : isDirect && effective === "CANCELLED" ? "Listing removed" : isClosed(effective)
       ? effective === "CANCELLED"
         ? "This auction was cancelled"
         : "This auction is closed"
@@ -110,7 +112,7 @@ export function PublishButton({
           ? "Paused by BidBlitz"
           : "Live now";
 
-    const shareable = effective === "LIVE" || effective === "SCHEDULED";
+    const shareable = effective === "LISTED" || effective === "LIVE" || effective === "SCHEDULED";
 
     return (
       <div className="space-y-3" data-testid="publish-success">
@@ -127,12 +129,12 @@ export function PublishButton({
         )}
         {shareable && (
           <p className="text-sm text-muted-foreground">
-            Share your auction to get the first bids in.
+            {isDirect ? "Share your listing with buyers." : "Share your auction to get the first bids in."}
           </p>
         )}
         <div className="flex flex-wrap items-center gap-2">
           <Button asChild variant="outline" size="sm">
-            <Link href={`/auction/${auctionId}`}>View the live listing</Link>
+            <Link href={`/auction/${auctionId}`}>View listing</Link>
           </Button>
           {shareable && <ShareButton auctionId={auctionId} title={title} size="sm" />}
         </div>
@@ -142,7 +144,8 @@ export function PublishButton({
 
   const blockedByImage = imageCount < 1;
   const blockedByFulfilment = !hasFulfilment;
-  const blockedByPayout = !payoutReady;
+  const blockedByPayout = !isDirect && !payoutReady;
+  const publishLabel = isDirect ? "Publish listing" : "Publish auction";
   const blocked = blockedByImage || blockedByFulfilment || blockedByPayout;
 
   return (
@@ -158,15 +161,17 @@ export function PublishButton({
         data-testid="publish-button"
       >
         <Rocket className="size-4" aria-hidden />
-        Publish auction
+        {publishLabel}
       </Button>
 
       <ConfirmDialog
         open={confirmOpen}
         onOpenChange={setConfirmOpen}
-        title="Publish this auction?"
-        description="Bidding starts immediately. Your terms are locked from that moment: price, bid increment, duration and the closing time can't be changed afterwards."
-        confirmLabel="Publish auction"
+        title={isDirect ? "Publish this listing?" : "Publish this auction?"}
+        description={isDirect
+          ? "Once approved, your item and contact number become public. Buyers will contact and pay you directly."
+          : "Bidding starts immediately. The price, bid increment, duration and closing time are locked."}
+        confirmLabel={publishLabel}
         cancelLabel="Not yet"
         confirmVariant="default"
         confirmTestId="publish-confirm"

@@ -9,9 +9,10 @@ import { LiveStatus } from "@/components/auction/live-status";
 import { Money } from "@/components/auction/money";
 import { feePercentLabel } from "@/lib/money";
 import { ConditionBadge } from "@/components/auction/status-badge";
-import { DURATIONS, conditionLabels } from "@/lib/validation";
+import { DURATIONS, conditionLabels, fulfilmentMethodLabels } from "@/lib/validation";
 import { isClosed } from "@/lib/auction-status";
 import { ImageUploader } from "@/components/sell/image-uploader";
+import { CloseDirectListing } from "@/components/sell/close-direct-listing";
 import { PublishButton } from "@/components/sell/publish-button";
 import { FulfilmentEditor } from "@/components/sell/fulfilment-editor";
 import { CancelAuctionButton } from "@/components/sell/cancel-auction-button";
@@ -30,7 +31,7 @@ import { PromotionRequest } from "@/components/sell/promotion-request";
 
 export const metadata: Metadata = {
   title: "Finish your listing",
-  description: "Add photos, review the terms and publish your BidBlitz auction.",
+  description: "Add photos, review your listing and publish on BidBlitz.",
   robots: { index: false, follow: false },
 };
 
@@ -56,6 +57,54 @@ export default async function SellDraftPage({
   if (!detail) notFound();
   const { auction } = detail;
   if (auction.seller_id !== user.id) notFound();
+  if (auction.is_direct) {
+    const images = [...auction.auction_images]
+      .sort((a, b) => a.position - b.position)
+      .flatMap((image) => {
+        const url = imageUrlFor(image.storage_path);
+        return url ? [{ key: image.id, storagePath: image.storage_path, url }] : [];
+      });
+    const isDraft = auction.status === "DRAFT";
+
+    return (
+      <div className="page-container py-8 sm:py-12">
+        <PageHeader title={auction.title}
+          description={isDraft ? "Add a photo and review what buyers will see." : "Manage your listing and share it with buyers."}
+          actions={<Link href="/dashboard/selling" className="inline-flex items-center gap-2 text-sm font-medium underline"><ArrowLeft className="size-4" aria-hidden /> My selling</Link>} />
+        <div className="mt-6 grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,24rem)]">
+          <div className="space-y-5">
+            <section className="space-y-3 rounded-xl border bg-card p-5" aria-labelledby="direct-details">
+              <h2 id="direct-details" className="font-semibold">Listing details</h2>
+              <p className="break-words whitespace-pre-line text-sm text-muted-foreground">{auction.description}</p>
+              <dl className="grid grid-cols-2 gap-4 text-sm">
+                <div><dt className="text-muted-foreground">Asking price</dt><dd className="font-medium"><Money minor={auction.starting_bid_minor} currency={auction.currency} /></dd></div>
+                <div><dt className="text-muted-foreground">Location</dt><dd className="break-words font-medium">{auction.location}</dd></div>
+                <div><dt className="text-muted-foreground">Public contact number</dt><dd className="font-medium">{detail.contactPhone ?? "Unavailable"}</dd></div>
+                <div><dt className="text-muted-foreground">Handover</dt><dd className="font-medium">{auction.fulfilment_method ? fulfilmentMethodLabels[auction.fulfilment_method] : "Choose handover"}</dd></div>
+              </dl>
+              {auction.fulfilment_notes && <p className="break-words text-sm text-muted-foreground">{auction.fulfilment_notes}</p>}
+            </section>
+            {isDraft && <section className="space-y-3 rounded-xl border bg-card p-5" aria-labelledby="direct-photos">
+              <h2 id="direct-photos" className="font-semibold">Listing photos</h2>
+              <p className="text-sm text-muted-foreground">Add at least one photo of the actual item.</p>
+              <ImageUploader auctionId={id} images={images} />
+            </section>}
+          </div>
+          <div className="space-y-5">
+            <section className="space-y-4 rounded-xl border bg-card p-5" aria-labelledby="direct-publish">
+              <h2 id="direct-publish" className="font-semibold">Listing status</h2>
+              <PublishButton auctionId={id} title={auction.title} imageCount={images.length} hasFulfilment={Boolean(auction.fulfilment_method)}
+                payoutReady={false} isDirect status={auction.status} endsAt={null} />
+              {isDraft && <DeleteDraftButton auctionId={id} />}
+              {auction.status === "PENDING_REVIEW" && <WithdrawReviewButton auctionId={id} />}
+            </section>
+            {auction.status === "LISTED" && <CloseDirectListing auctionId={id} />}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const [feeBps, serverNowResult, payoutSetupResult, paymentsEnabled] = await Promise.all([
     getFeeBps(),
     supabase.rpc("server_now"),

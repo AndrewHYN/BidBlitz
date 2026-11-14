@@ -8,12 +8,14 @@
 
 import { revalidatePath } from "next/cache";
 import { randomUUID } from "node:crypto";
+import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createServerRealtime } from "@/lib/realtime/supabase";
 import {
   CANCELLATION_REASONS,
   createAuctionSchema,
+  directListingSchema,
   fulfilmentMethodSchema,
   publishAuctionSchema,
 } from "@/lib/validation";
@@ -130,6 +132,85 @@ export async function createAuctionAction(input: unknown): Promise<
 
   revalidatePath("/sell");
   return { ok: true, auctionId: data.id as string };
+}
+
+export async function createDirectListingAction(input: unknown): Promise<
+  ActionResult<{ auctionId: string }>
+> {
+  const parsed = directListingSchema.safeParse(input);
+  if (!parsed.success) {
+    const fieldErrors: Record<string, string[]> = {};
+    for (const issue of parsed.error.issues) {
+      const key = issue.path[0]?.toString() ?? "_";
+      (fieldErrors[key] ??= []).push(issue.message);
+    }
+    return {
+      ok: false,
+      rejection: { code: "invalid_input", message: "Please fix the highlighted fields." },
+      fieldErrors,
+    };
+  }
+
+  const { supabase, user } = await requireUser();
+  if (!user) {
+    return { ok: false, rejection: { code: "not_authenticated", message: "Sign in to sell." } };
+  }
+
+  const budget = rateLimit(
+    `auction:${user.id}`,
+    AUCTION_CREATE_LIMIT.limit,
+    AUCTION_CREATE_LIMIT.windowMs
+  );
+  if (!budget.allowed) {
+    return { ok: false, rejection: { code: "rate_limited", message: "Wait a minute before creating another listing." } };
+  }
+
+  const listing = parsed.data;
+  const { data, error } = await supabase.rpc("create_direct_listing", {
+    p_title: listing.title,
+    p_description: listing.description,
+    p_category_id: listing.categoryId,
+    p_condition: listing.condition,
+    p_location: listing.location,
+    p_fulfilment_method: listing.fulfilmentMethod,
+    p_fulfilment_notes: listing.fulfilmentNotes || null,
+    p_price_minor: Number(listing.priceMinor),
+    p_phone: listing.contactPhone,
+  });
+  if (error) {
+    return { ok: false, rejection: normalizeEngineError({ message: error.message, hint: error.hint }) };
+  }
+
+  revalidatePath("/dashboard/selling");
+  return { ok: true, auctionId: data as string };
+}
+
+export async function closeDirectListingAction(input: {
+  auctionId: string;
+  sold: boolean;
+}): Promise<ActionResult<{ status: string }>> {
+  if (!z.string().uuid().safeParse(input?.auctionId).success || typeof input?.sold !== "boolean") {
+    return { ok: false, rejection: { code: "invalid_input", message: "Invalid listing." } };
+  }
+  const { supabase, user } = await requireUser();
+  if (!user) {
+    return { ok: false, rejection: { code: "not_authenticated", message: "Sign in to manage this listing." } };
+  }
+
+  const { data, error } = await supabase.rpc("close_direct_listing", {
+    p_auction_id: input.auctionId,
+    p_sold: input.sold,
+  });
+  if (error) {
+    return { ok: false, rejection: normalizeEngineError({ message: error.message, hint: error.hint }) };
+  }
+
+  revalidatePath("/");
+  revalidatePath("/browse");
+  revalidatePath(`/auction/${input.auctionId}`);
+  revalidatePath(`/sell/${input.auctionId}`);
+  revalidatePath("/dashboard/selling");
+  return { ok: true, status: data as string };
 }
 
 /**
@@ -400,7 +481,7 @@ export async function updateAuctionFulfilmentAction(input: {
 }
 
 export async function publishAuctionAction(input: unknown): Promise<
-  ActionResult<{ status: string; endsAt: string }>
+  ActionResult<{ status: string; endsAt: string | null }>
 > {
   const parsed = publishAuctionSchema.safeParse(input);
   if (!parsed.success) {
@@ -421,7 +502,7 @@ export async function publishAuctionAction(input: unknown): Promise<
     return { ok: false, rejection: normalizeEngineError({ message: error.message, hint: error.hint }) };
   }
 
-  const payload = data as { status: string; ends_at: string; ok: boolean };
+  const payload = data as { status: string; ends_at: string | null; ok: boolean };
 
   // A held listing gets an email as well as the in-app notice: the seller
   // needs to know to wait, and "under review" with no message looks stuck.

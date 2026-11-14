@@ -10,6 +10,7 @@
 export const CLOSED_STATUSES = new Set([
   "ENDED",
   "SOLD",
+  "SOLD_DIRECT",
   "UNSOLD",
   "CANCELLED",
 ]);

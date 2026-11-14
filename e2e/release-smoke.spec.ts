@@ -128,7 +128,7 @@ test.describe("release visual smoke", () => {
   test("landing page exposes obvious marketplace actions", async ({ page }) => {
     await page.goto("/", { waitUntil: "domcontentloaded" });
     await expect(
-      page.getByRole("link", { name: /browse live auctions|browse auctions/i }).first()
+      page.getByRole("link", { name: /^browse listings$/i }).first()
     ).toBeVisible();
     await expect(
       page.getByRole("link", { name: /sell an item|sell/i }).first()

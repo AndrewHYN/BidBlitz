@@ -9,6 +9,9 @@ function source(path: string) {
 const sql = source("supabase/migrations/20261010121900_manual_payout_contact_onboarding_20261010.sql");
 const action = source("src/server/actions/payout-setup.ts");
 const sell = source("src/app/sell/page.tsx");
+const listingDraft = source("src/app/sell/[id]/page.tsx");
+const publish = source("src/components/sell/publish-button.tsx");
+const directMigration = source("supabase/migrations/20261113202007_direct_marketplace_listings.sql");
 const settings = source("src/components/auth/payout-settings-form.tsx");
 const payoutEngine = source("src/server/payments/seller-payout.ts");
 
@@ -29,7 +32,10 @@ describe("manual seller wallet contact onboarding", () => {
     expect(sql).toContain("r.external_user_id is not null");
     expect(sql).toContain("r.phone_e164 ~ '^[+]263[0-9]{9}$'");
     expect(sql).toContain("private.auction_require_payout_ready");
-    expect(sell).toContain('wallet?.setup_status === "MANUAL_READY"');
+    expect(listingDraft).toContain('supabase.rpc("my_payout_setup")');
+    expect(publish).toContain("!isDirect && !payoutReady");
+    expect(directMigration).toContain("if not new.is_direct");
+    expect(directMigration).toContain("r.setup_status='MANUAL_READY'");
     expect(settings).toContain('mode === "MANUAL"');
   });
 
@@ -44,6 +50,7 @@ describe("manual seller wallet contact onboarding", () => {
   it("does not present a saved phone number as evidence that money moved", () => {
     expect(settings).toContain("No money has moved");
     expect(settings).toContain("This does not mean a transfer has been sent or received");
-    expect(sell).toContain("Finance checks the recipient");
+    expect(sell).toContain("get paid directly");
+    expect(sell).not.toContain("my_payout_setup");
   });
 });

@@ -31,24 +31,24 @@ const siteUrl = SITE_URL;
 const baseMetadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: "Online Auctions in Zimbabwe | BidBlitz",
+    default: "Buy and Sell in Zimbabwe | BidBlitz Marketplace",
     template: "%s · BidBlitz",
   },
   description:
-    "BidBlitz is a Zimbabwean online auction marketplace: sellers list items with a real closing time, buyers compete bid by bid, and one transparent 5% platform fee applies to sold auctions.",
+    "Browse items for sale across Zimbabwe. Contact the seller directly and agree on cash, EcoCash or another mobile wallet.",
   openGraph: {
     type: "website",
     siteName: "BidBlitz",
-    title: "Online Auctions in Zimbabwe | BidBlitz",
+    title: "Buy and Sell in Zimbabwe | BidBlitz Marketplace",
     description:
-      "Live online auctions in Zimbabwe with real closing times: list an item, bid against other buyers in real time, and win when the clock runs out.",
+      "List an item for sale or shop local listings in Zimbabwe. Call or WhatsApp sellers directly.",
     url: siteUrl,
     images: [{ url: `${siteUrl}/brand/bidblitz-logo-512.png`, width: 512, height: 512, alt: "BidBlitz" }],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Online Auctions in Zimbabwe | BidBlitz",
-    description: "Live competitive online auctions in Zimbabwe: bid in real time and win when the clock runs out.",
+    title: "Buy and Sell in Zimbabwe | BidBlitz Marketplace",
+    description: "Buy and sell locally in Zimbabwe on BidBlitz.",
     images: [`${siteUrl}/brand/bidblitz-logo-512.png`],
   },
 };
