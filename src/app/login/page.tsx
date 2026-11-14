@@ -7,7 +7,7 @@ import { AuthShell } from "@/components/auth/auth-shell";
 
 export const metadata: Metadata = {
   title: "Sign in",
-  description: "Sign in to BidBlitz to bid, sell and track your auctions.",
+  description: "Sign in to BidBlitz to post listings and manage saved items.",
   robots: { index: false, follow: false },
 };
 
@@ -36,9 +36,9 @@ export default async function LoginPage({
 
   return (
     <AuthShell
-      eyebrow="Zimbabwe’s auction marketplace"
-      title="Bid on what you love. Sell what’s next."
-      description="Join live auctions, follow your bids and arrange handovers with buyers and sellers."
+      eyebrow="Zimbabwe marketplace"
+      title="Find it here. Buy it locally."
+      description="Post items for sale, manage your listings and keep track of what you’ve saved."
     >
       <LoginForm redirectTo={redirectTo} initialError={callbackFailed} />
     </AuthShell>

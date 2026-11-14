@@ -180,7 +180,7 @@ export function SignupForm() {
           Create your account
         </h1>
         <p className="text-sm text-muted-foreground">
-          One account to bid, sell and follow your auctions.
+          Post items for sale and save listings you like.
         </p>
       </div>
 
@@ -242,7 +242,7 @@ export function SignupForm() {
           data-testid="phone-field"
         />
         <p className="text-xs text-muted-foreground">
-          Kept private. If you sell, this becomes the starting number for your payout setup.
+          Private account number. Choose separately what to share on a listing.
         </p>
       </div>
 

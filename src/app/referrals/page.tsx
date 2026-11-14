@@ -7,7 +7,7 @@ import { InvitationControls } from "@/components/referrals/invitation-controls";
 
 export const metadata: Metadata = {
   title: "Invite a friend",
-  description: "Invite genuine buyers and sellers to BidBlitz, Zimbabwe's auction marketplace.",
+  description: "Invite genuine buyers and sellers to BidBlitz, Zimbabwe's local marketplace.",
   robots: { index: false, follow: false },
 };
 

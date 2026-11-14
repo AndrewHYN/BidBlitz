@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Gavel, MessageCircle, Zap } from "lucide-react";
+import { Tag, MessageCircle, Zap } from "lucide-react";
 import { BrandMark } from "@/components/brand-mark";
 
 export function AuthShell({
@@ -32,8 +32,8 @@ export function AuthShell({
           <div>
             <div className="flex gap-3" aria-label="Marketplace features">
               {[
-                { icon: Gavel, label: "Live auctions", detail: "Clear bids. Live updates." },
-                { icon: MessageCircle, label: "Private handovers", detail: "Chat after the sale." },
+                { icon: Tag, label: "Local listings", detail: "Set your asking price." },
+                { icon: MessageCircle, label: "Direct contact", detail: "Call or WhatsApp the seller." },
               ].map(({ icon: Icon, label, detail }) => (
                 <div key={label} className="min-w-0 flex-1 rounded-xl border border-white/15 bg-white/5 p-4">
                   <Icon className="mb-3 size-5 text-orange-300" aria-hidden />

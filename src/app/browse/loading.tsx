@@ -8,7 +8,7 @@ export default function BrowseLoading() {
   return (
     <div
       role="status"
-      aria-label="Loading auctions"
+      aria-label="Loading listings"
       className="page-container py-10 sm:py-14"
     >
       <div className="space-y-3">
