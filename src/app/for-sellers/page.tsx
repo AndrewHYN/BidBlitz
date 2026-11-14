@@ -1,6 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Camera, MapPin, MessageCircle, ShieldCheck, Tag } from "lucide-react";
+
+const GUIDE_URL = "https://www.bidblitz.co.zw/for-sellers";
+const WHATSAPP_SHARE = `https://wa.me/?text=${encodeURIComponent(`Selling something in Zimbabwe? Post a free listing on BidBlitz and talk to buyers directly: ${GUIDE_URL}`)}`;
+const FACEBOOK_SHARE = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(GUIDE_URL)}`;
 import { Button } from "@/components/ui/button";
 
 export const metadata: Metadata = {
@@ -82,7 +86,7 @@ export default function ForSellersPage() {
             Payment stays between you and your buyer
           </h2>
           <p className="mt-3 text-sm leading-7 text-muted-foreground">
-            For fixed-price listings, BidBlitz does not collect the buyer's money or
+            For fixed-price listings, BidBlitz does not collect the buyer&apos;s money or
             take a transaction fee. Agree on cash or a mobile wallet directly.
             Any wallet transfer fee is set by that provider.
           </p>
@@ -103,6 +107,26 @@ export default function ForSellersPage() {
           <Link href="/help" className="mt-3 inline-block font-medium text-primary underline underline-offset-4">
             Safety and support
           </Link>
+        </div>
+      </section>
+
+      <section className="rounded-xl border bg-card p-6 sm:p-8">
+        <h2 className="text-xl font-semibold">Know another seller?</h2>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+          Share this guide with someone who has a genuine item to sell.
+          Only post in groups that welcome marketplace links.
+        </p>
+        <div className="mt-4 flex flex-wrap gap-3">
+          <Button asChild variant="outline">
+            <a href={WHATSAPP_SHARE} target="_blank" rel="noopener noreferrer">
+              Share on WhatsApp
+            </a>
+          </Button>
+          <Button asChild variant="outline">
+            <a href={FACEBOOK_SHARE} target="_blank" rel="noopener noreferrer">
+              Share on Facebook
+            </a>
+          </Button>
         </div>
       </section>
 
