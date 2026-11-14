@@ -8,7 +8,7 @@ const FACEBOOK_SHARE = `https://www.facebook.com/sharer/sharer.php?u=${encodeURI
 import { Button } from "@/components/ui/button";
 
 export const metadata: Metadata = {
-  title: "Sell Online in Zimbabwe — Free Local Listings",
+  title: "Sell Online in Zimbabwe: Free Local Listings",
   description:
     "Post an item for free on BidBlitz. Share real photos, your asking price and Zimbabwean town. Buyers can call or WhatsApp you and pay directly.",
   alternates: { canonical: "/for-sellers" },
