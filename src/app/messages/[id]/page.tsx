@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { ReportDialog } from "@/components/auction/report-dialog";
 import { ListingChatThread, type ListingChatMessage } from "@/components/messages/listing-chat-thread";
 
 export const metadata: Metadata = {
@@ -29,7 +30,7 @@ export default async function ListingConversationPage({
   const otherId = chat.seller_id === user.id ? chat.buyer_id : chat.seller_id;
   const [{ data: listing }, { data: person }, { data: messages }] = await Promise.all([
     supabase.from("auctions").select("id, title, status").eq("id", chat.listing_id).maybeSingle(),
-    supabase.from("profiles").select("display_name").eq("id", otherId).maybeSingle(),
+    supabase.from("profiles").select("display_name, username").eq("id", otherId).maybeSingle(),
     supabase.from("listing_messages")
       .select("id, sender_id, body, created_at, read_at")
       .eq("conversation_id", chat.id)
@@ -52,6 +53,7 @@ export default async function ListingConversationPage({
             {listing && listing.status !== "LISTED" ? " · Item no longer listed" : ""}
           </p>
         </header>
+        <div className="flex justify-end"><ReportDialog userId={otherId} username={person?.username ?? "member"} /></div>
         <div className="rounded-xl border bg-card p-4 sm:p-6">
           <ListingChatThread conversationId={chat.id} viewerId={user.id} initial={ordered} />
         </div>
