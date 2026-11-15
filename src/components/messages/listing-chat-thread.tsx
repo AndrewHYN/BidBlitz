@@ -6,6 +6,7 @@ import { Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { markListingChatReadAction, sendListingChatAction } from "@/server/actions/listing-chat";
+import { createClient } from "@/lib/supabase/client";
 
 export type ListingChatMessage = {
   id: string;
@@ -27,17 +28,30 @@ export function ListingChatThread({ conversationId, viewerId, initial }: {
   const busy = useRef(false);
   const lastMessageId = initial.at(-1)?.id;
 
-  // Server remains the source of truth. Polling is a free-tier fallback until
-  // private realtime channels and notification delivery are verified.
+  // Realtime wakes the thread as new messages arrive; every message is re-read
+  // through the existing RLS-scoped server query. Polling is only a safety fallback.
   useEffect(() => {
+    const supabase = createClient();
+    const channel = supabase
+      .channel(`listing-thread:${conversationId}:${Date.now()}`)
+      .on("postgres_changes", {
+        event: "INSERT", schema: "public", table: "listing_messages",
+        filter: `conversation_id=eq.${conversationId}`,
+      }, () => router.refresh())
+      .on("postgres_changes", {
+        event: "UPDATE", schema: "public", table: "listing_messages",
+        filter: `conversation_id=eq.${conversationId}`,
+      }, () => router.refresh())
+      .subscribe();
     const refresh = () => {
       if (document.visibilityState === "visible") router.refresh();
     };
-    const interval = window.setInterval(refresh, 10_000);
+    const interval = window.setInterval(refresh, 30_000);
     window.addEventListener("focus", refresh);
     return () => {
       window.clearInterval(interval);
       window.removeEventListener("focus", refresh);
+      void supabase.removeChannel(channel);
     };
   }, [router, conversationId]);
 
