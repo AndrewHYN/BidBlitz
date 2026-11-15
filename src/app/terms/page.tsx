@@ -16,7 +16,7 @@ export const metadata: Metadata = {
   alternates: { canonical: "/terms" },
 };
 
-const LAST_UPDATED = "13 November 2026";
+const LAST_UPDATED = "16 November 2026";
 
 /**
  * The page index.
@@ -39,6 +39,11 @@ const SECTIONS = [
   { id: "moderation", title: "10. Reporting and moderation" },
   { id: "ownership", title: "11. What you list is yours" },
   { id: "provision", title: "12. How the site is provided" },
+  { id: "offers", title: "13. Direct sales and buyer offers" },
+  { id: "services", title: "14. Service bookings and reviews" },
+  { id: "consumer-rights", title: "15. Consumer rights, returns and disputes" },
+  { id: "privacy-safety", title: "16. Privacy, messaging and safety" },
+  { id: "law", title: "17. Legal terms and changes" },
 ] as const;
 
 function TermsSection({
@@ -76,16 +81,20 @@ export default function TermsPage() {
             use BidBlitz.
           </p>
           <p>
-            BidBlitz lets sellers advertise items at an asking price. Buyers and sellers
-            agree directly on price, payment and collection or delivery. The bidding
-            and settlement provisions below apply to auction transactions.
+            BidBlitz is a marketplace for independent sellers to advertise goods,
+            offer services and run auctions. Buyers and sellers arrange payment
+            and delivery directly for ordinary listings. Payment collection and
+            automatic payouts are currently disabled; existing auction records
+            remain subject to their applicable auction rules.
           </p>
         </TermsSection>
 
         <TermsSection id="account" title="2. Your account">
           <p>
-            You need an account to bid or sell. Keep your password to yourself. You are responsible for what happens on your account. Tell us
-            straight away if you think someone else has access to it.
+            You need an account to message, make offers, hire, list or bid.
+            Protect your password and sign out of shared devices. Report suspected
+            unauthorized access immediately. We investigate reports fairly rather
+            than automatically making you liable for actions you did not authorize.
           </p>
           <p>
             You must be at least 18 years old, or the age of legal majority
@@ -101,9 +110,12 @@ export default function TermsPage() {
             right condition and category.
           </p>
           <p>
-            Do not list anything illegal, stolen, or prohibited. Listings that
-            break these rules can be removed, and accounts that break them can
-            be suspended.
+            Do not list anything illegal, stolen, counterfeit, dangerous or
+            restricted, and do not advertise services you lack the right or licence
+            to perform. No scams, impersonation, spam, harassment, doxxing or
+            attempts to collect users&apos; OTPs, passwords or wallet PINs.
+            We may remove listings and apply proportionate account restrictions,
+            with a way to ask support to reconsider a mistake.
           </p>
           <p>
             For a fixed-price listing, provide a number you are authorised to share.
@@ -228,11 +240,11 @@ export default function TermsPage() {
 
         <TermsSection id="reviews" title="9. Reviews">
           <p>
-            Reviews are tied to a real transaction, so only the actual buyer and
-            seller of a settled sale can write one, and each sale gets one
-            review in total: whoever reviews first holds the slot. Write honest
-            reviews of your own experience. Fake or incentivised reviews are
-            not allowed.
+            Auction reviews are tied to qualifying transaction records.
+            Service reviews are available to the client after a hire is
+            accepted, marked delivered and confirmed complete. Reviews are
+            users&apos; opinions, not BidBlitz certification. Invented, paid-for
+            or retaliatory reviews and private-information disclosures are prohibited.
           </p>
         </TermsSection>
 
@@ -257,15 +269,111 @@ export default function TermsPage() {
 
         <TermsSection id="provision" title="12. How the site is provided">
           <p>
-            BidBlitz is provided as-is. Listings are written by other users, so
-            use your judgement before bidding. We do not guarantee that every
-            description is accurate, and we do not guarantee uninterrupted or
-            error-free operation of the site.
+            Listings are supplied by users, and we cannot promise every
+            description is accurate or the website is always available.
+            We aim to maintain reasonable security and address credible safety
+            reports. Nothing here excludes non-waivable consumer or privacy
+            protections, liability for fraud, or other legal duties.
           </p>
           <p>
-            These terms may change over time. The date at the top of this page
-            shows when they were last updated, and continued use after an update
-            means you accept the new version.
+            We date policy changes and provide reasonable notice of material
+            updates. Updated rules generally apply prospectively; existing
+            auction contracts and accrued rights are not silently rewritten.
+            You may stop using BidBlitz if you disagree.
+          </p>
+        </TermsSection>
+
+
+        <TermsSection id="offers" title="13. Direct sales and buyer offers">
+          <p>
+            A fixed-price listing invites enquiries. A buyer may send a price
+            offer and the seller may accept or decline. Acceptance records a
+            negotiation in the conversation, not a completed payment, a
+            guaranteed sale, an escrow deposit or transfer of ownership.
+          </p>
+          <p>
+            Before exchanging money, confirm the actual item, currency, total
+            price, wallet recipient, transfer charges, collection or delivery,
+            estimated timing, and any applicable return conditions. Business
+            sellers must provide the disclosures and remedies the law requires.
+          </p>
+          <p>
+            There is no BidBlitz transaction commission on a direct sale under
+            the current free-marketplace model. Optional promotion prices, if
+            offered, must be shown before purchase, never charged retroactively.
+          </p>
+        </TermsSection>
+
+        <TermsSection id="services" title="14. Service bookings and reviews">
+          <p>
+            Service providers must describe their work truthfully, including
+            location, starting price, availability and qualifications where
+            necessary. A hire request opens a conversation, not an automatic
+            payment, guaranteed booking or employment relationship.
+          </p>
+          <p>
+            Both parties should agree on scope, materials, final price,
+            timeframe, location and cancellation conditions in writing.
+            A provider can mark work delivered; the client can confirm
+            completion and publish a verified transaction-linked review.
+            These statuses are user-reported, not independent professional
+            inspection or certification by BidBlitz.
+          </p>
+        </TermsSection>
+
+        <TermsSection id="consumer-rights" title="15. Consumer rights, returns and disputes">
+          <p>
+            Independent sellers and service providers normally supply their
+            own goods and work. Business suppliers must make legally required
+            disclosures about their identity, full costs, payment methods,
+            delivery, returns and complaint procedures. Buyers should retain
+            relevant receipts and messages.
+          </p>
+          <p>
+            Zimbabwe&apos;s Consumer Protection Act may provide mandatory
+            quality, disclosure, cancellation and refund rights, with
+            exceptions depending on the transaction. Nothing in these terms
+            overrides those rights. BidBlitz cannot refund a direct payment
+            it never collected, but can review platform misconduct reports.
+            Consumers remain free to pursue available statutory remedies.
+          </p>
+        </TermsSection>
+
+        <TermsSection id="privacy-safety" title="16. Privacy, messaging and safety">
+          <p>
+            Private messages and offers are accessible to their participants
+            and may be reviewed by authorized support personnel where necessary
+            to investigate a credible report, protect users or comply with law.
+            Marketplace chat is not end-to-end encrypted. Never share an OTP,
+            password, wallet PIN or identity-document image in chat.
+          </p>
+          <p>
+            The phone number a seller actively chooses to publish on a listing
+            is visible to visitors while that listing is available. Do not
+            scrape, bulk-export, resell or use other members&apos; information
+            for unsolicited promotion. See the <Link href="/privacy">Privacy Policy</Link>
+            and <Link href="/safety">Safety Centre</Link>.
+          </p>
+        </TermsSection>
+
+        <TermsSection id="law" title="17. Legal terms and changes">
+          <p>
+            Zimbabwean law governs this marketplace&apos;s operating terms,
+            subject to mandatory consumer-protection, privacy and applicable
+            jurisdiction rules. If a provision is unlawful, the remaining
+            provisions continue only insofar as legally fair and workable.
+          </p>
+          <p>
+            We may restrict accounts for credible fraud, harassment, unlawful
+            data collection, prohibited goods or repeated abuse, and accept
+            requests to review moderation decisions through <Link href="/help">support</Link>.
+            Disclosure to authorities is subject to applicable legal processes,
+            not informal requests.
+          </p>
+          <p>
+            No part of these terms creates a partnership, employment or agency
+            relationship between BidBlitz and independent users, nor waives
+            any duty the law does not allow a business to exclude.
           </p>
         </TermsSection>
 

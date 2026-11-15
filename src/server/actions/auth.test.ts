@@ -118,8 +118,32 @@ afterEach(() => {
 });
 
 describe("signUpAction", () => {
-  it("a fresh signup succeeds and spends none of the failure budget", async () => {
+  it("rejects missing legal acceptance without creating an account", async () => {
     const result = await signUpAction({
+      acceptedTerms: false, email: EMAIL, password: "longenough",
+      displayName: "New User", phone: "",
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.rejection.message).toMatch(/terms of use/i);
+    expect(createSignupClient).not.toHaveBeenCalled();
+  });
+
+  it("allows a private, phone-free account with consent", async () => {
+    const result = await signUpAction({
+      acceptedTerms: true, email: EMAIL, password: "longenough",
+      displayName: "New User", phone: "",
+    });
+    expect(result).toEqual({ ok: true });
+    const client = vi.mocked(createSignupClient).mock.results[0].value as {
+      auth: { signUp: { mock: { calls: Array<Array<{ options: { data: Record<string, string> } }>> } } };
+    };
+    const data = client.auth.signUp.mock.calls[0][0].options.data;
+    expect(data.payout_phone_e164).toBeUndefined();
+    expect(data.accepted_terms_version).toBe("2026-11-16");
+  });
+
+  it("a fresh signup succeeds and spends none of the failure budget", async () => {
+    const result = await signUpAction({ acceptedTerms: true,
       email: EMAIL,
       password: "longenough",
       displayName: "New User",
@@ -140,7 +164,7 @@ describe("signUpAction", () => {
     // failed with "We couldn't complete sign-in from your email link."
     // The implicit client needs no verifier, so the fragment callback
     // completes on any device or browser.
-    const result = await signUpAction({
+    const result = await signUpAction({ acceptedTerms: true,
       email: EMAIL,
       password: "longenough",
       displayName: "New User",
@@ -169,7 +193,7 @@ describe("signUpAction", () => {
     // Far past AUTH_LIMIT: if a GoTrue throttle also counted as a BidBlitz
     // failure, the sixth attempt here would already be blocked by us.
     for (let i = 0; i < AUTH_LIMIT.limit * 3; i += 1) {
-      const result = await signUpAction({
+      const result = await signUpAction({ acceptedTerms: true,
         email: EMAIL,
         password: "longenough",
         displayName: "New User",
@@ -189,7 +213,7 @@ describe("signUpAction", () => {
   it("keeps 'already registered' distinct from a rate limit", async () => {
     signUpError = { message: "User already registered" };
 
-    const result = await signUpAction({
+    const result = await signUpAction({ acceptedTerms: true,
       email: EMAIL,
       password: "longenough",
       displayName: "New User",
@@ -211,7 +235,7 @@ describe("signUpAction", () => {
     // says, the signup form must speak signup.
     signUpError = { message: "Error sending confirmation email", status: 500 };
 
-    const result = await signUpAction({
+    const result = await signUpAction({ acceptedTerms: true,
       email: EMAIL,
       password: "longenough",
       displayName: "New User",
@@ -228,7 +252,7 @@ describe("signUpAction", () => {
   it("rejects an invalid email address with an address error, not a signup error", async () => {
     signUpError = { message: "Email address foo@bar.test is invalid" };
 
-    const result = await signUpAction({
+    const result = await signUpAction({ acceptedTerms: true,
       email: EMAIL,
       password: "longenough",
       displayName: "New User",
@@ -244,7 +268,7 @@ describe("signUpAction", () => {
   it("gives invalid password feedback without contacting the provider", async () => {
     signUpError = { message: "Password should be at least 6 characters" };
 
-    const result = await signUpAction({
+    const result = await signUpAction({ acceptedTerms: true,
       email: EMAIL,
       password: "short",
       displayName: "New User",
@@ -263,7 +287,7 @@ describe("signUpAction", () => {
     }
     vi.mocked(createClient).mockClear();
 
-    const result = await signUpAction({
+    const result = await signUpAction({ acceptedTerms: true,
       email: EMAIL,
       password: "longenough",
       displayName: "New User",
@@ -285,13 +309,13 @@ describe("signUpAction", () => {
       for (let i = 0; i < AUTH_LIMIT.limit; i += 1) {
         rateLimit(KEY, AUTH_LIMIT.limit, AUTH_LIMIT.windowMs);
       }
-      expect((await signUpAction({ email: EMAIL, password: "longenough", displayName: "N", phone: "0771234567" })).ok).toBe(
+      expect((await signUpAction({ acceptedTerms: true, email: EMAIL, password: "longenough", displayName: "N", phone: "0771234567" })).ok).toBe(
         false
       );
 
       vi.advanceTimersByTime(AUTH_LIMIT.windowMs + 1_000);
 
-      const after = await signUpAction({
+      const after = await signUpAction({ acceptedTerms: true,
         email: EMAIL,
         password: "longenough",
         displayName: "New User",

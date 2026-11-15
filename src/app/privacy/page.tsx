@@ -16,7 +16,7 @@ export const metadata: Metadata = {
   alternates: { canonical: "/privacy" },
 };
 
-const LAST_UPDATED = "13 November 2026";
+const LAST_UPDATED = "16 November 2026";
 
 /** Declared once, used for both the headings and the table of contents. */
 const SECTIONS = [
@@ -28,7 +28,9 @@ const SECTIONS = [
   { id: "sharing", title: "6. Who else receives it" },
   { id: "retention", title: "7. How long we keep it" },
   { id: "choices", title: "8. Your choices" },
-  { id: "changes", title: "9. Changes to this policy" },
+  { id: "security", title: "9. Security and incidents" },
+  { id: "international", title: "10. International service providers" },
+  { id: "changes", title: "11. Changes to this policy" },
 ] as const;
 
 function PrivacySection({
@@ -61,11 +63,11 @@ export default function PrivacyPage() {
 
         <PrivacySection id="overview" title="1. The short version">
           <p>
-            BidBlitz stores the information you provide so the marketplace can
-            work: your account details, your listings, your bids and your
-            reviews. Some of that is deliberately public: bidding is a public,
-            competitive activity. The rest stays private to you and to the
-            people directly involved in a sale.
+            BidBlitz handles information needed for your account, item listings,
+            auctions, offers, service hires, messages, notifications and reviews.
+            Public listings and any contact number you deliberately publish are
+            visible to visitors; private conversations are restricted to the
+            participants, subject to lawful support and safety access.
           </p>
           <p>
             <strong>
@@ -116,6 +118,20 @@ export default function PrivacyPage() {
               watch, reviews you write and reports you file.
             </li>
             <li>
+              <strong>Messages and negotiations:</strong> private buyer-seller
+              messages, listing offer amounts and acceptance decisions, service
+              hire requests and confirmation steps, and message read status.
+              These are stored to make conversations work and to investigate
+              relevant safety or support issues when legally justified.
+              Messages are not end-to-end encrypted.
+            </li>
+            <li>
+              <strong>Notifications:</strong> in-app message alerts, account
+              notifications and, with your device permission, foreground browser
+              notifications. Browser permission is optional and can be revoked
+              in device settings.
+            </li>
+            <li>
               <strong>Dispute data:</strong> case reasons, messages, staff
               decisions and any evidence images uploaded for a transaction
               dispute. Evidence is stored privately for the buyer, seller and
@@ -153,9 +169,12 @@ export default function PrivacyPage() {
             <li>the amount and timing of each bid on an auction you can view;</li>
             <li>your public profile page, including your rating summary.</li>
             <li>
-              The phone number you choose to publish appears on the live listing so buyers
-              can call or use WhatsApp. Marking the listing sold or removing it hides the
-              number from new visitors. People who already saw it may have saved it.
+              To publish a direct listing, the current seller form asks you
+              to consent to publicly displaying its contact number. Visitors
+              can call or use WhatsApp, and can copy or save a number they see.
+              Marking an item sold or removing it hides the number from new
+              visitors, but cannot retrieve earlier copies. Do not use someone
+              else&apos;s contact details without authorization.
             </li>
           </ul>
           <p>
@@ -213,17 +232,22 @@ export default function PrivacyPage() {
             used, the connected payment/payout provider such as Linkwa. We send
             each provider only the information needed for the service it performs.
             Public marketplace data is also visible to the users described above.
+            Support staff only access private material for legitimate customer
+            assistance, fraud investigations, operational security or legal
+            requests, not to read private conversations casually.
           </p>
         </PrivacySection>
 
         <PrivacySection id="retention" title="7. How long we keep it">
           <p>
-            We keep your data while your account is active. You can ask us to
-            delete your account and its data at any time using the contact
-            details below. Records of settled sales, payout instructions,
-            moderation actions and disputes may need to be kept so transaction,
-            audit and case histories stay consistent. If that applies, we will
-            tell you.
+            We keep account information while needed for an active account,
+            then review it for deletion or anonymisation when it is no longer
+            necessary. Transaction, safety, legal, audit, complaint and
+            payment records may need to be retained for legitimate obligations.
+            Data in service-provider backups is removed under their backup
+            lifecycles. There is no promise of instant removal from every
+            system. Contact us for a review or deletion request and an explanation
+            of any lawful retention.
           </p>
         </PrivacySection>
 
@@ -249,7 +273,10 @@ export default function PrivacyPage() {
               the one-time attribution is retained as a marketplace audit record.
             </li>
             <li>
-              Ask for a copy of your data, or its deletion, by contacting us.
+              Contact support to request access, correction, a copy, restriction
+              or deletion of your personal data, or to object to processing
+              where the law permits. We may need to verify account ownership
+              and explain necessary legal or fraud-prevention retention.
             </li>
             <li>
               Clear cookies in your browser at any time and you will simply be
@@ -258,10 +285,50 @@ export default function PrivacyPage() {
           </ul>
         </PrivacySection>
 
-        <PrivacySection id="changes" title="9. Changes to this policy">
+
+        <PrivacySection id="security" title="9. Security and incidents">
           <p>
-            If the data BidBlitz handles changes, this page is updated and the
-            date at the top is reset. Check it occasionally.
+            BidBlitz uses authenticated access, row-level database rules for
+            private chat and transaction records, TLS for the website and
+            browser security controls. Access to sensitive administrative
+            systems should be limited to authorized staff. No online platform
+            can promise absolute protection.
+          </p>
+          <p>
+            If you suspect account compromise, stolen information, phishing
+            or exposure of private messages, please contact
+            <a href="mailto:support@bidblitz.co.zw"> support@bidblitz.co.zw</a>.
+            We investigate suspected incidents and will notify affected
+            people or the appropriate authority when required by applicable law.
+            Do not send passwords, wallet PINs or identification documents
+            in ordinary support messages.
+          </p>
+        </PrivacySection>
+
+        <PrivacySection id="international" title="10. International service providers">
+          <p>
+            BidBlitz uses cloud services such as Vercel and Supabase. Depending
+            on the provider and configuration, information may be hosted,
+            transmitted, backed up or accessed outside Zimbabwe. These
+            arrangements are subject to applicable Zimbabwean data-protection
+            requirements, including any required authorizations and appropriate
+            safeguards. Contact us for a description of the processors used
+            for your account.
+          </p>
+          <p>
+            We do not claim a particular Zimbabwean data-hosting location or
+            POTRAZ data-controller licence status unless those facts have
+            been verified. Our legal and operational compliance work does not
+            reduce your rights under the Cyber and Data Protection Act.
+          </p>
+        </PrivacySection>
+
+        <PrivacySection id="changes" title="11. Changes to this policy">
+          <p>
+            We will update this date and give reasonable notice if the way
+            we process personal information materially changes. We will seek
+            any additional consent required by law rather than treating use of
+            the website as blanket marketing consent.
           </p>
         </PrivacySection>
 

@@ -174,10 +174,14 @@ export async function signUpAction(input: {
   password: string;
   displayName: string;
   phone: string;
+  acceptedTerms?: boolean;
   redirectTo?: string;
 }): Promise<AuthResult> {
-  const phone = normalizeZimbabwePhone(input.phone);
-  if (!phone) {
+  if (input.acceptedTerms !== true) {
+    return { ok: false, rejection: { code: "invalid_input", message: "Please read and accept the Terms of Use and Privacy Policy." } };
+  }
+  const phone = input.phone.trim() ? normalizeZimbabwePhone(input.phone) : null;
+  if (input.phone.trim() && !phone) {
     return {
       ok: false,
       rejection: {
@@ -204,7 +208,9 @@ export async function signUpAction(input: {
     options: {
       data: {
         display_name: input.displayName.trim(),
-        payout_phone_e164: phone,
+        ...(phone ? { payout_phone_e164: phone } : {}),
+        accepted_terms_version: "2026-11-16",
+        accepted_terms_at: new Date().toISOString(),
       },
       // Canonical origin, trailing slash stripped (site-url.ts) — otherwise
       // confirmation links point at "//auth/callback" and miss the route.

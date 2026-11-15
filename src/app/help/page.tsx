@@ -27,6 +27,7 @@ export default function HelpPage() {
       <div className="flex flex-wrap gap-4 text-sm font-medium text-primary">
         <Link className="underline" href="/how-it-works">How it works</Link>
         <Link className="underline" href="/faq">Frequently asked questions</Link>
+        <Link className="underline" href="/safety">Safety & Trust Centre</Link>
         <Link className="underline" href="/dashboard/transactions">Previous transactions</Link>
       </div>
     </div>

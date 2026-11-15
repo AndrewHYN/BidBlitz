@@ -56,7 +56,12 @@ export function SignupForm() {
     const email = String(data.get("email") ?? "").trim();
     const password = String(data.get("password") ?? "");
     const phone = String(data.get("phone") ?? "").trim();
+    const acceptedTerms = data.get("acceptedTerms") === "on";
 
+    if (!acceptedTerms) {
+      setError("Please read and accept the Terms of Use and Privacy Policy.");
+      return;
+    }
     if (!displayName) {
       setError("Enter your name.");
       return;
@@ -71,7 +76,7 @@ export function SignupForm() {
     setError(null);
     startTransition(async () => {
       try {
-        const result = await signUpAction({ email, password, displayName, phone });
+        const result = await signUpAction({ email, password, displayName, phone, acceptedTerms });
         if (!result.ok) {
           setError(result.rejection.message);
           return;
@@ -195,6 +200,11 @@ export function SignupForm() {
       )}
 
       <GoogleSignInButton />
+      <p className="text-xs leading-5 text-muted-foreground">
+        By continuing with Google, you can review our <Link href="/terms" className="underline">Terms</Link>
+        and <Link href="/privacy" className="underline">Privacy Policy</Link>. Google sign-in may
+        create a new account. It does not opt you into promotional emails.
+      </p>
 
       <div className="flex items-center gap-3" aria-hidden="true">
         <span className="h-px flex-1 bg-border" />
@@ -230,7 +240,7 @@ export function SignupForm() {
       </div>
 
       <div className="space-y-1.5">
-        <Label htmlFor="signup-phone">Mobile number</Label>
+        <Label htmlFor="signup-phone">Mobile number (optional)</Label>
         <Input
           id="signup-phone"
           name="phone"
@@ -238,11 +248,11 @@ export function SignupForm() {
           inputMode="tel"
           autoComplete="tel"
           placeholder="0771234567"
-          required
           data-testid="phone-field"
         />
         <p className="text-xs text-muted-foreground">
-          Private account number. Choose separately what to share on a listing.
+          Optional for browsing and messaging. If you provide it, your account
+          phone stays private. Publishing a listing contact number is a separate choice.
         </p>
       </div>
 
@@ -262,6 +272,18 @@ export function SignupForm() {
           At least {MIN_PASSWORD_LENGTH} characters.
         </p>
       </div>
+
+      <label htmlFor="signup-terms" className="flex items-start gap-3 rounded-lg border bg-card p-3 text-sm leading-6">
+        <input id="signup-terms" name="acceptedTerms" type="checkbox" required
+          className="mt-1 size-4 shrink-0 accent-primary" />
+        <span>
+          I have read and agree to the <Link href="/terms" target="_blank" rel="noopener noreferrer"
+            className="font-semibold text-primary underline">Terms of Use</Link> and understand how
+          BidBlitz uses personal information in the <Link href="/privacy" target="_blank" rel="noopener noreferrer"
+            className="font-semibold text-primary underline">Privacy Policy</Link>.
+          Marketing emails are optional and managed separately.
+        </span>
+      </label>
 
       <Button
         type="submit"
