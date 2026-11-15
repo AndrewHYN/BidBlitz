@@ -36,11 +36,26 @@ export function MarketplaceMessageAlerts({ userId }: { userId: string }) {
             action: { label: "Open chat", onClick: () => router.push(url) },
           });
           if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
-            try {
-              const alert = new Notification("New BidBlitz message", { body: `New enquiry about ${title}`, tag: `listing-chat-${conversationId}` });
-              alert.onclick = () => { window.focus(); router.push(url); alert.close(); };
-            } catch {
-              // Keep the in-app alert even when the browser blocks an OS notification.
+            if ("serviceWorker" in navigator) {
+              void navigator.serviceWorker.register("/message-alert-sw.js").then((registration) =>
+                registration.showNotification("New BidBlitz message", {
+                  body: `New enquiry about ${title}`,
+                  tag: `listing-chat-${conversationId}`,
+                  data: { url },
+                })
+              ).catch(() => {
+                // The in-app toast remains available when mobile OS alerts are blocked.
+              });
+            } else {
+              try {
+                const alert = new Notification("New BidBlitz message", {
+                  body: `New enquiry about ${title}`,
+                  tag: `listing-chat-${conversationId}`,
+                });
+                alert.onclick = () => { window.focus(); router.push(url); alert.close(); };
+              } catch {
+                // No OS notification support: retain the in-app alert.
+              }
             }
           }
         }
