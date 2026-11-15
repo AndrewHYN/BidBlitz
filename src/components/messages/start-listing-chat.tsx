@@ -30,7 +30,7 @@ export function StartListingChat({ listingId, sellerName }: { listingId: string;
   }
 
   return (
-    <form onSubmit={submit} className="space-y-4" data-testid="listing-chat-start">
+    <form method="post" onSubmit={submit} className="space-y-4" data-testid="listing-chat-start">
       <label htmlFor="first-listing-message" className="block text-sm font-medium">
         Your message to {sellerName}
       </label>
