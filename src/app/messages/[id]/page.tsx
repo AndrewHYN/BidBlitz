@@ -49,7 +49,7 @@ export default async function ListingConversationPage({
   const ordered = ([...(messages ?? [])].reverse()) as ListingChatMessage[];
 
   return (
-    <div className="page-container py-10 sm:py-14">
+    <div className="page-container pt-8 pb-32 sm:py-14">
       <div className="mx-auto max-w-2xl space-y-5">
         <Link href="/messages" className="text-sm font-medium text-primary hover:underline">Back to messages</Link>
         <header className="space-y-2">
