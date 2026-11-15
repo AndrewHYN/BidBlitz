@@ -7,7 +7,7 @@ import { DirectListingForm } from "@/components/sell/direct-listing-form";
 
 export const metadata: Metadata = {
   title: "Sell an item",
-  description: "List an item at your asking price and let buyers call or WhatsApp you.",
+  description: "List an item at your asking price and receive buyer enquiries through BidBlitz messages or WhatsApp.",
   robots: { index: false, follow: false },
 };
 
