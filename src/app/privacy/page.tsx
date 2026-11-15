@@ -118,6 +118,20 @@ export default function PrivacyPage() {
               watch, reviews you write and reports you file.
             </li>
             <li>
+              <strong>Messages and negotiations:</strong> private buyer-seller
+              messages, listing offer amounts and acceptance decisions, service
+              hire requests and confirmation steps, and message read status.
+              These are stored to make conversations work and to investigate
+              relevant safety or support issues when legally justified.
+              Messages are not end-to-end encrypted.
+            </li>
+            <li>
+              <strong>Notifications:</strong> in-app message alerts, account
+              notifications and, with your device permission, foreground browser
+              notifications. Browser permission is optional and can be revoked
+              in device settings.
+            </li>
+            <li>
               <strong>Dispute data:</strong> case reasons, messages, staff
               decisions and any evidence images uploaded for a transaction
               dispute. Evidence is stored privately for the buyer, seller and
@@ -155,9 +169,12 @@ export default function PrivacyPage() {
             <li>the amount and timing of each bid on an auction you can view;</li>
             <li>your public profile page, including your rating summary.</li>
             <li>
-              The phone number you choose to publish appears on the live listing so buyers
-              can call or use WhatsApp. Marking the listing sold or removing it hides the
-              number from new visitors. People who already saw it may have saved it.
+              To publish a direct listing, the current seller form asks you
+              to consent to publicly displaying its contact number. Visitors
+              can call or use WhatsApp, and can copy or save a number they see.
+              Marking an item sold or removing it hides the number from new
+              visitors, but cannot retrieve earlier copies. Do not use someone
+              else&apos;s contact details without authorization.
             </li>
           </ul>
           <p>
@@ -215,6 +232,9 @@ export default function PrivacyPage() {
             used, the connected payment/payout provider such as Linkwa. We send
             each provider only the information needed for the service it performs.
             Public marketplace data is also visible to the users described above.
+            Support staff only access private material for legitimate customer
+            assistance, fraud investigations, operational security or legal
+            requests, not to read private conversations casually.
           </p>
         </PrivacySection>
 
@@ -253,7 +273,10 @@ export default function PrivacyPage() {
               the one-time attribution is retained as a marketplace audit record.
             </li>
             <li>
-              Ask for a copy of your data, or its deletion, by contacting us.
+              Contact support to request access, correction, a copy, restriction
+              or deletion of your personal data, or to object to processing
+              where the law permits. We may need to verify account ownership
+              and explain necessary legal or fraud-prevention retention.
             </li>
             <li>
               Clear cookies in your browser at any time and you will simply be
@@ -262,7 +285,45 @@ export default function PrivacyPage() {
           </ul>
         </PrivacySection>
 
-        <PrivacySection id="changes" title="9. Changes to this policy">
+
+        <PrivacySection id="security" title="9. Security and incidents">
+          <p>
+            BidBlitz uses authenticated access, row-level database rules for
+            private chat and transaction records, TLS for the website and
+            browser security controls. Access to sensitive administrative
+            systems should be limited to authorized staff. No online platform
+            can promise absolute protection.
+          </p>
+          <p>
+            If you suspect account compromise, stolen information, phishing
+            or exposure of private messages, please contact
+            <a href="mailto:support@bidblitz.co.zw"> support@bidblitz.co.zw</a>.
+            We investigate suspected incidents and will notify affected
+            people or the appropriate authority when required by applicable law.
+            Do not send passwords, wallet PINs or identification documents
+            in ordinary support messages.
+          </p>
+        </PrivacySection>
+
+        <PrivacySection id="international" title="10. International service providers">
+          <p>
+            BidBlitz uses cloud services such as Vercel and Supabase. Depending
+            on the provider and configuration, information may be hosted,
+            transmitted, backed up or accessed outside Zimbabwe. These
+            arrangements are subject to applicable Zimbabwean data-protection
+            requirements, including any required authorizations and appropriate
+            safeguards. Contact us for a description of the processors used
+            for your account.
+          </p>
+          <p>
+            We do not claim a particular Zimbabwean data-hosting location or
+            POTRAZ data-controller licence status unless those facts have
+            been verified. Our legal and operational compliance work does not
+            reduce your rights under the Cyber and Data Protection Act.
+          </p>
+        </PrivacySection>
+
+        <PrivacySection id="changes" title="11. Changes to this policy">
           <p>
             We will update this date and give reasonable notice if the way
             we process personal information materially changes. We will seek
