@@ -25,7 +25,7 @@ export default async function SellPage() {
     <div className="page-container py-10 sm:py-14">
       <PageHeader
         title="Create a listing"
-        description="Choose an item sale, an auction or a service. Publish with real photos and connect directly."
+        description="Choose an item sale, an auction or a service. For direct listings, get paid directly by your buyer or client; auctions follow separate bidding rules."
       />
       <div className="mt-6 max-w-4xl">
         {profile?.is_banned ? (
