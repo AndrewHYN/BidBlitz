@@ -60,6 +60,7 @@ function parseFilters(flat: Record<string, string>): {
 
   return {
     values: {
+      kind: filters.kind ?? "",
       q: filters.q ?? "",
       category: filters.category ?? "",
       condition: filters.condition ?? "",
@@ -87,7 +88,7 @@ export default async function BrowsePage({
    * business, not a dead end, and the copy below says so.
    */
   const hasFilters = Boolean(
-    values.q ||
+    values.kind || values.q ||
       values.category ||
       values.condition ||
       values.min ||
@@ -97,6 +98,7 @@ export default async function BrowsePage({
 
   const [result, categories] = await Promise.all([
     browseListings({
+      kind: values.kind || undefined,
       q: values.q || undefined,
       category: values.category || undefined,
       condition: values.condition || undefined,
@@ -118,7 +120,7 @@ export default async function BrowsePage({
     <div className="page-container py-10 sm:py-14">
       <PageHeader
         title="Browse listings"
-        description="Find items by category, location, condition and asking price."
+        description="Browse item sales, auctions and hireable services across Zimbabwe."
       />
 
       <div className="mt-6">
