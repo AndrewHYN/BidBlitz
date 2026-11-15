@@ -392,6 +392,22 @@ export interface Database {
         Insert: never;
         Update: never;
       };
+      listing_conversations: {
+        Row: {
+          id: string; listing_id: string; buyer_id: string; seller_id: string;
+          created_at: string; last_message_at: string;
+        };
+        Insert: never;
+        Update: never;
+      };
+      listing_messages: {
+        Row: {
+          id: string; conversation_id: string; sender_id: string; body: string;
+          created_at: string; read_at: string | null;
+        };
+        Insert: never;
+        Update: never;
+      };
       schema_migrations: {
         Row: { filename: string; applied_at: string };
         Insert: { filename: string; applied_at?: string };
@@ -399,6 +415,18 @@ export interface Database {
       };
     };
     Functions: {
+      start_listing_conversation: {
+        Args: { p_listing_id: string; p_body: string };
+        Returns: string;
+      };
+      send_listing_message: {
+        Args: { p_conversation_id: string; p_body: string };
+        Returns: string;
+      };
+      mark_listing_conversation_read: {
+        Args: { p_conversation_id: string };
+        Returns: number;
+      };
       create_direct_listing: {
         Args: {
           p_title: string; p_description: string; p_category_id: number; p_condition: Condition;
