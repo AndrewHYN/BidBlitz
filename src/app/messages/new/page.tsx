@@ -39,7 +39,7 @@ export default async function NewListingChatPage({
         <div className="rounded-xl border bg-card p-5 sm:p-7">
           <StartListingChat
             listingId={listing}
-            sellerName={detail.auction.seller.display_name}
+            sellerName={detail.auction.seller?.display_name ?? "seller"}
           />
         </div>
       </div>
