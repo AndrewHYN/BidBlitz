@@ -16,7 +16,7 @@ export const metadata: Metadata = {
   alternates: { canonical: "/privacy" },
 };
 
-const LAST_UPDATED = "13 November 2026";
+const LAST_UPDATED = "16 November 2026";
 
 /** Declared once, used for both the headings and the table of contents. */
 const SECTIONS = [
@@ -28,7 +28,9 @@ const SECTIONS = [
   { id: "sharing", title: "6. Who else receives it" },
   { id: "retention", title: "7. How long we keep it" },
   { id: "choices", title: "8. Your choices" },
-  { id: "changes", title: "9. Changes to this policy" },
+  { id: "security", title: "9. Security and incidents" },
+  { id: "international", title: "10. International service providers" },
+  { id: "changes", title: "11. Changes to this policy" },
 ] as const;
 
 function PrivacySection({
@@ -61,11 +63,11 @@ export default function PrivacyPage() {
 
         <PrivacySection id="overview" title="1. The short version">
           <p>
-            BidBlitz stores the information you provide so the marketplace can
-            work: your account details, your listings, your bids and your
-            reviews. Some of that is deliberately public: bidding is a public,
-            competitive activity. The rest stays private to you and to the
-            people directly involved in a sale.
+            BidBlitz handles information needed for your account, item listings,
+            auctions, offers, service hires, messages, notifications and reviews.
+            Public listings and any contact number you deliberately publish are
+            visible to visitors; private conversations are restricted to the
+            participants, subject to lawful support and safety access.
           </p>
           <p>
             <strong>
@@ -218,12 +220,14 @@ export default function PrivacyPage() {
 
         <PrivacySection id="retention" title="7. How long we keep it">
           <p>
-            We keep your data while your account is active. You can ask us to
-            delete your account and its data at any time using the contact
-            details below. Records of settled sales, payout instructions,
-            moderation actions and disputes may need to be kept so transaction,
-            audit and case histories stay consistent. If that applies, we will
-            tell you.
+            We keep account information while needed for an active account,
+            then review it for deletion or anonymisation when it is no longer
+            necessary. Transaction, safety, legal, audit, complaint and
+            payment records may need to be retained for legitimate obligations.
+            Data in service-provider backups is removed under their backup
+            lifecycles. There is no promise of instant removal from every
+            system. Contact us for a review or deletion request and an explanation
+            of any lawful retention.
           </p>
         </PrivacySection>
 
@@ -260,8 +264,10 @@ export default function PrivacyPage() {
 
         <PrivacySection id="changes" title="9. Changes to this policy">
           <p>
-            If the data BidBlitz handles changes, this page is updated and the
-            date at the top is reset. Check it occasionally.
+            We will update this date and give reasonable notice if the way
+            we process personal information materially changes. We will seek
+            any additional consent required by law rather than treating use of
+            the website as blanket marketing consent.
           </p>
         </PrivacySection>
 
