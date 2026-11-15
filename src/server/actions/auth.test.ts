@@ -516,7 +516,7 @@ describe("verifyEmailLoginCodeAction", () => {
       verifyEmailLoginCodeAction({ email: EMAIL, token: "123456", redirectTo: "https://evil.example" })
     ).rejects.toThrow("NEXT_REDIRECT");
 
-    expect(vi.mocked(redirect)).toHaveBeenLastCalledWith("/dashboard");
+    expect(vi.mocked(redirect)).toHaveBeenLastCalledWith("/browse");
   });
 
   it("rejects a malformed code without contacting the provider", async () => {
