@@ -13,12 +13,9 @@ import { cn } from "@/lib/utils";
 
 const TABS = [
   { href: "/dashboard", label: "Home" },
-  { href: "/dashboard/buying", label: "My bids" },
-  { href: "/dashboard/selling", label: "Selling" },
-  { href: "/dashboard/watchlist", label: "Watchlist" },
-  { href: "/dashboard/transactions", label: "Activity" },
-  { href: "/dashboard/account", label: "Sales account" },
-  { href: "/dashboard/disputes", label: "Cases" },
+  { href: "/dashboard/selling", label: "My listings" },
+  { href: "/messages", label: "Messages" },
+  { href: "/dashboard/watchlist", label: "Saved items" },
 ] as const;
 
 export function DashboardTabs() {
