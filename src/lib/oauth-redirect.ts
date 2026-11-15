@@ -8,7 +8,7 @@ import { safeNext } from "@/lib/safe-next";
  * email-link callback: same canonical origin, same `/auth/callback` route,
  * same single-slash `next` rule. `safeNext` is the ONLY redirect validation
  * mechanism — an attacker-controlled `next` (e.g. `https://evil.example`)
- * falls back to `/dashboard` here, exactly as it does for email links.
+ * falls back to `/browse` here, exactly as it does for email links.
  */
 export function googleOAuthRedirectTo(next?: string | null): string {
   return `${absoluteUrl("/auth/callback")}?next=${encodeURIComponent(safeNext(next))}`;
