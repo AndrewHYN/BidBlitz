@@ -92,7 +92,7 @@ export function ListingChatThread({ conversationId, viewerId, initial }: {
           );
         })}
       </ol>
-      <form onSubmit={send} className="space-y-3">
+      <form method="post" onSubmit={send} className="space-y-3">
         <label htmlFor="listing-chat-body" className="block text-sm font-medium">Reply</label>
         <Textarea
           id="listing-chat-body"
