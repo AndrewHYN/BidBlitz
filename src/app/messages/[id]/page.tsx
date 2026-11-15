@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { ReportDialog } from "@/components/auction/report-dialog";
 import { ListingChatThread, type ListingChatMessage } from "@/components/messages/listing-chat-thread";
+import { MarketplaceDealPanels } from "@/components/messages/marketplace-deal-panels";
 
 export const metadata: Metadata = {
   title: "Conversation",
@@ -28,14 +29,22 @@ export default async function ListingConversationPage({
   if (!chat) notFound();
 
   const otherId = chat.seller_id === user.id ? chat.buyer_id : chat.seller_id;
-  const [{ data: listing }, { data: person }, { data: messages }] = await Promise.all([
+  const [{ data: listing }, { data: person }, { data: messages }, { data: offers }, { data: hires }] = await Promise.all([
     supabase.from("auctions").select("id, title, status").eq("id", chat.listing_id).maybeSingle(),
     supabase.from("profiles").select("display_name, username").eq("id", otherId).maybeSingle(),
     supabase.from("listing_messages")
       .select("id, sender_id, body, created_at, read_at")
       .eq("conversation_id", chat.id)
       .order("created_at", { ascending: false }).limit(100),
+    supabase.from("listing_offers").select("id,amount_minor,status,buyer_id,seller_id,created_at")
+      .eq("conversation_id", chat.id).order("created_at", { ascending: false }).limit(30),
+    supabase.from("service_requests").select("id,details,status,client_id,provider_id,created_at")
+      .eq("conversation_id", chat.id).order("created_at", { ascending: false }).limit(30),
   ]);
+  const requestIds = (hires ?? []).map((request) => request.id);
+  const { data: existingReviews } = requestIds.length
+    ? await supabase.from("service_reviews").select("request_id").in("request_id", requestIds)
+    : { data: [] as { request_id: string }[] };
 
   const ordered = ([...(messages ?? [])].reverse()) as ListingChatMessage[];
 
@@ -54,6 +63,8 @@ export default async function ListingConversationPage({
           </p>
         </header>
         <div className="flex justify-end"><ReportDialog userId={otherId} username={person?.username ?? "member"} /></div>
+        <MarketplaceDealPanels viewerId={user.id} offers={offers ?? []} hires={hires ?? []}
+          reviewedRequestIds={(existingReviews ?? []).map((review) => review.request_id)} />
         <div className="rounded-xl border bg-card p-4 sm:p-6">
           <ListingChatThread conversationId={chat.id} viewerId={user.id} initial={ordered} />
         </div>
