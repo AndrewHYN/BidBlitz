@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getUnreadCount } from "@/server/queries";
 import { HeaderBar, type HeaderUser } from "@/components/header-bar";
+import { MarketplaceMessageAlerts } from "@/components/messages/marketplace-message-alerts";
 
 /**
  * Server wrapper for the navigation: it resolves the session (RLS-scoped) and
@@ -51,5 +52,10 @@ export async function SiteHeader() {
     }
   }
 
-  return <HeaderBar user={headerUser} unreadCount={unreadCount} />;
+  return (
+    <>
+      <HeaderBar user={headerUser} unreadCount={unreadCount} />
+      {user && <MarketplaceMessageAlerts userId={user.id} />}
+    </>
+  );
 }
