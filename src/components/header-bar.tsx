@@ -145,24 +145,6 @@ export function HeaderBar({
   const router = useRouter();
   const [term, setTerm] = useState("");
 
-  // Escape closes the drawer; a history navigation (back/forward) closes it
-  // too, so it can never hang open over a page it does not belong to. Both
-  // are listener callbacks — the sanctioned place for state updates.
-  useEffect(() => {
-    if (!open) return;
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") setOpen(false);
-    }
-    function onPopState() {
-      }
-    window.addEventListener("keydown", onKeyDown);
-    window.addEventListener("popstate", onPopState);
-    return () => {
-      window.removeEventListener("keydown", onKeyDown);
-      window.removeEventListener("popstate", onPopState);
-    };
-  }, [open]);
-
   // The `user` prop above is a server snapshot: after OAuth completes IN THE
   // BROWSER, the session exists but this render still shows "Sign in / Join"
   // until something re-reads the server. So this one subscription watches
