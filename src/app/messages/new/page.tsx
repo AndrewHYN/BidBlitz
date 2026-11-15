@@ -27,7 +27,7 @@ export default async function NewListingChatPage({
   if (detail.auction.seller_id === user.id) redirect(`/sell/${listing}`);
 
   return (
-    <div className="page-container py-10 sm:py-14">
+    <div className="page-container pt-8 pb-32 sm:py-14">
       <div className="mx-auto max-w-xl space-y-6">
         <Link href={`/auction/${listing}`} className="text-sm font-medium text-primary hover:underline">Back to listing</Link>
         <div className="space-y-2">
