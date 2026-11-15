@@ -154,8 +154,7 @@ export function HeaderBar({
       if (event.key === "Escape") setOpen(false);
     }
     function onPopState() {
-      setOpen(false);
-    }
+      }
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("popstate", onPopState);
     return () => {
