@@ -100,6 +100,7 @@ export interface Database {
           fulfilment_notes: string | null;
           currency: string;
           is_direct: boolean;
+          listing_kind: "SALE" | "SERVICE" | "AUCTION";
           starting_bid_minor: number;
           bid_increment_minor: number;
           status: AuctionStatus;
@@ -408,6 +409,24 @@ export interface Database {
         Insert: never;
         Update: never;
       };
+      listing_offers: {
+        Row: { id: string; listing_id: string; conversation_id: string; buyer_id: string;
+          seller_id: string; amount_minor: number; status: "PENDING" | "ACCEPTED" | "DECLINED";
+          created_at: string; responded_at: string | null; };
+        Insert: never; Update: never;
+      };
+      service_requests: {
+        Row: { id: string; listing_id: string; conversation_id: string; client_id: string;
+          provider_id: string; details: string;
+          status: "REQUESTED" | "ACCEPTED" | "DECLINED" | "DELIVERED" | "COMPLETED" | "CANCELLED";
+          created_at: string; updated_at: string; };
+        Insert: never; Update: never;
+      };
+      service_reviews: {
+        Row: { id: string; request_id: string; listing_id: string; provider_id: string;
+          reviewer_id: string; rating: number; comment: string | null; created_at: string; };
+        Insert: never; Update: never;
+      };
       schema_migrations: {
         Row: { filename: string; applied_at: string };
         Insert: { filename: string; applied_at?: string };
@@ -426,6 +445,28 @@ export interface Database {
       mark_listing_conversation_read: {
         Args: { p_conversation_id: string };
         Returns: number;
+      };
+      create_service_listing: {
+        Args: { p_title: string; p_description: string; p_category_id: number;
+          p_condition: Condition; p_location: string;
+          p_fulfilment_method: "COLLECTION" | "DELIVERY" | "BOTH";
+          p_fulfilment_notes: string | null; p_price_minor: number; p_phone: string; };
+        Returns: string;
+      };
+      make_listing_offer: {
+        Args: { p_listing_id: string; p_amount_minor: number }; Returns: string;
+      };
+      respond_listing_offer: {
+        Args: { p_offer_id: string; p_accept: boolean }; Returns: string;
+      };
+      request_service_hire: {
+        Args: { p_listing_id: string; p_details: string }; Returns: string;
+      };
+      respond_service_hire: {
+        Args: { p_request_id: string; p_action: "ACCEPT" | "DECLINE" | "DELIVER" | "CONFIRM" | "CANCEL" }; Returns: string;
+      };
+      review_completed_service: {
+        Args: { p_request_id: string; p_rating: number; p_comment: string }; Returns: string;
       };
       create_direct_listing: {
         Args: {
