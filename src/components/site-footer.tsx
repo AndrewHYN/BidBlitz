@@ -30,6 +30,7 @@ const COLUMNS = [
       { label: "Support tickets", href: "/support/tickets" },
       { label: "Terms of use", href: "/terms" },
       { label: "Privacy policy", href: "/privacy" },
+      { label: "Safety & Trust Centre", href: "/safety" },
       { label: "About BidBlitz", href: "/about" },
     ],
   },
@@ -77,7 +78,7 @@ export function SiteFooter() {
         <div className="page-container grid gap-4 py-5 text-sm lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
           <div className="space-y-1">
             <h2 className="font-semibold">Pay the seller directly</h2>
-            <p className="text-muted-foreground">Agree on cash or mobile money with the seller. BidBlitz does not process these payments.</p>
+            <p className="text-muted-foreground">Agree on cash or mobile money with the seller. BidBlitz does not process these payments. Logos indicate independently operated payment options, not partnerships or endorsements.</p>
           </div>
           <ul className="flex flex-wrap items-center gap-2" aria-label="Cash and mobile-wallet options">
             <li className="inline-flex h-10 items-center gap-2 rounded-md border px-3 font-medium"><Banknote className="size-4" aria-hidden /> Cash</li>
