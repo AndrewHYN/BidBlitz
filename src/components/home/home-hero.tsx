@@ -37,7 +37,7 @@ export function HomeHero() {
           </div>
         </div>
         <div className="hidden space-y-4 border-l border-white/15 pl-6 text-sm text-zinc-300 lg:block">
-          <p className="flex items-start gap-3"><MessageCircle className="mt-0.5 size-5 shrink-0 text-orange-300" aria-hidden /><span>Call or WhatsApp the seller to check availability.</span></p>
+          <p className="flex items-start gap-3"><MessageCircle className="mt-0.5 size-5 shrink-0 text-orange-300" aria-hidden /><span>Message sellers privately on BidBlitz, or use WhatsApp if they share a number.</span></p>
           <p className="flex items-start gap-3"><Wallet className="mt-0.5 size-5 shrink-0 text-orange-300" aria-hidden /><span>Pay the seller by cash or a mobile wallet you both agree on.</span></p>
         </div>
       </div>

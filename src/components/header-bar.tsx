@@ -10,6 +10,7 @@ import {
   Bell,
   Bookmark,
   Gavel,
+  MessageCircle,
   Home,
   Menu,
   Moon,
@@ -63,17 +64,16 @@ const NAV = [
 const DESKTOP_AUTH_NAV = [
   { label: "Home", href: "/dashboard", exact: true },
   { label: "Browse", href: "/browse", exact: false },
-  { label: "Watchlist", href: "/dashboard/watchlist", exact: true },
+  { label: "Messages", href: "/messages", exact: false },
+  { label: "Selling", href: "/dashboard/selling", exact: true },
 ] as const;
 
 const AUTH_NAV = [
   { label: "Home", href: "/dashboard", exact: true },
   { label: "Browse", href: "/browse", exact: false },
-  { label: "Watchlist", href: "/dashboard/watchlist", exact: true },
-  { label: "My bids", href: "/dashboard/buying", exact: true },
-  { label: "My selling", href: "/dashboard/selling", exact: true },
-  { label: "Activity", href: "/dashboard/transactions", exact: true },
-  { label: "Cases", href: "/dashboard/disputes", exact: false },
+  { label: "Messages", href: "/messages", exact: false },
+  { label: "My listings", href: "/dashboard/selling", exact: true },
+  { label: "Saved items", href: "/dashboard/watchlist", exact: true },
   { label: "Help", href: "/help", exact: false },
 ] as const;
 
@@ -392,7 +392,7 @@ export function HeaderBar({
         { label: "Browse", href: "/browse", icon: Search, exact: false },
         { label: "Sell", href: "/sell", icon: Plus, exact: false, primary: true },
         { label: "Watch", href: "/dashboard/watchlist", icon: Bookmark, exact: true },
-        { label: "Activity", href: "/dashboard/transactions", icon: Gavel, exact: true },
+        { label: "Chat", href: "/messages", icon: MessageCircle, exact: false },
       ].map(({ label, href, icon: Icon, exact, primary }) => {
         const active = isActive(pathname, href, exact);
         return (

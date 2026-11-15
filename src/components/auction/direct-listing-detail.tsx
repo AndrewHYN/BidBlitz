@@ -51,6 +51,13 @@ export function DirectListingDetail({ detail, images }: { detail: Listing; image
               <h2 id="listing-price" className="text-sm font-medium text-muted-foreground">Asking price</h2>
               <p className="text-3xl font-bold"><Money minor={auction.starting_bid_minor} currency={auction.currency} /></p>
             </div>
+            {isAvailable && !isOwner && (
+              <Button asChild size="lg" variant="outline" className="mb-3 min-h-11 w-full">
+                <Link href={`/messages/new?listing=${auction.id}`}>
+                  <MessageCircle aria-hidden /> Message seller on BidBlitz
+                </Link>
+              </Button>
+            )}
             {canContact && contactPhone && whatsapp ? (
               <div className="space-y-2">
                 <Button asChild size="lg" className="min-h-11 w-full">
