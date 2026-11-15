@@ -444,6 +444,11 @@ export function HeaderBar({
 
                   <DropdownMenuItem asChild><Link href="/dashboard/selling" onClick={closeMenu}><Bookmark className="size-4" /> My listings</Link></DropdownMenuItem>
                   <DropdownMenuItem asChild><Link href="/dashboard/watchlist" onClick={closeMenu}><Bookmark className="size-4" /> Saved items</Link></DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => {
+                    if (typeof window !== "undefined" && "Notification" in window) {
+                      void Notification.requestPermission();
+                    }
+                  }}>Enable message alerts</DropdownMenuItem>
                   <DropdownMenuItem asChild><Link href="/settings" onClick={closeMenu}><UserIcon className="size-4" /> Settings</Link></DropdownMenuItem>
                   <DropdownMenuItem asChild><Link href="/help" onClick={closeMenu}>Help and safety</Link></DropdownMenuItem>
                   <DropdownMenuItem asChild><Link href="/dashboard/account" onClick={closeMenu}>Previous sales account</Link></DropdownMenuItem>
