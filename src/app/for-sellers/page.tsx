@@ -28,7 +28,7 @@ const steps = [
   {
     icon: MessageCircle,
     title: "Talk to interested buyers",
-    body: "Publish only a phone number you are happy to share. Buyers can call or WhatsApp to discuss collection and payment.",
+    body: "Publish only a phone number you are happy to share. Buyers can message you privately on BidBlitz, or use your published phone number for WhatsApp or calls.",
   },
 ] as const;
 
