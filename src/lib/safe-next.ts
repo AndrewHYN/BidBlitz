@@ -18,7 +18,7 @@
  */
 export function safeNext(
   value: string | null | undefined,
-  fallback = "/dashboard"
+  fallback = "/browse"
 ): string {
   if (typeof value !== "string") return fallback;
   const v = value.trim();
