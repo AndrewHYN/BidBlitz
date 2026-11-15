@@ -32,6 +32,7 @@ import { formatMoney, money, parseMoneyToMinor } from "@/lib/money";
  */
 
 export type BrowseFilterValues = {
+  kind: "" | "SALE" | "AUCTION" | "SERVICE";
   q: string;
   /** category slug, "" = all */
   category: string;
@@ -54,6 +55,7 @@ const ALL = "all";
 
 export function buildBrowseUrl(values: BrowseFilterValues): string {
   const params = new URLSearchParams();
+  if (values.kind) params.set("kind", values.kind);
   const q = values.q.trim();
   if (q) params.set("q", q);
   if (values.category) params.set("category", values.category);
@@ -174,6 +176,22 @@ export function BrowseFilters({
       aria-label="Filter listings"
       className="space-y-4 rounded-xl border bg-card p-4 shadow-sm sm:p-5"
     >
+      <div role="group" aria-label="Listing type" className="grid grid-cols-4 gap-1 rounded-lg bg-muted p-1">
+        {[
+          { key: "" as const, label: "All" },
+          { key: "SALE" as const, label: "Sales" },
+          { key: "AUCTION" as const, label: "Auctions" },
+          { key: "SERVICE" as const, label: "Services" },
+        ].map(({ key, label }) => (
+          <button type="button" key={label} aria-pressed={values.kind === key}
+            onClick={() => patch({ kind: key })}
+            className={values.kind === key
+              ? "min-h-10 rounded-md bg-background px-1 text-xs font-semibold shadow-sm sm:text-sm"
+              : "min-h-10 rounded-md px-1 text-xs font-medium text-muted-foreground hover:text-foreground sm:text-sm"}>
+            {label}
+          </button>
+        ))}
+      </div>
       <form
       onSubmit={submitSearch}
       /* GET, stated rather than defaulted. This is a genuine navigation form —
