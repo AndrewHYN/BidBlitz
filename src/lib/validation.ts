@@ -236,6 +236,7 @@ export const SORTS = [
 export type SortValue = (typeof SORTS)[number]["value"];
 
 export const browseParamsSchema = z.object({
+  kind: z.enum(["SALE", "AUCTION", "SERVICE"]).optional(),
   q: z.string().trim().max(80).optional(),
   category: z.string().regex(/^[a-z0-9-]{0,40}$/).optional(),
   condition: conditionSchema.optional(),
