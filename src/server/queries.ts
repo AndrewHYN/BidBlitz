@@ -37,10 +37,11 @@ export type AuctionCardData = {
   businessName: string | null;
   businessSlug: string | null;
   isDirect?: boolean;
+  listingKind?: "SALE" | "AUCTION" | "SERVICE";
 };
 
 const CARD_SELECT = `
-  id, title, is_direct, current_bid_minor, starting_bid_minor, bid_count,
+  id, title, is_direct, listing_kind, current_bid_minor, starting_bid_minor, bid_count,
   ends_at, status, location, condition, featured, featured_until,
   categories:category_id(slug, name),
   business:business_id(slug, display_name),
@@ -50,6 +51,7 @@ const CARD_SELECT = `
 type CardJoin = {
   id: string;
   is_direct?: boolean;
+  listing_kind?: "SALE" | "AUCTION" | "SERVICE";
   title: string;
   current_bid_minor: number | null;
   starting_bid_minor: number;
@@ -102,6 +104,7 @@ function toCard(row: CardJoin): AuctionCardData {
     id: row.id,
     title: row.title,
     isDirect: row.is_direct === true,
+    listingKind: row.listing_kind ?? (row.is_direct ? "SALE" : "AUCTION"),
     imageUrl: imageUrlFor(sorted[0]?.storage_path),
     currentBidMinor: row.current_bid_minor,
     startingBidMinor: row.starting_bid_minor,
@@ -126,8 +129,7 @@ export const getMarketplaceHome = cache(async () => {
   const [{ data, error }, categories] = await Promise.all([
     supabase.from("auctions")
       .select(CARD_SELECT)
-      .eq("is_direct", true)
-      .eq("status", "LISTED")
+      .or("and(is_direct.eq.true,status.eq.LISTED),and(is_direct.eq.false,status.eq.LIVE)")
       .is("archived_at", null)
       .order("listed_at", { ascending: false })
       .order("id")
@@ -139,6 +141,7 @@ export const getMarketplaceHome = cache(async () => {
 });
 
 export type BrowseFilters = {
+  kind?: "SALE" | "AUCTION" | "SERVICE";
   q?: string;
   category?: string;
   condition?: string;
@@ -163,9 +166,10 @@ export const browseListings = cache(async (filters: BrowseFilters) => {
         : CARD_SELECT,
       { count: "exact" }
     )
-    .eq("is_direct", true)
-    .eq("status", "LISTED")
+    .or("and(is_direct.eq.true,status.eq.LISTED),and(is_direct.eq.false,status.eq.LIVE)")
     .is("archived_at", null);
+
+  if (filters.kind) query = query.eq("listing_kind", filters.kind);
 
   if (filters.q) {
     // Postgres full-text, no search cluster needed at this scale

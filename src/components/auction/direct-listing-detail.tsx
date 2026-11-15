@@ -5,6 +5,8 @@ import { ImageGallery, type GalleryImage } from "@/components/auction/image-gall
 import { Money } from "@/components/auction/money";
 import { ReportDialog } from "@/components/auction/report-dialog";
 import { SellerCard } from "@/components/auction/seller-card";
+import { ListingDealButtons } from "@/components/auction/listing-deal-buttons";
+import { ServiceReviewList } from "@/components/auction/service-review-list";
 import { ShareButton } from "@/components/auction/share-button";
 import { ConditionBadge, StatusBadge } from "@/components/auction/status-badge";
 import { WatchButton } from "@/components/auction/watch-button";
@@ -39,7 +41,7 @@ export function DirectListingDetail({ detail, images }: { detail: Listing; image
             <h1 data-testid="auction-title" className="text-3xl font-bold tracking-tight break-words">{auction.title}</h1>
             <div className="flex flex-wrap items-center gap-2">
               <StatusBadge status={auction.status} />
-              <ConditionBadge condition={auction.condition} />
+              {auction.listing_kind !== "SERVICE" && <ConditionBadge condition={auction.condition} />}
               <span className="inline-flex items-center gap-1 text-sm text-muted-foreground">
                 <MapPin className="size-4 shrink-0" aria-hidden /> {auction.location}
               </span>
@@ -48,9 +50,14 @@ export function DirectListingDetail({ detail, images }: { detail: Listing; image
 
           <section aria-labelledby="listing-price" className="space-y-4 rounded-xl border bg-card p-5 shadow-sm">
             <div>
-              <h2 id="listing-price" className="text-sm font-medium text-muted-foreground">Asking price</h2>
+              <h2 id="listing-price" className="text-sm font-medium text-muted-foreground">{auction.listing_kind === "SERVICE" ? "Starting price" : "Asking price"}</h2>
               <p className="text-3xl font-bold"><Money minor={auction.starting_bid_minor} currency={auction.currency} /></p>
             </div>
+            {isAvailable && !isOwner && (
+              <div className="mb-3">
+                <ListingDealButtons listingId={auction.id} kind={auction.listing_kind === "SERVICE" ? "SERVICE" : "SALE"} />
+              </div>
+            )}
             {isAvailable && !isOwner && (
               <Button asChild size="lg" variant="outline" className="mb-3 min-h-11 w-full">
                 <Link href={`/messages/new?listing=${auction.id}`}>
@@ -83,11 +90,12 @@ export function DirectListingDetail({ detail, images }: { detail: Listing; image
           </div>
 
           <section aria-labelledby="listing-description" className="space-y-2">
-            <h2 id="listing-description" className="font-semibold">About this item</h2>
+            <h2 id="listing-description" className="font-semibold">{auction.listing_kind === "SERVICE" ? "About this service" : "About this item"}</h2>
             <p className="break-words whitespace-pre-line text-muted-foreground">{auction.description}</p>
           </section>
 
           <SellerCard seller={auction.seller} business={auction.business} />
+          {auction.listing_kind === "SERVICE" && <ServiceReviewList listingId={auction.id} />}
 
           {auction.fulfilment_method && <section className="space-y-1" aria-labelledby="listing-handover">
             <h2 id="listing-handover" className="font-semibold">{fulfilmentMethodLabels[auction.fulfilment_method]}</h2>

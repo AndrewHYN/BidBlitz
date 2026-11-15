@@ -361,10 +361,13 @@ function describe(
     }
     case "NEW_MESSAGE": {
       const transactionId = typeof p.transactionId === "string" ? p.transactionId : null;
+      const chatId = typeof p.listingChatId === "string" ? p.listingChatId : null;
       return {
         headline: `New message about ${headline}`,
         detail: <>Open the conversation to read it and reply.</>,
         threadId: transactionId,
+        href: chatId ? `/messages/${chatId}` : null,
+        actionLabel: chatId ? "Reply" : undefined,
       };
     }
     default:

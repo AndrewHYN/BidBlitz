@@ -33,9 +33,9 @@ describe("googleOAuthRedirectTo", () => {
     }
   });
 
-  it("defaults a missing destination to the dashboard", () => {
-    expect(googleOAuthRedirectTo(undefined)).toContain(`next=${encodeURIComponent("/dashboard")}`);
-    expect(googleOAuthRedirectTo(null)).toContain(`next=${encodeURIComponent("/dashboard")}`);
+  it("defaults a missing destination to the product feed", () => {
+    expect(googleOAuthRedirectTo(undefined)).toContain(`next=${encodeURIComponent("/browse")}`);
+    expect(googleOAuthRedirectTo(null)).toContain(`next=${encodeURIComponent("/browse")}`);
   });
 
   it("never hardcodes a hostname", () => {

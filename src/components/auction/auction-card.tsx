@@ -79,7 +79,11 @@ export function AuctionCard({
         <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/25 to-transparent" />
 
         <div className="absolute left-2 top-2 flex flex-wrap gap-1.5">
-          <LiveStatus status={auction.status} endsAt={auction.endsAt} />
+          {auction.isDirect ? (
+            <span className="rounded-md bg-background/95 px-2 py-1 text-[11px] font-semibold">
+              {auction.listingKind === "SERVICE" ? "Service" : "For sale"}
+            </span>
+          ) : <LiveStatus status={auction.status} endsAt={auction.endsAt} />}
           {auction.featured && (
             <span className="rounded-md border border-primary/20 bg-primary px-2 py-0.5 text-[11px] font-bold text-primary-foreground shadow-md shadow-primary/10">
               Promoted
@@ -106,7 +110,7 @@ export function AuctionCard({
           {auction.categoryName && (
             <span className="rounded-md bg-muted px-1.5 py-0.5">{auction.categoryName}</span>
           )}
-          <ConditionBadge condition={auction.condition} className="px-1.5 py-0 text-[11px]" />
+          {auction.listingKind !== "SERVICE" && <ConditionBadge condition={auction.condition} className="px-1.5 py-0 text-[11px]" />}
           {auction.businessName && (
             <span className="inline-flex items-center gap-1 rounded-md bg-primary/5 px-1.5 py-0.5 font-semibold text-primary">
               <Building2 className="size-3" aria-hidden />
@@ -118,7 +122,7 @@ export function AuctionCard({
         <div className="mt-auto flex items-end justify-between gap-2 pt-3">
           <div className="min-w-0">
             <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-              {auction.isDirect ? "Asking price" : hasBids ? "Current bid" : "Starting bid"}
+              {auction.listingKind === "SERVICE" ? "Starting from" : auction.isDirect ? "Asking price" : hasBids ? "Current bid" : "Starting bid"}
             </p>
             <p
               data-testid="card-price"
@@ -153,7 +157,7 @@ export function AuctionCard({
             <span />
           )}
           <span className="inline-flex shrink-0 items-center gap-1 font-semibold text-primary">
-            View auction
+            {auction.listingKind === "SERVICE" ? "View service" : auction.isDirect ? "View item" : "View auction"}
             <ArrowUpRight className="size-3.5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" aria-hidden />
           </span>
         </div>

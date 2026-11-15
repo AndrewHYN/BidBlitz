@@ -166,7 +166,7 @@ export async function createDirectListingAction(input: unknown): Promise<
   }
 
   const listing = parsed.data;
-  const { data, error } = await supabase.rpc("create_direct_listing", {
+  const { data, error } = await supabase.rpc(listing.listingKind === "SERVICE" ? "create_service_listing" : "create_direct_listing", {
     p_title: listing.title,
     p_description: listing.description,
     p_category_id: listing.categoryId,

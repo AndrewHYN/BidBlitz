@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useMounted } from "@/hooks/use-mounted";
 import {
   Bell,
@@ -12,14 +11,12 @@ import {
   Gavel,
   MessageCircle,
   Home,
-  Menu,
   Moon,
   Plus,
   Search,
   ShieldAlert,
   Sun,
   User as UserIcon,
-  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -62,20 +59,13 @@ const NAV = [
 
 /** Keep the signed-in desktop mental model deliberately small. */
 const DESKTOP_AUTH_NAV = [
-  { label: "Home", href: "/dashboard", exact: true },
+  { label: "Home", href: "/", exact: true },
   { label: "Browse", href: "/browse", exact: false },
   { label: "Messages", href: "/messages", exact: false },
   { label: "Selling", href: "/dashboard/selling", exact: true },
 ] as const;
 
-const AUTH_NAV = [
-  { label: "Home", href: "/dashboard", exact: true },
-  { label: "Browse", href: "/browse", exact: false },
-  { label: "Messages", href: "/messages", exact: false },
-  { label: "My listings", href: "/dashboard/selling", exact: true },
-  { label: "Saved items", href: "/dashboard/watchlist", exact: true },
-  { label: "Help", href: "/help", exact: false },
-] as const;
+
 
 /**
  * Badge-refresh pacing (see the subscription in `HeaderBar`).
@@ -153,28 +143,7 @@ export function HeaderBar({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const reduceMotion = useReducedMotion();
-  const [open, setOpen] = useState(false);
   const [term, setTerm] = useState("");
-
-  // Escape closes the drawer; a history navigation (back/forward) closes it
-  // too, so it can never hang open over a page it does not belong to. Both
-  // are listener callbacks — the sanctioned place for state updates.
-  useEffect(() => {
-    if (!open) return;
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") setOpen(false);
-    }
-    function onPopState() {
-      setOpen(false);
-    }
-    window.addEventListener("keydown", onKeyDown);
-    window.addEventListener("popstate", onPopState);
-    return () => {
-      window.removeEventListener("keydown", onKeyDown);
-      window.removeEventListener("popstate", onPopState);
-    };
-  }, [open]);
 
   // The `user` prop above is a server snapshot: after OAuth completes IN THE
   // BROWSER, the session exists but this render still shows "Sign in / Join"
@@ -315,69 +284,10 @@ export function HeaderBar({
     e.preventDefault();
     const q = term.trim();
     router.push(q ? `/browse?q=${encodeURIComponent(q)}` : "/browse");
-    setOpen(false);
   }
 
-  const links = user ? AUTH_NAV : NAV;
   const desktopLinks = user ? DESKTOP_AUTH_NAV : NAV;
-  // Admin discoverability: the entry appears if and only if the server says
-  // the session is an admin. Visibility is not authorization - /admin and
-  // every admin action re-check server-side - but an operator should not have
-  // to guess the URL.
-  const adminLink = user?.isAdmin
-    ? [{ label: "Admin", href: "/admin", exact: true } as const]
-    : [];
-  /** Any in-header navigation also closes the drawer. */
-  const closeMenu = () => setOpen(false);
-
-  const drawerContent = (
-    <div className="page-container space-y-3 py-4">
-      <form
-        onSubmit={submitSearch}
-        /* GET, stated rather than defaulted: this is a navigation form and the
-           query string is the correct result. Carries no secrets. */
-        method="get"
-        className="md:hidden"
-      >
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={term}
-            onChange={(e) => setTerm(e.target.value)}
-            placeholder="Search listings…"
-            aria-label="Search listings"
-            className="pl-9"
-          />
-        </div>
-      </form>
-
-      <nav aria-label="Mobile" className="grid gap-1">
-        {[...links, ...adminLink].map((l) => (
-          <Link
-            key={l.href}
-            href={l.href}
-            onClick={() => setOpen(false)}
-            aria-current={isActive(pathname, l.href, "exact" in l && l.exact) ? "page" : undefined}
-            className={cn(
-              "rounded-md px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-              isActive(pathname, l.href, "exact" in l && l.exact) &&
-                "bg-accent text-accent-foreground"
-            )}
-          >
-            {l.label}
-          </Link>
-        ))}
-      </nav>
-
-      {user && (
-        <Button asChild className="w-full">
-          <Link href="/sell" onClick={() => setOpen(false)}>
-            <Plus className="size-4" /> List an item
-          </Link>
-        </Button>
-      )}
-    </div>
-  );
+  const closeMenu = () => {};
 
   const showMobileDock = user !== null && !pathname.startsWith("/auction/");
 
@@ -388,7 +298,7 @@ export function HeaderBar({
       className="fixed inset-x-2 bottom-2 z-30 grid grid-cols-5 rounded-2xl border bg-background/95 p-1.5 shadow-2xl backdrop-blur-md md:hidden"
     >
       {[
-        { label: "Home", href: "/dashboard", icon: Home, exact: true },
+        { label: "Home", href: "/", icon: Home, exact: true },
         { label: "Browse", href: "/browse", icon: Search, exact: false },
         { label: "Sell", href: "/sell", icon: Plus, exact: false, primary: true },
         { label: "Watch", href: "/dashboard/watchlist", icon: Bookmark, exact: true },
@@ -421,19 +331,6 @@ export function HeaderBar({
     <>
     <header className="sticky top-0 z-40 border-b bg-background/85 backdrop-blur-md">
       <div className="page-container flex h-16 items-center gap-3">
-        {/* mobile menu trigger */}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="lg:hidden"
-          aria-label={open ? "Close menu" : "Open menu"}
-          aria-expanded={open}
-          aria-controls="mobile-menu"
-          onClick={() => setOpen((v) => !v)}
-        >
-          {open ? <X className="size-5" /> : <Menu className="size-5" />}
-        </Button>
-
         <Link
           href="/"
           onClick={closeMenu}
@@ -544,6 +441,17 @@ export function HeaderBar({
                       <UserIcon className="size-4" /> Profile
                     </Link>
                   </DropdownMenuItem>
+
+                  <DropdownMenuItem asChild><Link href="/dashboard/selling" onClick={closeMenu}><Bookmark className="size-4" /> My listings</Link></DropdownMenuItem>
+                  <DropdownMenuItem asChild><Link href="/dashboard/watchlist" onClick={closeMenu}><Bookmark className="size-4" /> Saved items</Link></DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => {
+                    if (typeof window !== "undefined" && "Notification" in window) {
+                      void Notification.requestPermission();
+                    }
+                  }}>Enable message alerts</DropdownMenuItem>
+                  <DropdownMenuItem asChild><Link href="/settings" onClick={closeMenu}><UserIcon className="size-4" /> Settings</Link></DropdownMenuItem>
+                  <DropdownMenuItem asChild><Link href="/help" onClick={closeMenu}>Help and safety</Link></DropdownMenuItem>
+                  <DropdownMenuItem asChild><Link href="/dashboard/account" onClick={closeMenu}>Previous sales account</Link></DropdownMenuItem>
                   <DropdownMenuItem asChild>
                     <Link href="/dashboard/transactions" onClick={closeMenu}>
                       <Gavel className="size-4" /> Transactions
@@ -587,26 +495,6 @@ export function HeaderBar({
         </div>
       </div>
 
-      {/* mobile drawer — transform/opacity only, standing down for reduced motion */}
-      {open &&
-        (reduceMotion ? (
-          <div id="mobile-menu" className="border-t lg:hidden">
-            {drawerContent}
-          </div>
-        ) : (
-          <AnimatePresence initial={false}>
-            <motion.div
-              id="mobile-menu"
-              initial={{ opacity: 0, y: -8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-              className="overflow-hidden border-t lg:hidden"
-            >
-              {drawerContent}
-            </motion.div>
-          </AnimatePresence>
-        ))}
     </header>
     {mobileDock}
     </>
