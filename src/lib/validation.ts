@@ -154,6 +154,7 @@ export const directListingSchema = createAuctionSchema.pick({
   location: true,
   fulfilmentNotes: true,
 }).extend({
+  listingKind: z.enum(["SALE", "SERVICE"]).default("SALE"),
   fulfilmentMethod: fulfilmentMethodSchema,
   priceMinor: minorAmount.refine((value) => value >= 100n, "Minimum asking price is $1.00"),
   contactPhone: z.string().transform(normalizeZimbabwePhone).pipe(
