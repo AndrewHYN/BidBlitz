@@ -65,9 +65,10 @@ export default function PrivacyPage() {
           <p>
             BidBlitz handles information needed for your account, item listings,
             auctions, offers, service hires, messages, notifications and reviews.
-            Public listings and any contact number you deliberately publish are
-            visible to visitors; private conversations are restricted to the
-            participants, subject to lawful support and safety access.
+            Public listings are visible to visitors, but seller phone numbers are
+            available through limited, recorded reveal requests by signed-in
+            buyers. Private conversations are restricted to participants,
+            subject to lawful support and safety access.
           </p>
           <p>
             <strong>
@@ -111,7 +112,7 @@ export default function PrivacyPage() {
             <li>
               <strong>Your listings:</strong> item titles, descriptions,
               category, condition, location, pricing, timing, the photos you upload
-              and any number you choose to publish for buyer enquiries.
+              and the contact number you provide for buyer enquiries.
             </li>
             <li>
               <strong>Your activity:</strong> bids you place, auctions you
@@ -169,12 +170,12 @@ export default function PrivacyPage() {
             <li>the amount and timing of each bid on an auction you can view;</li>
             <li>your public profile page, including your rating summary.</li>
             <li>
-              To publish a direct listing, the current seller form asks you
-              to consent to publicly displaying its contact number. Visitors
-              can call or use WhatsApp, and can copy or save a number they see.
-              Marking an item sold or removing it hides the number from new
-              visitors, but cannot retrieve earlier copies. Do not use someone
-              else&apos;s contact details without authorization.
+              To publish a direct listing, you consent to allowing signed-in
+              buyers to request your contact number while the listing is available.
+              Reveals are limited and recorded for abuse prevention. Once a buyer
+              receives it, they can still save or share it. Marking an item sold
+              or removing it blocks new requests but cannot retrieve earlier
+              copies. Never provide someone else&apos;s number without permission.
             </li>
           </ul>
           <p>
