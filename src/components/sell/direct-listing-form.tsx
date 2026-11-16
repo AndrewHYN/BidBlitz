@@ -130,13 +130,13 @@ export function DirectListingForm({ categories, listingKind = "SALE" }: { catego
 
       <div className="space-y-3 border-t pt-5">
         <div className="space-y-2">
-          <Label htmlFor="sell-phone">Public phone / WhatsApp number</Label>
+          <Label htmlFor="sell-phone">Seller contact / WhatsApp number</Label>
           <Input id="sell-phone" name="contactPhone" type="tel" autoComplete="tel" maxLength={24} placeholder="e.g. 0772 123 456" required />
           {error("contactPhone")}
         </div>
         <label className="flex items-start gap-3 text-sm">
           <input type="checkbox" name="publishContact" required className="mt-0.5 size-4 shrink-0 accent-primary" />
-          <span>Show this number on my public listing so interested people can call or WhatsApp me. Private chat is available too.</span>
+          <span>Allow signed-in buyers to request my phone or WhatsApp number for this available listing. Requests are limited and recorded, but a buyer who receives my number can save or share it. Private BidBlitz chat is available too.</span>
         </label>
         {error("publishContact")}
       </div>

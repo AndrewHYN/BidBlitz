@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { Banknote, Mail, Phone } from "lucide-react";
+import { Banknote, Mail } from "lucide-react";
 import { BrandMark } from "@/components/brand-mark";
 
 const COLUMNS = [
@@ -54,9 +54,6 @@ export function SiteFooter() {
           <p className="max-w-xs text-sm text-muted-foreground">Buy and sell locally across Zimbabwe.</p>
           <a href="mailto:support@bidblitz.co.zw" className="flex items-center gap-2 py-1 text-sm text-muted-foreground hover:text-foreground">
             <Mail className="size-4 shrink-0" aria-hidden /> support@bidblitz.co.zw
-          </a>
-          <a href="tel:+263789335669" className="flex items-center gap-2 py-1 text-sm text-muted-foreground hover:text-foreground">
-            <Phone className="size-4 shrink-0" aria-hidden /> +263 789 335 669
           </a>
         </div>
 

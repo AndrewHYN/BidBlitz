@@ -283,7 +283,8 @@ export const getAuctionDetail = cache(async (id: string) => {
     transaction = tx ?? null;
   }
 
-  const contact = data.is_direct
+  // Sellers need their own contact when editing; other visitors use the audited reveal action.
+  const contact = user && user.id === data.seller_id && data.is_direct
     ? await supabase.from("listing_contacts").select("phone_e164").eq("auction_id", id).maybeSingle()
     : null;
 

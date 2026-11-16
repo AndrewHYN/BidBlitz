@@ -62,14 +62,7 @@ function Reputation({ profile }: { profile: Profile }) {
         </span>
       )}
 
-      {profile.sales_count > 0 && (
-        <>
-          <span aria-hidden className="text-border">·</span>
-          <span data-numeric>
-            {profile.sales_count} completed {profile.sales_count === 1 ? "sale" : "sales"}
-          </span>
-        </>
-      )}
+
     </div>
   );
 }

@@ -119,8 +119,9 @@ export default function TermsPage() {
           </p>
           <p>
             For a fixed-price listing, provide a number you are authorised to share.
-            It appears publicly while the listing is available. Mark the item sold or remove
-            the listing when buyers should stop contacting you.
+            Signed-in buyers may request to reveal it while the listing is available;
+            requests are limited and recorded. Buyers who receive the number may still
+            save or share it. Mark the item sold or remove it when enquiries should stop.
           </p>
           <p>
             Once you publish an auction, its starting price, bid increment,
@@ -269,11 +270,20 @@ export default function TermsPage() {
 
         <TermsSection id="provision" title="12. How the site is provided">
           <p>
-            Listings are supplied by users, and we cannot promise every
-            description is accurate or the website is always available.
-            We aim to maintain reasonable security and address credible safety
-            reports. Nothing here excludes non-waivable consumer or privacy
-            protections, liability for fraud, or other legal duties.
+            BidBlitz operates an online listing and communication service, not a party
+            to ordinary direct buyer-seller sales or service contracts. In these
+            direct transactions BidBlitz does not own, inspect, store, ship or
+            guarantee goods, collect the payment or control seller delivery.
+            Buyer and seller are responsible for agreeing the price, verifying
+            identity and condition, payment, handover, and any lawful return or
+            refund remedy. BidBlitz cannot reverse funds it never received.
+            Listings are supplied by users, so we cannot promise their accuracy
+            or guarantee against fraud, loss or interruptions. To the extent
+            permitted by applicable law, BidBlitz does not accept liability for
+            losses arising solely from transactions between independent users.
+            We aim to maintain reasonable security and act on credible reports;
+            nothing here excludes non-waivable consumer or privacy protections,
+            liability for our own unlawful conduct, or other mandatory duties.
           </p>
           <p>
             We date policy changes and provide reasonable notice of material
@@ -348,9 +358,11 @@ export default function TermsPage() {
             password, wallet PIN or identity-document image in chat.
           </p>
           <p>
-            The phone number a seller actively chooses to publish on a listing
-            is visible to visitors while that listing is available. Do not
-            scrape, bulk-export, resell or use other members&apos; information
+            A seller&apos;s listing phone number is not shown to anonymous visitors.
+            Signed-in buyers may request to reveal it for an available listing;
+            requests are rate-limited and recorded for abuse prevention. A buyer
+            who receives the number may still save it. Do not scrape,
+            bulk-export, resell or use other members&apos; information
             for unsolicited promotion. See the <Link href="/privacy">Privacy Policy</Link>
             and <Link href="/safety">Safety Centre</Link>.
           </p>
