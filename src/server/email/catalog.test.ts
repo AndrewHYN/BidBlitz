@@ -39,6 +39,7 @@ const DATA: Record<string, Record<string, string>> = {
   payment_received: { title: "Radio", auctionId: "a-1", name: "Buyer", amount: "$30.00" },
   payment_expired: { title: "Radio", name: "Buyer", isSeller: "false" },
   team_invite: { role: "MODERATOR", token: "abc" },
+  listing_message: { title: "Radio", name: "Seller", conversationId: "c-1" },
   new_message: { title: "Radio", name: "Buyer", senderName: "Seller", transactionId: "t-1" },
 };
 

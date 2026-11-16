@@ -361,6 +361,23 @@ export const EMAIL_TEMPLATES: Record<string, EmailTemplate> = {
       cta: { label: "Accept the invitation", href: `${appUrl}/admin/team/accept?token=${d.token}` },
     }),
   },
+  listing_message: {
+    key: "listing_message",
+    // Transactional enquiry notification. A rate limit in notify.ts prevents
+    // a message burst from flooding a buyer or seller's inbox.
+    critical: true,
+    subject: (d) => `New BidBlitz message about ${d.title}`,
+    content: (d, appUrl) => ({
+      subject: `New BidBlitz message about ${d.title}`,
+      name: d.name,
+      headline: `Someone messaged you about “${d.title}”`,
+      paragraphs: [
+        "Sign in to BidBlitz to read the new message and reply.",
+        "For your safety, do not send wallet PINs, passwords or verification codes to strangers.",
+      ],
+      cta: { label: "Open conversation", href: `${appUrl}/messages/${d.conversationId}` },
+    }),
+  },
   new_message: {
     key: "new_message",
     // Critical, not preference-gated: this is how a buyer and seller finish

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { notifyListingChatRecipient } from "@/server/email/notify";
 
 const conversationInput = z.object({
   listingId: z.uuid(),
@@ -25,6 +26,35 @@ function chatError(code?: string): string {
   return "Messaging is unavailable right now. Please try again.";
 }
 
+async function alertOtherParticipant(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  conversationId: string,
+  senderId: string
+): Promise<void> {
+  try {
+    // The DB RPC controls who can send; this read only discovers the actual
+    // counterparty, never accepting a recipient from a browser payload.
+    const { data: thread } = await supabase
+      .from("listing_conversations")
+      .select("listing_id, buyer_id, seller_id")
+      .eq("id", conversationId)
+      .maybeSingle();
+    if (!thread) return;
+    const recipientId =
+      thread.buyer_id === senderId ? thread.seller_id :
+      thread.seller_id === senderId ? thread.buyer_id : null;
+    if (!recipientId) return;
+    const { data: listing } = await supabase
+      .from("auctions")
+      .select("title")
+      .eq("id", thread.listing_id)
+      .maybeSingle();
+    await notifyListingChatRecipient(recipientId, listing?.title ?? "your listing", conversationId);
+  } catch {
+    // The message is committed before notifications; an alert cannot undo it.
+  }
+}
+
 export async function startListingChatAction(input: unknown): Promise<ListingChatResult> {
   const parsed = conversationInput.safeParse(input);
   if (!parsed.success) return { ok: false, message: "Choose an item and write a message (maximum 2,000 characters)." };
@@ -39,6 +69,7 @@ export async function startListingChatAction(input: unknown): Promise<ListingCha
   if (error || !data) return { ok: false, message: chatError(error?.message) };
   revalidatePath("/messages");
   revalidatePath(`/messages/${data}`);
+  await alertOtherParticipant(supabase, data, user.id);
   return { ok: true, conversationId: data };
 }
 
@@ -56,6 +87,7 @@ export async function sendListingChatAction(input: unknown): Promise<ListingChat
   if (error) return { ok: false, message: chatError(error.message) };
   revalidatePath("/messages");
   revalidatePath(`/messages/${parsed.data.conversationId}`);
+  await alertOtherParticipant(supabase, parsed.data.conversationId, user.id);
   return { ok: true, conversationId: parsed.data.conversationId };
 }
 

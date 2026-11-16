@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createClient } from "@/lib/supabase/server";
+import { notifyListingChatRecipient } from "@/server/email/notify";
 import {
   startListingChatAction,
   sendListingChatAction,
@@ -8,23 +9,38 @@ import {
 
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+vi.mock("@/server/email/notify", () => ({ notifyListingChatRecipient: vi.fn() }));
 
 const LISTING = "123e4567-e89b-42d3-a456-426614174000";
 const THREAD = "123e4567-e89b-42d3-a456-426614174001";
 let signedIn = true;
+let currentUserId = "user1";
 let failure: string | null = null;
 const rpcMock = vi.fn();
 
 beforeEach(() => {
   signedIn = true;
+  currentUserId = "user1";
   failure = null;
+  vi.mocked(notifyListingChatRecipient).mockReset();
+  vi.mocked(notifyListingChatRecipient).mockResolvedValue(undefined);
   rpcMock.mockReset();
   rpcMock.mockImplementation(async (name: string) => ({
     data: name === "start_listing_conversation" ? THREAD : name === "mark_listing_conversation_read" ? 1 : null,
     error: failure ? { message: failure } : null,
   }));
   vi.mocked(createClient).mockResolvedValue({
-    auth: { getUser: vi.fn(async () => ({ data: { user: signedIn ? { id: "user1" } : null } })) },
+    auth: { getUser: vi.fn(async () => ({ data: { user: signedIn ? { id: currentUserId } : null } })) },
+    from: vi.fn((table: string) => ({
+      select: () => ({
+        eq: () => ({ maybeSingle: async () => ({
+          data: table === "listing_conversations"
+            ? { listing_id: LISTING, buyer_id: "user1", seller_id: "seller1" }
+            : table === "auctions" ? { title: "Test listing" } : null,
+          error: null,
+        }) }),
+      }),
+    })),
     rpc: rpcMock,
   } as unknown as Awaited<ReturnType<typeof createClient>>);
 });
@@ -58,6 +74,15 @@ describe("direct marketplace chat actions", () => {
     expect(rpcMock).toHaveBeenCalledWith("send_listing_message", {
       p_conversation_id: THREAD, p_body: "Thanks!",
     });
+  });
+
+  it("emails only the actual other participant after a successful listing chat message", async () => {
+    await startListingChatAction({ listingId: LISTING, body: "Can I collect it?" });
+    expect(notifyListingChatRecipient).toHaveBeenCalledWith("seller1", "Test listing", THREAD);
+    vi.mocked(notifyListingChatRecipient).mockClear();
+    currentUserId = "seller1";
+    await sendListingChatAction({ conversationId: THREAD, body: "Yes, in town." });
+    expect(notifyListingChatRecipient).toHaveBeenCalledWith("user1", "Test listing", THREAD);
   });
 
   it("fails closed when the database denies access or rate limits", async () => {
