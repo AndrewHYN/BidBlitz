@@ -1,6 +1,6 @@
 import "server-only";
 import { createAdminClient, hasAdminCredentials } from "@/lib/supabase/admin";
-import { emailKey, queueEmail } from "./sender";
+import { dispatchEmailOutbox, emailKey, queueEmail } from "./sender";
 
 /**
  * One-liner fan-out for marketplace events. Every function here is
@@ -150,4 +150,30 @@ export async function notifyUser(
     data: { ...data, name: contact.name },
     idempotencyKey: key,
   });
+}
+
+/**
+ * Send one private-listing enquiry alert to the actual conversation recipient.
+ * Suppress bursts: at most one email per recipient/thread per 10-minute window.
+ * The message itself is already committed, so provider failures never affect it.
+ */
+export async function notifyListingChatRecipient(
+  recipientId: string,
+  title: string,
+  conversationId: string
+): Promise<void> {
+  try {
+    const contact = await userContact(recipientId);
+    if (!contact) return;
+    const windowIndex = Math.floor(Date.now() / 600_000);
+    const jobId = await queueEmail({
+      to: contact.email,
+      template: "listing_message",
+      data: { name: contact.name, title, conversationId },
+      idempotencyKey: emailKey("listing_message", conversationId, recipientId, windowIndex),
+    });
+    if (jobId) await dispatchEmailOutbox(1, jobId);
+  } catch {
+    // Alerts are best-effort; the buyer/seller message must never roll back.
+  }
 }
