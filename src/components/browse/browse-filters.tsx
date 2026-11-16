@@ -177,7 +177,7 @@ export function BrowseFilters({
       aria-label="Filter listings"
       className="space-y-4 rounded-xl border bg-card p-4 shadow-sm sm:p-5"
     >
-      <div role="group" aria-label="Listing type" className={`grid ${PUBLIC_AUCTIONS_ENABLED ? "grid-cols-4" : "grid-cols-3"} gap-1 rounded-lg bg-muted p-1`}>
+      <div role="group" aria-label="Listing type" className={`grid ${PUBLIC_AUCTIONS_ENABLED ? "grid-cols-4" : "grid-cols-3"} gap-1 rounded-lg bg-muted p-1`}}>
         {[
           { key: "" as const, label: "All" },
           { key: "SALE" as const, label: "Sales" },
