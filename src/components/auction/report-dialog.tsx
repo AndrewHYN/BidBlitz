@@ -37,7 +37,7 @@ export function ReportDialog({
   const targetType = auctionId ? ("auction" as const) : ("user" as const);
   const targetId = (auctionId ?? userId) as string;
   const targetName =
-    targetType === "auction" ? "this auction" : `@${username ?? "this user"}`;
+    targetType === "auction" ? "this listing" : `@${username ?? "this user"}`;
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
   const [pending, setPending] = useState(false);
@@ -96,14 +96,14 @@ export function ReportDialog({
           className="text-muted-foreground"
         >
           <Flag aria-hidden />
-          {targetType === "auction" ? "Report this auction" : `Report @${username ?? "user"}`}
+          {targetType === "auction" ? "Report this listing" : `Report @${username ?? "user"}`}
         </Button>
       </DialogTrigger>
 
       <DialogContent>
         <DialogHeader>
           <DialogTitle>
-            {targetType === "auction" ? "Report this auction" : `Report @${username ?? "user"}`}
+            {targetType === "auction" ? "Report this listing" : `Report @${username ?? "user"}`}
           </DialogTitle>
           <DialogDescription>
             Tell us what&apos;s wrong with {targetName}. Reports go to the

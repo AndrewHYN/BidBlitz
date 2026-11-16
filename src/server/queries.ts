@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { Database, SellerPayoutStatus, TransactionStatus } from "@/lib/supabase/types";
 import { businessLogoUrl } from "@/lib/business";
+import { PUBLIC_AUCTIONS_ENABLED } from "@/lib/launch-features";
 
 /**
  * Read model. Server Components call these so the first paint already has
@@ -129,7 +130,9 @@ export const getMarketplaceHome = cache(async () => {
   const [{ data, error }, categories] = await Promise.all([
     supabase.from("auctions")
       .select(CARD_SELECT)
-      .or("and(is_direct.eq.true,status.eq.LISTED),and(is_direct.eq.false,status.eq.LIVE)")
+      .or(PUBLIC_AUCTIONS_ENABLED
+        ? "and(is_direct.eq.true,status.eq.LISTED),and(is_direct.eq.false,status.eq.LIVE)"
+        : "and(is_direct.eq.true,status.eq.LISTED)")
       .is("archived_at", null)
       .order("listed_at", { ascending: false })
       .order("id")
@@ -166,7 +169,9 @@ export const browseListings = cache(async (filters: BrowseFilters) => {
         : CARD_SELECT,
       { count: "exact" }
     )
-    .or("and(is_direct.eq.true,status.eq.LISTED),and(is_direct.eq.false,status.eq.LIVE)")
+    .or(PUBLIC_AUCTIONS_ENABLED
+        ? "and(is_direct.eq.true,status.eq.LISTED),and(is_direct.eq.false,status.eq.LIVE)"
+        : "and(is_direct.eq.true,status.eq.LISTED)")
     .is("archived_at", null);
 
   if (filters.kind) query = query.eq("listing_kind", filters.kind);

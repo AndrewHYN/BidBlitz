@@ -75,7 +75,7 @@ describe("auctionStructuredData() — offers", () => {
     expect(offer.price).toBe("145.00");
     expect(offer.priceCurrency).toBe("USD");
     expect(offer.availability).toBe("https://schema.org/InStock");
-    expect(offer.url).toBe(`${SITE}/auction/b44c3c45-8186-4eb1-98c8-db4b9a6d7c58`);
+    expect(offer.url).toBe(`${SITE}/listing/b44c3c45-8186-4eb1-98c8-db4b9a6d7c58`);
     expect(offer.priceValidUntil).toBe(iso(60 * 60_000));
   });
 
@@ -186,14 +186,14 @@ describe("auctionStructuredData() — breadcrumbs", () => {
     expect(items.every((item) => item["@type"] === "ListItem")).toBe(true);
     expect(items.map((i) => i.name)).toEqual([
       "BidBlitz",
-      "Browse auctions",
+      "Browse listings",
       "Computers & Laptops",
       "HP EliteBook 840 G7, i5, 16GB RAM, 512GB SSD",
     ]);
     expect(items.map((i) => i.position)).toEqual([1, 2, 3, 4]);
     expect(items[2].item).toBe(`${SITE}/browse?category=computers-laptops`);
     expect(items[3].item).toBe(
-      `${SITE}/auction/b44c3c45-8186-4eb1-98c8-db4b9a6d7c58`
+      `${SITE}/listing/b44c3c45-8186-4eb1-98c8-db4b9a6d7c58`
     );
   });
 
@@ -268,3 +268,4 @@ describe("serializeJsonLd()", () => {
     expect(JSON.parse(serializeJsonLd(data))).toEqual(data);
   });
 });
+ 

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { BriefcaseBusiness, Gavel, Tag } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { PUBLIC_AUCTIONS_ENABLED } from "@/lib/launch-features";
 import { DirectListingForm } from "@/components/sell/direct-listing-form";
 import { SellForm } from "@/components/sell/sell-form";
 
@@ -10,7 +11,7 @@ type Kind = "SALE" | "SERVICE" | "AUCTION";
 
 const options = [
   { kind: "SALE" as const, title: "Sell an item", summary: "Post a fixed price and negotiate with buyers.", icon: Tag },
-  { kind: "AUCTION" as const, title: "Start an auction", summary: "Set a timed bidding window and auction rules.", icon: Gavel },
+  ...(PUBLIC_AUCTIONS_ENABLED ? [{ kind: "AUCTION" as const, title: "Start an auction", summary: "Set a timed bidding window and auction rules.", icon: Gavel }] : []),
   { kind: "SERVICE" as const, title: "Offer a service", summary: "Let clients hire you and leave verified reviews.", icon: BriefcaseBusiness },
 ];
 
@@ -18,7 +19,7 @@ export function ListingTypeChooser({ categories }: { categories: { id: number; n
   const [kind, setKind] = useState<Kind>("SALE");
   return (
     <div className="space-y-6">
-      <div className="grid gap-3 sm:grid-cols-3" role="group" aria-label="Choose listing type">
+      <div className={`grid gap-3 ${PUBLIC_AUCTIONS_ENABLED ? "sm:grid-cols-3" : "sm:grid-cols-2"}`} role="group" aria-label="Choose listing type">
         {options.map(({ kind: option, title, summary, icon: Icon }) => (
           <button key={option} type="button" onClick={() => setKind(option)}
             aria-pressed={option === kind}

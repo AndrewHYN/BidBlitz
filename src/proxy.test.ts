@@ -68,7 +68,7 @@ describe("public resource HTTP routing", () => {
     expect(response.headers.get("x-middleware-rewrite")).toBeNull();
   });
 
-  it.each(["/auction/not-a-uuid", "/profile/missing-profile"])("keeps the existing missing-resource guard for %s", async (path) => {
+  it.each(["/listing/not-a-uuid", "/profile/missing-profile"])("keeps the existing missing-resource guard for %s", async (path) => {
     const { proxy } = await import("./proxy");
     const response = await proxy(new NextRequest(`https://www.bidblitz.co.zw${path}`));
     expect(response.status).toBe(404);

@@ -56,12 +56,15 @@ const nextConfig: NextConfig = {
     return [{ source: "/:path*", headers: securityHeaders }];
   },
   async redirects() {
-    return ["bidblitz.co.zw", "bid-blitz-ten.vercel.app"].map((host) => ({
+    return [
+      { source: "/auction/:id", destination: "/listing/:id", statusCode: 301 as const },
+      ...["bidblitz.co.zw", "bid-blitz-ten.vercel.app"].map((host) => ({
       source: "/:path*",
       has: [{ type: "host" as const, value: host }],
       destination: "https://www.bidblitz.co.zw/:path*",
-      permanent: true,
-    }));
+      statusCode: 301 as const,
+      })),
+    ];
   },
   images: {
     remotePatterns: supabaseUrl

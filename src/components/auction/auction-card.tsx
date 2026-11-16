@@ -52,7 +52,7 @@ export function AuctionCard({
 
   return (
     <Link
-      href={href ?? `/auction/${auction.id}`}
+      href={href ?? `/listing/${auction.id}`}
       className={cn(
         "group relative flex flex-col overflow-hidden rounded-[1.15rem] border bg-card shadow-[0_3px_12px_rgba(0,0,0,.04)] transition-[transform,box-shadow,border-color] duration-300 ease-[cubic-bezier(.16,1,.3,1)]",
         "hover:-translate-y-[3px] hover:border-primary/40 hover:shadow-[0_20px_50px_-23px_rgba(0,0,0,.35)]",
@@ -157,7 +157,7 @@ export function AuctionCard({
             <span />
           )}
           <span className="inline-flex shrink-0 items-center gap-1 font-semibold text-primary">
-            {auction.listingKind === "SERVICE" ? "View service" : auction.isDirect ? "View item" : "View auction"}
+            {auction.listingKind === "SERVICE" ? "View service" : auction.isDirect ? "View item" : "View listing"}
             <ArrowUpRight className="size-3.5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" aria-hidden />
           </span>
         </div>

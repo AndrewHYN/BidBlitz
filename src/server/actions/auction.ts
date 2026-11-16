@@ -207,7 +207,7 @@ export async function closeDirectListingAction(input: {
 
   revalidatePath("/");
   revalidatePath("/browse");
-  revalidatePath(`/auction/${input.auctionId}`);
+  revalidatePath(`/listing/${input.auctionId}`);
   revalidatePath(`/sell/${input.auctionId}`);
   revalidatePath("/dashboard/selling");
   return { ok: true, status: data as string };
@@ -476,7 +476,7 @@ export async function updateAuctionFulfilmentAction(input: {
   }
 
   revalidatePath(`/sell/${input.auctionId}`);
-  revalidatePath(`/auction/${input.auctionId}`);
+  revalidatePath(`/listing/${input.auctionId}`);
   return { ok: true };
 }
 
@@ -549,7 +549,7 @@ export async function publishAuctionAction(input: unknown): Promise<
 
   revalidatePath("/");
   revalidatePath("/browse");
-  revalidatePath(`/auction/${parsed.data.auctionId}`);
+  revalidatePath(`/listing/${parsed.data.auctionId}`);
   revalidatePath("/dashboard/selling");
 
   return { ok: true, status: payload.status, endsAt: payload.ends_at };
@@ -587,7 +587,7 @@ export async function cancelAuctionAction(input: {
     return { ok: false, rejection: normalizeEngineError({ message: error.message, hint: error.hint }) };
   }
 
-  revalidatePath(`/auction/${input.auctionId}`);
+  revalidatePath(`/listing/${input.auctionId}`);
   revalidatePath("/dashboard/selling");
   return { ok: true, status: (data as { status: string }).status };
 }
@@ -623,7 +623,7 @@ export async function requestCancellationAction(input: {
     return { ok: false, rejection: normalizeEngineError({ message: error.message, hint: error.hint }) };
   }
 
-  revalidatePath(`/auction/${input.auctionId}`);
+  revalidatePath(`/listing/${input.auctionId}`);
   revalidatePath("/dashboard/selling");
   revalidatePath("/admin");
   return { ok: true, status: (data as { status: string }).status ?? "PENDING" };
@@ -690,7 +690,7 @@ export async function settleIfDueAction(auctionId: string): Promise<{ settled: b
     currency?: string;
   };
   const settled = Boolean(payload?.ok) && payload?.status === "SOLD";
-  if (settled) revalidatePath(`/auction/${auctionId}`);
+  if (settled) revalidatePath(`/listing/${auctionId}`);
 
   // Outcome emails, best-effort and keyed: a viewer-triggered settle that
   // actually closed the auction announces it once, however many viewers watch
