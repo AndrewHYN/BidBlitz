@@ -19,7 +19,7 @@ export function ListingTypeChooser({ categories }: { categories: { id: number; n
   const [kind, setKind] = useState<Kind>("SALE");
   return (
     <div className="space-y-6">
-      <div className={`grid gap-3 ${PUBLIC_AUCTIONS_ENABLED ? "sm:grid-cols-3" : "sm:grid-cols-2"}` role="group" aria-label="Choose listing type">
+      <div className={`grid gap-3 ${PUBLIC_AUCTIONS_ENABLED ? "sm:grid-cols-3" : "sm:grid-cols-2"}`} role="group" aria-label="Choose listing type">
         {options.map(({ kind: option, title, summary, icon: Icon }) => (
           <button key={option} type="button" onClick={() => setKind(option)}
             aria-pressed={option === kind}
