@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 /**
  * Phase 4 guarantee: a URL that names no resource answers with a REAL 404.
  *
- * The defect this pins down: `/auction/[id]` and `/profile/[username]` stream a
+ * The defect this pins down: `/listing/[id]` and `/profile/[username]` stream a
  * `loading.tsx` shell before the page can call `notFound()`, so the status is
  * committed at 200 before the not-found code ever runs â€” and no page-level
  * workaround escapes it (a synchronous `notFound()` in a dedicated route still
@@ -18,20 +18,20 @@ import { expect, test } from "@playwright/test";
  * `next({ status: 404 })` behaved differently on the two platforms.
  */
 test.describe("not found", () => {
-  test("unknown auction id answers 404 with a noindexed not-found page", async ({
+  test("unknown listing id answers 404 with a noindexed not-found page", async ({
     page,
   }) => {
     const pageErrors: string[] = [];
     page.on("pageerror", (err) => pageErrors.push(String(err)));
 
     const response = await page.goto(
-      "/auction/00000000-0000-4000-8000-000000000000"
+      "/listing/00000000-0000-4000-8000-000000000000"
     );
     expect(response?.status()).toBe(404);
 
     // The browser keeps the original URL (internal rewrite, not a redirect).
     expect(new URL(page.url()).pathname).toBe(
-      "/auction/00000000-0000-4000-8000-000000000000"
+      "/listing/00000000-0000-4000-8000-000000000000"
     );
 
     // The useful not-found UI renders â€” the root one, inside the site chrome.
@@ -55,11 +55,11 @@ test.describe("not found", () => {
     // Next's router-level fallback can discard rewrite-only request headers.
     // Both the resource title and the truthful generic 404 title are valid;
     // neither may fall back to homepage marketing metadata.
-    await expect(page).toHaveTitle(/(?:Auction|Page) not found/);
+    await expect(page).toHaveTitle(/(?:Listing|Page) not found/);
 
     // Navigation out of the dead end works. Scoped to the not-found UI: the
     // footer marketplace nav carries the same label.
-    await notFoundUi.getByRole("link", { name: "Browse auctions" }).click();
+    await notFoundUi.getByRole("link", { name: "Browse listings" }).click();
     await expect(page).toHaveURL(/\/browse$/);
     await expect(page.getByTestId("browse-filters")).toBeVisible({
       timeout: 30_000,
@@ -69,15 +69,15 @@ test.describe("not found", () => {
     expect(pageErrors).toEqual([]);
   });
 
-  test("malformed auction id answers 404 without a not-a-uuid page", async ({
+  test("malformed listing id answers 404 without a not-a-uuid page", async ({
     page,
   }) => {
-    const response = await page.goto("/auction/not-a-uuid");
+    const response = await page.goto("/listing/not-a-uuid");
     expect(response?.status()).toBe(404);
     await expect(page.getByTestId("not-found-page")).toBeVisible({
       timeout: 15_000,
     });
-    await expect(page).toHaveTitle(/(?:Auction|Page) not found/);
+    await expect(page).toHaveTitle(/(?:Listing|Page) not found/);
   });
 
   test("unknown profile answers 404 while existing routes still answer 200", async ({
