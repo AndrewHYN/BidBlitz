@@ -434,6 +434,10 @@ export interface Database {
       };
     };
     Functions: {
+      reveal_listing_contact: {
+        Args: { p_listing_id: string };
+        Returns: string;
+      };
       start_listing_conversation: {
         Args: { p_listing_id: string; p_body: string };
         Returns: string;

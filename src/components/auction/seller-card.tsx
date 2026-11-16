@@ -4,7 +4,6 @@ import {
   Building2,
   Calendar,
   MapPin,
-  Package,
   Star,
 } from "lucide-react";
 import { UserAvatar } from "@/components/profile/user-avatar";
@@ -45,7 +44,7 @@ export function SellerCard({
     return (
       <section aria-label="Seller" className="rounded-xl border bg-card p-4">
         <p className="text-sm text-muted-foreground">
-          Seller details are unavailable for this auction.
+          Seller details are unavailable for this listing.
         </p>
       </section>
     );
@@ -116,11 +115,6 @@ export function SellerCard({
               ) : (
                 "No ratings yet"
               )}
-            </span>
-            <span className="inline-flex items-center gap-1">
-              <Package className="size-3.5" aria-hidden />
-              <span data-numeric>{seller.sales_count}</span>{" "}
-              {seller.sales_count === 1 ? "account sale" : "account sales"}
             </span>
             {(businessActive?.location ?? seller.location) && (
               <span className="inline-flex items-center gap-1">

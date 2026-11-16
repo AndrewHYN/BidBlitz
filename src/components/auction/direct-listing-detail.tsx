@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft, MapPin, MessageCircle, Phone, ShieldCheck } from "lucide-react";
+import { ArrowLeft, MapPin, MessageCircle, ShieldCheck } from "lucide-react";
 
 import { ImageGallery, type GalleryImage } from "@/components/auction/image-gallery";
 import { Money } from "@/components/auction/money";
@@ -11,7 +11,7 @@ import { ShareButton } from "@/components/auction/share-button";
 import { ConditionBadge, StatusBadge } from "@/components/auction/status-badge";
 import { WatchButton } from "@/components/auction/watch-button";
 import { Button } from "@/components/ui/button";
-import { CANONICAL_SITE_URL } from "@/lib/site-url";
+import { ListingContactReveal } from "@/components/auction/listing-contact-reveal";
 import { fulfilmentMethodLabels } from "@/lib/validation";
 import { publicListingLocation } from "@/lib/listing-display";
 import type { getAuctionDetail } from "@/server/queries";
@@ -19,13 +19,9 @@ import type { getAuctionDetail } from "@/server/queries";
 type Listing = NonNullable<Awaited<ReturnType<typeof getAuctionDetail>>>;
 
 export function DirectListingDetail({ detail, images }: { detail: Listing; images: GalleryImage[] }) {
-  const { auction, contactPhone, viewerId, watched } = detail;
+  const { auction, viewerId, watched } = detail;
   const isOwner = viewerId === auction.seller_id;
   const isAvailable = auction.status === "LISTED";
-  const canContact = isAvailable && !isOwner && Boolean(contactPhone);
-  const whatsapp = contactPhone && `https://wa.me/${contactPhone.slice(1)}?text=${encodeURIComponent(
-    `Hi, is "${auction.title}" still available? I saw it on BidBlitz: ${CANONICAL_SITE_URL}/listing/${auction.id}`
-  )}`;
 
   return (
     <div className="page-container py-7 sm:py-12">
@@ -66,22 +62,16 @@ export function DirectListingDetail({ detail, images }: { detail: Listing; image
                 </Link>
               </Button>
             )}
-            {canContact && contactPhone && whatsapp ? (
-              <div className="space-y-2">
-                <Button asChild size="lg" className="min-h-11 w-full">
-                  <a href={whatsapp} target="_blank" rel="noopener noreferrer"><MessageCircle aria-hidden /> WhatsApp seller</a>
-                </Button>
-                <Button asChild variant="outline" size="lg" className="min-h-11 w-full">
-                  <a href={`tel:${contactPhone}`}><Phone aria-hidden /> Call {contactPhone}</a>
-                </Button>
-                <p className="text-sm leading-6 text-muted-foreground">Agree on cash, EcoCash, Omari or InnBucks with the seller. Payment goes directly to the seller.</p>
-              </div>
-            ) : isOwner ? (
+            {isOwner ? (
               <Button asChild variant="outline"><Link href={`/sell/${auction.id}`}>Manage listing</Link></Button>
+            ) : isAvailable ? (
+              <ListingContactReveal
+                listingId={auction.id}
+                listingTitle={auction.title}
+                signedIn={Boolean(viewerId)}
+              />
             ) : (
-              <p className="text-sm text-muted-foreground">
-                {isAvailable ? "Seller contact is temporarily unavailable." : "This item is no longer available."}
-              </p>
+              <p className="text-sm text-muted-foreground">This item is no longer available.</p>
             )}
           </section>
 
@@ -103,7 +93,7 @@ export function DirectListingDetail({ detail, images }: { detail: Listing; image
             {auction.fulfilment_notes && <p className="break-words text-sm text-muted-foreground">{auction.fulfilment_notes}</p>}
           </section>}
 
-          {canContact && <p className="flex gap-2 text-sm leading-6 text-muted-foreground">
+          {isAvailable && !isOwner && <p className="flex gap-2 text-sm leading-6 text-muted-foreground">
             <ShieldCheck className="mt-0.5 size-5 shrink-0 text-primary" aria-hidden />
             Meet in a public place, inspect the item before paying, and keep your mobile wallet PIN private.
           </p>}
