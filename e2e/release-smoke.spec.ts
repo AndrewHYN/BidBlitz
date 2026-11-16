@@ -153,8 +153,8 @@ test.describe("release visual smoke", () => {
 
   test("signup keeps payout phone guidance visible before account creation", async ({ page }) => {
     await page.goto("/signup", { waitUntil: "domcontentloaded" });
-    await expect(page.getByTestId("signup-form")).toBeVisible();
-    await expect(page.getByTestId("phone-field")).toBeVisible();
-    await expect(page.getByTestId("sign-up-button")).toBeVisible();
+    await expect(page.locator('[data-testid="signup-form"]:visible')).toBeVisible();
+    await expect(page.locator('[data-testid="phone-field"]:visible')).toBeVisible();
+    await expect(page.locator('[data-testid="sign-up-button"]:visible')).toBeVisible();
   });
 });
