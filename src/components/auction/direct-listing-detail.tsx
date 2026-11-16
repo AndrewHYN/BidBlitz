@@ -23,7 +23,7 @@ export function DirectListingDetail({ detail, images }: { detail: Listing; image
   const isAvailable = auction.status === "LISTED";
   const canContact = isAvailable && !isOwner && Boolean(contactPhone);
   const whatsapp = contactPhone && `https://wa.me/${contactPhone.slice(1)}?text=${encodeURIComponent(
-    `Hi, is "${auction.title}" still available? I saw it on BidBlitz: ${CANONICAL_SITE_URL}/auction/${auction.id}`
+    `Hi, is "${auction.title}" still available? I saw it on BidBlitz: ${CANONICAL_SITE_URL}/listing/${auction.id}`
   )}`;
 
   return (

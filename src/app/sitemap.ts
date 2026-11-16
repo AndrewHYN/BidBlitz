@@ -77,7 +77,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       console.error("[sitemap] completed auctions:", completed.error.message);
 
     const openUrls: MetadataRoute.Sitemap = (open.data ?? []).map((row) => ({
-      url: `${siteUrl}/auction/${row.id}`,
+      url: `${siteUrl}/listing/${row.id}`,
       lastModified: new Date(row.updated_at),
       changeFrequency: "hourly",
       priority: 0.8,
@@ -86,7 +86,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     const completedUrls: MetadataRoute.Sitemap = (completed.data ?? [])
       .filter((row) => row.bid_count > 0)
       .map((row) => ({
-        url: `${siteUrl}/auction/${row.id}`,
+        url: `${siteUrl}/listing/${row.id}`,
         lastModified: new Date(row.updated_at),
         changeFrequency: "weekly",
         priority: 0.4,

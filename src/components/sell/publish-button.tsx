@@ -134,7 +134,7 @@ export function PublishButton({
         )}
         <div className="flex flex-wrap items-center gap-2">
           <Button asChild variant="outline" size="sm">
-            <Link href={`/auction/${auctionId}`}>View listing</Link>
+            <Link href={`/listing/${auctionId}`}>View listing</Link>
           </Button>
           {shareable && <ShareButton auctionId={auctionId} title={title} size="sm" />}
         </div>

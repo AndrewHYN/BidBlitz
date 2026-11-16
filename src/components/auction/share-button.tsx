@@ -32,14 +32,14 @@ export function ShareButton({
   className?: string;
 }) {
   const [copied, setCopied] = useState(false);
-  const url = absoluteUrl(`/auction/${auctionId}`);
+  const url = absoluteUrl(`/listing/${auctionId}`);
 
   async function copyLink() {
     try {
       await navigator.clipboard.writeText(url);
       setCopied(true);
       toast.success("Link copied", {
-        description: "Paste it anywhere to share this auction.",
+        description: "Paste it anywhere to share this listing.",
       });
       window.setTimeout(() => setCopied(false), 2500);
     } catch {
@@ -79,8 +79,8 @@ export function ShareButton({
         size={size}
         onClick={copyLink}
         data-testid="copy-auction-link"
-        aria-label="Copy auction link"
-        title="Copy auction link"
+        aria-label="Copy listing link"
+        title="Copy listing link"
       >
         {copied ? <Check aria-hidden /> : <Copy aria-hidden />}
       </Button>

@@ -32,7 +32,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const missing = (await headers()).get("x-bidblitz-missing");
   const title =
     missing === "auction"
-      ? "Auction not found"
+      ? "Listing not found"
       : missing === "profile"
         ? "Profile not found"
         : missing === "business"
@@ -68,7 +68,7 @@ export default function NotFound() {
             <Link href="/">Back to home</Link>
           </Button>
           <Button asChild variant="outline">
-            <Link href="/browse">Browse auctions</Link>
+            <Link href="/browse">Browse listings</Link>
           </Button>
         </div>
       </div>

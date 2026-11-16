@@ -109,7 +109,7 @@ test.describe("release visual smoke", () => {
 
   test("dynamic public resources return real 404s without browser errors", async ({ page }) => {
     for (const route of [
-      "/auction/not-a-valid-uuid",
+      "/listing/not-a-valid-uuid",
       "/profile/bidblitz-release-smoke-user-that-does-not-exist",
       "/business/bidblitz-release-smoke-storefront-that-does-not-exist",
     ]) {

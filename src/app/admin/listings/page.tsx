@@ -63,7 +63,7 @@ export default async function AdminListingReviews(){
         <p className="mt-2 text-xs text-muted-foreground">Duration: {Math.round(r.durationSeconds/3600)} hours</p>
        </div>
        <p className="line-clamp-5 whitespace-pre-wrap text-sm leading-6 text-muted-foreground">{r.description}</p>
-       <Link href={`/auction/${r.auctionId}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs font-bold text-primary hover:underline">Inspect auction details <ArrowRight className="size-3.5" aria-hidden/></Link>
+       <Link href={`/listing/${r.auctionId}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs font-bold text-primary hover:underline">Inspect listing details <ArrowRight className="size-3.5" aria-hidden/></Link>
        <ListingReviewControls reviewId={r.reviewId} canApprove={canApprove} canReject={canReject} canRequestChanges={canChanges}/>
       </li>)}
      </ul>}

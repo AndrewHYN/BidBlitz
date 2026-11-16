@@ -48,13 +48,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     title: detail.auction.title,
     ...(detail.auction.is_direct && detail.auction.status !== "LISTED" ? { robots: { index: false } } : {}),
     description,
-    alternates: { canonical: `/auction/${detail.auction.id}` },
+    alternates: { canonical: `/listing/${detail.auction.id}` },
     openGraph: {
       type: "website",
       siteName: "BidBlitz",
       title: detail.auction.title,
       description,
-      url: `/auction/${detail.auction.id}`,
+      url: `/listing/${detail.auction.id}`,
       ...(coverUrl ? { images: [{ url: coverUrl }] } : {}),
     },
     // Explicit twitter fields: the card type alone would fall back to the

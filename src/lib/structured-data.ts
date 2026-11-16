@@ -116,7 +116,7 @@ function excerpt(text: string, max = 160): string {
  */
 export function auctionStructuredData(input: AuctionStructuredInput): JsonLd {
   const nowMs = input.nowMs ?? Date.now();
-  const url = `${input.siteUrl}/auction/${input.id}`;
+  const url = `${input.siteUrl}/listing/${input.id}`;
 
   const product: JsonLd = {
     "@type": "Product",
@@ -158,7 +158,7 @@ export function auctionStructuredData(input: AuctionStructuredInput): JsonLd {
 
   const crumbs: JsonLd[] = [
     { "@type": "ListItem", position: 1, name: "BidBlitz", item: `${input.siteUrl}/` },
-    { "@type": "ListItem", position: 2, name: input.isDirect ? "Browse listings" : "Browse auctions", item: `${input.siteUrl}/browse` },
+    { "@type": "ListItem", position: 2, name: input.isDirect ? "Browse listings" : "Browse listings", item: `${input.siteUrl}/browse` },
   ];
   if (input.categoryName) {
     crumbs.push({

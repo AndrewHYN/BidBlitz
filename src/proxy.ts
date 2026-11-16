@@ -44,7 +44,7 @@ import { NextResponse, type NextRequest } from "next/server";
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
-const AUCTION_PATH_RE = /^\/auction\/([^/]+)$/;
+const LISTING_PATH_RE = /^\/listing\/([^/]+)$/;
 const PROFILE_PATH_RE = /^\/profile\/([^/]+)$/;
 const BUSINESS_PATH_RE = /^\/business\/([^/]+)$/;
 const UUID_RE =
@@ -68,7 +68,7 @@ async function missingResourceKind(
   request: NextRequest,
   supabase: ProxyClient
 ): Promise<"auction" | "profile" | "business" | null> {
-  const auction = AUCTION_PATH_RE.exec(request.nextUrl.pathname);
+  const auction = LISTING_PATH_RE.exec(request.nextUrl.pathname);
   if (auction) {
     // A malformed id can never match a uuid column: rewrite without a round trip.
     if (!UUID_RE.test(auction[1])) return "auction";

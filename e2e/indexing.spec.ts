@@ -18,9 +18,9 @@ test("sitemap URLs resolve directly and declare their own canonical", async ({ r
   }
 });
 
-test("auction breadcrumbs identify every entry as a ListItem", async ({ page, request }) => {
+test("listing breadcrumbs identify every entry as a ListItem", async ({ page, request }) => {
   const response = await request.get("/sitemap.xml");
-  const auction = (await response.text()).match(/<loc>([^<]+\/auction\/[^<]+)<\/loc>/);
+  const auction = (await response.text()).match(/<loc>([^<]+\/listing\/[^<]+)<\/loc>/);
   expect(auction, "A public auction is required to verify rendered structured data").not.toBeNull();
   expect(new URL(auction![1]).origin).toBe(CANONICAL_ORIGIN);
   await page.goto(new URL(auction![1]).pathname);
@@ -44,7 +44,17 @@ test("legacy public hosts permanently redirect with path and query intact", asyn
     const response = await request.get("/browse?category=computers-laptops", {
       headers: { host }, maxRedirects: 0,
     });
-    expect(response.status()).toBe(308);
+    expect(response.status()).toBe(301);
     expect(response.headers().location).toBe("https://www.bidblitz.co.zw/browse?category=computers-laptops");
   }
+});
+
+
+test("legacy auction URLs redirect to canonical listing URLs with HTTP 301", async ({ request }) => {
+  const legacy = "/auction/00000000-0000-0000-0000-000000000000?utm_source=whatsapp";
+  const response = await request.get(legacy, { maxRedirects: 0 });
+  expect(response.status()).toBe(301);
+  const destination = new URL(response.headers().location!, CANONICAL_ORIGIN);
+  expect(destination.pathname).toBe("/listing/00000000-0000-0000-0000-000000000000");
+  expect(destination.searchParams.get("utm_source")).toBe("whatsapp");
 });
