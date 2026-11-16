@@ -8,6 +8,7 @@ import { Countdown } from "@/components/auction/countdown";
 import { LiveStatus } from "@/components/auction/live-status";
 import { isClosed } from "@/lib/auction-status";
 import { ConditionBadge } from "@/components/auction/status-badge";
+import { publicListingLocation } from "@/lib/listing-display";
 
 /**
  * The one card used on home, browse, watchlist, dashboards and profiles.
@@ -66,7 +67,7 @@ export function AuctionCard({
       <div className="relative aspect-[4/3] overflow-hidden bg-muted">
         <ImageWithFallback
           src={auction.imageUrl}
-          alt=""
+          alt={`${auction.title}, photo 1`}
           loading="lazy"
           className="size-full object-cover transition-[transform,filter] duration-700 ease-[cubic-bezier(.16,1,.3,1)] group-hover:scale-[1.055]"
           fallback={
@@ -151,7 +152,7 @@ export function AuctionCard({
           {auction.location ? (
             <p className="flex min-w-0 items-center gap-1 text-muted-foreground">
               <MapPin className="size-3.5 shrink-0" aria-hidden />
-              <span className="truncate">{auction.location}</span>
+              <span className="truncate">{publicListingLocation(auction.location)}</span>
             </p>
           ) : (
             <span />
