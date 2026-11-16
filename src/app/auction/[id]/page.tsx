@@ -24,6 +24,7 @@ import { ShareButton } from "@/components/auction/share-button";
 import { WatchButton } from "@/components/auction/watch-button";
 import { ConditionBadge } from "@/components/auction/status-badge";
 import { fulfilmentMethodLabels } from "@/lib/validation";
+import { publicListingLocation } from "@/lib/listing-display";
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -178,7 +179,7 @@ export default async function AuctionPage({ params }: Props) {
               <ConditionBadge condition={auction.condition} />
               <span className="inline-flex min-w-0 items-center gap-1">
                 <MapPin className="size-3.5 shrink-0" aria-hidden />
-                <span className="truncate">{auction.location}</span>
+                <span className="truncate">{publicListingLocation(auction.location)}</span>
               </span>
             </div>
           </div>

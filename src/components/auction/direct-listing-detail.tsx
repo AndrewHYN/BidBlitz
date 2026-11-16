@@ -13,6 +13,7 @@ import { WatchButton } from "@/components/auction/watch-button";
 import { Button } from "@/components/ui/button";
 import { CANONICAL_SITE_URL } from "@/lib/site-url";
 import { fulfilmentMethodLabels } from "@/lib/validation";
+import { publicListingLocation } from "@/lib/listing-display";
 import type { getAuctionDetail } from "@/server/queries";
 
 type Listing = NonNullable<Awaited<ReturnType<typeof getAuctionDetail>>>;
@@ -43,7 +44,7 @@ export function DirectListingDetail({ detail, images }: { detail: Listing; image
               <StatusBadge status={auction.status} />
               {auction.listing_kind !== "SERVICE" && <ConditionBadge condition={auction.condition} />}
               <span className="inline-flex items-center gap-1 text-sm text-muted-foreground">
-                <MapPin className="size-4 shrink-0" aria-hidden /> {auction.location}
+                <MapPin className="size-4 shrink-0" aria-hidden /> {publicListingLocation(auction.location)}
               </span>
             </div>
           </div>
