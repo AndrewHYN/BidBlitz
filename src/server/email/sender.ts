@@ -133,7 +133,7 @@ async function userIdForEmail(
  * Send due outbox rows. Bounded, idempotent, and incapable of throwing into
  * the caller: every path ends in a row update or a summary.
  */
-export async function dispatchEmailOutbox(limit = 25): Promise<DispatchSummary> {
+export async function dispatchEmailOutbox(limit = 25, specificJobId?: string): Promise<DispatchSummary> {
   const summary: DispatchSummary = { attempted: 0, sent: 0, skipped: 0, failed: 0, held: null };
   if (!hasAdminCredentials()) {
     summary.held = "no-service-credentials";
@@ -148,9 +148,16 @@ export async function dispatchEmailOutbox(limit = 25): Promise<DispatchSummary> 
   }
 
   const admin = createAdminClient();
-  const { data: claimed, error: claimError } = await admin.rpc("claim_email_jobs", {
-    p_limit: limit,
-  });
+  // For a new marketplace message, send that specific queued job immediately.
+  // The daily cron continues using the existing batch claim RPC.
+  const { data: claimed, error: claimError } = specificJobId
+    ? await admin
+      .from("email_outbox")
+      .update({ status: "SENDING", attempts: 1 })
+      .eq("id", specificJobId)
+      .eq("status", "QUEUED")
+      .select("id, recipient, template_key, payload, idempotency_key")
+    : await admin.rpc("claim_email_jobs", { p_limit: limit });
   if (claimError || !claimed) return summary;
 
   const url = appUrl();
