@@ -41,7 +41,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   // Seller-supplied copy can be extremely short; give Google a useful,
   // factual summary without inventing product claims.
-  const sellerCopy = detail.auction.description.replace(/\\s+/g, " ").trim();
+  const sellerCopy = detail.auction.description.replace(/\s+/g, " ").trim();
   const listingLocation = publicListingLocation(detail.auction.location);
   const context = [
     detail.auction.title,
