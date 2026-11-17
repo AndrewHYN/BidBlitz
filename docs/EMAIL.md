@@ -12,8 +12,9 @@ marketplace action commits (bid, settlement, decision, refund)
         v  same server action, separate best-effort step
 email_outbox row (idempotency_key, recipient, template, payload, QUEUED)
         |
-        v  the daily cron sweep (05:00) claims and dispatches every
-           row still QUEUED — there is no inline dispatch today
+        v  direct listing chat: immediately claim and dispatch that specific job
+           other transactional events: daily cron sweep (05:00 UTC) claims
+           due QUEUED rows
 Resend API  --->  SENT / FAILED / SKIPPED (+ attempts, last error)
 ```
 
@@ -75,14 +76,14 @@ Resend (resend.com → Domains → Add Domain):
 3. Development and testing may use Resend's permitted test sender where
    applicable; production must use the verified custom domain.
 
-Cron backstop (`vercel.json`): `/api/email/dispatch` runs daily with the same
-`CRON_SECRET` bearer as `/api/cron/settle`. It only delivers what the outbox
-holds — it never creates mail. **This sweep is currently the only delivery
-path**: nothing dispatches inline, so queued mail can wait up to ~24 hours
-(a "you won" notification included). Inline dispatch in the actions that can
-afford it is deferred work in `docs/POST_LAUNCH_BACKLOG.md`; it is a latency
-limitation, not a data-loss one — the row stays `QUEUED` until it is sent.
-
+Cron backstop (`vercel.json`): `/api/email/dispatch` runs daily at 05:00 UTC
+with the same `CRON_SECRET` bearer as `/api/cron/settle`. It only dispatches
+queued mail. Since PR #26 (16 Nov 2026), **private direct-listing messages try to
+send immediately** after message commit, limited to one email per recipient and
+conversation per ten-minute window. Other queued transactional mail still depends
+on the daily sweep and may wait up to ~24 hours. A real recipient inbox receipt
+and provider acceptance must still be verified; a source build alone does not
+prove delivery.
 ## Templates
 
 The catalogue is the contract: each entry knows its subject, body, CTA,
@@ -104,35 +105,35 @@ activity (off). Everything else is critical and cannot be disabled. The
 dispatcher reads the recipient's live row at send time; unknown recipients
 fall back to safe defaults.
 
-## Status today
+## Production status checked 17 November 2026
 
-Architecture, catalogue, outbox, dispatcher, preferences and the
-delivery-failures SQL read path are implemented and unit-tested, and the
-database queue is proven (`OB:` checks in `db:verify`). There is **no admin UI
-for the outbox**: inspecting it means the SQL read path in
-`supabase/migrations/20260930000003_email_outbox.sql`, or the `attempts` /
-`last_error` columns directly.
+- Vercel lists `RESEND_API_KEY`, `EMAIL_FROM` and `APP_URL` in Production.
+  Presence does **not** prove their values or a verified sender domain are valid.
+  Do not print, copy or log the secret values.
+- The live `email_outbox` contains **38 FAILED and 0 SENT** records, all created
+  no later than 9 October 2026. Historical failure: `resend 401: API key is invalid`.
+  No successful direct-listing email delivery has been recorded since PR #26.
+- A Gmail inbox self-test is **not** proof that BidBlitz Resend sends.
+- Marketplace messages persist independently of an email provider outage.
 
-Provider key verified 2026-09-30: a `RESEND_API_KEY` has been issued and a
-live API test through it returned `200` with a Resend message id, so the key
-authenticates and delivers. (Dated evidence — re-read the dashboards rather
-than assuming this still holds.) Two things are still true:
+### Minimal owner / QA release procedure
 
-- The test sent from Resend's permitted test sender. Sending from a Gmail
-  address was refused (`gmail.com` is not verifiable): **production mail
-  needs a verified custom domain** (Resend dashboard → Domains → SPF/DKIM/
-  DMARC), then `EMAIL_FROM` becomes that domain sender.
-- The key is not deployed anywhere yet: `RESEND_API_KEY`, `EMAIL_FROM` and
-  `APP_URL` must be added in the Vercel dashboard (Environment Variables),
-  and Supabase Auth custom SMTP (`smtp.resend.com:465`, user `resend`,
-  password the API key) is still unconfigured — signup stays rate-capped
-  until then.
+1. In Resend → API Keys, confirm the active sending key or rotate it.
+   In Resend → Domains, verify BidBlitz's domain, SPF/DKIM and other DNS records
+   required by Resend.
+2. In Vercel → bid-blitz → Environment Variables, update only Production
+   `RESEND_API_KEY` and `EMAIL_FROM` to the verified account and sender.
+   Keep the key server-side and redeploy to activate changed variables.
+3. Use two *different* test accounts. Send one harmless new listing message.
+   The recipient checks both the in-app notification and inbox/spam.
+   Reply and confirm the other account also receives the notification.
+4. Check a **new** `email_outbox` row with `template_key='listing_message'`.
+   `SENT` and `provider_message_id` prove provider acceptance, **not** inbox receipt.
+   If `FAILED`, review only the error class/status; never expose mail recipients,
+   API keys, raw mail content or private message bodies in issue attachments.
+5. Do **not** blindly replay the 38 historical FAILED records. They may be stale.
+6. Confirm Supabase Auth custom SMTP separately before advertising signup
+   email reliability at volume.
 
-> **OWNER ACTION.** Both items are dashboard/account work: an email provider,
-> credentials and a verified sending domain. No code in this repository adds
-> them, and none should. While they are outstanding, mail queues but does not
-> send — which is the designed behaviour, not a failure — and the 2-per-hour
-> built-in-mailer warning above remains a launch gate.
-
-Until those two owner steps are done, mail queues but does not send — which is
-the designed behaviour, not a failure.
+Private message email copy links to the conversation without revealing the
+message body. Background push, browser alerts and email are separate checks.
