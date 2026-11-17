@@ -16,7 +16,7 @@ import { BrowsePagination } from "@/components/browse/browse-pagination";
 export const metadata: Metadata = {
   title: "Browse listings",
   description:
-    "Find items for sale across Zimbabwe and contact sellers directly.",
+    "Shop local listings across Zimbabwe, compare asking prices and contact independent sellers by private chat, WhatsApp or phone to arrange collection.",
   alternates: { canonical: "/browse" },
 };
 

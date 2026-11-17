@@ -39,7 +39,19 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     return { title: "Listing not found", robots: { index: false } };
   }
 
-  const description = detail.auction.description.slice(0, 160);
+  // Seller-supplied copy can be extremely short; give Google a useful,
+  // factual summary without inventing product claims.
+  const sellerCopy = detail.auction.description.replace(/\s+/g, " ").trim();
+  const listingLocation = publicListingLocation(detail.auction.location);
+  const context = [
+    detail.auction.title,
+    detail.auction.categories?.name ? `in ${detail.auction.categories.name}` : null,
+    listingLocation && listingLocation !== "Location not specified" ? `in ${listingLocation}` : null,
+    "on BidBlitz Zimbabwe",
+  ].filter(Boolean).join(" ");
+  const description = sellerCopy.length >= 70
+    ? sellerCopy.slice(0, 160)
+    : `${context}. ${sellerCopy} Contact the seller through BidBlitz to confirm availability and collection details.`.slice(0, 160);
   const cover = [...detail.auction.auction_images]
     .filter((image) => image.storage_path)
     .sort((a, b) => a.position - b.position)[0];
@@ -47,7 +59,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   return {
     title: detail.auction.title,
-    ...(detail.auction.is_direct && detail.auction.status !== "LISTED" ? { robots: { index: false } } : {}),
+    // Launch search discovery is classifieds-only. Legacy auction histories,
+    // including old QA/payment fixtures, remain accessible but not indexable.
+    ...(!detail.auction.is_direct || detail.auction.status !== "LISTED" ? { robots: { index: false, follow: false } } : {}),
     description,
     alternates: { canonical: `/listing/${detail.auction.id}` },
     openGraph: {
