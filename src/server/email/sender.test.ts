@@ -104,6 +104,76 @@ describe("dispatchEmailOutbox", () => {
     delete process.env.RESEND_API_KEY;
   });
 
+  it("immediately dispatches only the requested private message job, not the whole queue", async () => {
+    process.env.RESEND_API_KEY = "re_test";
+    const target = job({
+      id: "message-job",
+      template_key: "listing_message",
+      payload: { name: "Seller", title: "Laptop", conversationId: "thread-123" },
+      idempotency_key: "listing_message:thread-123:seller:42",
+    });
+    const claim = {
+      eq: vi.fn().mockReturnThis(),
+      select: vi.fn(async () => ({ data: [target], error: null })),
+    };
+    const statusUpdate = { eq: vi.fn(async () => ({ error: null })) };
+    const update = vi.fn((values: { status: string }) =>
+      values.status === "SENDING" ? claim : statusUpdate
+    );
+    mockFrom.mockReturnValue({ update });
+    const fetchSpy = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ id: "resend-message-id" }),
+    }));
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const summary = await dispatchEmailOutbox(1, "message-job");
+
+    expect(mockRpc).not.toHaveBeenCalled();
+    expect(claim.eq).toHaveBeenCalledWith("id", "message-job");
+    expect(claim.eq).toHaveBeenCalledWith("status", "QUEUED");
+    expect(summary).toEqual({ attempted: 1, sent: 1, skipped: 0, failed: 0, held: null });
+    expect(fetchSpy).toHaveBeenCalledOnce();
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({ status: "SENT", provider_message_id: "resend-message-id" }));
+    delete process.env.RESEND_API_KEY;
+  });
+
+  it("records a provider 401 on the specific message job without claiming a send", async () => {
+    process.env.RESEND_API_KEY = "re_test";
+    const target = job({
+      id: "message-job",
+      template_key: "listing_message",
+      payload: { name: "Buyer", title: "Laptop", conversationId: "thread-123" },
+    });
+    const claim = {
+      eq: vi.fn().mockReturnThis(),
+      select: vi.fn(async () => ({ data: [target], error: null })),
+    };
+    const statusUpdate = { eq: vi.fn(async () => ({ error: null })) };
+    const updates: Array<Record<string, unknown>> = [];
+    const update = vi.fn((values: Record<string, unknown>) => {
+      updates.push(values);
+      return values.status === "SENDING" ? claim : statusUpdate;
+    });
+    mockFrom.mockReturnValue({ update });
+    vi.stubGlobal("fetch", vi.fn(async () => ({
+      ok: false,
+      status: 401,
+      text: async () => '{"message":"API key is invalid"}',
+    })));
+
+    const summary = await dispatchEmailOutbox(1, "message-job");
+
+    expect(summary.sent).toBe(0);
+    expect(summary.failed).toBe(1);
+    expect(updates).toContainEqual(expect.objectContaining({
+      status: "FAILED",
+      last_error: expect.stringContaining("resend 401"),
+    }));
+    expect(mockRpc).not.toHaveBeenCalled();
+    delete process.env.RESEND_API_KEY;
+  });
+
   it("marks optional mail SKIPPED when the recipient disabled it, without calling Resend", async () => {
     process.env.RESEND_API_KEY = "re_test";
     const outbidJob = job({ template_key: "outbid", idempotency_key: "outbid:bid:b-1" });
