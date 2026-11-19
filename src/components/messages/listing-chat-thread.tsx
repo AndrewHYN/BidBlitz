@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Check, CheckCheck, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { ReportDialog } from "@/components/auction/report-dialog";
 import { UserAvatar } from "@/components/profile/user-avatar";
 import { markListingChatReadAction, sendListingChatAction } from "@/server/actions/listing-chat";
 import { createClient } from "@/lib/supabase/client";
@@ -126,6 +127,7 @@ export function ListingChatThread({ conversationId, viewerId, initial, peerName,
                     </span>
                   )}
                 </p>
+                {!mine && <ReportDialog messageId={message.id} />}
               </div>
             </li>
           );
