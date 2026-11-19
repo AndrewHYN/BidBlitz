@@ -15,10 +15,15 @@ test.describe("transaction loop", () => {
 
     // ---- buyer1 signs in and bids the floor -------------------------------
     await signIn(page, ACCOUNTS.buyer1.email, ACCOUNTS.buyer1.password);
-    await page.goto(`/auction/${auctionId}`);
+    await page.goto(`/listing/${auctionId}`);
 
     await expect(page.getByTestId("auction-title")).toBeVisible({ timeout: 30_000 });
     await expect(page.getByTestId("auction-status")).toBeVisible({ timeout: 15_000 });
+
+    if (await page.evaluate(() => matchMedia("(width < 64rem)").matches)) {
+      await expect(page.locator("[data-mobile-bid-bar]")).toBeInViewport();
+      await expect(page.locator("[data-mobile-dock]")).toBeHidden();
+    }
 
     await page.getByTestId("bid-amount-input").fill("10");
     await page.getByTestId("place-bid-button").click();

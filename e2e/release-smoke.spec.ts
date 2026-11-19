@@ -56,6 +56,21 @@ const PROTECTED_ROUTES = [
 ] as const;
 
 test.describe("release visual smoke", () => {
+  test("signed-in navigation stays reachable across the tablet breakpoint", async ({ page }) => {
+    await signIn(page, ACCOUNTS.buyer1.email);
+    await page.goto("/messages");
+    const dock = page.getByRole("navigation", { name: "Quick navigation" });
+    const desktop = page.getByRole("navigation", { name: "Primary" });
+    for (const width of [320, 768, 1023]) {
+      await page.setViewportSize({ width, height: 844 });
+      await expect(dock.getByRole("link", { name: "Chat" })).toBeInViewport();
+      await expect(desktop).toBeHidden();
+    }
+    await page.setViewportSize({ width: 1024, height: 844 });
+    await expect(desktop.getByRole("link", { name: "Messages" })).toBeInViewport();
+    await expect(dock).toBeHidden();
+  });
+
   test("signed-in users can open their sales account without overflow", async ({ page }, testInfo) => {
     await signIn(page, ACCOUNTS.buyer1.email);
     await page.goto("/dashboard/account");

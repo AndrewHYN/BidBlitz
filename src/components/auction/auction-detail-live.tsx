@@ -297,7 +297,7 @@ export function AuctionDetailLive({
     </div>
 
     {live.status === "LIVE" && viewerId !== sellerId && (
-      <div className="fixed inset-x-3 bottom-3 z-40 rounded-xl border bg-background/95 p-2 shadow-2xl backdrop-blur-md lg:hidden">
+      <div data-mobile-bid-bar className="fixed inset-x-3 bottom-3 z-40 rounded-xl border bg-background/95 p-2 shadow-2xl backdrop-blur-md lg:hidden">
         <a
           href="#bid-panel"
           className="flex min-h-12 items-center justify-between gap-3 rounded-lg bg-primary px-4 text-primary-foreground shadow-md"
