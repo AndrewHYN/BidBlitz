@@ -435,10 +435,10 @@ export function HeaderBar({
                   <DropdownMenuSeparator />
                   <DropdownMenuItem asChild>
                     <Link
-                      href={user.username ? `/profile/${user.username}` : "/settings"}
+                      href="/settings"
                       onClick={closeMenu}
                     >
-                      <UserIcon className="size-4" /> Profile
+                      <UserIcon className="size-4" /> Profile &amp; account settings
                     </Link>
                   </DropdownMenuItem>
 
@@ -449,7 +449,6 @@ export function HeaderBar({
                       void Notification.requestPermission();
                     }
                   }}>Enable message alerts</DropdownMenuItem>
-                  <DropdownMenuItem asChild><Link href="/settings" onClick={closeMenu}><UserIcon className="size-4" /> Settings</Link></DropdownMenuItem>
                   <DropdownMenuItem asChild><Link href="/help" onClick={closeMenu}>Help and safety</Link></DropdownMenuItem>
                   <DropdownMenuItem asChild><Link href="/dashboard/account" onClick={closeMenu}>Previous sales account</Link></DropdownMenuItem>
                   <DropdownMenuItem asChild>

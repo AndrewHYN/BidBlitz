@@ -126,21 +126,34 @@ function toCard(row: CardJoin): AuctionCardData {
   };
 }
 
+const publicListingFilter = PUBLIC_AUCTIONS_ENABLED
+  ? "and(is_direct.eq.true,status.eq.LISTED),and(is_direct.eq.false,status.eq.LIVE)"
+  : "and(is_direct.eq.true,status.eq.LISTED)";
+
 export const getMarketplaceHome = cache(async (location: string | null = null) => {
   const supabase = await createClient();
-  let listingsQuery = supabase.from("auctions")
-      .select(CARD_SELECT)
-      .or(PUBLIC_AUCTIONS_ENABLED
-        ? "and(is_direct.eq.true,status.eq.LISTED),and(is_direct.eq.false,status.eq.LIVE)"
-        : "and(is_direct.eq.true,status.eq.LISTED)")
-      .is("archived_at", null)
-      .order("listed_at", { ascending: false })
-      .order("id")
-      .limit(12);
-  if (location) listingsQuery = listingsQuery.ilike("location", locationSearchPattern(location));
-  const [{ data, error }, categories] = await Promise.all([listingsQuery, getCategories()]);
+  const latestListings = () => supabase.from("auctions")
+    .select(CARD_SELECT)
+    .or(publicListingFilter)
+    .is("archived_at", null)
+    .order("listed_at", { ascending: false })
+    .order("id")
+    .limit(12);
 
-  return { listings: (data ?? []).map(toCard), categories, error: Boolean(error) };
+  const pattern = location ? locationSearchPattern(location) : null;
+  const [local, elsewhere, categories] = await Promise.all([
+    pattern ? latestListings().ilike("location", pattern) : latestListings(),
+    pattern ? latestListings().not("location", "ilike", pattern) : null,
+    getCategories(),
+  ]);
+
+  return {
+    listings: (local.data ?? []).map(toCard),
+    otherListings: (elsewhere?.data ?? []).map(toCard),
+    categories,
+    error: Boolean(local.error),
+    otherError: Boolean(elsewhere?.error),
+  };
 });
 
 export type BrowseFilters = {
@@ -170,9 +183,7 @@ export const browseListings = cache(async (filters: BrowseFilters) => {
         : CARD_SELECT,
       { count: "exact" }
     )
-    .or(PUBLIC_AUCTIONS_ENABLED
-        ? "and(is_direct.eq.true,status.eq.LISTED),and(is_direct.eq.false,status.eq.LIVE)"
-        : "and(is_direct.eq.true,status.eq.LISTED)")
+    .or(publicListingFilter)
     .is("archived_at", null);
 
   if (filters.kind) query = query.eq("listing_kind", filters.kind);
@@ -745,7 +756,7 @@ export const getProfileByUsername = cache(async (username: string) => {
       .from("auctions")
       .select(CARD_SELECT)
       .eq("seller_id", data.id)
-      .or("and(is_direct.eq.true,status.eq.LISTED),and(is_direct.eq.false,status.neq.DRAFT)")
+      .or(publicListingFilter)
       .is("archived_at", null)
       .order("created_at", { ascending: false })
       .limit(12),
