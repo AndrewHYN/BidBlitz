@@ -84,7 +84,7 @@
   --accent-foreground: oklch(0.42 0.15 45);
   --destructive: oklch(0.577 0.245 27.325);
   --border: oklch(0.924 0.005 90);
-  --input: oklch(0.924 0.005 90);
+  --input: #a6b1bf;
   --ring: oklch(0.53 0.18 45);
   --chart-1: oklch(0.53 0.18 45);
   --chart-2: oklch(0.696 0.17 162.48);
@@ -112,23 +112,23 @@
 }
 
 .dark {
-  --background: oklch(0.181 0.006 53);
-  --foreground: oklch(0.967 0.003 90);
-  --card: oklch(0.231 0.006 53);
-  --card-foreground: oklch(0.967 0.003 90);
-  --popover: oklch(0.231 0.006 53);
-  --popover-foreground: oklch(0.967 0.003 90);
+  --background: #12161c;
+  --foreground: #f3f5f7;
+  --card: #1a2028;
+  --card-foreground: #f3f5f7;
+  --popover: #202731;
+  --popover-foreground: #f3f5f7;
   --primary: oklch(0.74 0.16 65);
   --primary-foreground: oklch(0.216 0.006 53);
-  --secondary: oklch(0.281 0.006 53);
+  --secondary: #252d37;
   --secondary-foreground: oklch(0.967 0.003 90);
-  --muted: oklch(0.281 0.006 53);
-  --muted-foreground: oklch(0.734 0.011 79);
+  --muted: #252d37;
+  --muted-foreground: #adb7c4;
   --accent: oklch(0.29 0.035 55);
   --accent-foreground: oklch(0.91 0.045 75);
   --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(0.311 0.006 53);
-  --input: oklch(0.311 0.006 53);
+  --border: #333d49;
+  --input: #5b6879;
   --ring: oklch(0.74 0.16 65);
   --chart-1: oklch(0.74 0.16 65);
   --chart-2: oklch(0.696 0.17 162.48);
@@ -446,5 +446,63 @@
   .auth-card,
   .auth-primary-action {
     transition: none !important;
+  }
+}
+
+/* Controls shared with native forms on seller, support and operator screens. */
+:where(select:not([multiple]):not([size])) {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%23798191' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m4 6 4 4 4-4'/%3E%3C/svg%3E");
+  background-position: right .75rem center;
+  background-repeat: no-repeat;
+  padding-right: 2.5rem;
+}
+:where(select, textarea:not([data-slot]), input:not([data-slot]):is(:not([type]), [type="text"], [type="number"], [type="email"], [type="date"], [type="url"])) {
+  border-color: var(--input);
+  border-radius: var(--radius);
+  min-width: 0;
+  accent-color: var(--primary);
+}
+:where(select, textarea:not([data-slot]), input:not([data-slot]):is(:not([type]), [type="text"], [type="number"], [type="email"], [type="date"], [type="url"])):focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+@media (pointer: coarse) {
+  :where(select, textarea:not([data-slot]), input:not([data-slot]):is(:not([type]), [type="text"], [type="number"], [type="email"], [type="date"], [type="url"])) {
+    min-height: 2.75rem;
+    font-size: 1rem;
+  }
+}
+@media (forced-colors: active) {
+  select:not([multiple]):not([size]) { appearance: auto; background-image: none; }
+}
+
+.chat-screen {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 22rem;
+  max-width: 54rem;
+  height: min(52rem, calc(100dvh - 7rem));
+  margin: 1.5rem auto;
+  border: 1px solid var(--border);
+  border-radius: 1.125rem;
+  background: var(--card);
+  box-shadow: 0 16px 44px -32px #0f172a66;
+}
+@media (min-width: 768px) and (max-width: 910px) {
+  .chat-screen { margin-inline: 1rem; }
+}
+@media (max-width: 767px) {
+  body:has(.chat-screen) :is([data-site-header], [data-mobile-dock], [data-site-footer]) { display: none; }
+  body:has(.chat-screen) #main { padding-bottom: 0; }
+  .chat-screen {
+    height: 100dvh;
+    min-height: 0;
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+    padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+    box-shadow: none;
   }
 }

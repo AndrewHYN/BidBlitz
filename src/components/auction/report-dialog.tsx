@@ -29,12 +29,14 @@ export function ReportDialog({
   auctionId,
   userId,
   username,
+  compact = false,
   messageId,
   reviewId,
 }: {
   auctionId?: string;
   userId?: string;
   username?: string;
+  compact?: boolean;
   messageId?: string;
   reviewId?: string;
 }) {
@@ -94,11 +96,13 @@ export function ReportDialog({
           type="button"
           data-testid="report-button"
           variant="ghost"
-          size="sm"
-          className="text-muted-foreground"
+          size={compact ? "icon" : "sm"}
+          title={compact ? label : undefined}
+          aria-label={compact ? label : undefined}
+          className={compact ? "size-11 shrink-0 text-muted-foreground hover:text-destructive" : "text-muted-foreground"}
         >
           <Flag aria-hidden />
-          {label}
+          {!compact && label}
         </Button>
       </DialogTrigger>
 
