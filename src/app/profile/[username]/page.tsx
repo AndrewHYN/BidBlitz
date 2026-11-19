@@ -1,3 +1,4 @@
+import type { Database } from "@/lib/supabase/types";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -47,7 +48,7 @@ export default async function ProfilePage({
   const isSelf = user?.id === data.profile.id;
 
   const { data: eligibility, error: eligibilityError } = user && !isSelf
-    ? await supabase.rpc("chat_review_context", { p_peer: data.profile.id }).maybeSingle()
+    ? await supabase.rpc("chat_review_context", { p_peer: data.profile.id }).maybeSingle<Database["public"]["Functions"]["chat_review_context"]["Returns"][number]>()
     : { data: null, error: null };
 
   return (
