@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { UserAvatar } from "@/components/profile/user-avatar";
 import { ReportDialog } from "@/components/auction/report-dialog";
 import { ListingChatThread, type ListingChatMessage } from "@/components/messages/listing-chat-thread";
 import { MarketplaceDealPanels } from "@/components/messages/marketplace-deal-panels";
@@ -53,7 +54,13 @@ export default async function ListingConversationPage({
       <div className="mx-auto max-w-2xl space-y-5">
         <Link href="/messages" className="text-sm font-medium text-primary hover:underline">Back to messages</Link>
         <header className="space-y-2">
-          <h1 className="text-2xl font-bold tracking-tight">{person?.display_name ?? "Marketplace member"}</h1>
+          <div className="flex flex-wrap items-center gap-3">
+            <UserAvatar name={person?.display_name ?? "Marketplace member"} avatarPath={person?.avatar_path} pixelSize={48} />
+            <div className="min-w-0">
+              <h1 className="break-words text-2xl font-bold tracking-tight">{person?.display_name ?? "Marketplace member"}</h1>
+              {person?.username && <Link href={`/profile/${person.username}`} className="text-sm font-semibold text-primary underline underline-offset-4">View profile and reviews</Link>}
+            </div>
+          </div>
           <p className="text-sm text-muted-foreground">
             Discussing{" "}
             <Link href={`/auction/${chat.listing_id}`} className="font-medium text-primary underline underline-offset-2">
