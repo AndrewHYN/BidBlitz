@@ -10,6 +10,7 @@ import { MIN_PASSWORD_LENGTH } from "@/lib/validation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { MarketplaceLocationField } from "@/components/home/marketplace-location-field";
 
 /** NEXT_REDIRECT is navigation succeeding, not an error to render. */
 function isNextRedirect(err: unknown): boolean {
@@ -56,6 +57,7 @@ export function SignupForm() {
     const email = String(data.get("email") ?? "").trim();
     const password = String(data.get("password") ?? "");
     const phone = String(data.get("phone") ?? "").trim();
+    const location = String(data.get("location") ?? "");
     const acceptedTerms = data.get("acceptedTerms") === "on";
 
     if (!acceptedTerms) {
@@ -76,7 +78,7 @@ export function SignupForm() {
     setError(null);
     startTransition(async () => {
       try {
-        const result = await signUpAction({ email, password, displayName, phone, acceptedTerms });
+        const result = await signUpAction({ email, password, displayName, phone, location, acceptedTerms });
         if (!result.ok) {
           setError(result.rejection.message);
           return;
@@ -199,7 +201,7 @@ export function SignupForm() {
         </div>
       )}
 
-      <GoogleSignInButton />
+      <GoogleSignInButton next="/welcome-location" />
       <p className="text-xs leading-5 text-muted-foreground">
         By continuing with Google, you can review our <Link href="/terms" className="underline">Terms</Link>
         and <Link href="/privacy" className="underline">Privacy Policy</Link>. Google sign-in may
@@ -238,6 +240,9 @@ export function SignupForm() {
           data-testid="email-field"
         />
       </div>
+
+      <MarketplaceLocationField id="signup-location" />
+      <p className="text-xs text-muted-foreground">Sets your homepage area and the starting location for your listings.</p>
 
       <div className="space-y-1.5">
         <Label htmlFor="signup-phone">Mobile number (optional)</Label>

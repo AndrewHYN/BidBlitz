@@ -16,6 +16,7 @@ import { AUTH_LIMIT, peekRateLimit, rateLimit } from "@/server/rate-limit";
 import type { BidRejection } from "@/server/errors";
 import { MIN_PASSWORD_LENGTH } from "@/lib/validation";
 import { normalizeZimbabwePhone } from "@/lib/phone";
+import { DEFAULT_MARKETPLACE_LOCATION, normalizeMarketplaceLocation } from "@/lib/marketplace-location";
 
 export type AuthResult = { ok: true } | { ok: false; rejection: BidRejection };
 
@@ -174,11 +175,16 @@ export async function signUpAction(input: {
   password: string;
   displayName: string;
   phone: string;
+  location?: string;
   acceptedTerms?: boolean;
   redirectTo?: string;
 }): Promise<AuthResult> {
   if (input.acceptedTerms !== true) {
     return { ok: false, rejection: { code: "invalid_input", message: "Please read and accept the Terms of Use and Privacy Policy." } };
+  }
+  const location = input.location === undefined ? DEFAULT_MARKETPLACE_LOCATION : normalizeMarketplaceLocation(input.location);
+  if (!location) {
+    return { ok: false, rejection: { code: "invalid_input", message: "Enter a Zimbabwean town or suburb." } };
   }
   const phone = input.phone.trim() ? normalizeZimbabwePhone(input.phone) : null;
   if (input.phone.trim() && !phone) {
@@ -208,6 +214,7 @@ export async function signUpAction(input: {
     options: {
       data: {
         display_name: input.displayName.trim(),
+        marketplace_location: location,
         ...(phone ? { payout_phone_e164: phone } : {}),
         accepted_terms_version: "2026-11-16",
         accepted_terms_at: new Date().toISOString(),

@@ -15,7 +15,10 @@ const options = [
   { kind: "SERVICE" as const, title: "Offer a service", summary: "Let clients hire you and leave verified reviews.", icon: BriefcaseBusiness },
 ];
 
-export function ListingTypeChooser({ categories }: { categories: { id: number; name: string }[] }) {
+export function ListingTypeChooser({ categories, defaultLocation }: {
+  categories: { id: number; name: string }[];
+  defaultLocation: string;
+}) {
   const [kind, setKind] = useState<Kind>("SALE");
   return (
     <div className="space-y-6">
@@ -39,10 +42,10 @@ export function ListingTypeChooser({ categories }: { categories: { id: number; n
           <p className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm text-muted-foreground">
             Auctions use timed bids and the existing auction ledger. Online checkout is paused, so publishing an auction may require additional payout setup.
           </p>
-          <SellForm categories={categories} feeBps={null} providerName={null} paymentsEnabled={false} />
+          <SellForm categories={categories} feeBps={null} providerName={null} paymentsEnabled={false} defaultLocation={defaultLocation} />
         </div>
       ) : (
-        <DirectListingForm key={kind} categories={categories} listingKind={kind} />
+        <DirectListingForm key={kind} categories={categories} listingKind={kind} defaultLocation={defaultLocation} />
       )}
     </div>
   );

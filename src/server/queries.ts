@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import type { Database, SellerPayoutStatus, TransactionStatus } from "@/lib/supabase/types";
 import { businessLogoUrl } from "@/lib/business";
 import { PUBLIC_AUCTIONS_ENABLED } from "@/lib/launch-features";
+import { locationSearchPattern } from "@/lib/marketplace-location";
 
 /**
  * Read model. Server Components call these so the first paint already has
@@ -125,10 +126,9 @@ function toCard(row: CardJoin): AuctionCardData {
   };
 }
 
-export const getMarketplaceHome = cache(async () => {
+export const getMarketplaceHome = cache(async (location: string | null = null) => {
   const supabase = await createClient();
-  const [{ data, error }, categories] = await Promise.all([
-    supabase.from("auctions")
+  let listingsQuery = supabase.from("auctions")
       .select(CARD_SELECT)
       .or(PUBLIC_AUCTIONS_ENABLED
         ? "and(is_direct.eq.true,status.eq.LISTED),and(is_direct.eq.false,status.eq.LIVE)"
@@ -136,9 +136,9 @@ export const getMarketplaceHome = cache(async () => {
       .is("archived_at", null)
       .order("listed_at", { ascending: false })
       .order("id")
-      .limit(12),
-    getCategories(),
-  ]);
+      .limit(12);
+  if (location) listingsQuery = listingsQuery.ilike("location", locationSearchPattern(location));
+  const [{ data, error }, categories] = await Promise.all([listingsQuery, getCategories()]);
 
   return { listings: (data ?? []).map(toCard), categories, error: Boolean(error) };
 });
@@ -185,8 +185,7 @@ export const browseListings = cache(async (filters: BrowseFilters) => {
   if (filters.category) query = query.eq("categories.slug", filters.category);
   if (filters.condition) query = query.eq("condition", filters.condition);
   if (filters.location) {
-    const location = filters.location.replace(/[\\%_]/g, "\\$&");
-    query = query.ilike("location", `%${location}%`);
+    query = query.ilike("location", locationSearchPattern(filters.location));
   }
   if (filters.recent) {
     const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);

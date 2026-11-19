@@ -74,6 +74,7 @@ export function SellForm({
   feeBps,
   providerName,
   paymentsEnabled,
+  defaultLocation = "",
 }: {
   categories: CategoryOption[];
   /** Live rate from fee_settings; null = omit the percent rather than guess. */
@@ -82,6 +83,7 @@ export function SellForm({
   providerName: string | null;
   /** Runtime kill switch; provider configuration alone never means checkout is live. */
   paymentsEnabled: boolean;
+  defaultLocation?: string;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -92,7 +94,7 @@ export function SellForm({
   const [description, setDescription] = useState("");
   const [categoryId, setCategoryId] = useState(NO_SELECTION);
   const [condition, setCondition] = useState(NO_SELECTION);
-  const [location, setLocation] = useState("");
+  const [location, setLocation] = useState(defaultLocation);
   const [fulfilmentMethod, setFulfilmentMethod] = useState("");
   const [fulfilmentNotes, setFulfilmentNotes] = useState("");
   const [startingBid, setStartingBid] = useState("");
