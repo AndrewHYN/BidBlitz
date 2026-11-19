@@ -21,7 +21,8 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export default async function SellingPage() {
+export default async function SellingPage({ searchParams }: { searchParams: Promise<{ view?: string }> }) {
+  const history = (await searchParams).view === "history";
   const supabase = await createClient();
   const {
     data: { user },
@@ -89,10 +90,16 @@ export default async function SellingPage() {
   // eslint-disable-next-line react-hooks/purity -- server component: one render per request
   const now = Date.now();
 
+  // ENDED auctions still need the seller to settle them.
+  const isHistory = (item: (typeof items)[number]) => item.status !== "ENDED" && isClosed(item.status);
+  const finished = items.filter(isHistory);
+  const current = items.filter((item) => !isHistory(item));
+  const visible = history ? finished : current;
+
   return (
     <div className="space-y-6">
       <PageHeader
-        title="My selling"
+        title="My listings"
         description="Manage listings and review your sales."
         actions={
           <Button asChild>
@@ -110,12 +117,20 @@ export default async function SellingPage() {
         </li>)}</ul>
       </section>}
 
+      <nav aria-label="Listing views" className="flex flex-wrap gap-2">
+        <Button asChild variant={history ? "outline" : "default"}>
+          <Link href="/dashboard/selling" aria-current={history ? undefined : "page"}>Current ({current.length})</Link>
+        </Button>
+        <Button asChild variant={history ? "default" : "outline"}>
+          <Link href="/dashboard/selling?view=history" aria-current={history ? "page" : undefined}>History ({finished.length})</Link>
+        </Button>
+      </nav>
       <div data-testid="selling-list">
-        {items.length === 0 ? (
+        {visible.length === 0 ? (
           <EmptyState
             icon={Tag}
-            title="You haven’t listed anything yet"
-            description="Set an asking price, add photos and let buyers contact you directly."
+            title={history ? "No finished listings" : "No current listings"}
+            description={history ? "Sold, unsold and cancelled listings appear here." : "Set an asking price, add photos and let buyers contact you directly."}
             action={
               <Button asChild>
                 <Link href="/sell">Create a listing</Link>
@@ -124,7 +139,7 @@ export default async function SellingPage() {
           />
         ) : (
           <ul className="space-y-6">
-            {items.map((item) => {
+            {visible.map((item) => {
               const settleDue =
                 item.status === "ENDED" ||
                 (item.status === "LIVE" && item.endsAt !== null && Date.parse(item.endsAt) <= now);

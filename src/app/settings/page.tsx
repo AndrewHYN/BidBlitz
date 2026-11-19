@@ -26,7 +26,7 @@ export default async function SettingsPage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("display_name, bio, location, avatar_path")
+    .select("username, display_name, bio, location, avatar_path")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -39,13 +39,27 @@ export default async function SettingsPage() {
     <div className="page-container py-10 sm:py-14">
       <div className="mx-auto w-full max-w-lg space-y-6">
         <PageHeader
-          title="Settings"
-          description="Your public profile details and account session."
+          title="Account settings"
+          description="Manage your profile, password and email preferences."
         />
         <AvatarUploader
           avatarPath={profile?.avatar_path ?? null}
           displayName={fallbackName}
         />
+        <div className="flex flex-wrap gap-3">
+          <Button asChild variant="outline"><Link href="/dashboard/selling">My listings</Link></Button>
+          {profile?.username && <Button asChild variant="outline"><Link href={`/profile/${profile.username}`}>View public profile</Link></Button>}
+        </div>
+        <SettingsForm
+          email={user.email ?? ""}
+          initial={{
+            displayName: fallbackName,
+            bio: profile?.bio ?? "",
+            location: profile?.location ?? "",
+          }}
+        />
+        <ChangePasswordForm />
+        <EmailPreferences initial={await getPreferencesAction()} />
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="rounded-xl border bg-card p-5 shadow-sm">
             <div className="flex items-start gap-3">
@@ -81,16 +95,7 @@ export default async function SettingsPage() {
             </div>
           </div>
         </div>
-        <SettingsForm
-          email={user.email ?? ""}
-          initial={{
-            displayName: fallbackName,
-            bio: profile?.bio ?? "",
-            location: profile?.location ?? "",
-          }}
-        />
-        <ChangePasswordForm />
-        <EmailPreferences initial={await getPreferencesAction()} />
+
       </div>
     </div>
   );
