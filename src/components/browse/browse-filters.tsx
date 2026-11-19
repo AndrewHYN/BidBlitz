@@ -3,7 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronDown, Search, X } from "lucide-react";
+import { MapPin, Search, SlidersHorizontal, X } from "lucide-react";
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,6 +44,7 @@ export type BrowseFilterValues = {
   max: string;
   sort: string;
   location?: string;
+  recent?: boolean;
 };
 
 export type CategoryOption = {
@@ -66,6 +68,7 @@ export function buildBrowseUrl(values: BrowseFilterValues): string {
   const max = values.max.trim();
   if (max) params.set("max", max);
   if (values.location?.trim()) params.set("location", values.location.trim());
+  if (values.recent) params.set("recent", "1");
   params.set("sort", values.sort || "newest");
   // No `page` here: any filter change resets to page 1 by construction.
   return `/browse?${params.toString()}`;
@@ -94,6 +97,8 @@ export function BrowseFilters({
 }) {
   const router = useRouter();
   const [values, setValues] = useState(initial);
+  const [locationDraft, setLocationDraft] = useState(initial.location ?? "");
+  const [locationOpen, setLocationOpen] = useState(false);
   // Price drafts live in dollars and only reach the URL when committed
   // (blur or submit), so typing never triggers a navigation per keystroke.
   const [minDraft, setMinDraft] = useState(() => minorToDollars(initial.min));
@@ -166,8 +171,10 @@ export function BrowseFilters({
 
   // Which of the secondary filters are actually set, so the collapsed panel
   // can say so instead of hiding the fact that results are narrowed.
-  const [filtersOpen, setFiltersOpen] = useState(false);
-  const activeFilterCount = [values.category, values.condition, values.min, values.max, values.location].filter(
+  const [filtersOpen, setFiltersOpen] = useState(
+    () => Boolean(initial.category || initial.condition || initial.min || initial.max || initial.sort !== "newest")
+  );
+  const activeFilterCount = [values.category, values.condition, values.min, values.max].filter(
     Boolean
   ).length;
 
@@ -192,6 +199,48 @@ export function BrowseFilters({
             {label}
           </button>
         ))}
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <Dialog open={locationOpen} onOpenChange={(open) => {
+          setLocationOpen(open);
+          if (open) setLocationDraft(values.location ?? "");
+        }}>
+          <DialogTrigger asChild>
+            <Button type="button" variant="outline" className="max-w-full">
+              <MapPin aria-hidden />
+              <span className="truncate">{values.location || "Nearby · Choose location"}</span>
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogTitle>Browse nearby</DialogTitle>
+            <DialogDescription>Find items in a Zimbabwean town or suburb.</DialogDescription>
+            <form method="get" className="space-y-3" onSubmit={(event) => {
+              event.preventDefault();
+              patch({ location: locationDraft.trim() });
+              setLocationOpen(false);
+            }}>
+              <Label htmlFor="browse-location">Town or suburb</Label>
+              <Input id="browse-location" name="location" list="browse-towns" maxLength={80}
+                value={locationDraft} onChange={(event) => setLocationDraft(event.target.value)}
+                placeholder="e.g. Harare or Avondale" />
+              <datalist id="browse-towns">
+                {["Harare", "Bulawayo", "Chitungwiza", "Gweru", "Mutare", "Masvingo", "Kwekwe", "Kadoma", "Marondera", "Victoria Falls"].map((town) => <option key={town} value={town} />)}
+              </datalist>
+              <div className="flex flex-wrap gap-2">
+                <DialogClose asChild>
+                  <Button type="button" variant="outline" onClick={() => patch({ location: "" })}>All Zimbabwe</Button>
+                </DialogClose>
+                <Button type="submit">Apply location</Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
+        <Button type="button" variant="outline" aria-expanded={filtersOpen} aria-controls="browse-advanced-filters"
+          data-testid="browse-filters-toggle" onClick={() => setFiltersOpen(!filtersOpen)}>
+          <SlidersHorizontal aria-hidden /> Filters{activeFilterCount > 0 && ` (${activeFilterCount})`}
+        </Button>
+        <Button type="button" variant={values.recent ? "default" : "outline"} aria-pressed={Boolean(values.recent)}
+          onClick={() => patch({ recent: !values.recent, sort: "newest" })}>Just listed</Button>
       </div>
       <form
       onSubmit={submitSearch}
@@ -222,47 +271,10 @@ export function BrowseFilters({
           </Button>
         </div>
 
-        {/* Progressive disclosure: see the file-level note in the commit. */}
-        <div className="sm:hidden">
-          <button
-            type="button"
-            onClick={() => setFiltersOpen((o) => !o)}
-            aria-expanded={filtersOpen}
-            aria-controls="browse-advanced-filters"
-            data-testid="browse-filters-toggle"
-            className="flex w-full items-center justify-between gap-2 rounded-lg border px-3 py-2.5 text-sm font-medium transition-colors hover:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
-          >
-            <span>
-              Filters
-              {activeFilterCount > 0 && (
-                <span className="ml-1.5 text-primary">({activeFilterCount})</span>
-              )}
-            </span>
-            <span
-              aria-hidden
-              className={`text-muted-foreground transition-transform duration-200 ${filtersOpen ? "rotate-180" : ""}`}
-            >
-              <ChevronDown className="size-4" />
-            </span>
-          </button>
-        </div>
-
-        {/*
-          Driven by the class, not by the `hidden` attribute.
-
-          The first version used `hidden={!filtersOpen}` plus `sm:block` and it
-          silently did nothing on desktop: the browser showed the advanced
-          filters hidden at 1440px, where the whole panel should have been
-          visible. The UA rule for `[hidden]` and the `sm:block` utility have the
-          same specificity, and in this cascade the attribute won. Relying on an
-          attribute and a utility to disagree about `display` is fragile, so the
-          state is expressed once, in the class list, and the attribute is not
-          used at all.
-        */}
         <div
           id="browse-advanced-filters"
           data-testid="browse-advanced-filters"
-          className={filtersOpen ? "block" : "hidden sm:block"}
+          hidden={!filtersOpen}
         >
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <div className="space-y-1.5">
@@ -323,14 +335,6 @@ export function BrowseFilters({
             </Select>
           </div>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="browse-location">Town or suburb</Label>
-            <Input id="browse-location" name="location" maxLength={80} value={values.location ?? ""} placeholder="e.g. Harare"
-              onChange={(event) => setValues((current) => ({ ...current, location: event.target.value }))}
-              onBlur={() => {
-                if (values.location?.trim() !== (initial.location ?? "")) apply(values);
-              }} />
-          </div>
           <div className="space-y-1.5">
             <Label htmlFor="browse-sort">Sort by</Label>
             <Select value={values.sort} onValueChange={(value) => patch({ sort: value })}>

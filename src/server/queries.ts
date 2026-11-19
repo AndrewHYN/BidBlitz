@@ -151,6 +151,7 @@ export type BrowseFilters = {
   min?: number;
   max?: number;
   location?: string;
+  recent?: boolean;
   sort?: string;
   page?: number;
 };
@@ -183,7 +184,14 @@ export const browseListings = cache(async (filters: BrowseFilters) => {
   }
   if (filters.category) query = query.eq("categories.slug", filters.category);
   if (filters.condition) query = query.eq("condition", filters.condition);
-  if (filters.location) query = query.ilike("location", `%${filters.location}%`);
+  if (filters.location) {
+    const location = filters.location.replace(/[\\%_]/g, "\\$&");
+    query = query.ilike("location", `%${location}%`);
+  }
+  if (filters.recent) {
+    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    query = query.gte("listed_at", weekAgo.toISOString());
+  }
   if (filters.min !== undefined) query = query.gte("starting_bid_minor", filters.min);
   if (filters.max !== undefined) query = query.lte("starting_bid_minor", filters.max);
 
