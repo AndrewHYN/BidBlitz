@@ -260,19 +260,19 @@
 }
 
 
-/* Signed-in mobile navigation is fixed to stay one tap away. Reserve space
-   only when that dock actually exists; signed-out pages keep their normal
-   rhythm. :has() is supported by our modern browser baseline. */
-@media (max-width: 767px) {
-  body:has([data-mobile-dock]) main {
-    padding-bottom: 5rem;
-  }
+/* The auction action owns the bottom edge while bidding is available. */
+@media (width < 64rem) {
+  [data-mobile-dock] { bottom: calc(0.5rem + env(safe-area-inset-bottom)); }
+  [data-mobile-bid-bar] { bottom: calc(0.75rem + env(safe-area-inset-bottom)); }
+  body:has([data-mobile-bid-bar]) [data-mobile-dock] { display: none; }
 
-  body:has([data-mobile-dock]) footer {
-    padding-bottom: 4.5rem;
+  body:has([data-mobile-dock], [data-mobile-bid-bar]) main {
+    padding-bottom: calc(5rem + env(safe-area-inset-bottom));
+  }
+  body:has([data-mobile-dock], [data-mobile-bid-bar]) [data-site-footer] {
+    padding-bottom: calc(5rem + env(safe-area-inset-bottom));
   }
 }
-
 
 /* Premium placement has one visual language across seller and staff surfaces:
    a restrained warm lift, not a different app skin. The glow is static so it
@@ -490,14 +490,12 @@
   background: var(--card);
   box-shadow: 0 16px 44px -32px #0f172a66;
 }
-@media (min-width: 768px) and (max-width: 910px) {
-  .chat-screen { margin-inline: 1rem; }
-}
-@media (max-width: 767px) {
+@media (width < 64rem) {
   body:has(.chat-screen) :is([data-site-header], [data-mobile-dock], [data-site-footer]) { display: none; }
   body:has(.chat-screen) #main { padding-bottom: 0; }
   .chat-screen {
     height: 100dvh;
+    max-width: none;
     min-height: 0;
     margin: 0;
     border: 0;
