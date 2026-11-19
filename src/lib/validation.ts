@@ -188,7 +188,7 @@ export const watchlistSchema = z.object({
 });
 
 export const reportSchema = z.object({
-  targetType: z.enum(["auction", "user"]),
+  targetType: z.enum(["auction", "user", "message", "review"]),
   targetId: z.string().uuid("Invalid target"),
   reason: z.string().trim().min(5, "Tell us a bit more").max(1000, "Too long"),
 });
