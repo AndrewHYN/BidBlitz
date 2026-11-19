@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { MessageCircle, ArrowRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { UserAvatar } from "@/components/profile/user-avatar";
 import { Button } from "@/components/ui/button";
 
 export const metadata: Metadata = {
@@ -32,8 +33,8 @@ export default async function MessagesInboxPage() {
         ? supabase.from("auctions").select("id, title").in("id", listingIds)
         : Promise.resolve({ data: [] as { id: string; title: string }[] }),
       otherIds.length
-        ? supabase.from("profiles").select("id, display_name").in("id", otherIds)
-        : Promise.resolve({ data: [] as { id: string; display_name: string }[] }),
+        ? supabase.from("profiles").select("id, display_name, username, avatar_path").in("id", otherIds)
+        : Promise.resolve({ data: [] as { id: string; display_name: string; username: string; avatar_path: string | null }[] }),
       threadIds.length
         ? supabase.from("listing_messages")
           .select("conversation_id, body, created_at")
@@ -51,7 +52,7 @@ export default async function MessagesInboxPage() {
     ]);
 
   const titles = new Map((listings ?? []).map((item) => [item.id, item.title]));
-  const names = new Map((people ?? []).map((person) => [person.id, person.display_name]));
+  const profiles = new Map((people ?? []).map((person) => [person.id, person]));
   const latest = new Map<string, string>();
   for (const message of recentMessages ?? []) {
     if (!latest.has(message.conversation_id)) latest.set(message.conversation_id, message.body);
@@ -87,15 +88,21 @@ export default async function MessagesInboxPage() {
           <ul className="divide-y overflow-hidden rounded-xl border bg-card">
             {threads.map((thread) => {
               const other = thread.seller_id === user.id ? thread.buyer_id : thread.seller_id;
+              const peer = profiles.get(other);
               const count = unreadCounts.get(thread.id) ?? 0;
               return (
-                <li key={thread.id}>
+                <li key={thread.id} className="flex items-center gap-3 px-4">
+                  {peer?.username && (
+                    <Link href={`/profile/${peer.username}`} aria-label={`View ${peer.display_name}’s profile`} className="shrink-0 rounded-full focus-visible:outline-2">
+                      <UserAvatar name={peer.display_name} avatarPath={peer.avatar_path} pixelSize={40} />
+                    </Link>
+                  )}
                   <Link href={`/messages/${thread.id}`}
-                    className="flex min-h-20 items-center justify-between gap-4 p-4 hover:bg-muted/50 focus-visible:outline-2 focus-visible:outline-ring">
+                    className="flex min-h-20 min-w-0 flex-1 items-center justify-between gap-4 py-4 hover:bg-muted/50 focus-visible:outline-2 focus-visible:outline-ring">
                     <div className="min-w-0 space-y-1">
                       <p className="font-semibold">{titles.get(thread.listing_id) ?? "Listing"}</p>
                       <p className="text-sm text-muted-foreground">
-                        With {names.get(other) ?? "Marketplace member"} · {thread.seller_id === user.id ? "Selling" : "Buying"}
+                        With {peer?.display_name ?? "Marketplace member"} · {thread.seller_id === user.id ? "Selling" : "Buying"}
                       </p>
                       <p className="truncate text-sm text-muted-foreground">{latest.get(thread.id) ?? "Open conversation"}</p>
                     </div>
