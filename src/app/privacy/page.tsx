@@ -124,7 +124,9 @@ export default function PrivacyPage() {
               hire requests and confirmation steps, and message read status.
               These are stored to make conversations work and to investigate
               relevant safety or support issues when legally justified.
-              Messages are not end-to-end encrypted.
+              When you report a message, authorised moderators receive that message and your reason.
+              Reporting does not share the rest of the conversation. Profile ratings and written reviews
+              are public and identify the reviewer. Messages are not end-to-end encrypted.
             </li>
             <li>
               <strong>Notifications:</strong> in-app message alerts, account
