@@ -33,7 +33,7 @@ export function HomeHero() {
             </Button>
             <Button
               asChild
-              className="bg-[#39ff14] font-semibold text-[#092006] shadow-[0_0_14px_#39ff1459] hover:bg-[#68ff4c] hover:shadow-[0_0_20px_#39ff1480] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white"
+              className="border-blue-300/30 bg-blue-600 font-semibold text-white shadow-sm hover:bg-blue-700 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white"
             >
               <Link href="/sell">Sell an item</Link>
             </Button>
