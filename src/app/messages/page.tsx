@@ -85,24 +85,24 @@ export default async function MessagesInboxPage() {
             <Button asChild><Link href="/browse">Explore items</Link></Button>
           </div>
         ) : (
-          <ul className="divide-y overflow-hidden rounded-xl border bg-card">
+          <ul className="divide-y overflow-hidden rounded-2xl border bg-card shadow-sm">
             {threads.map((thread) => {
               const other = thread.seller_id === user.id ? thread.buyer_id : thread.seller_id;
               const peer = profiles.get(other);
               const count = unreadCounts.get(thread.id) ?? 0;
               return (
-                <li key={thread.id} className="flex items-center gap-3 px-4">
+                <li key={thread.id} className="flex items-center gap-3 px-4 hover:bg-muted/40">
                   {peer?.username && (
                     <Link href={`/profile/${peer.username}`} aria-label={`View ${peer.display_name}’s profile`} className="shrink-0 rounded-full focus-visible:outline-2">
-                      <UserAvatar name={peer.display_name} avatarPath={peer.avatar_path} pixelSize={40} />
+                      <UserAvatar name={peer.display_name} avatarPath={peer.avatar_path} pixelSize={48} className="size-11" />
                     </Link>
                   )}
                   <Link href={`/messages/${thread.id}`}
                     className="flex min-h-20 min-w-0 flex-1 items-center justify-between gap-4 py-4 hover:bg-muted/50 focus-visible:outline-2 focus-visible:outline-ring">
                     <div className="min-w-0 space-y-1">
-                      <p className="font-semibold">{titles.get(thread.listing_id) ?? "Listing"}</p>
+                      <p className="truncate font-semibold">{peer?.display_name ?? "Marketplace member"}</p>
                       <p className="text-sm text-muted-foreground">
-                        With {peer?.display_name ?? "Marketplace member"} · {thread.seller_id === user.id ? "Selling" : "Buying"}
+                        {titles.get(thread.listing_id) ?? "Listing"} · {thread.seller_id === user.id ? "Selling" : "Buying"}
                       </p>
                       <p className="truncate text-sm text-muted-foreground">{latest.get(thread.id) ?? "Open conversation"}</p>
                     </div>

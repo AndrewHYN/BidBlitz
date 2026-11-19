@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { ChevronDown, Handshake, Check, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -50,8 +51,17 @@ export function MarketplaceDealPanels({
 
   if (offers.length === 0 && hires.length === 0) return null;
   return (
-    <section className="space-y-4" aria-label="Offers and service hire requests">
-      <h2 className="text-lg font-semibold">Offers and hire requests</h2>
+    <details className="group/deals max-h-[32dvh] shrink-0 overflow-y-auto border-b bg-card">
+      <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 px-4 text-sm sm:px-6">
+        <Handshake className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+        <span className="font-semibold">{hires.length ? "Offers and service requests" : "Offers"}</span>
+        {offers.length === 1 && hires.length === 0 ? <>
+          <span className="font-medium"><Money minor={offers[0].amount_minor} /></span>
+          <span className="ml-auto rounded-md bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground capitalize">{offers[0].status.toLowerCase()}</span>
+        </> : <span className="ml-auto text-xs text-muted-foreground">{offers.length + hires.length}</span>}
+        <ChevronDown className="size-4 shrink-0 transition-transform group-open/deals:rotate-180" aria-hidden />
+      </summary>
+      <div className="space-y-2 px-3 pb-3 sm:px-5">
       {error && <p role="alert" className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive">{error}</p>}
       {offers.map((offer) => {
         const isSeller = offer.seller_id === viewerId;
@@ -64,9 +74,9 @@ export function MarketplaceDealPanels({
             {offer.status === "PENDING" && isSeller && (
               <div className="flex flex-wrap gap-2">
                 <Button type="button" size="sm" disabled={pending}
-                  onClick={() => act(() => respondListingOfferAction({ offerId: offer.id, accept: true }))}>Accept offer</Button>
+                  onClick={() => act(() => respondListingOfferAction({ offerId: offer.id, accept: true }))}><Check aria-hidden />Accept offer</Button>
                 <Button type="button" size="sm" variant="outline" disabled={pending}
-                  onClick={() => act(() => respondListingOfferAction({ offerId: offer.id, accept: false }))}>Decline</Button>
+                  onClick={() => act(() => respondListingOfferAction({ offerId: offer.id, accept: false }))}><X aria-hidden />Decline</Button>
               </div>
             )}
             {offer.status === "ACCEPTED" && <p className="text-xs text-muted-foreground">
@@ -125,6 +135,7 @@ export function MarketplaceDealPanels({
           </article>
         );
       })}
-    </section>
+      </div>
+    </details>
   );
 }

@@ -329,7 +329,7 @@ export function HeaderBar({
 
   return (
     <>
-    <header className="sticky top-0 z-40 border-b bg-background/85 backdrop-blur-md">
+    <header data-site-header className="sticky top-0 z-40 border-b bg-background/85 backdrop-blur-md">
       <div className="page-container flex h-16 items-center gap-3">
         <Link
           href="/"

@@ -25,9 +25,9 @@ export function ImageWithFallback({
   loading?: "lazy" | "eager";
   fallback: React.ReactNode;
 }) {
-  const [failed, setFailed] = useState(false);
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
 
-  if (!src || failed) return <>{fallback}</>;
+  if (!src || failedSrc === src) return <>{fallback}</>;
 
   return (
     // eslint-disable-next-line @next/next/no-img-element
@@ -35,7 +35,11 @@ export function ImageWithFallback({
       src={src}
       alt={alt}
       loading={loading}
-      onError={() => setFailed(true)}
+      ref={node => {
+        // A cached 404 can finish before React attaches its error listener.
+        if (node?.complete && node.naturalWidth === 0) setFailedSrc(src);
+      }}
+      onError={() => setFailedSrc(src)}
       className={className}
     />
   );

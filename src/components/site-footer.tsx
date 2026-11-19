@@ -44,7 +44,7 @@ const WALLETS = [
 
 export function SiteFooter() {
   return (
-    <footer className="mt-auto border-t bg-card/50">
+    <footer data-site-footer className="mt-auto border-t bg-card/50">
       <div className="page-container grid gap-8 py-10 sm:grid-cols-2 lg:grid-cols-4">
         <div className="space-y-3">
           <Link href="/" aria-label="BidBlitz" className="inline-flex items-center gap-2 font-semibold">
