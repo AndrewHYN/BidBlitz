@@ -1,3 +1,4 @@
+import type { Database } from "@/lib/supabase/types";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -10,7 +11,7 @@ export const metadata: Metadata = { title: "Community reports", robots: { index:
 export default async function CommunityQueue() {
   if (!(await requirePermission("reports.view")).ok) notFound();
   const db = await createClient();
-  const { data, error } = await db.rpc("marketplace_moderation_queue", {});
+  const { data, error } = await db.rpc("marketplace_moderation_queue", {}).returns<Database["public"]["Functions"]["marketplace_moderation_queue"]["Returns"]>();
   return <main className="page-container max-w-3xl space-y-5 py-8">
     <Link href="/admin" className="text-sm font-semibold text-primary underline">Admin overview</Link>
     <h1 className="text-3xl font-bold">Community reports</h1>
