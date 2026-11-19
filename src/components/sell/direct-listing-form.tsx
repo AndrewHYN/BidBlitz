@@ -13,7 +13,11 @@ import { createDirectListingAction } from "@/server/actions/auction";
 
 const selectClass = "h-10 w-full rounded-md border bg-background px-3 text-sm focus-visible:outline-2 focus-visible:outline-ring";
 
-export function DirectListingForm({ categories, listingKind = "SALE" }: { categories: { id: number; name: string }[]; listingKind?: "SALE" | "SERVICE" }) {
+export function DirectListingForm({ categories, listingKind = "SALE", defaultLocation = "" }: {
+  categories: { id: number; name: string }[];
+  listingKind?: "SALE" | "SERVICE";
+  defaultLocation?: string;
+}) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [errors, setErrors] = useState<Record<string, string[]>>({});
@@ -101,7 +105,7 @@ export function DirectListingForm({ categories, listingKind = "SALE" }: { catego
         </div>
         <div className="space-y-2">
           <Label htmlFor="sell-location">{listingKind === "SERVICE" ? "Area served" : "Town or suburb"}</Label>
-          <Input id="sell-location" name="location" data-testid="sell-location" required minLength={2} maxLength={80} placeholder="e.g. Harare CBD" />
+          <Input id="sell-location" name="location" data-testid="sell-location" defaultValue={defaultLocation} required minLength={2} maxLength={80} placeholder="e.g. Harare CBD" />
           {error("location")}
         </div>
       </div>

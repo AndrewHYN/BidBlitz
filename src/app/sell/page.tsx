@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCategories } from "@/server/queries";
 import { PageHeader } from "@/components/auction/page-header";
 import { ListingTypeChooser } from "@/components/sell/listing-type-chooser";
+import { marketplaceLocation } from "@/lib/marketplace-location";
 
 export const metadata: Metadata = {
   title: "Sell an item",
@@ -33,7 +34,7 @@ export default async function SellPage() {
         ) : categories.length === 0 ? (
           <p role="alert">We couldn’t load listing categories. Refresh the page to try again.</p>
         ) : (
-          <ListingTypeChooser categories={categories} />
+          <ListingTypeChooser categories={categories} defaultLocation={marketplaceLocation(user.user_metadata.marketplace_location)} />
         )}
       </div>
     </div>

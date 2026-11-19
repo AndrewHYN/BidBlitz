@@ -96,6 +96,7 @@ test.describe("authentication", () => {
     // e2e-<stamp> name satisfies. No mailbox is ever read; confirmation
     // links go nowhere.
     await page.getByTestId("name-field").fill(`E2E ${stamp}`);
+    await page.getByLabel("Town or suburb").fill("Harare");
     await page
       .getByTestId("email-field")
       .or(page.locator('input[type="email"]'))
