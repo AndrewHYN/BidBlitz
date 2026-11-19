@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Flag } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -29,15 +29,20 @@ export function ReportDialog({
   auctionId,
   userId,
   username,
+  messageId,
+  reviewId,
 }: {
   auctionId?: string;
   userId?: string;
   username?: string;
+  messageId?: string;
+  reviewId?: string;
 }) {
-  const targetType = auctionId ? ("auction" as const) : ("user" as const);
-  const targetId = (auctionId ?? userId) as string;
-  const targetName =
-    targetType === "auction" ? "this listing" : `@${username ?? "this user"}`;
+  const fieldId = useId();
+  const targetType = messageId ? "message" : reviewId ? "review" : auctionId ? "auction" : "user";
+  const targetId = messageId ?? reviewId ?? auctionId ?? userId;
+  const targetName = targetType === "auction" ? "this listing" : targetType === "user" ? `@${username ?? "user"}` : `this ${targetType}`;
+  const label = `Report ${targetName}`;
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
   const [pending, setPending] = useState(false);
@@ -62,10 +67,7 @@ export function ReportDialog({
       const result = await reportAction(parsed.data);
       if (result.ok) {
         toast.success("Report received", {
-          description:
-            targetType === "auction"
-              ? "The BidBlitz team will review this listing."
-              : "The BidBlitz team will review this account.",
+          description: "The BidBlitz moderation team has received your report.",
         });
         setReason("");
         setOpen(false);
@@ -96,19 +98,17 @@ export function ReportDialog({
           className="text-muted-foreground"
         >
           <Flag aria-hidden />
-          {targetType === "auction" ? "Report this listing" : `Report @${username ?? "user"}`}
+          {label}
         </Button>
       </DialogTrigger>
 
       <DialogContent>
         <DialogHeader>
           <DialogTitle>
-            {targetType === "auction" ? "Report this listing" : `Report @${username ?? "user"}`}
+            {label}
           </DialogTitle>
           <DialogDescription>
-            Tell us what&apos;s wrong with {targetName}. Reports go to the
-            BidBlitz team and are never shown to{" "}
-            {targetType === "auction" ? "the seller" : "that account"}.
+            {targetType === "message" ? "The moderation team will receive the selected message and your reason." : `Tell the moderation team what’s wrong with ${targetName}.`}
           </DialogDescription>
         </DialogHeader>
 
@@ -120,9 +120,9 @@ export function ReportDialog({
           className="space-y-4"
         >
           <div className="space-y-1.5">
-            <Label htmlFor="report-reason">What&apos;s wrong?</Label>
+            <Label htmlFor={fieldId}>What&apos;s wrong?</Label>
             <Textarea
-              id="report-reason"
+              id={fieldId}
               value={reason}
               onChange={(event) => setReason(event.target.value)}
               rows={4}

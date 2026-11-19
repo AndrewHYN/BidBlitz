@@ -299,6 +299,7 @@ export default async function AdminPage() {
       .select(
         "id, reporter_id, target_type, target_id, reason, status, resolution, created_at, resolved_at"
       )
+      .in("target_type", ["auction", "user"])
       .in("status", ["OPEN", "REVIEWING"])
       .order("created_at", { ascending: false })
       .limit(50),
@@ -673,6 +674,7 @@ export default async function AdminPage() {
           }
         />
 
+        <Link className="inline-flex font-semibold text-primary underline" href="/admin/community">Review reported messages and profile reviews</Link>
         <div data-testid="admin-reports" className="space-y-3">
           {reportsRes.error ? (
             <p role="alert" className="text-sm text-destructive">

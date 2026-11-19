@@ -745,7 +745,7 @@ export const getProfileByUsername = cache(async (username: string) => {
     supabase
       .from("reviews")
       .select(
-        `id, rating, comment, created_at,
+        `id, rating, comment, created_at, auction_id, transaction_id, reviewer_id,
          reviewer:profiles!reviews_reviewer_id_fkey(username, display_name),
          auctions:auction_id(title)`
       )

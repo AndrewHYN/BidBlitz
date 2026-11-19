@@ -131,6 +131,15 @@ export async function reportAction(input: unknown): Promise<SimpleResult> {
     return { ok: false, rejection: { code: "invalid_request_id", message: parsed.error.issues[0]?.message ?? "Invalid report." } };
   }
 
+  if (parsed.data.targetType === "review" || parsed.data.targetType === "message") {
+    const { error } = await supabase.rpc("report_marketplace_content", {
+      p_kind: parsed.data.targetType, p_target: parsed.data.targetId, p_reason: parsed.data.reason,
+    });
+    if (!error) return { ok: true };
+    if (error.code === "23505") return { ok: false, rejection: { code: "duplicate_report", message: "You've already reported this. The team has your first report." } };
+    return { ok: false, rejection: { code: "invalid_request_id", message: error.message.includes("too_many_reports") ? "You’ve reached the report limit. Try again later." : "The report could not be submitted. Refresh and try again." } };
+  }
+
   // The target must exist and be visible to the reporter, or the queue fills
   // with reports pointing nowhere. Auctions follow the same visibility rule
   // as browsing (public, own, or admin); profiles are public by design.
