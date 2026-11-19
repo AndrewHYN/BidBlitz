@@ -31,7 +31,7 @@ export default async function ListingConversationPage({
   const otherId = chat.seller_id === user.id ? chat.buyer_id : chat.seller_id;
   const [{ data: listing }, { data: person }, { data: messages }, { data: offers }, { data: hires }] = await Promise.all([
     supabase.from("auctions").select("id, title, status").eq("id", chat.listing_id).maybeSingle(),
-    supabase.from("profiles").select("display_name, username").eq("id", otherId).maybeSingle(),
+    supabase.from("profiles").select("display_name, username, avatar_path").eq("id", otherId).maybeSingle(),
     supabase.from("listing_messages")
       .select("id, sender_id, body, created_at, read_at")
       .eq("conversation_id", chat.id)
@@ -66,7 +66,8 @@ export default async function ListingConversationPage({
         <MarketplaceDealPanels viewerId={user.id} offers={offers ?? []} hires={hires ?? []}
           reviewedRequestIds={(existingReviews ?? []).map((review) => review.request_id)} />
         <div className="rounded-xl border bg-card p-4 sm:p-6">
-          <ListingChatThread conversationId={chat.id} viewerId={user.id} initial={ordered} />
+          <ListingChatThread conversationId={chat.id} viewerId={user.id} initial={ordered}
+            peerName={person?.display_name ?? "Marketplace member"} peerAvatarPath={person?.avatar_path} />
         </div>
         <p className="text-xs leading-5 text-muted-foreground">
           Payments and pickup are arranged directly between you and the seller. Inspect goods in person where possible.

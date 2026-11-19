@@ -243,6 +243,7 @@ export const browseParamsSchema = z.object({
   min: z.coerce.number().int().min(0).max(100_000_00).optional(),
   max: z.coerce.number().int().min(0).max(100_000_00).optional(),
   location: z.string().trim().max(80).optional(),
+  recent: z.literal("1").optional(),
   sort: z.enum(SORTS.map((s) => s.value)).default("ending-soon"),
 });
 

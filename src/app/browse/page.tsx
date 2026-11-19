@@ -68,6 +68,7 @@ function parseFilters(flat: Record<string, string>): {
       max: filters.max === undefined ? "" : String(filters.max),
       sort: filters.sort === "ending-soon" || filters.sort === "most-bids" ? "newest" : filters.sort,
       location: filters.location ?? "",
+      recent: filters.recent === "1",
     },
   };
 }
@@ -93,7 +94,8 @@ export default async function BrowsePage({
       values.condition ||
       values.min ||
       values.max ||
-      values.location
+      values.location ||
+      values.recent
   );
 
   const [result, categories] = await Promise.all([
@@ -105,6 +107,7 @@ export default async function BrowsePage({
       min: values.min === "" ? undefined : Number(values.min),
       max: values.max === "" ? undefined : Number(values.max),
       location: values.location || undefined,
+      recent: values.recent,
       sort: values.sort,
       page,
     }),

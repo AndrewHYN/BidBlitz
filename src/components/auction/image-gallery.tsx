@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { ImageIcon } from "lucide-react";
+import { ChevronLeft, ChevronRight, ImageIcon, Maximize2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { ImageWithFallback } from "@/components/auction/image-with-fallback";
 
@@ -45,6 +47,9 @@ export function ImageGallery({
 
   const activeIndex = Math.min(index, images.length - 1);
   const active = images[activeIndex];
+  const move = (direction: number) => setIndex((current) => (
+    (Math.min(current, images.length - 1) + direction + images.length) % images.length
+  ));
 
   return (
     <div data-testid="auction-gallery" className="space-y-3">
@@ -57,6 +62,36 @@ export function ImageGallery({
         or hitting a broken one changes nothing about the layout.
       */}
       <div className="relative overflow-hidden rounded-xl border bg-muted/40 shadow-xs">
+        <Dialog>
+          <DialogTrigger asChild>
+            <Button type="button" variant="secondary" size="icon" aria-label="View full-size photos" className="absolute top-2 right-2 z-10">
+              <Maximize2 aria-hidden />
+            </Button>
+          </DialogTrigger>
+          <DialogContent aria-describedby={undefined}
+            className="max-h-dvh max-w-[calc(100%-1rem)] sm:max-w-5xl"
+            onKeyDown={(event) => {
+              if (event.key === "ArrowLeft") move(-1);
+              if (event.key === "ArrowRight") move(1);
+            }}>
+            <DialogTitle className="pr-9">{title}</DialogTitle>
+            <div className="grid h-[70dvh] place-items-center overflow-hidden rounded-lg bg-muted">
+              <ImageWithFallback key={active.id} src={active.url}
+                alt={`${title}, photo ${activeIndex + 1} of ${images.length}`}
+                className="size-full min-h-0 object-contain"
+                fallback={<p className="text-muted-foreground">Photo unavailable</p>} />
+            </div>
+            <div className="flex items-center justify-center gap-4">
+              <Button type="button" variant="outline" size="icon" aria-label="Previous photo" disabled={images.length < 2} onClick={() => move(-1)}>
+                <ChevronLeft aria-hidden />
+              </Button>
+              <span aria-live="polite">{activeIndex + 1} / {images.length}</span>
+              <Button type="button" variant="outline" size="icon" aria-label="Next photo" disabled={images.length < 2} onClick={() => move(1)}>
+                <ChevronRight aria-hidden />
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
         <div className="flex aspect-[4/3] max-h-[min(58vh,560px)] w-full items-center justify-center p-3 sm:p-4 md:p-5">
           {/* key by photo: a failed load must reset when the user switches. */}
           <ImageWithFallback

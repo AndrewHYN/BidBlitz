@@ -2,9 +2,10 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Send } from "lucide-react";
+import { Check, CheckCheck, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { UserAvatar } from "@/components/profile/user-avatar";
 import { markListingChatReadAction, sendListingChatAction } from "@/server/actions/listing-chat";
 import { createClient } from "@/lib/supabase/client";
 
@@ -16,10 +17,12 @@ export type ListingChatMessage = {
   read_at: string | null;
 };
 
-export function ListingChatThread({ conversationId, viewerId, initial }: {
+export function ListingChatThread({ conversationId, viewerId, initial, peerName, peerAvatarPath }: {
   conversationId: string;
   viewerId: string;
   initial: ListingChatMessage[];
+  peerName: string;
+  peerAvatarPath?: string | null;
 }) {
   const router = useRouter();
   const [body, setBody] = useState("");
@@ -56,7 +59,18 @@ export function ListingChatThread({ conversationId, viewerId, initial }: {
   }, [router, conversationId]);
 
   useEffect(() => {
-    void markListingChatReadAction(conversationId).catch(() => {});
+    function markVisibleThreadRead() {
+      if (document.visibilityState === "visible" && document.hasFocus()) {
+        void markListingChatReadAction(conversationId).catch(() => {});
+      }
+    }
+    markVisibleThreadRead();
+    window.addEventListener("focus", markVisibleThreadRead);
+    document.addEventListener("visibilitychange", markVisibleThreadRead);
+    return () => {
+      window.removeEventListener("focus", markVisibleThreadRead);
+      document.removeEventListener("visibilitychange", markVisibleThreadRead);
+    };
   }, [conversationId, lastMessageId]);
 
   function send(event: React.FormEvent<HTMLFormElement>) {
@@ -92,14 +106,25 @@ export function ListingChatThread({ conversationId, viewerId, initial }: {
         {initial.map((message) => {
           const mine = message.sender_id === viewerId;
           return (
-            <li key={message.id} className={mine ? "flex justify-end" : "flex justify-start"}>
+            <li key={message.id} className={`flex items-end gap-2 ${mine ? "justify-end" : "justify-start"}`}>
+              {!mine && (
+                <div title={peerName} className="shrink-0">
+                  <span className="sr-only">{peerName}</span>
+                  <UserAvatar name={peerName} avatarPath={peerAvatarPath} pixelSize={32} />
+                </div>
+              )}
               <div className={mine
                 ? "max-w-[85%] rounded-xl bg-primary p-3 text-sm text-primary-foreground"
                 : "max-w-[85%] rounded-xl border bg-card p-3 text-sm"}>
                 <p className="whitespace-pre-wrap break-words">{message.body}</p>
                 <p className={mine ? "mt-1 text-right text-xs opacity-75" : "mt-1 text-right text-xs text-muted-foreground"}>
                   {new Date(message.created_at).toLocaleString("en-ZW", { dateStyle: "medium", timeStyle: "short" })}
-                  {mine && message.read_at ? " · Seen" : ""}
+                  {mine && (
+                    <span className="ml-2 inline-flex items-center gap-1">
+                      {message.read_at ? <CheckCheck className="size-3" aria-hidden /> : <Check className="size-3" aria-hidden />}
+                      {message.read_at ? "Seen" : "Sent"}
+                    </span>
+                  )}
                 </p>
               </div>
             </li>
