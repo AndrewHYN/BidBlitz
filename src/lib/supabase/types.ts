@@ -211,7 +211,7 @@ export interface Database {
       };
       reviews: {
         Row: {
-          id: string; transaction_id: string; auction_id: string; reviewer_id: string;
+          id: string; transaction_id: string | null; auction_id: string; reviewer_id: string;
           reviewee_id: string; rating: number; comment: string | null; created_at: string;
         };
         Insert: { id?: string; transaction_id: string; auction_id: string; reviewer_id: string; reviewee_id: string; rating: number; comment?: string | null };
@@ -434,6 +434,11 @@ export interface Database {
       };
     };
     Functions: {
+      chat_review_context: { Args: { p_peer: string }; Returns: { listing_id: string; already_reviewed: boolean }[] };
+      submit_chat_review: { Args: { p_peer: string; p_rating: number; p_comment: string }; Returns: undefined };
+      report_marketplace_content: { Args: { p_kind: string; p_target: string; p_reason: string }; Returns: undefined };
+      marketplace_moderation_queue: { Args: Record<never, never>; Returns: { report_id: string; kind: string; reason: string; excerpt: string; username: string | null; created_at: string }[] };
+      decide_marketplace_report: { Args: { p_report: string; p_decision: string }; Returns: undefined };
       reveal_listing_contact: {
         Args: { p_listing_id: string };
         Returns: string;
