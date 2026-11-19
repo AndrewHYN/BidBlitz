@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { PackageSearch } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getProfileByUsername } from "@/server/queries";
+import { PeerReviewForm } from "@/components/profile/peer-review-form";
 import { ProfileHeader } from "@/components/profile/profile-header";
 import { ReportDialog } from "@/components/auction/report-dialog";
 import { ReviewList } from "@/components/profile/review-list";
@@ -45,24 +46,9 @@ export default async function ProfilePage({
   } = await supabase.auth.getUser();
   const isSelf = user?.id === data.profile.id;
 
-  // The shared query returns review *content* but not the auction link target,
-  // so fetch only the id mapping — one tiny query instead of editing shared code.
-  const auctionByReview = new Map<string, string>();
-  if (data.reviews.length > 0) {
-    const { data: rows } = await supabase
-      .from("reviews")
-      .select("id, auction_id")
-      .in(
-        "id",
-        data.reviews.map((r) => r.id)
-      );
-    for (const row of rows ?? []) auctionByReview.set(row.id, row.auction_id);
-  }
-
-  const reviews = data.reviews.map((review) => ({
-    ...review,
-    auctionId: auctionByReview.get(review.id) ?? null,
-  }));
+  const { data: eligibility, error: eligibilityError } = user && !isSelf
+    ? await supabase.rpc("chat_review_context", { p_peer: data.profile.id }).maybeSingle()
+    : { data: null, error: null };
 
   return (
     <div className="page-container space-y-10 py-10 sm:py-14">
@@ -80,7 +66,16 @@ export default async function ProfilePage({
         <SectionHeading
           title={<span id="profile-reviews-heading">Reviews</span>}
         />
-        <ReviewList reviews={reviews} />
+        {!isSelf && (eligibilityError ? (
+          <p role="status" className="text-sm text-muted-foreground">Review availability could not be loaded.</p>
+        ) : eligibility?.already_reviewed ? (
+          <p className="text-sm text-muted-foreground">You’ve already rated your interaction with this member.</p>
+        ) : eligibility ? (
+          <PeerReviewForm peerId={data.profile.id} name={data.profile.display_name} />
+        ) : (
+          <p className="text-sm text-muted-foreground">You can rate this member after you’ve both sent a message in the same listing chat.</p>
+        ))}
+        <ReviewList reviews={data.reviews} viewerId={user?.id} />
       </section>
 
       <section className="space-y-4" aria-labelledby="profile-listings-heading">
