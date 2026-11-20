@@ -266,8 +266,8 @@
   [data-mobile-bid-bar] { bottom: calc(0.75rem + env(safe-area-inset-bottom)); }
   body:has([data-mobile-bid-bar]) [data-mobile-dock] { display: none; }
 
-  body:has([data-mobile-dock], [data-mobile-bid-bar]) main {
-    padding-bottom: calc(5rem + env(safe-area-inset-bottom));
+  html:has([data-mobile-dock], [data-mobile-bid-bar]):not(:has(.chat-screen)) {
+    scroll-padding-block: 4.5rem calc(5rem + env(safe-area-inset-bottom));
   }
   body:has([data-mobile-dock], [data-mobile-bid-bar]) [data-site-footer] {
     padding-bottom: calc(5rem + env(safe-area-inset-bottom));

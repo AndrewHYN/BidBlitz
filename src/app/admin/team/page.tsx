@@ -1,5 +1,5 @@
+import { BackLink } from "@/components/ui/back-link";
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { hasPermission } from "@/server/permissions";
 import { EmptyState, PageHeader, SectionHeading } from "@/components/auction/page-header";
@@ -110,12 +110,7 @@ export default async function TeamPage() {
         title="Team"
         description="Who holds staff access, what it grants, and every change ever made to it."
         actions={
-          <Link
-            href="/admin"
-            className="text-sm font-medium text-primary hover:underline"
-          >
-            Back to admin
-          </Link>
+          <BackLink href="/admin">Back to admin</BackLink>
         }
       />
 

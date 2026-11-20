@@ -311,7 +311,7 @@ export function HeaderBar({
             className={cn(
               "flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-xl px-1 text-[10px] font-semibold transition-colors",
               primary
-                ? "bg-primary text-primary-foreground shadow-sm"
+                ? "bg-blue-600 text-white shadow-sm hover:bg-blue-700"
                 : active
                   ? "bg-accent text-accent-foreground"
                   : "text-muted-foreground hover:bg-accent/70 hover:text-foreground"
@@ -398,7 +398,7 @@ export function HeaderBar({
                 </Link>
               </Button>
 
-              <Button asChild className="hidden gap-1.5 lg:inline-flex">
+              <Button asChild className="hidden gap-1.5 bg-blue-600 text-white hover:bg-blue-700 lg:inline-flex">
                 <Link href="/sell" onClick={closeMenu}>
                   <Plus className="size-4" /> Sell
                 </Link>

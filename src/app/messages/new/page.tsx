@@ -1,5 +1,5 @@
+import { BackLink } from "@/components/ui/back-link";
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getAuctionDetail } from "@/server/queries";
@@ -27,9 +27,9 @@ export default async function NewListingChatPage({
   if (detail.auction.seller_id === user.id) redirect(`/sell/${listing}`);
 
   return (
-    <div className="page-container pt-8 pb-32 sm:py-14">
+    <div className="page-container py-8 sm:py-14">
       <div className="mx-auto max-w-xl space-y-6">
-        <Link href={`/auction/${listing}`} className="text-sm font-medium text-primary hover:underline">Back to listing</Link>
+        <BackLink href={`/listing/${listing}`}>Back to listing</BackLink>
         <div className="space-y-2">
           <h1 className="text-2xl font-bold tracking-tight">Message the seller</h1>
           <p className="text-sm text-muted-foreground">

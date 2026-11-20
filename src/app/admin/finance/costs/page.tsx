@@ -1,7 +1,8 @@
+import { BackLink } from "@/components/ui/back-link";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowLeft,Wallet,Receipt,ShieldCheck,Boxes } from "lucide-react";
+import { Wallet,Receipt,ShieldCheck,Boxes } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { hasPermission } from "@/server/permissions";
 import { AdminNav } from "@/components/dashboard/admin-nav";
@@ -43,7 +44,7 @@ export default async function CompanyCostsPage(){
   </header>
   <AdminNav active="finance" showTeam={mayTeam}/>
   <nav className="flex flex-wrap gap-3 text-sm font-bold">
-   <Link href="/admin/finance" className="flex items-center gap-1 text-primary hover:underline"><ArrowLeft className="size-4" aria-hidden/> Finance headquarters</Link>
+   <BackLink href="/admin/finance">Finance headquarters</BackLink>
    {mayPayouts&&<Link href="/admin/finance/payouts" className="flex items-center gap-1 text-primary hover:underline"><Wallet className="size-4" aria-hidden/> Seller payout desk</Link>}
   </nav>
   {summary ? <section aria-label="Company cost totals" className="grid gap-3 sm:grid-cols-3">

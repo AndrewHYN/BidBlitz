@@ -56,6 +56,23 @@ const PROTECTED_ROUTES = [
 ] as const;
 
 test.describe("release visual smoke", () => {
+  test("footer links are reachable on small and large screens", async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 640 });
+    await page.goto("/help");
+    const footer = page.locator("[data-site-footer]");
+    const support = footer.locator("summary").filter({ hasText: /^Support$/ });
+    const safety = footer.getByRole("link", { name: "Safety & Trust Centre" });
+    await expect(safety).toBeHidden();
+    await support.focus();
+    await page.keyboard.press("Enter");
+    await expect(safety).toBeVisible();
+    await expect(safety).toHaveAttribute("href", "/safety");
+    await support.press("Enter");
+    await expect(safety).toBeHidden();
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await expect(safety).toBeVisible();
+  });
+
   test("signed-in navigation stays reachable across the tablet breakpoint", async ({ page }) => {
     await signIn(page, ACCOUNTS.buyer1.email);
     await page.goto("/messages");

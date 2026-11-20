@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { BadgeCheck, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { ConfirmDialog } from "@/components/sell/confirm-dialog";
@@ -34,9 +35,9 @@ export function CloseDirectListing({ auctionId }: { auctionId: string }) {
   return (
     <section aria-label="Manage availability" className="space-y-3 rounded-xl border bg-card p-5">
       <h2 className="font-semibold">Manage availability</h2>
-      <div className="flex flex-wrap gap-2">
-        <Button type="button" onClick={() => setDecision("sold")}>Mark as sold</Button>
-        <Button type="button" variant="outline" onClick={() => setDecision("withdraw")}>Remove listing</Button>
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,9rem),1fr))] gap-2">
+        <Button type="button" onClick={() => setDecision("sold")}><BadgeCheck aria-hidden /> Mark as sold</Button>
+        <Button type="button" variant="destructive" onClick={() => setDecision("withdraw")}><Trash2 aria-hidden /> Remove listing</Button>
       </div>
       <ConfirmDialog
         open={decision !== null}

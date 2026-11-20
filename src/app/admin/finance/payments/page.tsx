@@ -1,7 +1,8 @@
+import { BackLink } from "@/components/ui/back-link";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowLeft, ArrowRight, BadgeCheck, CircleAlert, ReceiptText } from "lucide-react";
+import { ArrowRight, BadgeCheck, CircleAlert, ReceiptText } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { hasPermission } from "@/server/permissions";
 import { readFinanceOperations } from "@/server/finance/operations";
@@ -52,9 +53,7 @@ export default async function PaymentsPage() {
       </header>
       <AdminNav active="finance" showTeam={team} />
       <div className="flex flex-wrap gap-3 text-sm font-bold">
-        <Link href="/admin/finance" className="inline-flex items-center gap-1 text-primary hover:underline">
-          <ArrowLeft className="size-4" aria-hidden /> Finance overview
-        </Link>
+        <BackLink href="/admin/finance">Finance overview</BackLink>
         {payouts && <Link href="/admin/finance/payouts" className="inline-flex items-center gap-1 text-primary hover:underline">
           Seller payout desk <ArrowRight className="size-4" aria-hidden />
         </Link>}

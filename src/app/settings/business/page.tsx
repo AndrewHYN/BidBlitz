@@ -1,7 +1,8 @@
+import { BackLink } from "@/components/ui/back-link";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowLeft, Building2 } from "lucide-react";
+import { Building2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { PageHeader } from "@/components/auction/page-header";
@@ -36,13 +37,7 @@ export default async function BusinessSettingsPage() {
           title="Business seller"
           description="Use a business storefront on the auctions you choose. This does not make the company BidBlitz-verified."
           actions={
-            <Link
-              href="/settings"
-              className="inline-flex items-center gap-1 text-sm font-semibold text-primary hover:underline"
-            >
-              <ArrowLeft className="size-4" aria-hidden />
-              Settings
-            </Link>
+            <BackLink href="/settings">Settings</BackLink>
           }
         />
 

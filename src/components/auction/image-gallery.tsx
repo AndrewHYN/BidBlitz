@@ -64,9 +64,11 @@ export function ImageGallery({
       <div className="relative overflow-hidden rounded-xl border bg-muted/40 shadow-xs">
         <Dialog>
           <DialogTrigger asChild>
-            <Button type="button" variant="secondary" size="icon" aria-label="View full-size photos" className="absolute top-2 right-2 z-10">
-              <Maximize2 aria-hidden />
-            </Button>
+            <button type="button" aria-label="View full-size photos" className="group absolute inset-0 z-10 cursor-zoom-in rounded-xl focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-ring">
+              <span className="absolute right-2 top-2 grid size-10 place-items-center rounded-lg border bg-card/95 shadow-sm group-hover:bg-card">
+                <Maximize2 className="size-4" aria-hidden />
+              </span>
+            </button>
           </DialogTrigger>
           <DialogContent aria-describedby={undefined}
             className="max-h-dvh max-w-[calc(100%-1rem)] sm:max-w-5xl"
@@ -75,7 +77,7 @@ export function ImageGallery({
               if (event.key === "ArrowRight") move(1);
             }}>
             <DialogTitle className="pr-9">{title}</DialogTitle>
-            <div className="grid h-[70dvh] place-items-center overflow-hidden rounded-lg bg-muted">
+            <div className="grid h-[min(70dvh,calc(100dvh-10rem))] place-items-center overflow-hidden rounded-lg bg-muted">
               <ImageWithFallback key={active.id} src={active.url}
                 alt={`${title}, photo ${activeIndex + 1} of ${images.length}`}
                 className="size-full min-h-0 object-contain"
@@ -112,7 +114,7 @@ export function ImageGallery({
             }
           />
         </div>
-        <span className="absolute right-2 bottom-2 rounded-md bg-background/90 px-2 py-0.5 text-xs tabular-nums backdrop-blur-sm">
+        <span className="pointer-events-none absolute right-2 bottom-2 rounded-md bg-background/90 px-2 py-0.5 text-xs tabular-nums backdrop-blur-sm">
           {activeIndex + 1} / {images.length}
         </span>
       </div>

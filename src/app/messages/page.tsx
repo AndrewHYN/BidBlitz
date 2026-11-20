@@ -63,7 +63,7 @@ export default async function MessagesInboxPage() {
   }
 
   return (
-    <div className="page-container pt-8 pb-32 sm:py-14">
+    <div className="page-container py-8 sm:py-14">
       <div className="mx-auto max-w-3xl space-y-6">
         <header className="flex flex-wrap items-center justify-between gap-4">
           <div>

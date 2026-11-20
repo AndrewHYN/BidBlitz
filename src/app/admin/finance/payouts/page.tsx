@@ -1,7 +1,8 @@
+import { BackLink } from "@/components/ui/back-link";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { AlertTriangle, ArrowLeft, ArrowRight, BadgeCheck, CircleCheck, LockKeyhole, ShieldAlert, Wallet } from "lucide-react";
+import { AlertTriangle, ArrowRight, BadgeCheck, CircleCheck, LockKeyhole, ShieldAlert, Wallet } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { hasPermission } from "@/server/permissions";
 import { readFinanceOperations } from "@/server/finance/operations";
@@ -136,9 +137,7 @@ export default async function FinancePayoutsPage() {
         </div>
       </section>
       <div className="flex flex-wrap gap-3 text-sm font-bold">
-        <Link href="/admin/finance" className="inline-flex items-center gap-1 text-primary hover:underline">
-          <ArrowLeft className="size-4" aria-hidden /> Finance overview
-        </Link>
+        <BackLink href="/admin/finance">Finance overview</BackLink>
         <Link href="/admin/finance/payments" className="inline-flex items-center gap-1 text-primary hover:underline">
           Buyer payment ledger <ArrowRight className="size-4" aria-hidden />
         </Link>

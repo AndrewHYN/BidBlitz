@@ -62,11 +62,12 @@ export function ShareButton({
   }
 
   return (
-    <div className={cn("flex flex-wrap items-center gap-2", className)}>
+    <div className={cn("grid max-w-full grid-cols-2 items-center gap-2", className)}>
       <Button
         type="button"
         variant="outline"
         size={size}
+        className="min-h-11 min-w-0 px-2.5"
         onClick={share}
         data-testid="share-auction"
       >
@@ -75,14 +76,16 @@ export function ShareButton({
       </Button>
       <Button
         type="button"
-        variant="ghost"
+        variant="outline"
         size={size}
+        className="min-h-11 min-w-0 px-2.5"
         onClick={copyLink}
         data-testid="copy-auction-link"
         aria-label="Copy listing link"
         title="Copy listing link"
       >
         {copied ? <Check aria-hidden /> : <Copy aria-hidden />}
+        {copied ? "Copied" : "Copy link"}
       </Button>
     </div>
   );

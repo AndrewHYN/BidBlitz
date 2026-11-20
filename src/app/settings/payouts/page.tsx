@@ -1,7 +1,7 @@
+import { BackLink } from "@/components/ui/back-link";
 import type { Metadata } from "next";
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowLeft, ShieldCheck } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { PageHeader } from "@/components/auction/page-header";
@@ -36,10 +36,7 @@ export default async function PayoutSettingsPage() {
           title="Seller payouts"
           description="Choose a seller payout contact or Linkwa wallet for transfers after buyer-confirmed handover."
           actions={
-            <Link href="/settings" className="inline-flex items-center gap-1 text-sm font-semibold text-primary hover:underline">
-              <ArrowLeft className="size-4" aria-hidden />
-              Settings
-            </Link>
+            <BackLink href="/settings">Settings</BackLink>
           }
         />
 
