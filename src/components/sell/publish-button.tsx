@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Rocket } from "lucide-react";
+import { ArrowUpRight, Radio, Rocket } from "lucide-react";
 import { toast } from "sonner";
 import { publishAuctionAction } from "@/server/actions/auction";
 import { Countdown } from "@/components/auction/countdown";
@@ -116,9 +116,8 @@ export function PublishButton({
 
     return (
       <div className="space-y-3" data-testid="publish-success">
-        <p className="flex items-center gap-2 text-sm font-medium">
-          <Rocket className="size-4 text-primary" aria-hidden />
-          {label}
+        <p className="inline-flex items-center gap-2 rounded-md bg-muted px-2.5 py-1.5 text-sm font-semibold">
+          <Radio className="size-4" aria-hidden /> {label}
         </p>
         {endsAt && <Countdown endsAt={endsAt} status={effective} variant="boxes" />}
         {effective === "PAUSED" && (
@@ -127,16 +126,11 @@ export function PublishButton({
             it.
           </p>
         )}
-        {shareable && (
-          <p className="text-sm text-muted-foreground">
-            {isDirect ? "Share your listing with buyers." : "Share your auction to get the first bids in."}
-          </p>
-        )}
-        <div className="flex flex-wrap items-center gap-2">
-          <Button asChild variant="outline" size="sm">
-            <Link href={`/listing/${auctionId}`}>View listing</Link>
+        <div className="grid gap-2">
+          <Button asChild className="w-full">
+            <Link href={`/listing/${auctionId}`}>View listing <ArrowUpRight aria-hidden /></Link>
           </Button>
-          {shareable && <ShareButton auctionId={auctionId} title={title} size="sm" />}
+          {shareable && <ShareButton auctionId={auctionId} title={title} size="default" />}
         </div>
       </div>
     );

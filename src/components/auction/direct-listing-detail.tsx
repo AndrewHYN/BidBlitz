@@ -1,5 +1,6 @@
+import { BackLink } from "@/components/ui/back-link";
 import Link from "next/link";
-import { ArrowLeft, MapPin, MessageCircle, ShieldCheck } from "lucide-react";
+import { MapPin, MessageCircle, ShieldCheck } from "lucide-react";
 
 import { ImageGallery, type GalleryImage } from "@/components/auction/image-gallery";
 import { Money } from "@/components/auction/money";
@@ -25,9 +26,7 @@ export function DirectListingDetail({ detail, images }: { detail: Listing; image
 
   return (
     <div className="page-container py-7 sm:py-12">
-      <Link href="/browse" className="mb-5 inline-flex min-h-10 items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground">
-        <ArrowLeft className="size-4" aria-hidden /> Browse listings
-      </Link>
+      <BackLink href="/browse" className="mb-5">Browse listings</BackLink>
       <div className="grid gap-7 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <div className="min-w-0">
           <ImageGallery images={images} imageCount={auction.image_count} title={auction.title} />

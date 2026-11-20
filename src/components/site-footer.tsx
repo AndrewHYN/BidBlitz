@@ -1,11 +1,11 @@
 import Image from "next/image";
 import Link from "next/link";
-import { Banknote, Mail } from "lucide-react";
+import { Banknote, ChevronDown, CircleHelp, Mail, Store, UserRound } from "lucide-react";
 import { BrandMark } from "@/components/brand-mark";
 
 const COLUMNS = [
   {
-    title: "Marketplace",
+    title: "Marketplace", icon: Store,
     links: [
       { label: "Browse listings", href: "/browse" },
       { label: "Sell an item", href: "/sell" },
@@ -15,16 +15,16 @@ const COLUMNS = [
     ],
   },
   {
-    title: "Your account",
+    title: "Your account", icon: UserRound,
     links: [
       { label: "Dashboard", href: "/dashboard" },
       { label: "Watchlist", href: "/dashboard/watchlist" },
-      { label: "My selling", href: "/dashboard/selling" },
+      { label: "My listings", href: "/dashboard/selling" },
       { label: "Invite friends", href: "/referrals" },
     ],
   },
   {
-    title: "Support",
+    title: "Support", icon: CircleHelp,
     links: [
       { label: "Help & contact", href: "/help" },
       { label: "Support tickets", href: "/support/tickets" },
@@ -42,62 +42,87 @@ const WALLETS = [
   { name: "InnBucks", image: "/brand/innbucks.png", width: 776, height: 312, url: "https://innbucks.co.zw/" },
 ] as const;
 
+function FooterLinks({ links }: { links: (typeof COLUMNS)[number]["links"] }) {
+  return (
+    <ul className="grid grid-cols-2 gap-x-3 pb-3 sm:block sm:pb-0">
+      {links.map(({ href, label }) => (
+        <li key={href}>
+          <Link href={href} className="inline-flex min-h-11 items-center rounded-md px-1 text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-2 focus-visible:outline-ring sm:min-h-9">
+            {label}
+          </Link>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export function SiteFooter() {
   return (
-    <footer data-site-footer className="mt-auto border-t bg-card/50">
-      <div className="page-container grid gap-8 py-10 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="space-y-3">
-          <Link href="/" aria-label="BidBlitz" className="inline-flex items-center gap-2 font-semibold">
-            <BrandMark size={28} />
-            <span aria-hidden>BidBlitz</span>
-          </Link>
-          <p className="max-w-xs text-sm text-muted-foreground">Buy and sell locally across Zimbabwe.</p>
-          <a href="mailto:support@bidblitz.co.zw" className="flex items-center gap-2 py-1 text-sm text-muted-foreground hover:text-foreground">
-            <Mail className="size-4 shrink-0" aria-hidden /> support@bidblitz.co.zw
-          </a>
-        </div>
-
-        {COLUMNS.map((column) => (
-          <nav key={column.title} aria-label={column.title} className="space-y-2">
-            <h2 className="text-sm font-semibold">{column.title}</h2>
-            <ul className="space-y-1">
-              {column.links.map((link) => (
-                <li key={link.href}>
-                  <Link href={link.href} className="inline-block py-1 text-sm text-muted-foreground hover:text-foreground">{link.label}</Link>
-                </li>
-              ))}
-            </ul>
-          </nav>
-        ))}
-      </div>
-
-      <div className="border-t">
-        <div className="page-container grid gap-4 py-5 text-sm lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
-          <div className="space-y-1">
-            <h2 className="font-semibold">Pay the seller directly</h2>
-            <p className="text-muted-foreground">Agree on cash or mobile money with the seller. BidBlitz does not process these payments. Logos indicate independently operated payment options, not partnerships or endorsements.</p>
+    <footer data-site-footer className="mt-auto border-t bg-card">
+      <div className="page-container pb-4 pt-6 sm:py-9">
+        <div className="grid gap-4 sm:grid-cols-2 sm:gap-7 lg:grid-cols-[1.15fr_1fr_1fr_1fr]">
+          <div>
+            <Link href="/" aria-label="BidBlitz" className="inline-flex min-h-11 items-center gap-2.5 rounded-lg text-lg font-bold tracking-tight">
+              <BrandMark size={34} /> BidBlitz
+            </Link>
+            <p className="mt-1 text-sm text-muted-foreground">Buy and sell locally across Zimbabwe.</p>
+            <a href="mailto:support@bidblitz.co.zw" className="inline-flex min-h-11 items-center gap-2 rounded-md text-sm font-medium hover:underline">
+              <Mail className="size-4 text-muted-foreground" aria-hidden /> support@bidblitz.co.zw
+            </a>
           </div>
-          <ul className="flex flex-wrap items-center gap-2" aria-label="Cash and mobile-wallet options">
-            <li className="inline-flex h-10 items-center gap-2 rounded-md border px-3 font-medium"><Banknote className="size-4" aria-hidden /> Cash</li>
+          <div className="divide-y rounded-xl border bg-background/60 sm:contents">
+            {COLUMNS.map(({ title, icon: Icon, links }) => (
+              <div key={title} className="sm:border-0">
+                <details className="group px-3 sm:hidden">
+                  <summary className="flex min-h-12 cursor-pointer list-none items-center gap-2.5 rounded-md text-sm font-semibold focus-visible:outline-2 focus-visible:outline-ring [&::-webkit-details-marker]:hidden">
+                    <Icon className="size-4 text-muted-foreground" aria-hidden />
+                    {title}
+                    <ChevronDown className="ml-auto size-4 text-muted-foreground group-open:rotate-180" aria-hidden />
+                  </summary>
+                  <nav aria-label={title}><FooterLinks links={links} /></nav>
+                </details>
+                <nav aria-label={title} className="hidden sm:block">
+                  <h2 className="mb-1.5 flex items-center gap-2 px-1 text-sm font-semibold">
+                    <Icon className="size-4 text-muted-foreground" aria-hidden /> {title}
+                  </h2>
+                  <FooterLinks links={links} />
+                </nav>
+              </div>
+            ))}
+          </div>
+        </div>
+        <section aria-label="Payment options" className="mt-5 grid items-center gap-3 rounded-xl border bg-muted/30 p-3.5 sm:mt-7 sm:p-4 lg:grid-cols-[minmax(0,1fr)_auto]">
+          <div>
+            <h2 className="text-sm font-semibold">Pay the seller directly</h2>
+            <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">Agree on cash or mobile money with the seller.</p>
+          </div>
+          <ul className="grid grid-cols-4 gap-1.5 sm:flex sm:flex-wrap" aria-label="Cash and mobile-wallet options">
+            <li className="flex min-h-11 items-center justify-center gap-1 rounded-md border bg-card px-1 text-xs font-semibold sm:w-20">
+              <Banknote className="size-4 shrink-0" aria-hidden /> Cash
+            </li>
             {WALLETS.map(({ name, image, width, height, url }) => (
               <li key={name}>
-                <a href={url} className="flex h-10 w-24 items-center justify-center rounded-md border bg-white p-1.5 transition-colors hover:border-primary">
-                  <Image src={image} alt={name} width={width} height={height} className="h-auto max-h-7 w-auto max-w-full object-contain" />
+                <a href={url} className="flex h-11 items-center justify-center rounded-md border bg-white p-2 hover:border-primary focus-visible:outline-2 focus-visible:outline-ring sm:w-24">
+                  <Image src={image} alt={name} width={width} height={height} className="max-h-full w-auto max-w-full object-contain" />
                 </a>
               </li>
             ))}
           </ul>
-        </div>
-        <div className="page-container flex flex-wrap items-center justify-between gap-3 border-t py-4 text-xs text-muted-foreground">
-          <p>© {new Date().getFullYear()} BidBlitz. Prices are shown in US dollars.</p>
-          <a href="https://www.econet.co.zw/" className="inline-flex min-h-8 items-center gap-2 rounded-md border bg-white px-2 text-zinc-700 hover:border-primary">
-            <span>Mobile network</span>
-            <Image src="/brand/econet.png" alt="Econet Wireless" width={195} height={43} className="h-4 w-auto" />
-          </a>
-          <p>
-            <a href="https://commons.wikimedia.org/wiki/File:O%E2%80%99mari.png" className="underline underline-offset-2">O’mari artwork by Old Mutual</a>
-            {" · "}<a href="https://creativecommons.org/licenses/by-sa/4.0/" className="underline underline-offset-2">CC BY-SA 4.0</a>
-          </p>
+        </section>
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-x-4 text-xs text-muted-foreground">
+          <p>© {new Date().getFullYear()} BidBlitz · Prices in USD</p>
+          <details className="group">
+            <summary className="flex min-h-11 cursor-pointer list-none items-center gap-1 rounded-md font-medium hover:text-foreground [&::-webkit-details-marker]:hidden">
+              Payment info &amp; credits <ChevronDown className="size-3.5 group-open:rotate-180" aria-hidden />
+            </summary>
+            <div className="max-w-md space-y-2 pb-2 leading-relaxed">
+              <p>Wallets operate independently. Their logos identify payment options and do not imply endorsement by the providers.</p>
+              <a href="https://www.econet.co.zw/" className="inline-flex min-h-11 items-center gap-2 rounded-md border bg-white px-2 text-zinc-700">
+                Mobile network <Image src="/brand/econet.png" alt="Econet Wireless" width={195} height={43} className="h-4 w-auto" />
+              </a>
+              <p><a href="https://commons.wikimedia.org/wiki/File:O%E2%80%99mari.png" className="underline">O’mari artwork by Old Mutual</a>{" · "}<a href="https://creativecommons.org/licenses/by-sa/4.0/" className="underline">CC BY-SA 4.0</a></p>
+            </div>
+          </details>
         </div>
       </div>
     </footer>

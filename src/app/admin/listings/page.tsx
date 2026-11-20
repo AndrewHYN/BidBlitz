@@ -1,3 +1,4 @@
+import { BackLink } from "@/components/ui/back-link";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -46,7 +47,7 @@ export default async function AdminListingReviews(){
      <div className="rounded-2xl border bg-card p-7">
       <h2 className="text-lg font-black">Review queue is clear</h2>
       <p className="mt-2 text-sm text-muted-foreground">No listings currently require moderation.</p>
-      <Link href="/admin/command" className="mt-4 inline-flex items-center gap-2 text-sm font-bold text-primary">Back to HQ <ArrowRight className="size-4" aria-hidden/></Link>
+      <BackLink href="/admin/command" className="mt-4">Back to HQ</BackLink>
      </div>:
      <ul className="grid gap-4 lg:grid-cols-2">
       {reviews.map(r=><li key={r.reviewId} className="space-y-4 rounded-2xl border bg-card p-5 shadow-sm" data-testid="listing-review-row">

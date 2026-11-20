@@ -1,7 +1,7 @@
+import { BackLink } from "@/components/ui/back-link";
 import type { Metadata } from "next";
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Activity,ArrowLeft,AlertTriangle,CheckCircle2,KeyRound,ShieldCheck } from "lucide-react";
+import { Activity,AlertTriangle,CheckCircle2,KeyRound,ShieldCheck } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { hasPermission } from "@/server/permissions";
 import { AdminNav } from "@/components/dashboard/admin-nav";
@@ -80,7 +80,7 @@ export default async function PaymentReadinessPage(){
    </div>
   </header>
   <AdminNav active="finance" showTeam={canTeam}/>
-  <Link href="/admin/finance" className="inline-flex items-center gap-2 text-sm font-bold text-primary hover:underline"><ArrowLeft className="size-4" aria-hidden/> Finance dashboard</Link>
+  <BackLink href="/admin/finance">Finance dashboard</BackLink>
   <section aria-label="Live payment and settlement checks" className="grid gap-3 md:grid-cols-2">
    {checks.map(c=>(
     <div key={c.title} className="rounded-2xl border bg-card p-5 shadow-sm">

@@ -1,5 +1,5 @@
+import { BackLink } from "@/components/ui/back-link";
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import {
   Banknote,
   BookOpen,
@@ -122,9 +122,7 @@ export default async function AdminGuidePage() {
         title="Staff guide"
         description="The short version of how to operate BidBlitz safely when work lands in your queue."
         actions={
-          <Link href="/admin" className="text-sm font-semibold text-primary hover:underline">
-            Back to admin
-          </Link>
+          <BackLink href="/admin">Back to admin</BackLink>
         }
       />
 

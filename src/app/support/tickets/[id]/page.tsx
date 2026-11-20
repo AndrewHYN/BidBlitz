@@ -1,7 +1,7 @@
+import { BackLink } from "@/components/ui/back-link";
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound,redirect } from "next/navigation";
-import { ArrowLeft,MessageSquare,LockKeyhole } from "lucide-react";
+import { MessageSquare,LockKeyhole } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { hasPermission } from "@/server/permissions";
 import { TicketReplyForm,StaffSupportActions } from "@/components/support/ticket-controls";
@@ -39,9 +39,7 @@ export default async function SupportConversationPage({params}:{params:Promise<{
  ]);
  const names=Array.isArray(agentsRes?.data)?agentsRes.data as Array<{id:string;name:string}>:[];
  return <main className="page-container max-w-5xl space-y-6 py-8 sm:py-12" data-testid="support-ticket-thread">
-  <Link href={canStaff?"/admin/support":"/support/tickets"} className="inline-flex items-center gap-2 text-sm font-bold text-primary hover:underline">
-   <ArrowLeft className="size-4" aria-hidden/> Back to {canStaff?"support desk":"your tickets"}
-  </Link>
+  <BackLink href={canStaff?"/admin/support":"/support/tickets"}>Back to {canStaff?"support desk":"your tickets"}</BackLink>
   <header className="overflow-hidden rounded-[1.5rem] border border-orange-500/20 bg-[#17191b] p-6 text-white sm:p-9">
    <p className="text-xs font-black uppercase tracking-widest text-orange-300">{ticket.category} / Reference {ticket.id.slice(0,8)}</p>
    <h1 className="mt-3 text-2xl font-black tracking-tight sm:text-4xl">{ticket.subject}</h1>
