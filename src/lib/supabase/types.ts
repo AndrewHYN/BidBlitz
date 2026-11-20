@@ -122,6 +122,7 @@ export interface Database {
           featured_by: string | null;
           business_id: string | null;
           image_count: number;
+          listed_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -485,6 +486,10 @@ export interface Database {
           p_fulfilment_notes: string | null; p_price_minor: number; p_phone: string;
         };
         Returns: string;
+      };
+      edit_direct_listing: {
+        Args: { p_auction_id: string; p_title: string; p_description: string; p_price_minor: number; p_expected_updated_at: string };
+        Returns: "DRAFT" | "LISTED" | "PENDING_REVIEW";
       };
       close_direct_listing: {
         Args: { p_auction_id: string; p_sold: boolean };
