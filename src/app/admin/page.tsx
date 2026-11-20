@@ -1135,7 +1135,7 @@ export default async function AdminPage() {
         </div>
       </section>
 
-      <section aria-labelledby="admin-fee-heading" className="space-y-4">
+      <section aria-labelledby="admin-fee-heading" className="space-y-4 wrap-anywhere">
         <SectionHeading
           title={
             <span id="admin-fee-heading" className="inline-flex scroll-mt-24 items-center gap-2">
