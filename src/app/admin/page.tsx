@@ -23,13 +23,14 @@ import { cancellationReasonLabel } from "@/lib/validation";
 import { PayoutControls } from "@/components/dashboard/payout-controls";
 import { getAdminPayouts, type AdminPayoutRow } from "@/server/queries";
 import { isPaymentProviderConfigured } from "@/server/payments/config";
+import { MarketplaceActivity } from "@/components/dashboard/marketplace-activity";
 import { AdminNav } from "@/components/dashboard/admin-nav";
 import { PromotionDecisions } from "@/components/dashboard/promotion-decisions";
 import { PromotionPricing } from "@/components/dashboard/promotion-pricing";
 
 export const metadata: Metadata = {
   title: "Admin",
-  description: "Payout operations, open reports and platform fee settings on BidBlitz.",
+  description: "Marketplace activity and operations on BidBlitz.",
   robots: { index: false, follow: false },
 };
 
@@ -249,6 +250,7 @@ export default async function AdminPage() {
     { data: canManageTeam },
     { data: canManagePromotions },
     { data: canViewDisputes },
+    { data: canViewAnalytics },
   ] = await Promise.all([
     supabase.rpc("has_permission", {
       p_user_id: user.id,
@@ -262,6 +264,7 @@ export default async function AdminPage() {
       p_user_id: user.id,
       p_permission: "disputes.view",
     }),
+    supabase.rpc("has_permission", { p_user_id: user.id, p_permission: "analytics.view" }),
   ]);
 
   // Not an admin: say so and run NO moderation queries. The report and fee
@@ -510,10 +513,10 @@ export default async function AdminPage() {
   }));
 
   return (
-    <div className="page-container py-10 sm:py-14 space-y-8" data-testid="admin-page">
+    <div className="page-container space-y-6 py-6 sm:space-y-8 sm:py-10" data-testid="admin-page">
       <PageHeader
         title="Admin"
-        description="Review marketplace work, promotions, safety actions and money operations from one console."
+        description="Track marketplace activity and manage operations."
       />
 
       <AdminNav
@@ -521,13 +524,34 @@ export default async function AdminPage() {
         showTeam={canManageTeam === true}
         disputeCount={openDisputeCount ?? 0}
       />
-      <Button asChild variant="outline"><Link href="/admin/activity">Marketplace activity</Link></Button>
+      <details className="rounded-xl border bg-card px-3">
+        <summary className="cursor-pointer py-3 text-sm font-medium">Jump to operations</summary>
+        <nav aria-label="Operations on this page" className="flex flex-wrap gap-2 pb-3">
+          {[
+            ...(canManagePromotions === true ? [["Promotions", "admin-promotions"]] : []),
+            ["Payouts", "admin-payouts-heading"],
+            ["Reports", "admin-reports-heading"],
+            ["Listing review", "admin-review-heading"],
+            ["Cancellations", "admin-cancellations-heading"],
+            ["Paused auctions", "admin-paused-heading"],
+            ["Audit log", "admin-audit-heading"],
+            ["Fees", "admin-fee-heading"],
+          ].map(([label, anchor]) => (
+            <a key={anchor} href={`#${anchor}`} className="inline-flex min-h-10 items-center rounded-md border bg-card px-3 text-sm font-medium hover:bg-muted">
+              {label}
+            </a>
+          ))}
+        </nav>
+      </details>
 
+      {canViewAnalytics === true && <MarketplaceActivity />}
+
+      <h2 className="border-t pt-5 text-xl font-semibold tracking-tight">Operations</h2>
       {canManagePromotions === true && (
         <section id="admin-promotions" aria-labelledby="admin-promotions-heading" className="space-y-4 scroll-mt-24">
           <SectionHeading
             title={
-              <span id="admin-promotions-heading" className="inline-flex items-center gap-2">
+              <span id="admin-promotions-heading" className="inline-flex scroll-mt-24 items-center gap-2">
                 <Megaphone className="size-4 text-primary" aria-hidden />
                 Promotion requests
                 {pendingPromotions.length > 0 && (
@@ -597,7 +621,7 @@ export default async function AdminPage() {
       <section aria-labelledby="admin-payouts-heading" className="space-y-4">
         <SectionHeading
           title={
-            <span id="admin-payouts-heading" className="inline-flex items-center gap-2">
+            <span id="admin-payouts-heading" className="inline-flex scroll-mt-24 items-center gap-2">
               <Banknote className="size-4 text-muted-foreground" aria-hidden />
               Payout operations
             </span>
@@ -660,7 +684,7 @@ export default async function AdminPage() {
       <section aria-labelledby="admin-reports-heading" className="space-y-4">
         <SectionHeading
           title={
-            <span id="admin-reports-heading" className="inline-flex items-center gap-2">
+            <span id="admin-reports-heading" className="inline-flex scroll-mt-24 items-center gap-2">
               <Flag className="size-4 text-muted-foreground" aria-hidden />
               Open reports
               {reports.length > 0 && (
@@ -818,7 +842,7 @@ export default async function AdminPage() {
       <section aria-labelledby="admin-review-heading" className="space-y-4 scroll-mt-24">
         <SectionHeading
           title={
-            <span id="admin-review-heading" className="inline-flex items-center gap-2">
+            <span id="admin-review-heading" className="inline-flex scroll-mt-24 items-center gap-2">
               <Flag className="size-4 text-muted-foreground" aria-hidden />
               Listing review
               {pendingReviews.length > 0 && (
@@ -895,7 +919,7 @@ export default async function AdminPage() {
       <section aria-labelledby="admin-cancellations-heading" className="space-y-4">
         <SectionHeading
           title={
-            <span id="admin-cancellations-heading" className="inline-flex items-center gap-2">
+            <span id="admin-cancellations-heading" className="inline-flex scroll-mt-24 items-center gap-2">
               <Flag className="size-4 text-muted-foreground" aria-hidden />
               Cancellation requests
               {cancelRequests.length > 0 && (
@@ -985,7 +1009,7 @@ export default async function AdminPage() {
       <section aria-labelledby="admin-paused-heading" className="space-y-4">
         <SectionHeading
           title={
-            <span id="admin-paused-heading" className="inline-flex items-center gap-2">
+            <span id="admin-paused-heading" className="inline-flex scroll-mt-24 items-center gap-2">
               <Flag className="size-4 text-muted-foreground" aria-hidden />
               Paused auctions
               {pausedAuctions.length > 0 && (
@@ -1045,7 +1069,7 @@ export default async function AdminPage() {
       <section aria-labelledby="admin-audit-heading" className="space-y-4">
         <SectionHeading
           title={
-            <span id="admin-audit-heading" className="inline-flex items-center gap-2">
+            <span id="admin-audit-heading" className="inline-flex scroll-mt-24 items-center gap-2">
               <ShieldAlert className="size-4 text-muted-foreground" aria-hidden />
               Moderation record
             </span>
@@ -1114,7 +1138,7 @@ export default async function AdminPage() {
       <section aria-labelledby="admin-fee-heading" className="space-y-4">
         <SectionHeading
           title={
-            <span id="admin-fee-heading" className="inline-flex items-center gap-2">
+            <span id="admin-fee-heading" className="inline-flex scroll-mt-24 items-center gap-2">
               <ReceiptText className="size-4 text-muted-foreground" aria-hidden />
               Platform fee
             </span>
