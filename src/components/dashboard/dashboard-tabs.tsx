@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 
 /**
@@ -12,26 +11,20 @@ import { cn } from "@/lib/utils";
  */
 
 const TABS = [
-  { href: "/dashboard", label: "Home" },
+  { href: "/dashboard", label: "Overview" },
   { href: "/dashboard/selling", label: "My listings" },
-  { href: "/messages", label: "Messages" },
   { href: "/dashboard/watchlist", label: "Saved items" },
 ] as const;
 
 export function DashboardTabs() {
   const pathname = usePathname();
-  const nav = useRef<HTMLElement>(null);
-  useEffect(() => {
-    nav.current?.querySelector<HTMLElement>('[aria-current="page"]')
-      ?.scrollIntoView({ block: "nearest", inline: "nearest" });
-  }, [pathname]);
+  if (pathname === "/dashboard/watchlist") return null;
 
   return (
     <nav
-      ref={nav}
       data-testid="dashboard-tabs"
       aria-label="Dashboard sections"
-      className="flex gap-1 overflow-x-auto rounded-xl border bg-muted/60 p-1.5 shadow-sm"
+      className="flex flex-wrap gap-1 rounded-xl border bg-muted/60 p-1.5 shadow-sm"
     >
       {TABS.map((tab) => {
         const active =
