@@ -504,3 +504,22 @@
     box-shadow: none;
   }
 }
+
+.home-action-browse { --action-ink: #98480b; }
+.home-action-sell { --action-ink: #234fb0; }
+.dark .home-action-browse { --action-ink: #ffb46c; }
+.dark .home-action-sell { --action-ink: #91b5ff; }
+
+.home-action {
+  min-height: 3rem;
+  padding-inline: clamp(0.45rem, 2vw, 1.2rem);
+  background: transparent;
+  border-color: var(--action-ink);
+  color: var(--action-ink);
+  box-shadow: 0 2px 5px #0002, 0 3px 9px color-mix(in srgb, var(--action-ink) 12%, transparent);
+}
+.home-action:hover, .home-action:focus-visible {
+  background: color-mix(in srgb, var(--action-ink) 7%, var(--background));
+  border-color: var(--action-ink);
+  color: var(--action-ink);
+}
