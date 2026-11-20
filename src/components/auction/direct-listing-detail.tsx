@@ -26,7 +26,13 @@ export function DirectListingDetail({ detail, images }: { detail: Listing; image
 
   return (
     <div className="page-container py-7 sm:py-12">
-      <BackLink href="/browse" className="mb-5">Browse listings</BackLink>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <BackLink href="/browse">Browse listings</BackLink>
+        <div role="group" aria-label="Listing actions" className="flex items-center gap-2">
+          {!isOwner && (isAvailable || watched) && <WatchButton auctionId={auction.id} initialWatched={watched} viewerId={viewerId} compact />}
+          <ShareButton auctionId={auction.id} title={auction.title} compact />
+        </div>
+      </div>
       <div className="grid gap-7 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <div className="min-w-0">
           <ImageGallery images={images} imageCount={auction.image_count} title={auction.title} />
@@ -44,18 +50,22 @@ export function DirectListingDetail({ detail, images }: { detail: Listing; image
             </div>
           </div>
 
-          <section aria-labelledby="listing-price" className="space-y-4 rounded-xl border bg-card p-5 shadow-sm">
+          <section aria-labelledby="listing-price" className="space-y-3">
             <div>
               <h2 id="listing-price" className="text-sm font-medium text-muted-foreground">{auction.listing_kind === "SERVICE" ? "Starting price" : "Asking price"}</h2>
               <p className="text-3xl font-bold"><Money minor={auction.starting_bid_minor} currency={auction.currency} /></p>
             </div>
+            <section aria-labelledby="listing-description" className="space-y-2 rounded-xl border bg-card p-4 sm:p-5">
+              <h2 id="listing-description" className="font-semibold">{auction.listing_kind === "SERVICE" ? "About this service" : "About this item"}</h2>
+              <p className="break-words whitespace-pre-line leading-7 text-muted-foreground">{auction.description}</p>
+            </section>
             {isAvailable && !isOwner && (
-              <div className="mb-3">
+              <div>
                 <ListingDealButtons listingId={auction.id} kind={auction.listing_kind === "SERVICE" ? "SERVICE" : "SALE"} />
               </div>
             )}
             {isAvailable && !isOwner && (
-              <Button asChild size="lg" variant="outline" className="mb-3 min-h-11 w-full">
+              <Button asChild size="lg" variant="outline" className="min-h-11 w-full">
                 <Link href={`/messages/new?listing=${auction.id}`}>
                   <MessageCircle aria-hidden /> Message seller on BidBlitz
                 </Link>
@@ -72,16 +82,6 @@ export function DirectListingDetail({ detail, images }: { detail: Listing; image
             ) : (
               <p className="text-sm text-muted-foreground">This item is no longer available.</p>
             )}
-          </section>
-
-          <div className="flex flex-wrap gap-2">
-            <WatchButton auctionId={auction.id} initialWatched={watched} viewerId={viewerId} />
-            <ShareButton auctionId={auction.id} title={auction.title} />
-          </div>
-
-          <section aria-labelledby="listing-description" className="space-y-2">
-            <h2 id="listing-description" className="font-semibold">{auction.listing_kind === "SERVICE" ? "About this service" : "About this item"}</h2>
-            <p className="break-words whitespace-pre-line text-muted-foreground">{auction.description}</p>
           </section>
 
           <SellerCard seller={auction.seller} business={auction.business} />
