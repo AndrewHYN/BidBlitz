@@ -25,11 +25,13 @@ export function ShareButton({
   title,
   size = "lg",
   className,
+  compact = false,
 }: {
   auctionId: string;
   title: string;
   size?: "default" | "sm" | "lg";
   className?: string;
+  compact?: boolean;
 }) {
   const [copied, setCopied] = useState(false);
   const url = absoluteUrl(`/listing/${auctionId}`);
@@ -67,25 +69,27 @@ export function ShareButton({
         type="button"
         variant="outline"
         size={size}
-        className="min-h-11 min-w-0 px-2.5"
+        className={compact ? "size-11 p-0" : "min-h-11 min-w-0 px-2.5"}
         onClick={share}
         data-testid="share-auction"
+        aria-label="Share listing"
+        title="Share listing"
       >
         <Share2 aria-hidden />
-        Share
+        {!compact && "Share"}
       </Button>
       <Button
         type="button"
         variant="outline"
         size={size}
-        className="min-h-11 min-w-0 px-2.5"
+        className={compact ? "size-11 p-0" : "min-h-11 min-w-0 px-2.5"}
         onClick={copyLink}
         data-testid="copy-auction-link"
         aria-label="Copy listing link"
         title="Copy listing link"
       >
         {copied ? <Check aria-hidden /> : <Copy aria-hidden />}
-        {copied ? "Copied" : "Copy link"}
+        {!compact && (copied ? "Copied" : "Copy link")}
       </Button>
     </div>
   );

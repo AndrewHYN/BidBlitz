@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Eye } from "lucide-react";
+import { Bookmark, Eye } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -17,15 +17,18 @@ export function WatchButton({
   auctionId,
   initialWatched,
   viewerId,
+  compact = false,
 }: {
   auctionId: string;
   initialWatched: boolean;
   viewerId: string | null;
+  compact?: boolean;
 }) {
   const router = useRouter();
   const [watched, setWatched] = useState(initialWatched);
   const [pending, setPending] = useState(false);
   const reduceMotion = useReducedMotion();
+  const Icon = compact ? Bookmark : Eye;
 
   async function toggle() {
     if (pending) return;
@@ -38,7 +41,7 @@ export function WatchButton({
         setWatched(result.watched);
         toast.success(
           result.watched ? "Added to your watchlist" : "Removed from your watchlist",
-          { description: result.watched ? "Find it under Dashboard → Watchlist." : undefined }
+          { description: result.watched ? "Find it under Saved items." : undefined }
         );
         if (viewerId === null) router.refresh();
         return;
@@ -60,9 +63,11 @@ export function WatchButton({
       variant={watched ? "default" : "outline"}
       size="lg"
       aria-pressed={watched}
+      aria-label={compact ? "Watch listing" : undefined}
+      title={compact ? (watched ? "Remove from Saved items" : "Watch listing") : undefined}
       disabled={pending}
       onClick={toggle}
-      className="w-full sm:w-auto"
+      className={compact ? "size-11 p-0" : "w-full sm:w-auto"}
     >
       {/* One pulse when the watch lands — transform only, no-op under
           reduced motion. The toast is the textual confirmation. */}
@@ -71,9 +76,9 @@ export function WatchButton({
         animate={watched && !reduceMotion ? { scale: [1, 1.18, 1] } : { scale: 1 }}
         transition={{ duration: 0.28, ease: "easeOut" }}
       >
-        <Eye />
+        <Icon fill={compact && watched ? "currentColor" : "none"} />
       </motion.span>
-      {watched ? "Watching" : "Watch"}
+      {!compact && (watched ? "Watching" : "Watch")}
     </Button>
   );
 }
