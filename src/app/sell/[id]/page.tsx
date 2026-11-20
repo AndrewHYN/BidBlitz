@@ -1,9 +1,12 @@
+import { Button } from "@/components/ui/button";
+import { ShareButton } from "@/components/auction/share-button";
+import { EditDirectListing } from "@/components/sell/edit-direct-listing";
 import { BackLink } from "@/components/ui/back-link";
 import { ImageWithFallback } from "@/components/auction/image-with-fallback";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { Eye, Images, Package, Rocket, TriangleAlert } from "lucide-react";
+import { ArrowUpRight, Eye, Images, Package, Rocket, TriangleAlert } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getAuctionDetail, getFeeBps, imageUrlFor } from "@/server/queries";
 import { EmptyState, PageHeader, SectionHeading } from "@/components/auction/page-header";
@@ -67,6 +70,13 @@ export default async function SellDraftPage({
         return url ? [{ key: image.id, storagePath: image.storage_path, url }] : [];
       });
     const isDraft = auction.status === "DRAFT";
+    const isListed = auction.status === "LISTED";
+    const canEdit = isDraft || isListed;
+    const { data: approvedEdit } = canEdit && auction.listed_at
+      ? await supabase.from("listing_reviews").select("id").eq("auction_id", id)
+          .eq("status", "APPROVED").contains("risk_flags", { listing_edit: true }).limit(1).maybeSingle()
+      : { data: null };
+    const reviewRequired = canEdit && Boolean(auction.listed_at) && !approvedEdit;
 
     return (
       <div className="page-container py-8 sm:py-12">
@@ -83,7 +93,22 @@ export default async function SellDraftPage({
             </p>
           </div>
         </header>
-        <div className="mt-6 grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,24rem)]">
+        {isListed && (
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <span className="mr-auto rounded-md bg-muted px-2.5 py-1.5 text-sm font-medium">Available</span>
+            <Button asChild variant="outline" className="min-h-11">
+              <Link href={`/listing/${id}`}>View listing <ArrowUpRight aria-hidden /></Link>
+            </Button>
+            <ShareButton auctionId={id} title={auction.title} compact />
+          </div>
+        )}
+        {canEdit && (
+          <div className="mt-4">
+            <EditDirectListing id={id} title={auction.title} description={auction.description}
+              price={(auction.starting_bid_minor / 100).toFixed(2)} updatedAt={auction.updated_at} reviewRequired={reviewRequired} />
+          </div>
+        )}
+        <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,24rem)]">
           <div className="space-y-5">
             <section className="space-y-3 rounded-xl border bg-card p-5" aria-labelledby="direct-details">
               <h2 id="direct-details" className="font-semibold">Listing details</h2>
@@ -101,13 +126,15 @@ export default async function SellDraftPage({
             </section>}
           </div>
           <div className="space-y-5">
-            <section className="space-y-4 rounded-xl border bg-card p-5" aria-labelledby="direct-publish">
+            {!isListed && <section className="space-y-4 rounded-xl border bg-card p-4 sm:p-5" aria-labelledby="direct-publish">
               <h2 id="direct-publish" className="font-semibold">Listing status</h2>
-              <PublishButton auctionId={id} title={auction.title} imageCount={images.length} hasFulfilment={Boolean(auction.fulfilment_method)}
-                payoutReady={false} isDirect status={auction.status} endsAt={null} />
+              {isDraft && reviewRequired ? (
+                <p className="text-sm text-muted-foreground">Open Edit listing to submit this draft for review.</p>
+              ) : <PublishButton auctionId={id} title={auction.title} imageCount={images.length} hasFulfilment={Boolean(auction.fulfilment_method)}
+                payoutReady={false} isDirect status={auction.status} endsAt={null} />}
               {isDraft && <DeleteDraftButton auctionId={id} />}
               {auction.status === "PENDING_REVIEW" && <WithdrawReviewButton auctionId={id} />}
-            </section>
+            </section>}
             {auction.status === "LISTED" && <CloseDirectListing auctionId={id} />}
           </div>
         </div>

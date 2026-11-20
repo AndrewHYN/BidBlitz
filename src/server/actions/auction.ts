@@ -185,6 +185,45 @@ export async function createDirectListingAction(input: unknown): Promise<
   return { ok: true, auctionId: data as string };
 }
 
+const editDirectListingSchema = directListingSchema.pick({
+  title: true,
+  description: true,
+  priceMinor: true,
+}).extend({ auctionId: z.uuid(), updatedAt: z.iso.datetime({ offset: true }) });
+
+export async function editDirectListingAction(input: z.input<typeof editDirectListingSchema>): Promise<ActionResult<{ status: string }>> {
+  const parsed = editDirectListingSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, rejection: { code: "invalid_input", message: parsed.error.issues[0].message } };
+  }
+  const { supabase, user } = await requireUser();
+  if (!user) {
+    return { ok: false, rejection: { code: "not_authenticated", message: "Sign in to edit your listing." } };
+  }
+  const { auctionId, title, description, priceMinor, updatedAt } = parsed.data;
+  const { data, error } = await supabase.rpc("edit_direct_listing", {
+    p_auction_id: auctionId,
+    p_title: title,
+    p_description: description,
+    p_price_minor: Number(priceMinor),
+    p_expected_updated_at: updatedAt,
+  });
+  if (error) {
+    if (error.message === "listing_changed") {
+      return { ok: false, rejection: { code: "invalid_state", message: "This listing changed. Refresh and reopen the editor." } };
+    }
+    return { ok: false, rejection: normalizeEngineError({ message: error.message, hint: error.hint }) };
+  }
+  revalidatePath("/");
+  revalidatePath("/browse");
+  revalidatePath(`/listing/${auctionId}`);
+  revalidatePath(`/sell/${auctionId}`);
+  revalidatePath("/dashboard/selling");
+  revalidatePath("/admin");
+  revalidatePath("/admin/listings");
+  return { ok: true, status: data };
+}
+
 export async function closeDirectListingAction(input: {
   auctionId: string;
   sold: boolean;
