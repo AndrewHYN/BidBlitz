@@ -27,6 +27,7 @@ export function ImageGallery({
   title: string;
 }) {
   const [index, setIndex] = useState(0);
+  const [viewerOpen, setViewerOpen] = useState(false);
 
   if (imageCount === 0 || images.length === 0) {
     return (
@@ -62,13 +63,24 @@ export function ImageGallery({
         or hitting a broken one changes nothing about the layout.
       */}
       <div className="relative overflow-hidden rounded-xl border bg-muted/40 shadow-xs">
-        <Dialog>
+        <Dialog open={viewerOpen} onOpenChange={setViewerOpen}>
           <DialogTrigger asChild>
-            <button type="button" aria-label="View full-size photos" className="group absolute inset-0 z-10 cursor-zoom-in rounded-xl focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-ring">
+            <a
+              href={active.url}
+              target="_blank"
+              rel="noopener"
+              aria-label="View full-size photos"
+              className="group absolute inset-0 z-10 cursor-zoom-in rounded-xl focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-ring"
+              onClick={(event) => {
+                // Before hydration the href already opens the full image.
+                event.preventDefault();
+                setViewerOpen(true);
+              }}
+            >
               <span className="absolute right-2 top-2 grid size-10 place-items-center rounded-lg border bg-card/95 shadow-sm group-hover:bg-card">
                 <Maximize2 className="size-4" aria-hidden />
               </span>
-            </button>
+            </a>
           </DialogTrigger>
           <DialogContent aria-describedby={undefined}
             className="max-h-dvh max-w-[calc(100%-1rem)] sm:max-w-5xl"

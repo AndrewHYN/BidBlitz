@@ -32,8 +32,8 @@ import { DeleteDraftButton } from "@/components/sell/delete-draft-button";
 import { PromotionRequest } from "@/components/sell/promotion-request";
 
 export const metadata: Metadata = {
-  title: "Finish your listing",
-  description: "Add photos, review your listing and publish on BidBlitz.",
+  title: "Manage your listing",
+  description: "Review your photos, publish a draft or manage a live BidBlitz listing.",
   robots: { index: false, follow: false },
 };
 
