@@ -434,6 +434,7 @@ export interface Database {
       };
     };
     Functions: {
+      marketplace_activity_summary: { Args: Record<string, never>; Returns: unknown };
       chat_review_context: { Args: { p_peer: string }; Returns: { listing_id: string; already_reviewed: boolean }[] };
       submit_chat_review: { Args: { p_peer: string; p_rating: number; p_comment: string }; Returns: undefined };
       report_marketplace_content: { Args: { p_kind: string; p_target: string; p_reason: string }; Returns: undefined };

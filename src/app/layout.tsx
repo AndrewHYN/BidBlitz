@@ -4,6 +4,7 @@ import "./globals.css";
 import { Providers } from "@/components/providers";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
+import { MarketplaceViewTracker } from "@/components/marketplace-view-tracker";
 import { CANONICAL_SITE_URL as SITE_URL } from "@/lib/site-url";
 import { serializeJsonLd, siteStructuredData } from "@/lib/structured-data";
 
@@ -121,6 +122,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           }}
         />
         <Providers serverTimeMs={serverTimeMs}>
+          <MarketplaceViewTracker />
           <a
             href="#main"
             className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-primary focus:px-4 focus:py-2 focus:text-primary-foreground"
