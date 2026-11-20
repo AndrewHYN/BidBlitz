@@ -157,6 +157,20 @@ test.describe("release visual smoke", () => {
     }
   });
 
+  test("home location opens from the corner pin and returns focus on Escape", async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 640 });
+    await page.goto("/");
+    const pin = page.getByRole("button", { name: /^Change location, currently / });
+    const panel = page.getByRole("dialog", { name: "Listing location" });
+    await expect(panel).toBeHidden();
+    await pin.focus();
+    await pin.press("Enter");
+    await expect(panel.getByLabel("Town or suburb")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(panel).toBeHidden();
+    await expect(pin).toBeFocused();
+  });
+
   test("landing page exposes obvious marketplace actions", async ({ page }) => {
     await page.goto("/", { waitUntil: "domcontentloaded" });
     await expect(

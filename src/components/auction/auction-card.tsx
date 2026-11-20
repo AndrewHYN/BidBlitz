@@ -22,6 +22,7 @@ export function AuctionCard({
   meta,
   className,
   headingLevel: Heading = "h3",
+  compact = false,
 }: {
   auction: AuctionCardData;
   href?: string;
@@ -42,6 +43,7 @@ export function AuctionCard({
    * Hardcoding one level gets the other context wrong, so the caller states it.
    */
   headingLevel?: "h2" | "h3";
+  compact?: boolean;
 }) {
   const closed = isClosed(auction.status);
   // A paused auction keeps its endsAt in the future, but the clock is
@@ -64,7 +66,7 @@ export function AuctionCard({
       data-auction-id={auction.id}
       data-promoted={auction.featured ? "true" : undefined}
     >
-      <div className="relative aspect-[4/3] overflow-hidden bg-muted">
+      <div className={cn("relative overflow-hidden bg-muted", compact ? "aspect-square" : "aspect-[4/3]")}>
         <ImageWithFallback
           src={auction.imageUrl}
           alt={`${auction.title}, photo 1`}
@@ -81,6 +83,7 @@ export function AuctionCard({
 
         <div className="absolute left-2 top-2 flex flex-wrap gap-1.5">
           {auction.isDirect ? (
+            (!compact || auction.listingKind === "SERVICE") &&
             <span className="rounded-md bg-background/95 px-2 py-1 text-[11px] font-semibold">
               {auction.listingKind === "SERVICE" ? "Service" : "For sale"}
             </span>
@@ -100,69 +103,80 @@ export function AuctionCard({
         )}
       </div>
 
-      <div className="flex flex-1 flex-col gap-2.5 p-4">
-        <div className="flex items-start justify-between gap-2">
-          <Heading className="line-clamp-2 text-[0.98rem] font-extrabold leading-snug tracking-[-.015em] transition-colors group-hover:text-primary">
-            {auction.title}
-          </Heading>
+      {compact ? (
+        <div className="min-w-0 space-y-1 px-2.5 py-2.5 sm:px-3">
+          <p data-testid="card-price" className="text-base font-bold leading-tight tracking-tight [overflow-wrap:anywhere]">
+            {auction.listingKind === "SERVICE" ? "From " : !auction.isDirect ? (hasBids ? "Bid " : "Starts at ") : ""}
+            <Money minor={auction.currentBidMinor ?? auction.startingBidMinor} compact={false} />
+          </p>
+          <Heading className="line-clamp-2 text-sm font-medium leading-snug [overflow-wrap:anywhere]">{auction.title}</Heading>
+          {auction.location && <p className="truncate text-xs text-muted-foreground">{publicListingLocation(auction.location)}</p>}
         </div>
-
-        <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
-          {auction.categoryName && (
-            <span className="rounded-md bg-muted px-1.5 py-0.5">{auction.categoryName}</span>
-          )}
-          {auction.listingKind !== "SERVICE" && <ConditionBadge condition={auction.condition} className="px-1.5 py-0 text-[11px]" />}
-          {auction.businessName && (
-            <span className="inline-flex items-center gap-1 rounded-md bg-primary/5 px-1.5 py-0.5 font-semibold text-primary">
-              <Building2 className="size-3" aria-hidden />
-              Business seller
-            </span>
-          )}
-        </div>
-
-        <div className="mt-auto flex items-end justify-between gap-2 pt-3">
-          <div className="min-w-0">
-            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-              {auction.listingKind === "SERVICE" ? "Starting from" : auction.isDirect ? "Asking price" : hasBids ? "Current bid" : "Starting bid"}
-            </p>
-            <p
-              data-testid="card-price"
-              className={cn(
-                "truncate text-lg font-bold tracking-tight",
-                auction.isDirect || auction.bidCount > 0 ? "text-foreground" : "text-muted-foreground"
-              )}
-            >
-              <Money
-                minor={auction.currentBidMinor ?? auction.startingBidMinor}
-                compact={false}
-              />
-            </p>
+      ) : (
+        <div className="flex flex-1 flex-col gap-2.5 p-4">
+          <div className="flex items-start justify-between gap-2">
+            <Heading className="line-clamp-2 text-[0.98rem] font-extrabold leading-snug tracking-[-.015em] transition-colors group-hover:text-primary">
+              {auction.title}
+            </Heading>
           </div>
 
-          {!auction.isDirect && <div className="flex shrink-0 items-center gap-1 text-[11px] text-muted-foreground">
-            <Gavel className="size-3" aria-hidden />
-            <span data-numeric>{auction.bidCount}</span>
-            <span>{auction.bidCount === 1 ? "bid" : "bids"}</span>
-          </div>}
-        </div>
+          <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+            {auction.categoryName && (
+              <span className="rounded-md bg-muted px-1.5 py-0.5">{auction.categoryName}</span>
+            )}
+            {auction.listingKind !== "SERVICE" && <ConditionBadge condition={auction.condition} className="px-1.5 py-0 text-[11px]" />}
+            {auction.businessName && (
+              <span className="inline-flex items-center gap-1 rounded-md bg-primary/5 px-1.5 py-0.5 font-semibold text-primary">
+                <Building2 className="size-3" aria-hidden />
+                Business seller
+              </span>
+            )}
+          </div>
 
-        {meta && <div className="border-t pt-2 text-[11px]">{meta}</div>}
+          <div className="mt-auto flex items-end justify-between gap-2 pt-3">
+            <div className="min-w-0">
+              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                {auction.listingKind === "SERVICE" ? "Starting from" : auction.isDirect ? "Asking price" : hasBids ? "Current bid" : "Starting bid"}
+              </p>
+              <p
+                data-testid="card-price"
+                className={cn(
+                  "truncate text-lg font-bold tracking-tight",
+                  auction.isDirect || auction.bidCount > 0 ? "text-foreground" : "text-muted-foreground"
+                )}
+              >
+                <Money
+                  minor={auction.currentBidMinor ?? auction.startingBidMinor}
+                  compact={false}
+                />
+              </p>
+            </div>
 
-        <div className="mt-0.5 flex items-center justify-between gap-3 border-t pt-2.5 text-xs">
-          {auction.location ? (
-            <p className="flex min-w-0 items-center gap-1 text-muted-foreground">
-              <MapPin className="size-3.5 shrink-0" aria-hidden />
-              <span className="truncate">{publicListingLocation(auction.location)}</span>
-            </p>
-          ) : (
-            <span />
-          )}
-          <span className="inline-flex shrink-0 items-center gap-1 font-semibold text-primary">
-            {auction.listingKind === "SERVICE" ? "View service" : auction.isDirect ? "View item" : "View listing"}
-            <ArrowUpRight className="size-3.5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" aria-hidden />
-          </span>
+            {!auction.isDirect && <div className="flex shrink-0 items-center gap-1 text-[11px] text-muted-foreground">
+              <Gavel className="size-3" aria-hidden />
+              <span data-numeric>{auction.bidCount}</span>
+              <span>{auction.bidCount === 1 ? "bid" : "bids"}</span>
+            </div>}
+          </div>
+
+          {meta && <div className="border-t pt-2 text-[11px]">{meta}</div>}
+
+          <div className="mt-0.5 flex items-center justify-between gap-3 border-t pt-2.5 text-xs">
+            {auction.location ? (
+              <p className="flex min-w-0 items-center gap-1 text-muted-foreground">
+                <MapPin className="size-3.5 shrink-0" aria-hidden />
+                <span className="truncate">{publicListingLocation(auction.location)}</span>
+              </p>
+            ) : (
+              <span />
+            )}
+            <span className="inline-flex shrink-0 items-center gap-1 font-semibold text-primary">
+              {auction.listingKind === "SERVICE" ? "View service" : auction.isDirect ? "View item" : "View listing"}
+              <ArrowUpRight className="size-3.5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" aria-hidden />
+            </span>
+          </div>
         </div>
-      </div>
+      )}
     </Link>
   );
 }
@@ -172,6 +186,7 @@ export function AuctionGrid({
   empty,
   className,
   headingLevel = "h3",
+  compact = false,
 }: {
   items: AuctionCardData[];
   empty?: React.ReactNode;
@@ -183,6 +198,7 @@ export function AuctionGrid({
    * the nested case is the default and the flat case is stated.
    */
   headingLevel?: "h2" | "h3";
+  compact?: boolean;
 }) {
   if (items.length === 0 && empty) return <>{empty}</>;
 
@@ -190,11 +206,12 @@ export function AuctionGrid({
     <div
       className={cn(
         "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4",
+        compact && "grid-cols-2 gap-2.5 sm:gap-4",
         className
       )}
     >
       {items.map((a) => (
-        <AuctionCard key={a.id} auction={a} headingLevel={headingLevel} />
+        <AuctionCard key={a.id} auction={a} headingLevel={headingLevel} compact={compact} />
       ))}
     </div>
   );
