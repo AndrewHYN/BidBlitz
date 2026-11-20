@@ -35,7 +35,7 @@ export default async function WatchlistPage() {
             <div className="space-y-1">
               <h2 className="text-lg font-semibold tracking-tight">No saved items yet</h2>
               <p className="max-w-xs text-sm leading-6 text-muted-foreground">
-                Tap the bookmark on a listing to find it here later.
+                Tap Watch on a listing to find it here later.
               </p>
             </div>
             <Button asChild variant="outline" className="min-h-11 shadow-sm">
