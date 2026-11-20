@@ -220,6 +220,10 @@ export default function PrivacyPage() {
 
         <PrivacySection id="cookies" title="5. Cookies and local storage">
           <p>
+            BidBlitz counts page views on its public marketplace pages to understand site activity.
+            The dashboard stores daily totals without visitor identifiers or tracking cookies.
+          </p>
+          <p>
             BidBlitz uses essential session cookies to keep you signed in, and
             stores your light/dark theme choice in your browser. There are no
             advertising or third-party tracking cookies.

@@ -521,6 +521,7 @@ export default async function AdminPage() {
         showTeam={canManageTeam === true}
         disputeCount={openDisputeCount ?? 0}
       />
+      <Button asChild variant="outline"><Link href="/admin/activity">Marketplace activity</Link></Button>
 
       {canManagePromotions === true && (
         <section id="admin-promotions" aria-labelledby="admin-promotions-heading" className="space-y-4 scroll-mt-24">
