@@ -19,9 +19,9 @@ export default async function DashboardLayout({
   if (!user) redirect("/login?next=/dashboard");
 
   return (
-    <div className="page-container py-10 sm:py-14">
+    <div className="page-container flex flex-col gap-6 py-6 sm:py-10">
       <DashboardTabs />
-      <div className="mt-6">{children}</div>
+      <div className="min-w-0">{children}</div>
     </div>
   );
 }
