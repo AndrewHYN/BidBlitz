@@ -1,21 +1,21 @@
 import Link from "next/link";
 import { Activity, Banknote, BookOpen, Gauge, Megaphone, Scale, Users, Headset, ClipboardCheck } from "lucide-react";
+import { callerId, effectivePermissions } from "@/server/permissions";
 import { cn } from "@/lib/utils";
 
 const ITEMS = [
-  { href: "/admin/command", label: "HQ", icon: Activity, key: "command" },
-  { href: "/admin/listings", label: "Listings", icon: ClipboardCheck, key: "listings" },
   { href: "/admin", label: "Overview", icon: Gauge, key: "overview" },
+  { href: "/admin/command", label: "Queues", icon: Activity, key: "command" },
+  { href: "/admin/listings", label: "Listings", icon: ClipboardCheck, key: "listings" },
   { href: "/admin/disputes", label: "Disputes", icon: Scale, key: "disputes" },
   { href: "/admin/finance", label: "Finance", icon: Banknote, key: "finance" },
   { href: "/admin/marketing", label: "Marketing", icon: Megaphone, key: "marketing" },
   { href: "/admin/support", label: "Support", icon: Headset, key: "support" },
-  { href: "/admin#admin-promotions-heading", label: "Promotions", icon: Megaphone, key: "promotions" },
   { href: "/admin/guide", label: "Guide", icon: BookOpen, key: "guide" },
   { href: "/admin/team", label: "Team", icon: Users, key: "team" },
 ] as const;
 
-export function AdminNav({
+export async function AdminNav({
   active = "overview",
   showTeam = false,
   showMarketing = false,
@@ -23,24 +23,34 @@ export function AdminNav({
   showListings = false,
   disputeCount = 0,
 }: {
-  active?: "listings" | "command" | "overview" | "disputes" | "finance" | "marketing" | "support" | "promotions" | "guide" | "team";
+  active?: "listings" | "command" | "overview" | "disputes" | "finance" | "marketing" | "support" | "guide" | "team";
   showTeam?: boolean;
   showMarketing?: boolean;
   showSupport?: boolean;
   showListings?: boolean;
   disputeCount?: number;
 }) {
+  const userId = await callerId();
+  const permissions = new Set(userId ? await effectivePermissions(userId) : []);
+  const can = (permission: string) => permissions.has("*") || permissions.has(permission);
+  const visible = {
+    team: showTeam || can("admin.manage_team"),
+    marketing: showMarketing || can("marketing.view") || can("settings.manage_marketplace"),
+    support: showSupport || can("support.manage"),
+    listings: showListings || can("listings.review"),
+    disputes: can("disputes.view"),
+    finance: can("payments.view") || can("payouts.view"),
+    overview: true,
+    command: true,
+    guide: true,
+  };
+
   return (
     <nav
       aria-label="Admin sections"
-      className="flex gap-2 overflow-x-auto rounded-xl border bg-muted/40 p-1.5 shadow-sm"
+      className="grid grid-cols-2 gap-1 rounded-xl border bg-card p-1.5 min-[380px]:grid-cols-3 sm:grid-cols-5 lg:flex lg:flex-wrap"
     >
-      {ITEMS.filter((item) =>
-        (showTeam || item.key !== "team") &&
-        (showMarketing || item.key !== "marketing") &&
-        (showSupport || item.key !== "support") &&
-        (showListings || item.key !== "listings")
-      ).map(
+      {ITEMS.filter(({ key }) => key === active || visible[key]).map(
         ({ href, label, icon: Icon, key }) => {
           const selected = active === key;
           return (
@@ -49,12 +59,12 @@ export function AdminNav({
               href={href}
               aria-current={selected ? "page" : undefined}
               className={cn(
-                "inline-flex min-h-10 shrink-0 items-center gap-2 rounded-lg px-3 text-sm font-semibold text-muted-foreground transition",
-                "hover:bg-background hover:text-foreground hover:shadow-sm",
-                selected && "bg-background text-foreground shadow-sm"
+                "inline-flex min-h-11 min-w-0 items-center gap-1.5 rounded-lg px-2 text-sm font-medium text-muted-foreground transition lg:px-3",
+                "hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary",
+                selected && "bg-primary/10 font-semibold text-foreground"
               )}
             >
-              <Icon className="size-4" aria-hidden />
+              <Icon className="size-4 shrink-0" aria-hidden />
               {label}
               {key === "disputes" && disputeCount > 0 && (
                 <span
