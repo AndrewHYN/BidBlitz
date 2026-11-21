@@ -305,7 +305,7 @@ export default async function TransactionsPage() {
                     </Link>
                   </TableCell>
                   <TableCell className="text-muted-foreground">{formatDate(row.created_at)}</TableCell>
-                  <TableCell>
+                  <TableCell id={`review-${row.id}`} className="scroll-mt-24">
                     {row.reviewed ? (
                       <span
                         data-testid="review-submitted"

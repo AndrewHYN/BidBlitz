@@ -98,7 +98,7 @@ export function MessageThread({
   }
 
   return (
-    <div className="space-y-4" data-testid="message-thread">
+    <div id="messages" className="scroll-mt-24 space-y-4" data-testid="message-thread">
       <div className="space-y-3" aria-live="polite">
         {initial.length === 0 ? (
           <p data-testid="message-empty" className="rounded-xl border bg-card p-4 text-sm text-muted-foreground">

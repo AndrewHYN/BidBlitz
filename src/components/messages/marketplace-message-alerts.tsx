@@ -2,6 +2,8 @@
 
 import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import Link from "next/link";
+import { MessageCircle } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 
@@ -56,10 +58,14 @@ export function MarketplaceMessageAlerts({ userId }: { userId: string }) {
         const title = typeof data.title === "string" ? data.title : "your listing";
         const url = `/messages/${conversationId}`;
         if (pathname !== url) {
-          toast("New marketplace message", {
-            description: `Someone messaged you about ${title}.`,
-            action: { label: "Open chat", onClick: () => router.push(url) },
-          });
+          toast(
+            <Link href={url} onClick={() => toast.dismiss(row.id)}
+              className="flex items-center gap-3 rounded-lg p-1 focus-visible:ring-2">
+              <MessageCircle aria-hidden className="size-5 shrink-0 text-blue-600 dark:text-blue-400" />
+              <span><strong className="block">New marketplace message</strong>
+                <span className="text-sm font-normal">New enquiry about {title}</span></span>
+            </Link>, { id: row.id }
+          );
           if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
             if ("serviceWorker" in navigator) {
               void navigator.serviceWorker.register("/message-alert-sw.js").then((registration) =>

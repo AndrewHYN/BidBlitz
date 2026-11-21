@@ -1,18 +1,16 @@
 export default function NotificationsLoading() {
   return (
-    <div
-      className="page-container py-10 sm:py-14"
-      role="status"
-      aria-label="Loading notifications"
-    >
-      <div className="mb-6 h-9 w-56 animate-pulse rounded-md bg-muted" />
-      <div className="mb-8 h-4 w-80 animate-pulse rounded-md bg-muted" />
-      <div className="space-y-3">
-        {Array.from({ length: 5 }).map((_, index) => (
-          <div key={index} className="h-14 animate-pulse rounded-xl border bg-card" />
+    <div className="notification-inbox" role="status" aria-label="Loading notifications">
+      <div className="notification-header"><div className="h-9 w-48 animate-pulse rounded bg-muted" /></div>
+      <div className="notification-feed divide-y divide-border" aria-hidden>
+        {Array.from({ length: 5 }, (_, index) => (
+          <div key={index} className="notification-row-content animate-pulse">
+            <span className="notification-photo" />
+            <span className="space-y-2"><span className="block h-3 w-16 rounded bg-muted" />
+              <span className="block h-4 w-3/4 rounded bg-muted" /></span>
+          </div>
         ))}
       </div>
-      <span className="sr-only">Loading…</span>
     </div>
   );
 }

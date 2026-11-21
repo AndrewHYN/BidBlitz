@@ -1,17 +1,10 @@
-import Link from "next/link";
+import { Bell, BriefcaseBusiness, Check, ChevronRight, ClipboardCheck, Gavel, MessageCircle, Tag } from "lucide-react";
+import { ImageWithFallback } from "@/components/auction/image-with-fallback";
+import { NotificationLink } from "./notification-link";
 import type { Json } from "@/lib/supabase/types";
 import { Money } from "@/components/auction/money";
 import { MarkReadButton } from "@/components/notifications/mark-read-button";
 import { isPaymentProviderConfigured } from "@/server/payments/config";
-
-/**
- * The notification feed. Server-rendered: rows and their money copy are fixed
- * once per request, and only the per-row "Mark read" buttons ship as client
- * components.
- *
- * Copy is DERIVED from the engine's payload (never invented here) — amounts
- * go through `<Money>` so nothing is ever hand-formatted.
- */
 
 export type NotificationItem = {
   id: string;
@@ -20,11 +13,14 @@ export type NotificationItem = {
   read_at: string | null;
   created_at: string;
   auction_id: string | null;
+  listingKind: "SALE" | "SERVICE" | "AUCTION" | null;
+  photo: string | null;
 };
 
 /** Server-rendered once per request, so the row never re-formats. */
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleString("en-US", {
+    timeZone: "Africa/Harare",
     month: "short",
     day: "numeric",
     hour: "numeric",
@@ -47,7 +43,8 @@ function amountOf(value: Json | undefined): bigint | number | string | null {
 
 function describe(
   type: string,
-  payload: Json
+  payload: Json,
+  kind: NotificationItem["listingKind"]
 ): { headline: string; detail: React.ReactNode; threadId?: string | null; href?: string | null; actionLabel?: string } {
   const p = asRecord(payload);
   const title = typeof p.title === "string" ? p.title : null;
@@ -110,7 +107,7 @@ function describe(
       };
     case "ENDED_UNSOLD":
       return {
-        headline: `${headline} ended with no bids`,
+        headline: kind === "AUCTION" ? `${headline} ended with no bids` : `${headline} ended`,
         detail: null,
       };
     case "BID_CONFIRMED":
@@ -127,7 +124,7 @@ function describe(
       return {
         headline: `Review needed: ${headline}`,
         detail: <>This listing is held and cannot go public until staff decide.</>,
-        href: "/admin#admin-review-heading",
+        href: typeof p.review_id === "string" ? `/admin/listings#review-${encodeURIComponent(p.review_id)}` : "/admin/listings",
         actionLabel: "Open review queue",
       };
     case "PROMOTION_REQUESTED":
@@ -245,7 +242,7 @@ function describe(
         detail: (
           <>
             Your listing is public.{" "}
-            {typeof p.ends_at === "string" && (
+            {kind === "AUCTION" && typeof p.ends_at === "string" && (
               <>Bidding closes {formatDate(p.ends_at)}.</>
             )}
           </>
@@ -308,22 +305,15 @@ function describe(
       // moderation_events, which ordinary users cannot read.
       return {
         headline: `${headline} was removed by BidBlitz`,
-        detail: (
-          <>
-            The listing broke marketplace rules, so it is no longer public. If
-            you think that is a mistake,{" "}
-            <Link href="/help" className="font-medium text-foreground underline underline-offset-2">
-              get in touch through the help page
-            </Link>
-            .
-          </>
-        ),
+        detail: "This listing was removed under the marketplace rules.",
+        href: "/help",
+        actionLabel: "Get help",
       };
     case "AUCTION_PUBLISHED":
       return {
-        headline: `${headline} is live`,
+        headline: kind === "SALE" ? `${headline} is now for sale` : kind === "SERVICE" ? `${headline} is available to hire` : `${headline} is live`,
         detail:
-          typeof p.ends_at === "string" ? (
+          kind === "AUCTION" && typeof p.ends_at === "string" ? (
             <>Bidding closes {formatDate(p.ends_at)}.</>
           ) : null,
       };
@@ -338,10 +328,11 @@ function describe(
     case "REVIEW_REQUEST":
       return {
         headline: `Leave a review for ${headline}`,
+        href: typeof p.transaction_id === "string" ? `/dashboard/transactions#review-${encodeURIComponent(p.transaction_id)}` : "/dashboard/transactions",
+        actionLabel: "Write a review",
         detail: (
           <>
-            The auction is complete. Your review keeps this marketplace honest
-            for the next buyer.
+            Share your experience with the other trader.
           </>
         ),
       };
@@ -364,10 +355,8 @@ function describe(
       const chatId = typeof p.listingChatId === "string" ? p.listingChatId : null;
       return {
         headline: `New message about ${headline}`,
-        detail: <>Open the conversation to read it and reply.</>,
-        threadId: transactionId,
-        href: chatId ? `/messages/${chatId}` : null,
-        actionLabel: chatId ? "Reply" : undefined,
+        detail: null,
+        href: chatId ? `/messages/${encodeURIComponent(chatId)}` : transactionId ? `/dashboard/transactions/${encodeURIComponent(transactionId)}#messages` : "/messages",
       };
     }
     default:
@@ -375,83 +364,56 @@ function describe(
   }
 }
 
+const kinds = {
+  SALE: { label: "Sale", Icon: Tag },
+  SERVICE: { label: "Service", Icon: BriefcaseBusiness },
+  AUCTION: { label: "Auction", Icon: Gavel },
+};
+
 export function NotificationsList({ items }: { items: NotificationItem[] }) {
   return (
-    <ul data-testid="notifications-list" className="space-y-3">
-      {items.map((item) => {
+    <ul data-testid="notifications-list" className="notification-feed">
+      {items.map(item => {
         const unread = item.read_at === null;
-        const { headline, detail, threadId, href, actionLabel } = describe(item.type, item.payload);
-        // WON/SOLD/REVIEW_REQUEST carry the reader to the transaction itself:
-        // payment state, fee breakdown and the review dialog all live there.
-        // NEW_MESSAGE deep-links to the private thread.
-        const transactionLinked =
-          item.type === "WON" ||
-          item.type === "SOLD" ||
-          item.type === "REVIEW_REQUEST";
-
+        const { headline, detail, threadId, href, actionLabel } = describe(item.type, item.payload, item.listingKind);
+        const p = asRecord(item.payload);
+        const saleEvent = ["WON", "SOLD"].includes(item.type);
+        const transactionId = threadId ?? p.transactionId ?? p.transaction_id;
+        const saleUrl = typeof transactionId === "string" ? `/dashboard/transactions/${encodeURIComponent(transactionId)}` : "/dashboard/transactions";
+        const destination = href ?? (saleEvent || threadId ? saleUrl : item.auction_id ? `/listing/${item.auction_id}` : null);
+        const listing = item.listingKind ? kinds[item.listingKind] : { label: "Listing", Icon: Tag };
+        const topic = item.type === "NEW_MESSAGE" ? { label: "Message", Icon: MessageCircle }
+          : item.type === "STAFF_REVIEW_REQUIRED" ? { label: "Staff review", Icon: ClipboardCheck }
+          : item.auction_id ? listing : { label: "Account", Icon: Bell };
+        const { Icon } = topic;
+        const content = (
+          <>
+            <span className="notification-photo" aria-hidden="true">
+              <ImageWithFallback src={item.photo} alt="" loading="lazy" responsive={{ width: 72, height: 72 }} className="size-full object-cover"
+                fallback={<Icon className="size-5 sm:size-6" />} />
+            </span>
+            <span className="min-w-0">
+              <span className="notification-meta">
+                <span>{topic.label}</span>
+                <span className="notification-state">
+                  {unread ? <i aria-hidden /> : <Check aria-hidden className="size-3" />}
+                  {unread ? "Unread" : "Read"}
+                </span>
+              </span>
+              <span className="notification-title">{headline}</span>
+              {detail && <span className="notification-detail">{detail}</span>}
+              <span className="notification-foot">
+                <time dateTime={item.created_at}>{formatDate(item.created_at)}</time>
+                {actionLabel && item.type !== "NEW_MESSAGE" && <span className="notification-action">{actionLabel}</span>}
+              </span>
+            </span>
+            {destination && <ChevronRight aria-hidden className="notification-chevron" />}
+          </>
+        );
         return (
-          <li
-            key={item.id}
-            data-testid="notification-row"
-            data-unread={unread ? "true" : undefined}
-            className={
-              unread
-                ? "flex flex-wrap items-start justify-between gap-3 rounded-xl border border-primary/30 bg-card p-4 shadow-sm"
-                : "flex flex-wrap items-start justify-between gap-3 rounded-xl border bg-card p-4 shadow-sm"
-            }
-          >
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                {unread && (
-                  <span
-                    aria-label="Unread"
-                    className="size-2 rounded-full bg-primary"
-                  />
-                )}
-                <p className="text-sm font-medium">{headline}</p>
-              </div>
-              {detail && (
-                <p className="mt-1 text-sm text-muted-foreground">{detail}</p>
-              )}
-              <p className="mt-1 text-xs text-muted-foreground">
-                {formatDate(item.created_at)}
-              </p>
-            </div>
-
-            <div className="flex shrink-0 items-center gap-2">
-              {href ? (
-                <Link
-                  href={href}
-                  className="text-sm font-medium text-muted-foreground hover:text-foreground hover:underline"
-                >
-                  {actionLabel ?? "Open"}
-                </Link>
-              ) : threadId ? (
-                <Link
-                  href={`/dashboard/transactions/${threadId}`}
-                  className="text-sm font-medium text-muted-foreground hover:text-foreground hover:underline"
-                >
-                  Read message
-                </Link>
-              ) : transactionLinked ? (
-                <Link
-                  href="/dashboard/transactions"
-                  className="text-sm font-medium text-muted-foreground hover:text-foreground hover:underline"
-                >
-                  {item.type === "REVIEW_REQUEST" ? "Write a review" : "View transaction"}
-                </Link>
-              ) : (
-                item.auction_id && (
-                  <Link
-                    href={`/auction/${item.auction_id}`}
-                    className="text-sm font-medium text-muted-foreground hover:text-foreground hover:underline"
-                  >
-                    View auction
-                  </Link>
-                )
-              )}
-              {unread && <MarkReadButton id={item.id} label={headline} />}
-            </div>
+          <li key={item.id} data-testid="notification-row" data-unread={unread}>
+            {destination ? <NotificationLink id={item.id} unread={unread} href={destination}>{content}</NotificationLink>
+              : <><div className="notification-row-content">{content}</div>{unread && <MarkReadButton id={item.id} label={headline} />}</>}
           </li>
         );
       })}

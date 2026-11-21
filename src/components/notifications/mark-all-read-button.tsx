@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
  * so the refreshed server render is the source of truth — no optimistic
  * "read" state that could disagree with the database.
  */
-export function MarkAllReadButton({ disabled }: { disabled: boolean }) {
+export function MarkAllReadButton() {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -23,7 +23,7 @@ export function MarkAllReadButton({ disabled }: { disabled: boolean }) {
         variant="outline"
         size="sm"
         data-testid="mark-all-read"
-        disabled={disabled || pending}
+        disabled={pending}
         onClick={() => {
           setError(null);
           startTransition(async () => {

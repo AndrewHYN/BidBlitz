@@ -112,6 +112,7 @@ export function ImageGallery({
             key={active.id}
             src={active.url}
             alt={`${title}, photo ${activeIndex + 1} of ${images.length}`}
+            responsive={{ width: 960, height: 720, sizes: "(min-width: 1024px) 54vw, 100vw" }}
             className="size-full object-contain"
             fallback={
               <div className="grid size-full place-items-center rounded-lg border border-dashed bg-background/60 text-center">
@@ -151,6 +152,7 @@ export function ImageGallery({
               <ImageWithFallback
                 key={img.id}
                 src={img.url}
+                responsive={{ width: 64, height: 64 }}
                 alt=""
                 className="size-full object-cover"
                 fallback={

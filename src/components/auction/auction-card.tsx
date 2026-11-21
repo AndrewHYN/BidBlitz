@@ -71,6 +71,7 @@ export function AuctionCard({
           src={auction.imageUrl}
           alt={`${auction.title}, photo 1`}
           loading="lazy"
+          responsive={{ width: 480, height: 360, sizes: "(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw" }}
           className="size-full object-cover transition-[transform,filter] duration-700 ease-[cubic-bezier(.16,1,.3,1)] group-hover:scale-[1.055]"
           fallback={
             <div className="grid size-full place-items-center bg-muted">

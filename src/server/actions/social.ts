@@ -74,6 +74,7 @@ export async function markNotificationsReadAction(input: unknown): Promise<Simpl
     .from("notifications")
     .update({ read_at: new Date().toISOString() })
     .in("id", parsed.data.ids)
+    .is("read_at", null)
     .eq("user_id", user.id);   // RLS enforces this too; belt and braces
 
   if (error) return { ok: false, rejection: normalizeEngineError({ message: error.message }) };
