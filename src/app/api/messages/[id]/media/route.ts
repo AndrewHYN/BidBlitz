@@ -27,7 +27,13 @@ function matchesFormat(bytes: Buffer, mime: string) {
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  if (request.headers.get("origin") !== new URL(request.url).origin) return reply("Request unavailable.", 403);
+  const origin = request.headers.get("origin");
+  // Next may build request.url with an internal hostname behind its proxy.
+  const originUrl = origin ? URL.parse(origin) : null;
+  if (!originUrl || originUrl.host !== request.headers.get("host")
+      || !["https:", "http:"].includes(originUrl.protocol)) {
+    return reply("Request unavailable.", 403);
+  }
   if (!z.uuid().safeParse(id).success) return reply("Conversation unavailable.", 404);
   const media = chatMediaType(request.headers.get("content-type") ?? "");
   if (!media || !request.body) return reply("Choose a supported photo or audio file.", 415);
