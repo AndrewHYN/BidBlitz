@@ -21,14 +21,31 @@ export function ChatRow({ id, userId, name, pinned, muted, archived, leftBy, unr
   const [busy, setBusy] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
   const press = useRef<{ x: number; y: number; timer: number } | null>(null);
-  const held = useRef(false);
+  const releaseGuard = useRef<AbortController | null>(null);
   const bubble = useChatBubble(userId);
 
   function cancelPress() {
     if (press.current) window.clearTimeout(press.current.timer);
     press.current = null;
   }
-  useEffect(() => cancelPress, []);
+  useEffect(() => () => { cancelPress(); releaseGuard.current?.abort(); }, []);
+  function openFromPress() {
+    releaseGuard.current?.abort();
+    const guard = new AbortController();
+    releaseGuard.current = guard;
+    const options = { capture: true, signal: guard.signal };
+    // Touch release can synthesize a click on the sheet now under the finger.
+    // Only a fresh press (or a keyboard activation) should choose an action.
+    window.addEventListener("click", event => {
+      if (event.detail > 0) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+      }
+      guard.abort();
+    }, options);
+    window.addEventListener("pointerdown", () => guard.abort(), options);
+    openMenu();
+  }
   function openMenu() {
     cancelPress();
     if (busy) return;
@@ -68,22 +85,16 @@ export function ChatRow({ id, userId, name, pinned, muted, archived, leftBy, unr
   return (
     <li className="flex items-center gap-2 px-3 hover:bg-muted/40 sm:gap-3 sm:px-4">
       <div className="flex min-w-0 flex-1 touch-pan-y items-center gap-3 select-none [-webkit-touch-callout:none]"
-        onContextMenu={event => { event.preventDefault(); held.current = true; openMenu(); }}
+        onContextMenu={event => { event.preventDefault(); openFromPress(); }}
         onPointerDown={event => {
           cancelPress();
-          held.current = false;
           if (!event.isPrimary || event.button !== 0) return;
-          press.current = { x: event.clientX, y: event.clientY, timer: window.setTimeout(() => {
-            held.current = true; openMenu();
-          }, 500) };
+          press.current = { x: event.clientX, y: event.clientY, timer: window.setTimeout(openFromPress, 500) };
         }}
         onPointerMove={event => {
           if (press.current && Math.hypot(event.clientX - press.current.x, event.clientY - press.current.y) > 10) cancelPress();
         }}
-        onPointerCancel={cancelPress} onPointerLeave={cancelPress} onPointerUp={cancelPress}
-        onClickCapture={event => {
-          if (held.current) { event.preventDefault(); event.stopPropagation(); held.current = false; }
-        }}>
+        onPointerCancel={cancelPress} onPointerLeave={cancelPress} onPointerUp={cancelPress}>
         {children}
       </div>
       <Button ref={trigger} disabled={busy} size="icon" variant="ghost" className="size-11 shrink-0" onClick={openMenu}
