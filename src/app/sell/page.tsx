@@ -23,12 +23,16 @@ export default async function SellPage() {
   ]);
 
   return (
-    <div className="page-container py-10 sm:py-14">
-      <PageHeader
-        title="Create a listing"
-        description="Choose an item sale, an auction or a service. For direct listings, get paid directly by your buyer or client; auctions follow separate bidding rules."
-      />
-      <div className="mt-6 max-w-4xl">
+    <div className="page-container pb-36 pt-5 sm:pb-20 sm:pt-10">
+      <div className="mx-auto max-w-3xl">
+        <div className="mb-5 space-y-2 sm:mb-7">
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-primary">Sell on BidBlitz</p>
+          <PageHeader
+            className="gap-1 border-0 pb-0"
+            title="Create a listing"
+            description="Find your category in seconds, set your price and get paid directly by your buyer or client. Add photos before publishing."
+          />
+        </div>
         {profile?.is_banned ? (
           <p role="alert">Your account can’t publish listings right now. <a className="underline" href="/help">Contact support</a>.</p>
         ) : categories.length === 0 ? (

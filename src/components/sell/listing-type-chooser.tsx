@@ -10,9 +10,11 @@ import { SellForm } from "@/components/sell/sell-form";
 type Kind = "SALE" | "SERVICE" | "AUCTION";
 
 const options = [
-  { kind: "SALE" as const, title: "Sell an item", summary: "Post a fixed price and negotiate with buyers.", icon: Tag },
-  ...(PUBLIC_AUCTIONS_ENABLED ? [{ kind: "AUCTION" as const, title: "Start an auction", summary: "Set a timed bidding window and auction rules.", icon: Gavel }] : []),
-  { kind: "SERVICE" as const, title: "Offer a service", summary: "Let clients hire you and leave verified reviews.", icon: BriefcaseBusiness },
+  { kind: "SALE" as const, title: "Sell an item", summary: "Fixed price", icon: Tag },
+  ...(PUBLIC_AUCTIONS_ENABLED
+    ? [{ kind: "AUCTION" as const, title: "Start an auction", summary: "Timed bids", icon: Gavel }]
+    : []),
+  { kind: "SERVICE" as const, title: "Offer a service", summary: "Get hired", icon: BriefcaseBusiness },
 ];
 
 export function ListingTypeChooser({ categories, defaultLocation }: {
@@ -21,22 +23,31 @@ export function ListingTypeChooser({ categories, defaultLocation }: {
 }) {
   const [kind, setKind] = useState<Kind>("SALE");
   return (
-    <div className="space-y-6">
-      <div className={`grid gap-3 ${PUBLIC_AUCTIONS_ENABLED ? "sm:grid-cols-3" : "sm:grid-cols-2"}`} role="group" aria-label="Choose listing type">
-        {options.map(({ kind: option, title, summary, icon: Icon }) => (
-          <button key={option} type="button" onClick={() => setKind(option)}
-            aria-pressed={option === kind}
-            className={cn(
-              "rounded-xl border p-4 text-left transition-colors hover:border-primary/50",
-              "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
-              kind === option ? "border-primary bg-primary/5 shadow-sm" : "bg-card"
-            )}>
-            <Icon className="mb-3 size-5 text-primary" aria-hidden />
-            <span className="block font-semibold">{title}</span>
-            <span className="mt-1 block text-xs leading-5 text-muted-foreground">{summary}</span>
-          </button>
-        ))}
+    <div className="space-y-4 sm:space-y-5">
+      <div role="group" aria-label="Choose listing type" className="space-y-2">
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">What are you posting?</p>
+        <div className={"grid gap-2.5 " + (PUBLIC_AUCTIONS_ENABLED ? "grid-cols-2 sm:grid-cols-3" : "grid-cols-2")}>
+          {options.map(({ kind: option, title, summary, icon: Icon }) => (
+            <button key={option} type="button" onClick={() => setKind(option)}
+              aria-pressed={option === kind} data-testid={"listing-kind-" + option.toLowerCase()}
+              className={cn(
+                "flex min-h-20 min-w-0 items-center gap-2.5 rounded-xl border px-3 py-3 text-left shadow-xs transition-[border-color,box-shadow,background-color] hover:border-primary/60 hover:shadow-sm",
+                "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring sm:px-4",
+                kind === option ? "border-primary/75 bg-primary/5 ring-1 ring-primary/20" : "border-border/80 bg-card"
+              )}>
+              <span className={cn(
+                "grid size-9 shrink-0 place-items-center rounded-lg border",
+                kind === option ? "border-primary/25 bg-primary/10 text-primary" : "border-border/80 bg-muted/50 text-muted-foreground"
+              )}><Icon className="size-4" aria-hidden /></span>
+              <span className="min-w-0">
+                <span className="block text-sm font-semibold leading-5 text-foreground">{title}</span>
+                <span className="mt-0.5 block text-xs text-muted-foreground">{summary}</span>
+              </span>
+            </button>
+          ))}
+        </div>
       </div>
+
       {kind === "AUCTION" ? (
         <div className="space-y-4">
           <p className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm text-muted-foreground">
