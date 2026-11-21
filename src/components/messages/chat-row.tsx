@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Archive, Bell, BellOff, Flag, LogIn, LogOut, Mail, MailOpen, MessageCircle, MoreHorizontal, Pin, PinOff, Trash2 } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -16,11 +15,10 @@ export function ChatRow({ id, userId, name, pinned, muted, archived, leftBy, unr
   id: string; userId: string; name: string; pinned: boolean; muted: boolean; archived: boolean;
   leftBy: string | null; unread: boolean; children: ReactNode;
 }) {
-  const router = useRouter();
   const [panel, setPanel] = useState<Panel | null>(null);
   const [reason, setReason] = useState("");
   const [error, setError] = useState("");
-  const [busy, start] = useTransition();
+  const [busy, setBusy] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
   const press = useRef<{ x: number; y: number; timer: number } | null>(null);
   const held = useRef(false);
@@ -33,22 +31,26 @@ export function ChatRow({ id, userId, name, pinned, muted, archived, leftBy, unr
   useEffect(() => cancelPress, []);
   function openMenu() {
     cancelPress();
+    if (busy) return;
     setError("");
     setPanel("menu");
   }
-  function act(action: ChatAction | "report", success: string) {
+  async function act(action: ChatAction | "report", success: string) {
+    if (busy) return;
+    setBusy(true);
     setError("");
-    start(async () => {
-      try {
-        const problem = action === "report" ? await reportChat(id, reason) : await updateChat(id, action);
-        if (problem) { setError(problem); return; }
-        if (bubble.id === id && (action === "delete" || action === "leave")) bubble.save(null);
-        setPanel(null);
-        setReason("");
-        toast.success(success);
-        router.refresh();
-      } catch { setError("Couldn’t save this change. Please try again."); }
-    });
+    try {
+      const problem = action === "report" ? await reportChat(id, reason) : await updateChat(id, action);
+      if (problem) { setError(problem); return; }
+      if (bubble.id === id && (action === "delete" || action === "leave")) bubble.save(null);
+      setPanel(null);
+      setReason("");
+      toast.success(success);
+    } catch {
+      setError("Couldn’t save this change. Please try again.");
+    } finally {
+      setBusy(false);
+    }
   }
   const options = [
     { icon: unread ? MailOpen : Mail, label: unread ? "Mark as read" : "Mark as unread", run: () => act(unread ? "read" : "unread", unread ? "Chat marked as read" : "Chat marked as unread") },
@@ -84,7 +86,7 @@ export function ChatRow({ id, userId, name, pinned, muted, archived, leftBy, unr
         }}>
         {children}
       </div>
-      <Button ref={trigger} size="icon" variant="ghost" className="size-11 shrink-0" onClick={openMenu}
+      <Button ref={trigger} disabled={busy} size="icon" variant="ghost" className="size-11 shrink-0" onClick={openMenu}
         aria-haspopup="dialog" aria-label={`Chat options for ${name}`}><MoreHorizontal aria-hidden /></Button>
       <Dialog open={panel !== null} onOpenChange={open => { if (!open && !busy) setPanel(null); }}>
         <DialogContent onCloseAutoFocus={event => { event.preventDefault(); trigger.current?.focus(); }}
@@ -106,6 +108,7 @@ export function ChatRow({ id, userId, name, pinned, muted, archived, leftBy, unr
             </Button>
             <Button variant="outline" disabled={busy} onClick={() => { setPanel("menu"); setError(""); }}>Back</Button>
           </div>}
+          {busy && panel === "menu" && <p role="status" className="text-sm text-muted-foreground">Saving…</p>}
           {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
         </DialogContent>
       </Dialog>
