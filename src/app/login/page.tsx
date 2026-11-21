@@ -2,8 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { safeNext } from "@/lib/safe-next";
-import { LoginForm } from "@/components/auth/login-form";
-import { AuthShell } from "@/components/auth/auth-shell";
+import { LoginExperience } from "@/components/auth/login-experience";
 
 export const metadata: Metadata = {
   title: "Sign in",
@@ -35,12 +34,6 @@ export default async function LoginPage({
       : undefined;
 
   return (
-    <AuthShell
-      eyebrow="Zimbabwe marketplace"
-      title="Find it here. Buy it locally."
-      description="Post items for sale, manage your listings and keep track of what you’ve saved."
-    >
-      <LoginForm redirectTo={redirectTo} initialError={callbackFailed} />
-    </AuthShell>
+    <LoginExperience redirectTo={redirectTo} initialError={callbackFailed} />
   );
 }
