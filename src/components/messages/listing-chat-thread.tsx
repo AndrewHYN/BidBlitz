@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ReportDialog } from "@/components/auction/report-dialog";
 import { UserAvatar } from "@/components/profile/user-avatar";
 import { markListingChatReadAction, sendListingChatAction } from "@/server/actions/listing-chat";
+import { updateChat } from "@/server/actions/chat-controls";
 import { ChatReceipt } from "./chat-status";
 import { chatMediaType } from "@/lib/chat-media";
 import { ChatMediaPicker, ChatMediaPreview, type ChatMediaStatus } from "./chat-media-picker";
@@ -26,12 +27,13 @@ export type ListingChatMessage = {
 const dayLabel = new Intl.DateTimeFormat("en-ZW", { day: "numeric", month: "short", year: "numeric", timeZone: "Africa/Harare" });
 const timeLabel = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Africa/Harare" });
 
-export function ListingChatThread({ conversationId, viewerId, initial, peerName, peerAvatarPath, peerOnline }: {
+export function ListingChatThread({ conversationId, viewerId, initial, peerName, peerAvatarPath, peerOnline, leftBy }: {
   conversationId: string;
   viewerId: string;
   initial: ListingChatMessage[];
   peerName: string;
   peerOnline: boolean;
+  leftBy: string | null;
   peerAvatarPath?: string | null;
 }) {
   const router = useRouter();
@@ -65,6 +67,9 @@ export function ListingChatThread({ conversationId, viewerId, initial, peerName,
       .on("postgres_changes", {
         event: "UPDATE", schema: "public", table: "listing_messages",
         filter: `conversation_id=eq.${conversationId}`,
+      }, () => router.refresh())
+      .on("postgres_changes", {
+        event: "UPDATE", schema: "public", table: "listing_conversations", filter: `id=eq.${conversationId}`,
       }, () => router.refresh())
       .subscribe();
     const refresh = () => {
@@ -184,7 +189,14 @@ export function ListingChatThread({ conversationId, viewerId, initial, peerName,
           })}
         </ol>
       </div>
-      <form method="post" onSubmit={send} className="shrink-0 border-t bg-card px-3 py-2.5 sm:px-5">
+      {leftBy ? <div role="status" className="shrink-0 space-y-2 border-t bg-card p-4 text-center text-sm">
+        <p>{leftBy === viewerId ? "You left this chat. Rejoin to exchange messages again." : `${peerName} left the chat. Replies are paused until they rejoin.`}</p>
+        {leftBy === viewerId && <Button variant="outline" disabled={pending} onClick={() => startTransition(async () => {
+          try { const problem = await updateChat(conversationId, "rejoin"); setError(problem); if (!problem) router.refresh(); }
+          catch { setError("Couldn’t reopen this chat. Try again."); }
+        })}>Rejoin chat</Button>}
+        {error && <p role="alert" className="text-destructive">{error}</p>}
+      </div> : <form method="post" onSubmit={send} className="shrink-0 border-t bg-card px-3 py-2.5 sm:px-5">
         {mediaStatus === "preparing" && <p role="status" className="mb-2 text-sm text-muted-foreground">Preparing attachment…</p>}
         {mediaStatus === "starting" && <p role="status" className="mb-2 text-sm text-muted-foreground">Waiting for microphone permission…</p>}
         {mediaStatus === "recording" && <RecordingIndicator />}
@@ -206,7 +218,7 @@ export function ListingChatThread({ conversationId, viewerId, initial, peerName,
         </div>
         {body.length >= 1800 && <p className="mt-1 text-xs text-muted-foreground">{body.length}/2000</p>}
         {error && <p role="alert" className="mt-1 text-sm text-destructive">{error}</p>}
-      </form>
+      </form>}
     </>
   );
 }

@@ -14,6 +14,7 @@ async function signedIn() {
   return { supabase, user };
 }
 function failure(message?: string): DealError {
+  if (message === "chat_closed") return { ok: false, message: "Someone left this chat. They must rejoin before you can start a new offer or request." };
   if (message?.includes("rate_limited")) return { ok: false, message: "Too many requests. Try again later." };
   if (message?.includes("already") || message?.includes("duplicate")) return { ok: false, message: "This request has already been decided." };
   return { ok: false, message: "This action is not available. Check the listing status and try again." };

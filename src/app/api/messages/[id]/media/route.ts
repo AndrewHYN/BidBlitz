@@ -44,7 +44,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const { data: { user } } = await db.auth.getUser();
   if (!user) return reply("Sign in to send attachments.", 401);
   const { data: thread } = await db.from("listing_conversations")
-    .select("listing_id,buyer_id,seller_id").eq("id", id).maybeSingle();
+    .select("listing_id,buyer_id,seller_id,left_by").eq("id", id).maybeSingle();
   if (!thread || ![thread.buyer_id, thread.seller_id].includes(user.id)) return reply("Conversation unavailable.", 404);
 
   const retryKey = request.headers.get("idempotency-key");
@@ -59,6 +59,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (existing.error) return reply("Couldn’t check delivery. Try again.", 503);
   }
 
+  if (thread.left_by) return reply("Someone left this chat. Attachments are paused.", 409);
   const admin = createAdminClient();
   const { error: reservation } = await admin.rpc("reserve_listing_chat_upload", {
     p_conversation_id: id, p_sender_id: user.id,
@@ -105,6 +106,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (result.error) return reply("Couldn’t confirm delivery. Check the conversation before resending.", 502);
     if (!result.data) {
       await bucket.remove([path]);
+      if (send.message === "chat_closed") return reply("Someone left this chat. Attachments are paused.", 409);
       return send.message === "rate_limited"
         ? reply("Too many messages. Try again later.", 429)
         : reply("Couldn’t send the attachment. Try again.", 502);

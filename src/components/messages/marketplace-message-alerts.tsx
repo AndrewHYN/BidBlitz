@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { ChatBubble } from "./chat-bubble";
 import Link from "next/link";
 import { MessageCircle } from "lucide-react";
 import { toast } from "sonner";
@@ -101,5 +102,5 @@ export function MarketplaceMessageAlerts({ userId }: { userId: string }) {
     };
   }, [userId, pathname, router]);
 
-  return null;
+  return <ChatBubble userId={userId} />;
 }

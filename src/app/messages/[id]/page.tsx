@@ -31,7 +31,7 @@ export default async function ListingConversationPage({
 
   // RLS filters out conversations not belonging to this user.
   const { data: chat } = await supabase.from("listing_conversations")
-    .select("id, listing_id, buyer_id, seller_id").eq("id", id).maybeSingle();
+    .select("id, listing_id, buyer_id, seller_id, left_by").eq("id", id).maybeSingle();
   if (!chat) notFound();
 
   const otherId = chat.seller_id === user.id ? chat.buyer_id : chat.seller_id;
@@ -86,7 +86,7 @@ export default async function ListingConversationPage({
       </Link>
       <MarketplaceDealPanels viewerId={user.id} offers={offers ?? []} hires={hires ?? []}
         reviewedRequestIds={(existingReviews ?? []).map((review) => review.request_id)} />
-      <ListingChatThread key={chat.id} conversationId={chat.id} viewerId={user.id} initial={ordered} peerOnline={isChatPeerOnline(lastSeen, now)}
+      <ListingChatThread key={chat.id} leftBy={chat.left_by} conversationId={chat.id} viewerId={user.id} initial={ordered} peerOnline={isChatPeerOnline(lastSeen, now)}
         peerName={person?.display_name ?? "Marketplace member"} peerAvatarPath={person?.avatar_path} />
       <details className="shrink-0 border-t bg-card px-4 text-xs text-muted-foreground">
         <summary className="flex min-h-9 cursor-pointer list-none items-center gap-1.5 font-medium"><ShieldCheck className="size-3.5" aria-hidden /> Trading safety</summary>
