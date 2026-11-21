@@ -34,6 +34,7 @@ const csp = [
   "script-src 'self' 'unsafe-inline'",
   "style-src 'self' 'unsafe-inline'",
   "font-src 'self' data:",
+  `media-src 'self' blob: ${supabaseOrigin}`.trim(),
   `img-src 'self' data: blob: ${supabaseOrigin}`.trim(),
   `connect-src 'self' ${supabaseOrigin} ${supabaseSocket}`.trim(),
   "worker-src 'self' blob:",
@@ -45,7 +46,7 @@ const securityHeaders = [
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "X-Frame-Options", value: "DENY" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=()" },
+  { key: "Permissions-Policy", value: "camera=(), microphone=(self), geolocation=(), payment=()" },
   { key: "X-DNS-Prefetch-Control", value: "off" },
   ...(process.env.NODE_ENV === "production"
     ? [{ key: "Strict-Transport-Security", value: "max-age=15552000" }]

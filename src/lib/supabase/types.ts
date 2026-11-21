@@ -405,7 +405,7 @@ export interface Database {
       listing_messages: {
         Row: {
           id: string; conversation_id: string; sender_id: string; body: string;
-          created_at: string; read_at: string | null;
+          created_at: string; read_at: string | null; attachment_kind: "image" | "audio" | null;
         };
         Insert: never;
         Update: never;
