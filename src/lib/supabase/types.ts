@@ -453,6 +453,11 @@ export interface Database {
         Args: { p_conversation_id: string; p_body: string };
         Returns: string;
       };
+      touch_marketplace_presence: { Args: Record<string, never>; Returns: undefined };
+      listing_chat_peer_presence: {
+        Args: { p_conversation_ids: string[] };
+        Returns: { conversation_id: string; last_seen_at: string }[];
+      };
       mark_listing_conversation_read: {
         Args: { p_conversation_id: string };
         Returns: number;

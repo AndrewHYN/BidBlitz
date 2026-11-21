@@ -1,3 +1,4 @@
+import { ChatPresence, isChatPeerOnline } from "@/components/messages/chat-status";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -34,7 +35,7 @@ export default async function ListingConversationPage({
   if (!chat) notFound();
 
   const otherId = chat.seller_id === user.id ? chat.buyer_id : chat.seller_id;
-  const [{ data: listing }, { data: person }, { data: messages }, { data: offers }, { data: hires }] = await Promise.all([
+  const [{ data: listing }, { data: person }, { data: messages }, { data: offers }, { data: hires }, { data: presence }] = await Promise.all([
     supabase.from("auctions").select("id, title, status, auction_images(storage_path)").eq("id", chat.listing_id)
       .order("position", { referencedTable: "auction_images" }).limit(1, { referencedTable: "auction_images" }).maybeSingle(),
     supabase.from("profiles").select("display_name, username, avatar_path").eq("id", otherId).maybeSingle(),
@@ -46,12 +47,17 @@ export default async function ListingConversationPage({
       .eq("conversation_id", chat.id).order("created_at", { ascending: false }).limit(30),
     supabase.from("service_requests").select("id,details,status,client_id,provider_id,created_at")
       .eq("conversation_id", chat.id).order("created_at", { ascending: false }).limit(30),
+    supabase.rpc("listing_chat_peer_presence", { p_conversation_ids: [chat.id] }),
   ]);
   const requestIds = (hires ?? []).map((request) => request.id);
   const { data: existingReviews } = requestIds.length
     ? await supabase.from("service_reviews").select("request_id").in("request_id", requestIds)
     : { data: [] as { request_id: string }[] };
 
+  // Snapshot the clock once per server request for presence and local dates.
+  // eslint-disable-next-line react-hooks/purity
+  const now = Date.now();
+  const lastSeen = presence?.[0]?.last_seen_at;
   const ordered = ([...(messages ?? [])].reverse()) as ListingChatMessage[];
 
   return (
@@ -63,6 +69,7 @@ export default async function ListingConversationPage({
         <UserAvatar name={person?.display_name ?? "Marketplace member"} avatarPath={person?.avatar_path} pixelSize={48} className="size-10 shrink-0" />
         <div className="min-w-0 flex-1">
           <h1 className="truncate text-base leading-snug font-bold">{person?.display_name ?? "Marketplace member"}</h1>
+          <ChatPresence lastSeen={lastSeen} now={now} />
           {person?.username && <Link href={`/profile/${person.username}`} className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground hover:underline">View profile and reviews <ChevronRight className="size-3.5" aria-hidden /></Link>}
         </div>
         <ReportDialog compact userId={otherId} username={person?.username ?? "member"} />
@@ -79,7 +86,7 @@ export default async function ListingConversationPage({
       </Link>
       <MarketplaceDealPanels viewerId={user.id} offers={offers ?? []} hires={hires ?? []}
         reviewedRequestIds={(existingReviews ?? []).map((review) => review.request_id)} />
-      <ListingChatThread key={chat.id} conversationId={chat.id} viewerId={user.id} initial={ordered}
+      <ListingChatThread key={chat.id} conversationId={chat.id} viewerId={user.id} initial={ordered} peerOnline={isChatPeerOnline(lastSeen, now)}
         peerName={person?.display_name ?? "Marketplace member"} peerAvatarPath={person?.avatar_path} />
       <details className="shrink-0 border-t bg-card px-4 text-xs text-muted-foreground">
         <summary className="flex min-h-9 cursor-pointer list-none items-center gap-1.5 font-medium"><ShieldCheck className="size-3.5" aria-hidden /> Trading safety</summary>

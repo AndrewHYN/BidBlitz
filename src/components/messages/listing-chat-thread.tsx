@@ -2,12 +2,14 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Check, CheckCheck, Send, MessageCircle } from "lucide-react";
+import { Send, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ReportDialog } from "@/components/auction/report-dialog";
 import { UserAvatar } from "@/components/profile/user-avatar";
 import { markListingChatReadAction, sendListingChatAction } from "@/server/actions/listing-chat";
+import { ChatReceipt } from "./chat-status";
+import { chatMediaType } from "@/lib/chat-media";
 import { ChatMediaPicker, ChatMediaPreview } from "./chat-media-picker";
 import { createClient } from "@/lib/supabase/client";
 
@@ -23,17 +25,19 @@ export type ListingChatMessage = {
 const dayLabel = new Intl.DateTimeFormat("en-ZW", { day: "numeric", month: "short", year: "numeric", timeZone: "Africa/Harare" });
 const timeLabel = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Africa/Harare" });
 
-export function ListingChatThread({ conversationId, viewerId, initial, peerName, peerAvatarPath }: {
+export function ListingChatThread({ conversationId, viewerId, initial, peerName, peerAvatarPath, peerOnline }: {
   conversationId: string;
   viewerId: string;
   initial: ListingChatMessage[];
   peerName: string;
+  peerOnline: boolean;
   peerAvatarPath?: string | null;
 }) {
   const router = useRouter();
   const [body, setBody] = useState("");
   const [file, setFile] = useState<File | null>(null);
-  const [recording, setRecording] = useState(false);
+  const [recording, setRecording] = useState<"idle" | "starting" | "recording">("idle");
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const busy = useRef(false);
@@ -90,7 +94,7 @@ export function ListingChatThread({ conversationId, viewerId, initial, peerName,
 
   function send(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (busy.current || recording) return;
+    if (busy.current || recording !== "idle") return;
     const text = body.trim();
     if (!text && !file) return setError("Write a message first.");
     busy.current = true;
@@ -98,12 +102,10 @@ export function ListingChatThread({ conversationId, viewerId, initial, peerName,
     startTransition(async () => {
       try {
         if (file) {
-          const response = await fetch(`/api/messages/${conversationId}/media`, {
-            method: "POST", headers: { "Content-Type": file.type }, body: file,
-          });
-          if (!response.ok) {
-            const result = await response.json().catch(() => null);
-            setError(result?.message ?? "Couldn’t send the attachment. Try again.");
+          setUploadProgress(0);
+          const problem = await uploadAttachment(conversationId, file, setUploadProgress);
+          if (problem) {
+            setError(problem);
             return;
           }
           setFile(null);
@@ -120,6 +122,7 @@ export function ListingChatThread({ conversationId, viewerId, initial, peerName,
       } catch {
         setError("We couldn't send your message. Try again.");
       } finally {
+        setUploadProgress(null);
         busy.current = false;
       }
     });
@@ -157,7 +160,7 @@ export function ListingChatThread({ conversationId, viewerId, initial, peerName,
                     ) : <p className="whitespace-pre-wrap text-[0.9375rem] leading-relaxed [overflow-wrap:anywhere]">{message.body}</p>}
                     <div className={`mt-1 flex items-center justify-end gap-1.5 text-[0.6875rem] tabular-nums ${mine ? "text-blue-100" : "text-muted-foreground"}`}>
                       <time dateTime={message.created_at} title={day}>{timeLabel.format(date)}</time>
-                      {mine && <span className="inline-flex items-center gap-1">{message.read_at ? <CheckCheck className="size-3.5" aria-hidden /> : <Check className="size-3.5" aria-hidden />}{message.read_at ? "Seen" : "Sent"}</span>}
+                      {mine && <ChatReceipt seen={Boolean(message.read_at)} peerOnline={peerOnline} inBubble />}
                     </div>
                   </div>
                   {!mine && <ReportDialog compact messageId={message.id} />}
@@ -168,13 +171,21 @@ export function ListingChatThread({ conversationId, viewerId, initial, peerName,
         </ol>
       </div>
       <form method="post" onSubmit={send} className="shrink-0 border-t bg-card px-3 py-2.5 sm:px-5">
+        {recording === "starting" && <p role="status" className="mb-2 text-sm text-muted-foreground">Waiting for microphone permission…</p>}
+        {recording === "recording" && <RecordingIndicator />}
+        {uploadProgress !== null && file && (
+          <div className="mb-2 space-y-1 text-sm">
+            <p role="status">{uploadProgress === 100 ? "Sending attachment…" : chatMediaType(file.type)?.kind === "image" ? "Uploading photo…" : "Uploading audio…"}</p>
+            <progress aria-label="Attachment upload progress" max={100} value={uploadProgress} className="block h-2 w-full accent-blue-600" />
+          </div>
+        )}
         {file && <ChatMediaPreview file={file} disabled={pending} onRemove={() => setFile(null)} />}
         <label htmlFor="listing-chat-body" className="sr-only">Reply</label>
         <div className="flex items-end gap-1 sm:gap-2">
           <ChatMediaPicker file={file} disabled={pending} onFile={setFile} onError={setError} onRecording={setRecording} />
           <Textarea id="listing-chat-body" value={body} onChange={event => setBody(event.target.value.slice(0, 2000))}
             maxLength={2000} rows={1} placeholder="Write a message…" className="max-h-28 min-h-11 min-w-0 flex-1 resize-none" />
-          <Button type="submit" size="icon" className="size-11 rounded-xl" title={file ? "Send attachment" : "Send message"} aria-label={file ? "Send attachment" : "Send message"} disabled={pending || recording || (!file && !body.trim())} aria-busy={pending}>
+          <Button type="submit" size="icon" className="size-11 rounded-xl" title={file ? "Send attachment" : "Send message"} aria-label={file ? "Send attachment" : "Send message"} disabled={pending || recording !== "idle" || (!file && !body.trim())} aria-busy={pending}>
             <Send className="size-5" aria-hidden />
           </Button>
         </div>
@@ -183,4 +194,40 @@ export function ListingChatThread({ conversationId, viewerId, initial, peerName,
       </form>
     </>
   );
+}
+
+function RecordingIndicator() {
+  const [seconds, setSeconds] = useState(0);
+  useEffect(() => {
+    const start = Date.now();
+    const tick = window.setInterval(() => setSeconds(Math.min(60, Math.floor((Date.now() - start) / 1000))), 250);
+    return () => window.clearInterval(tick);
+  }, []);
+  return (
+    <div className="mb-2 flex items-center justify-between rounded-lg border border-destructive/30 px-3 py-2 text-sm text-destructive">
+      <span role="status" className="inline-flex items-center gap-2">
+        <span className="size-2 rounded-full bg-destructive motion-safe:animate-pulse" aria-hidden /> Recording voice
+      </span>
+      <span className="tabular-nums">{Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, "0")}</span>
+    </div>
+  );
+}
+
+function uploadAttachment(conversationId: string, file: File, onProgress: (percent: number) => void) {
+  return new Promise<string | null>((resolve) => {
+    const request = new XMLHttpRequest();
+    request.open("POST", `/api/messages/${conversationId}/media`);
+    request.setRequestHeader("Content-Type", file.type);
+    request.timeout = 90_000;
+    request.upload.onprogress = (event) => {
+      if (event.lengthComputable) onProgress(Math.floor(event.loaded / event.total * 100));
+    };
+    request.upload.onload = () => onProgress(100);
+    request.responseType = "json";
+    request.onload = () => resolve(request.status >= 200 && request.status < 300
+      ? null
+      : request.response?.message ?? "Couldn’t send the attachment. Try again.");
+    request.onerror = request.ontimeout = request.onabort = () => resolve("Couldn’t confirm the upload. Check the chat before retrying.");
+    request.send(file);
+  });
 }
