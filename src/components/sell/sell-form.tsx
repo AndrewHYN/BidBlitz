@@ -13,6 +13,8 @@ import {
 } from "@/lib/validation";
 import { formatMoney, money, parseMoneyToMinor, feePercentLabel } from "@/lib/money";
 import { renderRejectionMessage } from "@/server/errors";
+import { CategoryPicker } from "@/components/sell/category-picker";
+import type { CategoryOption } from "@/lib/category-taxonomy";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -35,7 +37,6 @@ import {
  * field-level feedback; the action's `fieldErrors` win if they disagree.
  */
 
-type CategoryOption = { id: number; name: string };
 type IssueMap = Record<string, string[]>;
 
 const NO_SELECTION = "";
@@ -249,23 +250,7 @@ export function SellForm({
         <div className="grid gap-5 sm:grid-cols-2">
           <div className="space-y-1.5">
             <Label htmlFor="sell-category">Category</Label>
-            <Select value={categoryId} onValueChange={setCategoryId}>
-              <SelectTrigger
-                id="sell-category"
-                aria-invalid={errors.categoryId ? true : undefined}
-                data-testid="sell-category"
-                className="w-full"
-              >
-                <SelectValue placeholder="Select a category" />
-              </SelectTrigger>
-              <SelectContent>
-                {categories.map((category) => (
-                  <SelectItem key={category.id} value={String(category.id)}>
-                    {category.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <CategoryPicker categories={categories} value={categoryId} onChange={setCategoryId}\n              titleHint={title} kind="AUCTION" invalid={Boolean(errors.categoryId)} />
             <FieldError messages={errors.categoryId} />
           </div>
 
