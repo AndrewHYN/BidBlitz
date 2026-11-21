@@ -10,11 +10,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { parseMoneyToMinor } from "@/lib/money";
 import { CONDITIONS, conditionLabels, FULFILMENT_METHODS, fulfilmentMethodLabels } from "@/lib/validation";
 import { createDirectListingAction } from "@/server/actions/auction";
+import { CategoryPicker } from "@/components/sell/category-picker";
 
 const selectClass = "h-10 w-full rounded-md border bg-background px-3 text-sm focus-visible:outline-2 focus-visible:outline-ring";
 
 export function DirectListingForm({ categories, listingKind = "SALE", defaultLocation = "" }: {
-  categories: { id: number; name: string }[];
+  categories: { id: number; name: string; slug: string }[];
   listingKind?: "SALE" | "SERVICE";
   defaultLocation?: string;
 }) {
@@ -22,12 +23,18 @@ export function DirectListingForm({ categories, listingKind = "SALE", defaultLoc
   const [pending, startTransition] = useTransition();
   const [errors, setErrors] = useState<Record<string, string[]>>({});
   const [message, setMessage] = useState("");
+  const [categoryId, setCategoryId] = useState("");
+  const [title, setTitle] = useState("");
 
   function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setErrors({});
     setMessage("");
 
+    if (!categoryId) {
+      setErrors({ categoryId: ["Choose a category before continuing."] });
+      return;
+    }
     const fields = new FormData(event.currentTarget);
     const price = parseMoneyToMinor(String(fields.get("price") ?? ""));
     startTransition(async () => {
@@ -36,7 +43,7 @@ export function DirectListingForm({ categories, listingKind = "SALE", defaultLoc
           listingKind,
           title: fields.get("title"),
           description: fields.get("description"),
-          categoryId: fields.get("categoryId"),
+          categoryId,
           condition: fields.get("condition"),
           location: fields.get("location"),
           fulfilmentMethod: fields.get("fulfilmentMethod"),
@@ -67,7 +74,7 @@ export function DirectListingForm({ categories, listingKind = "SALE", defaultLoc
     <form method="post" onSubmit={submit} data-testid="sell-form" className="space-y-6 rounded-xl border bg-card p-5 sm:p-7">
       <div className="space-y-2">
         <Label htmlFor="sell-title">{listingKind === "SERVICE" ? "Service title" : "Item title"}</Label>
-        <Input id="sell-title" name="title" data-testid="sell-title" required minLength={3} maxLength={120} placeholder={listingKind === "SERVICE" ? "e.g. Mobile phone repair in Harare" : "e.g. Lenovo ThinkPad T480, 16GB RAM"} />
+        <Input id="sell-title" name="title" data-testid="sell-title" value={title} onChange={(event) => setTitle(event.target.value)} required minLength={3} maxLength={120} placeholder={listingKind === "SERVICE" ? "e.g. Mobile phone repair in Harare" : "e.g. Lenovo ThinkPad T480, 16GB RAM"} />
         {error("title")}
       </div>
 
@@ -80,10 +87,9 @@ export function DirectListingForm({ categories, listingKind = "SALE", defaultLoc
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="sell-category">Category</Label>
-          <select id="sell-category" name="categoryId" data-testid="sell-category" className={selectClass} required defaultValue="">
-            <option value="" disabled>Choose a category</option>
-            {categories.map(({ id, name }) => <option key={id} value={id}>{name}</option>)}
-          </select>
+          <CategoryPicker categories={categories} value={categoryId} onChange={setCategoryId}
+            titleHint={title} kind={listingKind} invalid={Boolean(errors.categoryId)} />
+          <input type="hidden" name="categoryId" value={categoryId} />
           {error("categoryId")}
         </div>
         {listingKind === "SERVICE" ? (
