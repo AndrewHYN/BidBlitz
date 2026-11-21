@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { ArrowRight, Eye, EyeOff, LockKeyhole, Mail, UserRoundPlus } from "lucide-react";
 import { useRef, useState, useTransition } from "react";
 import { signInAction, requestEmailLoginCodeAction, verifyEmailLoginCodeAction } from "@/server/actions/auth";
 import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
@@ -50,6 +51,7 @@ export function LoginForm({
   // exactly what turns an ordinary sign-in into a self-inflicted rate limit.
   const [, startTransition] = useTransition();
   const [submitting, setSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const busyRef = useRef(false);
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -177,39 +179,15 @@ export function LoginForm({
     <form
       onSubmit={handleSubmit}
       ref={formRef}
-      /*
-       * Declared POST on purpose. This form is driven by a server action
-       * through onSubmit, so it is not designed to work without JavaScript —
-       * but "not designed to" is not "impossible": a user on a slow connection
-       * who submits before hydration gets the browser's NATIVE submit, and a
-       * form with no method defaults to GET, which puts the email AND the
-       * password into the URL — into browser history, into proxy and access
-       * logs, and into the Referer of the next navigation.
-       *
-       * POST means an un-hydrated submit fails visibly instead of leaking. Once
-       * hydrated, onSubmit calls preventDefault and this attribute is never
-       * consulted.
-       */
+      // Native fallback must POST so credentials are never serialized into a URL.
       method="post"
       data-testid="login-form"
       data-hydrated={hydrated ? "true" : undefined}
-      className="space-y-5"
+      className="space-y-4 sm:space-y-5"
     >
-      <div className="mb-7 space-y-2">
-        <h1 className="text-3xl font-bold tracking-tight text-balance">
-          Welcome back
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Sign in to bid, sell and track your auctions.
-        </p>
-      </div>
-
       {error && mode === "password" && (
-        <div
-          data-testid="auth-error"
-          role="alert"
-          className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-        >
+        <div data-testid="auth-error" role="alert"
+          className="rounded-xl border border-red-400/40 bg-red-500/10 px-4 py-3 text-sm text-red-200">
           {error}
         </div>
       )}
@@ -218,14 +196,16 @@ export function LoginForm({
         <>
           <GoogleSignInButton next={redirectTo} />
 
-          <div className="flex items-center gap-3" aria-hidden="true">
-            <span className="h-px flex-1 bg-border" />
-            <span className="text-xs text-muted-foreground">or sign in with email</span>
-            <span className="h-px flex-1 bg-border" />
+          <div className="flex items-center gap-3 py-1" aria-hidden="true">
+            <span className="h-px flex-1 bg-[#50637F]/60" />
+            <span className="shrink-0 text-xs text-slate-400">or sign in with email</span>
+            <span className="h-px flex-1 bg-[#50637F]/60" />
           </div>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="login-email">Email</Label>
+          <div className="space-y-2">
+            <Label htmlFor="login-email" className="gap-2 text-sm font-semibold text-slate-100">
+              <Mail className="size-4 text-amber-300" aria-hidden /> Email
+            </Label>
             <Input
               id="login-email"
               name="email"
@@ -237,38 +217,53 @@ export function LoginForm({
             />
           </div>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="login-password">Password</Label>
-            <Input
-              id="login-password"
-              name="password"
-              type="password"
-              autoComplete="current-password"
-              required
-              data-testid="password-field"
-            />
+          <div className="space-y-2">
+            <Label htmlFor="login-password" className="gap-2 text-sm font-semibold text-slate-100">
+              <LockKeyhole className="size-4 text-amber-300" aria-hidden /> Password
+            </Label>
+            <div className="relative">
+              <Input
+                id="login-password"
+                name="password"
+                type={showPassword ? "text" : "password"}
+                autoComplete="current-password"
+                required
+                className="pr-14"
+                data-testid="password-field"
+              />
+              <button
+                type="button"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                aria-pressed={showPassword}
+                onClick={() => setShowPassword((current) => !current)}
+                className="absolute inset-y-0 right-0 inline-flex min-w-12 items-center justify-center rounded-r-xl text-slate-300 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-[-3px] focus-visible:outline-amber-400"
+                data-testid="toggle-password-visibility"
+              >
+                {showPassword ? <EyeOff className="size-5" aria-hidden /> : <Eye className="size-5" aria-hidden />}
+              </button>
+            </div>
           </div>
 
           <Button
             type="submit"
             size="lg"
-            className="auth-primary-action w-full"
+            className="login-primary-action h-12 w-full gap-2 rounded-xl font-bold sm:h-14"
             disabled={submitting}
             aria-busy={submitting}
             data-testid="sign-in-button"
           >
-            {submitting ? "Signing in…" : "Sign in"}
+            {submitting ? "Signing in…" : <>Sign in <ArrowRight className="size-4" aria-hidden /></>}
           </Button>
 
           <Button
             type="button"
             variant="outline"
             size="lg"
-            className="w-full"
+            className="login-secondary-action h-12 w-full gap-2 rounded-xl font-semibold sm:h-14"
             onClick={switchToOtp}
             data-testid="otp-toggle-button"
           >
-            Email me a sign-in code
+            <Mail className="size-4" aria-hidden /> Email me a sign-in code
           </Button>
         </>
       ) : (
@@ -282,24 +277,25 @@ export function LoginForm({
         />
       )}
 
-      <p className="text-center text-sm">
+      <div className="pt-1 text-center text-sm">
         <Link
           href="/forgot-password"
-          className="font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+          className="inline-flex min-h-10 items-center justify-center text-slate-300 underline-offset-4 hover:text-white hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
         >
           Forgot your password?
         </Link>
-      </p>
+      </div>
 
-      <p className="text-center text-sm text-muted-foreground">
-        New to BidBlitz?{" "}
+      <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 border-t border-[#526685]/45 pt-5 text-center text-sm">
+        <UserRoundPlus className="size-4 text-amber-300" aria-hidden />
+        <span className="text-slate-300">New to BidBlitz?</span>
         <Link
           href="/signup"
-          className="font-medium text-primary underline-offset-2 hover:underline"
+          className="inline-flex min-h-10 items-center gap-1 font-bold text-[#FFB648] underline-offset-4 hover:text-[#FFD18D] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-400"
         >
-          Create an account
+          Create an account <ArrowRight className="size-4" aria-hidden />
         </Link>
-      </p>
+      </div>
     </form>
   );
 }
@@ -321,8 +317,9 @@ function OtpLoginView({
 }) {
   return (
     <>
-      <div className="space-y-1.5">
-        <Label htmlFor="otp-email">Email</Label>
+      <div className="space-y-2">
+        <p className="text-sm leading-6 text-slate-300">Get a one-time code in your email instead of using a password.</p>
+        <Label htmlFor="otp-email" className="text-slate-100">Email</Label>
         <Input
           id="otp-email"
           name="email"
@@ -337,7 +334,7 @@ function OtpLoginView({
       {!sent ? (
         <Button
           type="submit"
-          className="w-full"
+          className="login-primary-action h-12 w-full rounded-xl font-bold"
           disabled={busy}
           aria-busy={busy}
           data-testid="send-code-button"
@@ -349,8 +346,8 @@ function OtpLoginView({
           <p data-testid="otp-sent-message" role="status" className="text-sm text-muted-foreground">
             If an account exists for that email, a 6-digit code is on its way.
           </p>
-          <div className="space-y-1.5">
-            <Label htmlFor="otp-code">6-digit code</Label>
+          <div className="space-y-2">
+            <Label htmlFor="otp-code" className="text-slate-100">6-digit code</Label>
             <Input
               id="otp-code"
               name="code"
@@ -368,7 +365,7 @@ function OtpLoginView({
           </div>
           <Button
             type="submit"
-            className="w-full"
+            className="login-primary-action h-12 w-full rounded-xl font-bold"
             disabled={busy}
             aria-busy={busy}
             data-testid="verify-code-button"
@@ -382,7 +379,7 @@ function OtpLoginView({
         <div
           data-testid="auth-error"
           role="alert"
-          className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+          className="rounded-xl border border-red-400/40 bg-red-500/10 px-4 py-3 text-sm text-red-200"
         >
           {error}
         </div>
