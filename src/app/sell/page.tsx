@@ -23,7 +23,7 @@ export default async function SellPage() {
   ]);
 
   return (
-    <main className="page-container pb-36 pt-5 sm:pb-20 sm:pt-10">
+    <div className="page-container pb-36 pt-5 sm:pb-20 sm:pt-10">
       <div className="mx-auto max-w-3xl">
         <div className="mb-5 space-y-2 sm:mb-7">
           <p className="text-xs font-bold uppercase tracking-[0.16em] text-primary">Sell on BidBlitz</p>
@@ -41,6 +41,6 @@ export default async function SellPage() {
           <ListingTypeChooser categories={categories} defaultLocation={marketplaceLocation(user.user_metadata.marketplace_location)} />
         )}
       </div>
-    </main>
+    </div>
   );
 }
