@@ -3,6 +3,7 @@ import { ArrowRight, Compass, MapPin, Search, Sparkles } from "lucide-react";
 import { AuctionCard } from "@/components/auction/auction-card";
 import { knownListingTown, suggestedSearches } from "@/lib/discovery";
 import { publicListingLocation } from "@/lib/listing-display";
+import { MARKETPLACE_TOWNS } from "@/lib/marketplace-location";
 import type { AuctionCardData } from "@/server/queries";
 
 function SearchLinks({ listings }: { listings: readonly { id: string; title: string }[] }) {
@@ -86,6 +87,13 @@ export function ListingDiscovery({
 }) {
   const town = knownListingTown(listing.location);
   const place = publicListingLocation(listing.location);
+  const coordinates = MARKETPLACE_TOWNS.find(([name]) => name === town);
+  const mapSrc = coordinates
+    ? "https://www.openstreetmap.org/export/embed.html?bbox=" +
+      (coordinates[2] - 0.12) + "," + (coordinates[1] - 0.09) + "," +
+      (coordinates[2] + 0.12) + "," + (coordinates[1] + 0.09) +
+      "&layer=mapnik&marker=" + coordinates[1] + "," + coordinates[2]
+    : null;
   return (
     <div className="mt-10 space-y-9 border-t pt-8" data-testid="listing-discovery">
       <ListingRail id="listing-related" title="More listings to explore" items={related} />
@@ -101,7 +109,10 @@ export function ListingDiscovery({
       {place !== "Location not specified" && (
         <section aria-labelledby="listing-location-heading" className="space-y-3">
           <h2 id="listing-location-heading" className="text-xl font-bold tracking-tight">Listing location</h2>
-          <div className="flex items-center gap-3 rounded-2xl border bg-card p-4 shadow-sm">
+          <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+            {mapSrc && <iframe title={"Approximate map of " + town} loading="lazy" referrerPolicy="no-referrer"
+              className="h-40 w-full border-0 sm:h-48" src={mapSrc} />}
+            <div className="flex items-center gap-3 p-4">
             <span className="grid size-12 shrink-0 place-items-center rounded-xl bg-muted text-primary">
               <MapPin className="size-6" aria-hidden />
             </span>
@@ -114,6 +125,7 @@ export function ListingDiscovery({
                 Nearby <ArrowRight aria-hidden className="ml-1 size-4" />
               </Link>
             )}
+            </div>
           </div>
         </section>
       )}
