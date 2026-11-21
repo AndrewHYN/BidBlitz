@@ -1,5 +1,6 @@
 "use client";
 
+import { getImageProps } from "next/image";
 import { useState } from "react";
 
 /**
@@ -9,8 +10,8 @@ import { useState } from "react";
  * acceptable product state — the audit rule is "broken images" get a real
  * error/empty state.
  *
- * Supabase public bucket; plain img keeps remote-pattern config out of the
- * build.
+ * For public listing photos, request a browser-selected size and retry the
+ * original object if its optimized rendition is unavailable.
  */
 export function ImageWithFallback({
   src,
@@ -18,28 +19,40 @@ export function ImageWithFallback({
   className,
   loading,
   fallback,
+  responsive,
 }: {
   src: string | null;
   alt: string;
   className?: string;
   loading?: "lazy" | "eager";
   fallback: React.ReactNode;
+  responsive?: { width: number; height: number; sizes?: string };
 }) {
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
 
+  const [failedRendition, setFailedRendition] = useState<string | null>(null);
   if (!src || failedSrc === src) return <>{fallback}</>;
+
+  const optimized = responsive && failedRendition !== src
+    ? getImageProps({ src, alt, ...responsive }).props : null;
+  function onFailure() {
+    if (optimized) setFailedRendition(src);
+    else setFailedSrc(src);
+  }
 
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      src={src}
+      sizes={optimized?.sizes}
+      srcSet={optimized?.srcSet}
+      src={optimized?.src ?? src}
       alt={alt}
       loading={loading}
       ref={node => {
         // A cached 404 can finish before React attaches its error listener.
-        if (node?.complete && node.naturalWidth === 0) setFailedSrc(src);
+        if (node?.complete && node.naturalWidth === 0) onFailure();
       }}
-      onError={() => setFailedSrc(src)}
+      onError={onFailure}
       className={className}
     />
   );

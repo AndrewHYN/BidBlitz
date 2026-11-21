@@ -438,28 +438,30 @@ export const getNotifications = cache(async (userId: string) => {
   const auctionIds = [
     ...new Set(rows.flatMap((row) => (row.auction_id ? [row.auction_id] : []))),
   ];
-  const archived = new Set<string>();
-
-  if (auctionIds.length > 0) {
-    const { data: hidden } = await supabase
-      .from("auctions")
-      .select("id")
-      .in("id", auctionIds)
-      .not("archived_at", "is", null);
-    for (const row of hidden ?? []) archived.add(row.id);
-  }
-
-  const items = rows
-    .filter((row) => row.auction_id === null || !archived.has(row.auction_id))
-    .slice(0, 50);
+  const { data: listings } = auctionIds.length ? await supabase
+    .from("auctions")
+    .select("id, listing_kind, archived_at, auction_images(position,storage_path)")
+    .in("id", auctionIds)
+    .order("position", { referencedTable: "auction_images" })
+    .limit(1, { referencedTable: "auction_images" }) : { data: [] };
+  const byId = new Map((listings ?? []).map(listing => [listing.id, listing]));
+  const items = rows.flatMap(row => {
+    const listing = row.auction_id ? byId.get(row.auction_id) : null;
+    if (listing?.archived_at) return [];
+    return [{
+      ...row,
+      listingKind: listing?.listing_kind ?? null,
+      photo: imageUrlFor(listing?.auction_images?.[0]?.storage_path),
+    }];
+  }).slice(0, 50);
 
   return {
     items,
-    unreadCount: items.filter((row) => row.read_at === null).length,
+    unreadCount: await getUnreadCount(userId).catch(() => items.filter(row => row.read_at === null).length),
   };
 });
 
-export const getUnreadCount = async (userId: string): Promise<number> => {
+export const getUnreadCount = cache(async (userId: string): Promise<number> => {
   const admin = createAdminClient();
   const { data: rows } = await admin
     .from("notifications")
@@ -484,7 +486,7 @@ export const getUnreadCount = async (userId: string): Promise<number> => {
   return unread.filter(
     (row) => row.auction_id === null || !archived.has(row.auction_id)
   ).length;
-};
+});
 
 /** Buyer view: auctions I bid on. */
 export const getBuying = cache(async (userId: string) => {

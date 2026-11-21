@@ -27,6 +27,9 @@ export default async function AdminListingReviews(){
  if(!canView)redirect("/");
  const {data,error}=await supabase.rpc("staff_listing_review_queue",{p_limit:60});
  const reviews:Review[]=Array.isArray(data)?data as Review[]:[];
+ const {data:kinds}=reviews.length ? await supabase.from("auctions")
+  .select("id,listing_kind").in("id",reviews.map(r=>r.auctionId)) : {data:[]};
+ const kindById=new Map((kinds??[]).map(row=>[row.id,row.listing_kind]));
  return <main className="page-container space-y-7 py-8 sm:py-12" data-testid="staff-listing-reviews">
   <header className="relative overflow-hidden rounded-[1.75rem] border border-orange-500/20 bg-[#151719] p-7 text-white shadow-xl sm:p-10">
    <p className="flex items-center gap-2 text-xs font-black uppercase tracking-[.2em] text-orange-300"><ClipboardCheck className="size-4" aria-hidden/> BidBlitz / Seller onboarding</p>
@@ -50,7 +53,9 @@ export default async function AdminListingReviews(){
       <BackLink href="/admin/command" className="mt-4">Back to HQ</BackLink>
      </div>:
      <ul className="grid gap-4 lg:grid-cols-2">
-      {reviews.map(r=><li key={r.reviewId} className="space-y-4 rounded-2xl border bg-card p-5 shadow-sm" data-testid="listing-review-row">
+      {reviews.map(r=>{
+       const kind=kindById.get(r.auctionId);
+       return <li key={r.reviewId} id={`review-${r.reviewId}`} className="scroll-mt-24 target:ring-2 target:ring-blue-500 space-y-4 rounded-2xl border bg-card p-5 shadow-sm" data-testid="listing-review-row">
        <div className="flex flex-wrap justify-between gap-2">
         <p className="text-xs font-black uppercase tracking-widest text-primary">{r.condition.replaceAll("_"," ")}</p>
         <time className="text-xs text-muted-foreground" dateTime={r.submittedAt}>{new Date(r.submittedAt).toLocaleString("en-US")}</time>
@@ -59,14 +64,14 @@ export default async function AdminListingReviews(){
         <p className="mt-1 text-sm text-muted-foreground">Seller: {r.sellerName} · {r.location||"Location not specified"}</p>
        </div>
        <div className="rounded-xl border bg-muted/20 p-4">
-        <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Starting bid</p>
+        <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{kind==="AUCTION" ? "Starting bid" : kind==="SERVICE" ? "Starting price" : kind==="SALE" ? "Asking price" : "Listed price"}</p>
         <p className="mt-1 text-2xl font-black tabular-nums">{formatMoney(money(r.startingMinor,"USD"))}</p>
-        <p className="mt-2 text-xs text-muted-foreground">Duration: {Math.round(r.durationSeconds/3600)} hours</p>
+        {kind==="AUCTION" && <p className="mt-2 text-xs text-muted-foreground">Duration: {Math.round(r.durationSeconds/3600)} hours</p>}
        </div>
        <p className="line-clamp-5 whitespace-pre-wrap text-sm leading-6 text-muted-foreground">{r.description}</p>
        <Link href={`/listing/${r.auctionId}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs font-bold text-primary hover:underline">Inspect listing details <ArrowRight className="size-3.5" aria-hidden/></Link>
        <ListingReviewControls reviewId={r.reviewId} canApprove={canApprove} canReject={canReject} canRequestChanges={canChanges}/>
-      </li>)}
+      </li>})}
      </ul>}
    </>}
   <p className="flex gap-2 rounded-xl border border-amber-500/20 bg-amber-500/5 p-4 text-xs leading-5">

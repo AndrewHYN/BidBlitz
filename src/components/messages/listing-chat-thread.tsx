@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Send, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { ReportDialog } from "@/components/auction/report-dialog";
 import { UserAvatar } from "@/components/profile/user-avatar";
@@ -153,10 +154,21 @@ export function ListingChatThread({ conversationId, viewerId, initial, peerName,
                     ? "rounded-br-sm bg-blue-700 text-white dark:bg-blue-800"
                     : "rounded-bl-sm border bg-card text-card-foreground"}`}>
                     {message.attachment_kind === "image" ? (
-                      <a href={`/api/messages/media/${message.id}`} target="_blank" rel="noreferrer" aria-label="Open chat photo">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={`/api/messages/media/${message.id}`} alt="Photo shared in chat" loading="lazy" className="max-h-64 w-56 max-w-full rounded-lg object-contain" />
-                      </a>
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <button type="button" aria-label="Open chat photo" className="block max-w-full cursor-zoom-in overflow-hidden rounded-lg">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={`/api/messages/media/${message.id}`} alt="Photo shared in chat" loading="lazy"
+                              className="block h-auto max-h-[min(48dvh,24rem)] w-auto max-w-[min(55vw,24rem)] object-contain" />
+                          </button>
+                        </DialogTrigger>
+                        <DialogContent aria-describedby={undefined} className="gap-2 p-3 sm:max-w-4xl">
+                          <DialogTitle className="py-2 pl-1 pr-10">Chat photo</DialogTitle>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={`/api/messages/media/${message.id}`} alt="Full photo shared in chat"
+                            className="mx-auto block h-auto max-h-[calc(100dvh-8rem)] max-w-full rounded-lg object-contain" />
+                        </DialogContent>
+                      </Dialog>
                     ) : message.attachment_kind === "audio" ? (
                       <audio controls preload="none" src={`/api/messages/media/${message.id}`} aria-label="Play audio message" className="h-10 w-64 max-w-full" />
                     ) : <p className="whitespace-pre-wrap text-[0.9375rem] leading-relaxed [overflow-wrap:anywhere]">{message.body}</p>}
