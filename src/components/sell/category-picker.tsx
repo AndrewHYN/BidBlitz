@@ -107,7 +107,7 @@ export function CategoryPicker({
       </div>
 
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="flex max-h-[calc(100dvh-1.25rem)] w-[calc(100%-1rem)] max-w-xl flex-col gap-0 overflow-hidden rounded-2xl p-0 sm:max-h-[min(80dvh,44rem)]">
+        <DialogContent className="!flex !max-h-[calc(100dvh-1.25rem)] w-[calc(100%-1rem)] max-w-xl flex-col gap-0 !overflow-hidden rounded-2xl p-0 sm:!max-h-[min(80dvh,44rem)]">
           <DialogHeader className="gap-1 px-5 pb-3 pt-5">
             <DialogTitle className="text-lg font-bold tracking-tight">Find your category</DialogTitle>
             <DialogDescription>
