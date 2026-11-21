@@ -192,7 +192,7 @@ export function ListingChatThread({ conversationId, viewerId, initial, peerName,
       {leftBy ? <div role="status" className="shrink-0 space-y-2 border-t bg-card p-4 text-center text-sm">
         <p>{leftBy === viewerId ? "You left this chat. Rejoin to exchange messages again." : `${peerName} left the chat. Replies are paused until they rejoin.`}</p>
         {leftBy === viewerId && <Button variant="outline" disabled={pending} onClick={() => startTransition(async () => {
-          try { const problem = await updateChat(conversationId, "rejoin"); setError(problem); if (!problem) router.refresh(); }
+          try { const problem = await updateChat(conversationId, "rejoin"); setError(problem); }
           catch { setError("Couldn’t reopen this chat. Try again."); }
         })}>Rejoin chat</Button>}
         {error && <p role="alert" className="text-destructive">{error}</p>}
