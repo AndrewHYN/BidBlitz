@@ -12,6 +12,7 @@ import { EmptyState } from "@/components/auction/page-header";
 import { Button } from "@/components/ui/button";
 import { HomeHero } from "@/components/home/home-hero";
 import { CategoryChips } from "@/components/home/category-chips";
+import { HomeDiscovery } from "@/components/marketplace/discovery-sections";
 
 export const metadata: Metadata = {
   title: { absolute: "Buy and Sell in Zimbabwe | BidBlitz Marketplace" },
@@ -47,6 +48,7 @@ export default async function HomePage() {
           <AuctionGrid items={listings} compact />
         )}
       </section>
+      <HomeDiscovery listings={[...listings, ...otherListings]} categories={categories} />
       {otherError && <p role="alert">Listings from other areas couldn’t load. <Link href="/browse" className="underline">Browse all listings</Link></p>}
       {otherListings.length > 0 && (
         <section aria-labelledby="other-listings" className="space-y-4">

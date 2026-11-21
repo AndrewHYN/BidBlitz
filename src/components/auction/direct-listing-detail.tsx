@@ -1,6 +1,6 @@
 import { BackLink } from "@/components/ui/back-link";
 import Link from "next/link";
-import { MapPin, MessageCircle, ShieldCheck } from "lucide-react";
+import { Clock3, MapPin, MessageCircle, ShieldCheck } from "lucide-react";
 
 import { ImageGallery, type GalleryImage } from "@/components/auction/image-gallery";
 import { Money } from "@/components/auction/money";
@@ -15,14 +15,23 @@ import { Button } from "@/components/ui/button";
 import { ListingContactReveal } from "@/components/auction/listing-contact-reveal";
 import { fulfilmentMethodLabels } from "@/lib/validation";
 import { publicListingLocation } from "@/lib/listing-display";
+import { listedAge } from "@/lib/discovery";
+import { ListingDiscovery } from "@/components/marketplace/discovery-sections";
+import type { AuctionCardData } from "@/server/queries";
 import type { getAuctionDetail } from "@/server/queries";
 
 type Listing = NonNullable<Awaited<ReturnType<typeof getAuctionDetail>>>;
 
-export function DirectListingDetail({ detail, images }: { detail: Listing; images: GalleryImage[] }) {
+export function DirectListingDetail({ detail, images, related, moreFromSeller }: {
+  detail: Listing;
+  images: GalleryImage[];
+  related: AuctionCardData[];
+  moreFromSeller: AuctionCardData[];
+}) {
   const { auction, viewerId, watched } = detail;
   const isOwner = viewerId === auction.seller_id;
   const isAvailable = auction.status === "LISTED";
+  const age = listedAge(auction.listed_at);
 
   return (
     <div className="page-container py-7 sm:py-12">
@@ -44,32 +53,29 @@ export function DirectListingDetail({ detail, images }: { detail: Listing; image
             <div className="flex flex-wrap items-center gap-2">
               <StatusBadge status={auction.status} />
               {auction.listing_kind !== "SERVICE" && <ConditionBadge condition={auction.condition} />}
-              <span className="inline-flex items-center gap-1 text-sm text-muted-foreground">
-                <MapPin className="size-4 shrink-0" aria-hidden /> {publicListingLocation(auction.location)}
-              </span>
+
             </div>
           </div>
 
           <section aria-labelledby="listing-price" className="space-y-3">
             <div>
               <h2 id="listing-price" className="text-sm font-medium text-muted-foreground">{auction.listing_kind === "SERVICE" ? "Starting price" : "Asking price"}</h2>
-              <p className="text-3xl font-bold"><Money minor={auction.starting_bid_minor} currency={auction.currency} /></p>
+              <p className="text-3xl font-bold tracking-tight"><Money minor={auction.starting_bid_minor} currency={auction.currency} /></p>
+              <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground" data-testid="listing-time-location">
+                {age && <span className="inline-flex items-center gap-1"><Clock3 className="size-4" aria-hidden /> Listed {age}</span>}
+                <span className="inline-flex items-center gap-1"><MapPin className="size-4" aria-hidden /> {publicListingLocation(auction.location)}</span>
+              </p>
             </div>
-            <section aria-labelledby="listing-description" className="space-y-2 rounded-xl border bg-card p-4 sm:p-5">
-              <h2 id="listing-description" className="font-semibold">{auction.listing_kind === "SERVICE" ? "About this service" : "About this item"}</h2>
-              <p className="break-words whitespace-pre-line leading-7 text-muted-foreground">{auction.description}</p>
-            </section>
             {isAvailable && !isOwner && (
-              <div>
+              <div className="grid gap-3 sm:grid-cols-2" data-testid="listing-primary-actions">
+                <Button asChild size="lg" variant="outline"
+                  className="min-h-12 w-full border-slate-900 bg-slate-900 font-semibold text-white shadow-md hover:bg-slate-800 hover:text-white dark:border-slate-100 dark:bg-slate-100 dark:text-slate-950 dark:hover:bg-white">
+                  <Link href={`/messages/new?listing=${auction.id}`}>
+                    <MessageCircle aria-hidden /> Message seller
+                  </Link>
+                </Button>
                 <ListingDealButtons listingId={auction.id} kind={auction.listing_kind === "SERVICE" ? "SERVICE" : "SALE"} />
               </div>
-            )}
-            {isAvailable && !isOwner && (
-              <Button asChild size="lg" variant="outline" className="min-h-11 w-full">
-                <Link href={`/messages/new?listing=${auction.id}`}>
-                  <MessageCircle aria-hidden /> Message seller on BidBlitz
-                </Link>
-              </Button>
             )}
             {isOwner ? (
               <Button asChild variant="outline"><Link href={`/sell/${auction.id}`}>Manage listing</Link></Button>
@@ -82,6 +88,10 @@ export function DirectListingDetail({ detail, images }: { detail: Listing; image
             ) : (
               <p className="text-sm text-muted-foreground">This item is no longer available.</p>
             )}
+            <section aria-labelledby="listing-description" className="space-y-2 border-t pt-5">
+              <h2 id="listing-description" className="font-semibold">{auction.listing_kind === "SERVICE" ? "About this service" : "About this item"}</h2>
+              <p className="break-words whitespace-pre-line leading-7 text-muted-foreground">{auction.description}</p>
+            </section>
           </section>
 
           <SellerCard seller={auction.seller} business={auction.business} />
@@ -99,6 +109,8 @@ export function DirectListingDetail({ detail, images }: { detail: Listing; image
           <ReportDialog auctionId={auction.id} />
         </div>
       </div>
+      <ListingDiscovery listing={{ id: auction.id, title: auction.title, location: auction.location }}
+        related={related} moreFromSeller={moreFromSeller} />
     </div>
   );
 }

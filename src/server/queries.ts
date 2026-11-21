@@ -6,6 +6,7 @@ import type { Database, SellerPayoutStatus, TransactionStatus } from "@/lib/supa
 import { businessLogoUrl } from "@/lib/business";
 import { PUBLIC_AUCTIONS_ENABLED } from "@/lib/launch-features";
 import { locationSearchPattern } from "@/lib/marketplace-location";
+import { knownListingTown } from "@/lib/discovery";
 
 /**
  * Read model. Server Components call these so the first paint already has
@@ -40,11 +41,12 @@ export type AuctionCardData = {
   businessSlug: string | null;
   isDirect?: boolean;
   listingKind?: "SALE" | "AUCTION" | "SERVICE";
+  listedAt?: string | null;
 };
 
 const CARD_SELECT = `
   id, title, is_direct, listing_kind, current_bid_minor, starting_bid_minor, bid_count,
-  ends_at, status, location, condition, featured, featured_until,
+  ends_at, status, location, condition, listed_at, featured, featured_until,
   categories:category_id(slug, name),
   business:business_id(slug, display_name),
   auction_images(position, storage_path)
@@ -64,6 +66,7 @@ type CardJoin = {
   condition: string;
   featured: boolean;
   featured_until: string | null;
+  listed_at?: string | null;
   /**
    * PostgREST returns an object for a to-one relation and an array for a
    * to-many one, and which it is depends on the schema introspection — so we
@@ -115,6 +118,7 @@ function toCard(row: CardJoin): AuctionCardData {
     status: row.status,
     location: row.location,
     condition: row.condition,
+    listedAt: row.listed_at ?? null,
     featured:
       row.featured &&
       row.featured_until !== null &&
@@ -225,6 +229,54 @@ export const browseListings = cache(async (filters: BrowseFilters) => {
     pageSize: PAGE_SIZE,
     error: null,
   };
+});
+
+
+/**
+ * Related items are real, public listings only. Category matches rank first,
+ * then the same known city, then other Zimbabwean listings. Seller inventory
+ * is shown separately when it exists. Nothing here pretends to be a paid ad.
+ */
+export const getListingDiscovery = cache(async ({
+  listingId, categoryId, sellerId, location,
+}: {
+  listingId: string;
+  categoryId: number | null;
+  sellerId: string;
+  location: string | null;
+}) => {
+  const supabase = await createClient();
+  const town = knownListingTown(location);
+  const base = () => supabase.from("auctions")
+    .select(CARD_SELECT)
+    .or(publicListingFilter)
+    .is("archived_at", null)
+    .neq("id", listingId)
+    .order("listed_at", { ascending: false })
+    .limit(8);
+
+  const [sameCategory, fromSeller, nearby, anywhere] = await Promise.all([
+    categoryId !== null ? base().eq("category_id", categoryId) : Promise.resolve({ data: [] }),
+    base().eq("seller_id", sellerId),
+    town ? base().ilike("location", locationSearchPattern(town)) : Promise.resolve({ data: [] }),
+    base(),
+  ]);
+
+  const cards = (data: unknown) => ((data ?? []) as CardJoin[]).map(toCard);
+  const seen = new Set<string>();
+  const collect = (items: AuctionCardData[], limit: number) => items.filter((item) => {
+    if (seen.has(item.id)) return false;
+    if (seen.size >= limit) return false;
+    seen.add(item.id);
+    return true;
+  });
+  const sellerItems = cards(fromSeller.data);
+  const sellerIds = new Set(sellerItems.map((item) => item.id));
+  const related = collect([
+    ...cards(sameCategory.data), ...cards(nearby.data), ...cards(anywhere.data),
+  ].filter((item) => !sellerIds.has(item.id)), 6);
+  const moreFromSeller = sellerItems.slice(0, 4);
+  return { related, moreFromSeller };
 });
 
 /** Detail page payload. Returns null when the auction is not visible to them. */

@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { MapPin, ShieldCheck } from "lucide-react";
 
-import { getAuctionDetail, imageUrlFor } from "@/server/queries";
+import { getAuctionDetail, getListingDiscovery, imageUrlFor } from "@/server/queries";
 import { MaxBidPanel } from "@/components/auction/max-bid-panel";
 import { getMaxBidOffers } from "@/server/max-bid-queries";
 import { isPaymentProviderConfigured } from "@/server/payments/config";
@@ -127,10 +127,17 @@ export default async function AuctionPage({ params }: Props) {
   });
 
   if (auction.is_direct) {
+    const discovery = await getListingDiscovery({
+      listingId: auction.id,
+      categoryId: auction.categories?.id ?? null,
+      sellerId: auction.seller_id,
+      location: auction.location,
+    });
     return (
       <>
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(structuredData) }} />
-        <DirectListingDetail detail={detail} images={images} />
+        <DirectListingDetail detail={detail} images={images}
+          related={discovery.related} moreFromSeller={discovery.moreFromSeller} />
       </>
     );
   }
