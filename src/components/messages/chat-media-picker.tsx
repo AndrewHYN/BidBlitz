@@ -5,12 +5,14 @@ import { AudioLines, ImagePlus, Mic, Square, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CHAT_AUDIO_TYPES, CHAT_IMAGE_TYPES, CHAT_MEDIA_LIMIT, chatMediaType } from "@/lib/chat-media";
 
-export function ChatMediaPicker({ file, disabled, onFile, onError, onRecording }: {
+export type ChatMediaStatus = "idle" | "preparing" | "starting" | "recording";
+
+export function ChatMediaPicker({ file, disabled, onFile, onError, onStatus }: {
   file: File | null;
   disabled: boolean;
   onFile: (file: File | null) => void;
   onError: (error: string | null) => void;
-  onRecording: (status: "idle" | "starting" | "recording") => void;
+  onStatus: (status: ChatMediaStatus) => void;
 }) {
   const image = useRef<HTMLInputElement>(null);
   const audio = useRef<HTMLInputElement>(null);
@@ -18,7 +20,7 @@ export function ChatMediaPicker({ file, disabled, onFile, onError, onRecording }
   const recorder = useRef<MediaRecorder | null>(null);
   const timer = useRef<number>(undefined);
   const mounted = useRef(false);
-  const [status, setStatus] = useState<"idle" | "starting" | "recording">("idle");
+  const [status, setStatus] = useState<ChatMediaStatus>("idle");
   const [showAudio, setShowAudio] = useState(false);
   const active = status !== "idle";
 
@@ -32,13 +34,35 @@ export function ChatMediaPicker({ file, disabled, onFile, onError, onRecording }
     };
   }, []);
 
-  function select(selected?: File) {
-    if (!selected) return;
+  async function select(selected: File) {
     if (!chatMediaType(selected.type)) return onError("Choose a JPEG, PNG, WebP or supported audio file.");
     if (selected.size > CHAT_MEDIA_LIMIT) return onError("Choose a file under 3 MB.");
+    setStatus("preparing");
+    onStatus("preparing");
     onError(null);
-    onFile(selected);
-    setShowAudio(false);
+    try {
+      // Mobile pickers can supply a temporary file handle. Keep the bytes in
+      // memory before clearing the input so preview, send and retry share them.
+      const bytes = await selected.arrayBuffer();
+      if (bytes.byteLength !== selected.size || !bytes.byteLength) throw new Error("Unreadable file");
+      if (mounted.current) {
+        onFile(new File([bytes], selected.name, { type: selected.type }));
+        setShowAudio(false);
+      }
+    } catch {
+      if (mounted.current) onError("Couldn’t read that file. Choose it again from your device.");
+    } finally {
+      if (mounted.current) {
+        setStatus("idle");
+        onStatus("idle");
+      }
+    }
+  }
+
+  async function choose(input: HTMLInputElement) {
+    const selected = input.files?.[0];
+    if (selected) await select(selected);
+    input.value = "";
   }
 
   async function record() {
@@ -47,7 +71,7 @@ export function ChatMediaPicker({ file, disabled, onFile, onError, onRecording }
       return onError("Voice recording isn’t available here. You can attach an audio file.");
     }
     onError(null);
-    onRecording("starting");
+    onStatus("starting");
     setStatus("starting");
     try {
       const input = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -74,15 +98,15 @@ export function ChatMediaPicker({ file, disabled, onFile, onError, onRecording }
         recorder.current = null;
         if (!mounted.current) return;
         setStatus("idle");
-        onRecording("idle");
+        onStatus("idle");
         if (!failed && chunks.length) {
           const type = recording.mimeType || chunks[0].type;
-          select(new File(chunks, "Voice message", { type }));
+          void select(new File(chunks, "Voice message", { type }));
         }
       };
       recording.start();
       setStatus("recording");
-      onRecording("recording");
+      onStatus("recording");
       timer.current = window.setTimeout(() => {
         if (recording.state === "recording") recording.stop();
       }, 60_000);
@@ -91,7 +115,7 @@ export function ChatMediaPicker({ file, disabled, onFile, onError, onRecording }
       stream.current = null;
       if (!mounted.current) return;
       setStatus("idle");
-      onRecording("idle");
+      onStatus("idle");
       onError("Couldn’t access the microphone. Allow it in your browser or attach an audio file.");
     }
   }
@@ -99,9 +123,9 @@ export function ChatMediaPicker({ file, disabled, onFile, onError, onRecording }
   return (
     <div className="relative flex shrink-0 items-center gap-0.5">
       <input ref={image} type="file" accept={CHAT_IMAGE_TYPES.join(",")} hidden
-        onChange={event => { select(event.currentTarget.files?.[0]); event.currentTarget.value = ""; }} />
+        onChange={event => void choose(event.currentTarget)} />
       <input ref={audio} type="file" accept={[...CHAT_AUDIO_TYPES, ".m4a", ".wav"].join(",")} hidden
-        onChange={event => { select(event.currentTarget.files?.[0]); event.currentTarget.value = ""; }} />
+        onChange={event => void choose(event.currentTarget)} />
       <Button type="button" size="icon" variant="ghost" className="size-11 text-blue-600 dark:text-blue-400"
         aria-label="Attach photo" title="Attach photo" disabled={disabled || active} onClick={() => { setShowAudio(false); image.current?.click(); }}>
         <ImagePlus aria-hidden />
@@ -110,7 +134,7 @@ export function ChatMediaPicker({ file, disabled, onFile, onError, onRecording }
         aria-label={status === "recording" ? "Stop recording" : "Audio options"}
         title={status === "recording" ? "Stop recording" : "Audio options"}
         aria-expanded={status === "idle" ? showAudio : undefined}
-        disabled={disabled || status === "starting"}
+        disabled={disabled || status === "starting" || status === "preparing"}
         onClick={() => {
           if (recorder.current?.state === "recording") recorder.current.stop();
           else setShowAudio(!showAudio);

@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { CHAT_MEDIA_LIMIT, chatMediaType } from "@/lib/chat-media";
@@ -46,6 +47,18 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     .select("listing_id,buyer_id,seller_id").eq("id", id).maybeSingle();
   if (!thread || ![thread.buyer_id, thread.seller_id].includes(user.id)) return reply("Conversation unavailable.", 404);
 
+  const retryKey = request.headers.get("idempotency-key");
+  if (retryKey !== null && !z.uuidv4().safeParse(retryKey).success) return reply("Invalid upload reference.", 400);
+  const messageId = retryKey ?? randomUUID();
+  const findSent = () => db.from("listing_messages").select("id")
+    .eq("id", messageId).eq("conversation_id", id).eq("sender_id", user.id)
+    .eq("attachment_kind", media.kind).maybeSingle();
+  if (retryKey) {
+    const existing = await findSent();
+    if (existing.data) return Response.json({ ok: true });
+    if (existing.error) return reply("Couldn’t check delivery. Try again.", 503);
+  }
+
   const admin = createAdminClient();
   const { error: reservation } = await admin.rpc("reserve_listing_chat_upload", {
     p_conversation_id: id, p_sender_id: user.id,
@@ -75,18 +88,20 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const bytes = Buffer.concat(chunks, length);
   if (!matchesFormat(bytes, media.mime)) return reply("The file doesn’t match its format.", 415);
 
-  const messageId = randomUUID();
   const path = `${id}/${messageId}`;
   const bucket = admin.storage.from("listing-chat-media");
   const { error: upload } = await bucket.upload(path, bytes, { contentType: media.mime, upsert: false });
-  if (upload) return reply("Couldn’t upload the attachment. Try again.", 502);
+  if (upload) {
+    if (retryKey && (await findSent()).data) return Response.json({ ok: true });
+    return reply("Couldn’t upload the attachment. Try again.", 502);
+  }
   const { error: send } = await admin.rpc("send_listing_chat_attachment", {
     p_conversation_id: id, p_sender_id: user.id, p_message_id: messageId, p_kind: media.kind,
   });
   if (send) {
     // A transport error can occur after the database commits. Preserve the
     // object unless a follow-up read confirms no message references it.
-    const result = await db.from("listing_messages").select("id").eq("id", messageId).maybeSingle();
+    const result = await findSent();
     if (result.error) return reply("Couldn’t confirm delivery. Check the conversation before resending.", 502);
     if (!result.data) {
       await bucket.remove([path]);
@@ -97,8 +112,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
   revalidatePath("/messages");
   revalidatePath(`/messages/${id}`);
-  const { data: listing } = await db.from("auctions").select("title").eq("id", thread.listing_id).maybeSingle();
-  const recipient = thread.buyer_id === user.id ? thread.seller_id : thread.buyer_id;
-  await notifyListingChatRecipient(recipient, listing?.title ?? "your listing", id).catch(() => {});
+  after(async () => {
+    const { data: listing } = await db.from("auctions").select("title").eq("id", thread.listing_id).maybeSingle();
+    const recipient = thread.buyer_id === user.id ? thread.seller_id : thread.buyer_id;
+    await notifyListingChatRecipient(recipient, listing?.title ?? "your listing", id).catch(() => {});
+  });
   return Response.json({ ok: true });
 }

@@ -93,7 +93,11 @@ test.describe("release visual smoke", () => {
     await page.goto("/dashboard/account");
     await expect(page.getByRole("heading", { name: "Your sales account", exact: true })).toBeVisible();
     await expect(page.getByRole("region", { name: "USD sales balances" })).toBeVisible();
-    await expect(page.getByRole("navigation", { name: "Dashboard sections" }).getByRole("link", { name: "Messages", exact: true })).toBeInViewport({ ratio: 0.99 });
+    const mobileNav = (page.viewportSize()?.width ?? 0) < 1024;
+    const nav = page.getByRole("navigation", { name: mobileNav ? "Quick navigation" : "Primary" });
+    const chatLink = nav.getByRole("link", { name: mobileNav ? "Chat" : "Messages", exact: true });
+    await expect(chatLink).toHaveAttribute("href", "/messages");
+    await expect(chatLink).toBeInViewport({ ratio: 0.99 });
     await expect(page.getByRole("heading", { name: "Sales account unavailable" })).toHaveCount(0);
     const sizes = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, viewport: document.documentElement.clientWidth }));
     expect(sizes.scroll).toBeLessThanOrEqual(sizes.viewport + 2);
