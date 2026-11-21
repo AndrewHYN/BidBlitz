@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { ACCOUNTS, signIn } from "./fixtures";
+import { ACCOUNTS, signIn, waitForHydratedForm } from "./fixtures";
 
 const PUBLIC_ROUTES = [
   "/",
@@ -199,6 +199,40 @@ test.describe("release visual smoke", () => {
     await expect(page.locator('[data-testid="google-sign-in-button"]:visible')).toBeVisible();
     await expect(page.locator('[data-testid="sign-in-button"]:visible')).toBeVisible();
     await expect(page.locator('[data-testid="otp-toggle-button"]:visible')).toBeVisible();
+  });
+
+  test("premium login is usable on a narrow phone and keeps password and code flows", async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 720 });
+    await page.goto("/login");
+    await waitForHydratedForm(page, "login-form");
+
+    await expect(page.getByRole("heading", { name: /welcome back/i })).toBeVisible();
+    await expect(page.getByTestId("google-sign-in-button")).toBeVisible();
+    await expect(page.getByTestId("sign-in-button")).toBeVisible();
+    await expect(page.getByTestId("otp-toggle-button")).toBeVisible();
+    await expect(page.getByRole("link", { name: /create an account/i })).toHaveAttribute("href", "/signup");
+    await expect(page.getByRole("link", { name: /forgot your password/i })).toHaveAttribute("href", "/forgot-password");
+
+    const password = page.getByTestId("password-field");
+    await password.fill("not-a-real-password-just-testing");
+    await expect(password).toHaveAttribute("type", "password");
+    await page.getByTestId("toggle-password-visibility").click();
+    await expect(password).toHaveAttribute("type", "text");
+    await page.getByTestId("toggle-password-visibility").click();
+    await expect(password).toHaveAttribute("type", "password");
+
+    await page.getByTestId("email-field").fill("seller@example.com");
+    await page.getByTestId("otp-toggle-button").click();
+    await expect(page.getByTestId("email-field")).toHaveValue("seller@example.com");
+    await expect(page.getByTestId("send-code-button")).toBeVisible();
+    await page.getByTestId("otp-back-button").click();
+    await expect(page.getByTestId("sign-in-button")).toBeVisible();
+
+    const widths = await page.evaluate(() => ({
+      scroll: document.documentElement.scrollWidth,
+      viewport: document.documentElement.clientWidth,
+    }));
+    expect(widths.scroll).toBeLessThanOrEqual(widths.viewport + 2);
   });
 
   test("signup keeps payout phone guidance visible before account creation", async ({ page }) => {
