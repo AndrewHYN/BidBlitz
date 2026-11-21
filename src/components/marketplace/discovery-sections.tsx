@@ -4,6 +4,7 @@ import { AuctionCard } from "@/components/auction/auction-card";
 import { knownListingTown, suggestedSearches } from "@/lib/discovery";
 import { publicListingLocation } from "@/lib/listing-display";
 import { MARKETPLACE_TOWNS } from "@/lib/marketplace-location";
+import { groupedCategories } from "@/lib/category-taxonomy";
 import type { AuctionCardData } from "@/server/queries";
 
 function SearchLinks({ listings }: { listings: readonly { id: string; title: string }[] }) {
@@ -46,7 +47,7 @@ export function HomeDiscovery({
       <SearchLinks listings={listings} />
       {categories.length > 0 && (
         <div className="flex flex-wrap gap-2 border-t pt-4">
-          {categories.slice(0, 7).map((category) => (
+          {groupedCategories(categories, "SALE").map((section) => section.categories[0]).filter(Boolean).slice(0, 7).map((category) => (
             <Link key={category.slug} href={"/browse?category=" + encodeURIComponent(category.slug)}
               className="inline-flex min-h-10 items-center rounded-xl border bg-background px-3 py-2 text-sm font-medium hover:border-primary/40 hover:text-primary focus-visible:outline-2 focus-visible:outline-ring">
               {category.name}
