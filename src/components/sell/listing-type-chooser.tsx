@@ -16,7 +16,7 @@ const options = [
 ];
 
 export function ListingTypeChooser({ categories, defaultLocation }: {
-  categories: { id: number; name: string }[];
+  categories: { id: number; name: string; slug: string }[];
   defaultLocation: string;
 }) {
   const [kind, setKind] = useState<Kind>("SALE");
