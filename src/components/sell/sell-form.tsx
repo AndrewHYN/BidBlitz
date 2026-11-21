@@ -250,7 +250,8 @@ export function SellForm({
         <div className="grid gap-5 sm:grid-cols-2">
           <div className="space-y-1.5">
             <Label htmlFor="sell-category">Category</Label>
-            <CategoryPicker categories={categories} value={categoryId} onChange={setCategoryId}\n              titleHint={title} kind="AUCTION" invalid={Boolean(errors.categoryId)} />
+            <CategoryPicker categories={categories} value={categoryId} onChange={setCategoryId}
+              titleHint={title} kind="AUCTION" invalid={Boolean(errors.categoryId)} />
             <FieldError messages={errors.categoryId} />
           </div>
 
