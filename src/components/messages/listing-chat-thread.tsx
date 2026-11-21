@@ -10,7 +10,7 @@ import { UserAvatar } from "@/components/profile/user-avatar";
 import { markListingChatReadAction, sendListingChatAction } from "@/server/actions/listing-chat";
 import { ChatReceipt } from "./chat-status";
 import { chatMediaType } from "@/lib/chat-media";
-import { ChatMediaPicker, ChatMediaPreview } from "./chat-media-picker";
+import { ChatMediaPicker, ChatMediaPreview, type ChatMediaStatus } from "./chat-media-picker";
 import { createClient } from "@/lib/supabase/client";
 
 export type ListingChatMessage = {
@@ -36,7 +36,8 @@ export function ListingChatThread({ conversationId, viewerId, initial, peerName,
   const router = useRouter();
   const [body, setBody] = useState("");
   const [file, setFile] = useState<File | null>(null);
-  const [recording, setRecording] = useState<"idle" | "starting" | "recording">("idle");
+  const [mediaStatus, setMediaStatus] = useState<ChatMediaStatus>("idle");
+  const attachmentId = useRef<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -94,7 +95,7 @@ export function ListingChatThread({ conversationId, viewerId, initial, peerName,
 
   function send(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (busy.current || recording !== "idle") return;
+    if (busy.current || mediaStatus !== "idle") return;
     const text = body.trim();
     if (!text && !file) return setError("Write a message first.");
     busy.current = true;
@@ -103,7 +104,8 @@ export function ListingChatThread({ conversationId, viewerId, initial, peerName,
       try {
         if (file) {
           setUploadProgress(0);
-          const problem = await uploadAttachment(conversationId, file, setUploadProgress);
+          const messageId = attachmentId.current ??= crypto.randomUUID();
+          const problem = await uploadAttachment(conversationId, file, messageId, setUploadProgress);
           if (problem) {
             setError(problem);
             return;
@@ -171,8 +173,9 @@ export function ListingChatThread({ conversationId, viewerId, initial, peerName,
         </ol>
       </div>
       <form method="post" onSubmit={send} className="shrink-0 border-t bg-card px-3 py-2.5 sm:px-5">
-        {recording === "starting" && <p role="status" className="mb-2 text-sm text-muted-foreground">Waiting for microphone permission…</p>}
-        {recording === "recording" && <RecordingIndicator />}
+        {mediaStatus === "preparing" && <p role="status" className="mb-2 text-sm text-muted-foreground">Preparing attachment…</p>}
+        {mediaStatus === "starting" && <p role="status" className="mb-2 text-sm text-muted-foreground">Waiting for microphone permission…</p>}
+        {mediaStatus === "recording" && <RecordingIndicator />}
         {uploadProgress !== null && file && (
           <div className="mb-2 space-y-1 text-sm">
             <p role="status">{uploadProgress === 100 ? "Sending attachment…" : chatMediaType(file.type)?.kind === "image" ? "Uploading photo…" : "Uploading audio…"}</p>
@@ -182,10 +185,10 @@ export function ListingChatThread({ conversationId, viewerId, initial, peerName,
         {file && <ChatMediaPreview file={file} disabled={pending} onRemove={() => setFile(null)} />}
         <label htmlFor="listing-chat-body" className="sr-only">Reply</label>
         <div className="flex items-end gap-1 sm:gap-2">
-          <ChatMediaPicker file={file} disabled={pending} onFile={setFile} onError={setError} onRecording={setRecording} />
+          <ChatMediaPicker file={file} disabled={pending} onFile={next => { attachmentId.current = null; setFile(next); }} onError={setError} onStatus={setMediaStatus} />
           <Textarea id="listing-chat-body" value={body} onChange={event => setBody(event.target.value.slice(0, 2000))}
             maxLength={2000} rows={1} placeholder="Write a message…" className="max-h-28 min-h-11 min-w-0 flex-1 resize-none" />
-          <Button type="submit" size="icon" className="size-11 rounded-xl" title={file ? "Send attachment" : "Send message"} aria-label={file ? "Send attachment" : "Send message"} disabled={pending || recording !== "idle" || (!file && !body.trim())} aria-busy={pending}>
+          <Button type="submit" size="icon" className="size-11 rounded-xl" title={file ? "Send attachment" : "Send message"} aria-label={file ? "Send attachment" : "Send message"} disabled={pending || mediaStatus !== "idle" || (!file && !body.trim())} aria-busy={pending}>
             <Send className="size-5" aria-hidden />
           </Button>
         </div>
@@ -213,21 +216,24 @@ function RecordingIndicator() {
   );
 }
 
-function uploadAttachment(conversationId: string, file: File, onProgress: (percent: number) => void) {
+function uploadAttachment(conversationId: string, file: File, messageId: string, onProgress: (percent: number) => void) {
   return new Promise<string | null>((resolve) => {
     const request = new XMLHttpRequest();
     request.open("POST", `/api/messages/${conversationId}/media`);
     request.setRequestHeader("Content-Type", file.type);
+    request.setRequestHeader("Idempotency-Key", messageId);
     request.timeout = 90_000;
     request.upload.onprogress = (event) => {
       if (event.lengthComputable) onProgress(Math.floor(event.loaded / event.total * 100));
     };
     request.upload.onload = () => onProgress(100);
     request.responseType = "json";
-    request.onload = () => resolve(request.status >= 200 && request.status < 300
+    request.onload = () => resolve(request.status >= 200 && request.status < 300 && request.response?.ok === true
       ? null
       : request.response?.message ?? "Couldn’t send the attachment. Try again.");
-    request.onerror = request.ontimeout = request.onabort = () => resolve("Couldn’t confirm the upload. Check the chat before retrying.");
+    request.onerror = request.ontimeout = request.onabort = () => resolve(navigator.onLine
+      ? "The connection was interrupted. Tap Send to retry this attachment."
+      : "You’re offline. Reconnect and tap Send to retry this attachment.");
     request.send(file);
   });
 }
