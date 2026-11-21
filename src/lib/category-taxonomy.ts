@@ -91,10 +91,10 @@ export const CATEGORY_SECTIONS: readonly CategorySection[] = [
   ] },
 ];
 
-export function groupedCategories(
-  categories: readonly CategoryOption[],
+export function groupedCategories<T extends { slug: string; name: string }>(
+  categories: readonly T[],
   kind: "SALE" | "AUCTION" | "SERVICE",
-): Array<{ label: string; categories: CategoryOption[] }> {
+): Array<{ label: string; categories: T[] }> {
   const bySlug = new Map(categories.map((category) => [category.slug, category]));
   const used = new Set<string>();
   const sections = CATEGORY_SECTIONS
@@ -102,7 +102,7 @@ export function groupedCategories(
     .map((section) => {
       const found = section.entries
         .map((entry) => bySlug.get(entry.slug))
-        .filter((category): category is CategoryOption => Boolean(category));
+        .filter((category): category is T => Boolean(category));
       for (const category of found) used.add(category.slug);
       return { label: section.label, categories: found };
     })
