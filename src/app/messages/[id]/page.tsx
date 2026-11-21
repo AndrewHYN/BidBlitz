@@ -54,6 +54,8 @@ export default async function ListingConversationPage({
     ? await supabase.from("service_reviews").select("request_id").in("request_id", requestIds)
     : { data: [] as { request_id: string }[] };
 
+  // Snapshot the clock once per server request for presence and local dates.
+  // eslint-disable-next-line react-hooks/purity
   const now = Date.now();
   const lastSeen = presence?.[0]?.last_seen_at;
   const ordered = ([...(messages ?? [])].reverse()) as ListingChatMessage[];

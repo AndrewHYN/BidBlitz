@@ -55,6 +55,8 @@ export default async function MessagesInboxPage() {
 
   const titles = new Map((listings ?? []).map((item) => [item.id, item.title]));
   const profiles = new Map((people ?? []).map((person) => [person.id, person]));
+  // Snapshot the clock once per server request for presence and local dates.
+  // eslint-disable-next-line react-hooks/purity
   const now = Date.now();
   const presenceByThread = new Map<string, string>((presence ?? []).map((peer: { conversation_id: string; last_seen_at: string }) => [peer.conversation_id, peer.last_seen_at]));
   const latest = new Map<string, NonNullable<typeof recentMessages>[number]>();
