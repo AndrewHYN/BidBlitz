@@ -13,11 +13,14 @@ import {
   Select,
   SelectContent,
   SelectItem,
+  SelectGroup,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
 import { CONDITIONS, conditionLabels, SORTS } from "@/lib/validation";
 import { categoryIcon } from "@/lib/category-icons";
+import { groupedCategories } from "@/lib/category-taxonomy";
 import { PUBLIC_AUCTIONS_ENABLED } from "@/lib/launch-features";
 import { formatMoney, money, parseMoneyToMinor } from "@/lib/money";
 
@@ -295,15 +298,21 @@ export function BrowseFilters({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL}>All categories</SelectItem>
-                {categories.map((category) => {
-                  const Icon = categoryIcon(category.slug);
-                  return (
-                    <SelectItem key={category.slug} value={category.slug}>
-                      <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-                      {category.name}
-                    </SelectItem>
-                  );
-                })}
+                {[...groupedCategories(categories, "SALE"), ...groupedCategories(categories, "SERVICE")]
+                  .map((section) => (
+                    <SelectGroup key={section.label}>
+                      <SelectLabel>{section.label}</SelectLabel>
+                      {section.categories.map((category) => {
+                        const Icon = categoryIcon(category.slug);
+                        return (
+                          <SelectItem key={category.slug} value={category.slug}>
+                            <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                            {category.name}
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectGroup>
+                  ))}
               </SelectContent>
             </Select>
           </div>
