@@ -97,7 +97,7 @@ export function AuctionCard({
           {badge}
         </div>
 
-        {auction.endsAt && !clockStopped && (
+        {!auction.isDirect && auction.endsAt && !clockStopped && (
           <span className="absolute bottom-2 right-2 rounded-lg border border-border/70 bg-background/95 px-2.5 py-1.5 shadow-sm backdrop-blur-sm">
             <Countdown endsAt={auction.endsAt} status={auction.status} className="text-xs" />
           </span>

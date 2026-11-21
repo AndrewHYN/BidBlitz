@@ -22,6 +22,7 @@ export function MarkAllReadButton() {
         type="button"
         variant="outline"
         size="sm"
+        className="h-11 border-blue-200 bg-blue-50 text-blue-800 hover:border-blue-300 hover:bg-blue-100 hover:text-blue-900 dark:border-blue-400/35 dark:bg-blue-400/10 dark:text-blue-200 dark:hover:bg-blue-400/20 dark:hover:text-blue-100"
         data-testid="mark-all-read"
         disabled={pending}
         onClick={() => {
