@@ -108,7 +108,14 @@ export function groupedCategories<T extends { slug: string; name: string }>(
     })
     .filter((section) => section.categories.length > 0);
   if (kind !== "SERVICE") {
-    const unmatched = categories.filter((category) => !used.has(category.slug));
+    // Preserve unknown historical item categories, but never leak known
+    // service-only categories into the sale/auction picker.
+    const recognized = new Set(CATEGORY_SECTIONS.flatMap((section) =>
+      section.entries.map((entry) => entry.slug)
+    ));
+    const unmatched = categories.filter((category) =>
+      !used.has(category.slug) && !recognized.has(category.slug)
+    );
     if (unmatched.length) sections.push({ label: "More categories", categories: unmatched });
   }
   return sections;
