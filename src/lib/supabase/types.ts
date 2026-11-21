@@ -394,10 +394,15 @@ export interface Database {
         Insert: never;
         Update: never;
       };
+      listing_chat_preferences: {
+        Row: { conversation_id: string; user_id: string; pinned: boolean; archived: boolean;
+          muted: boolean; manual_unread: boolean; hidden: boolean; cleared_at: string | null };
+        Insert: never; Update: never;
+      };
       listing_conversations: {
         Row: {
           id: string; listing_id: string; buyer_id: string; seller_id: string;
-          created_at: string; last_message_at: string;
+          created_at: string; last_message_at: string; left_by: string | null;
         };
         Insert: never;
         Update: never;
@@ -458,6 +463,13 @@ export interface Database {
         Args: { p_conversation_ids: string[] };
         Returns: { conversation_id: string; last_seen_at: string }[];
       };
+      listing_chat_inbox: {
+        Args: { p_archived: boolean; p_offset: number };
+        Returns: { id: string; listing_id: string; buyer_id: string; seller_id: string; left_by: string | null;
+          pinned: boolean; muted: boolean; last_body: string | null; last_sender: string | null;
+          last_at: string | null; last_read: string | null; manual_unread: boolean; unread_count: number }[];
+      };
+      set_listing_chat_action: { Args: { p_conversation_id: string; p_action: string }; Returns: undefined };
       mark_listing_conversation_read: {
         Args: { p_conversation_id: string };
         Returns: number;

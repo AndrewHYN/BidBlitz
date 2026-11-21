@@ -22,6 +22,10 @@ export default async function NewListingChatPage({
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect(`/login?next=/messages/new?listing=${listing}`);
 
+  const { data: existing } = await supabase.from("listing_conversations").select("id")
+    .eq("listing_id", listing).eq("buyer_id", user.id).maybeSingle();
+  if (existing) redirect(`/messages/${existing.id}`);
+
   const detail = await getAuctionDetail(listing);
   if (!detail || !detail.auction.is_direct || detail.auction.status !== "LISTED") notFound();
   if (detail.auction.seller_id === user.id) redirect(`/sell/${listing}`);

@@ -163,6 +163,10 @@ export async function notifyListingChatRecipient(
   conversationId: string
 ): Promise<void> {
   try {
+    const admin = createAdminClient();
+    const { data: prefs, error } = await admin.from("listing_chat_preferences").select("muted")
+      .eq("user_id", recipientId).eq("conversation_id", conversationId).maybeSingle();
+    if (error || prefs?.muted) return;
     const contact = await userContact(recipientId);
     if (!contact) return;
     const windowIndex = Math.floor(Date.now() / 600_000);

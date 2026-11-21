@@ -19,6 +19,7 @@ export type ListingChatResult =
   | { ok: false; message: string };
 
 function chatError(code?: string): string {
+  if (code === "chat_closed") return "Someone left this chat. They can rejoin from Messages.";
   if (code === "rate_limited") return "Too many messages. Please try again later.";
   if (code === "account_banned") return "This account cannot send messages.";
   if (code === "invalid_message") return "Messages must be between 1 and 2,000 characters.";
