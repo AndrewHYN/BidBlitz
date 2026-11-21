@@ -270,13 +270,12 @@ export const getListingDiscovery = cache(async ({
     seen.add(item.id);
     return true;
   });
+  const sellerItems = cards(fromSeller.data);
+  const sellerIds = new Set(sellerItems.map((item) => item.id));
   const related = collect([
     ...cards(sameCategory.data), ...cards(nearby.data), ...cards(anywhere.data),
-  ], 6);
-  const relatedIds = new Set(related.map((item) => item.id));
-  const moreFromSeller = cards(fromSeller.data)
-    .filter((item) => !relatedIds.has(item.id))
-    .slice(0, 4);
+  ].filter((item) => !sellerIds.has(item.id)), 6);
+  const moreFromSeller = sellerItems.slice(0, 4);
   return { related, moreFromSeller };
 });
 
