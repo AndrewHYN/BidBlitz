@@ -10,7 +10,7 @@ export function ChatMediaPicker({ file, disabled, onFile, onError, onRecording }
   disabled: boolean;
   onFile: (file: File | null) => void;
   onError: (error: string | null) => void;
-  onRecording: (recording: boolean) => void;
+  onRecording: (status: "idle" | "starting" | "recording") => void;
 }) {
   const image = useRef<HTMLInputElement>(null);
   const audio = useRef<HTMLInputElement>(null);
@@ -47,7 +47,7 @@ export function ChatMediaPicker({ file, disabled, onFile, onError, onRecording }
       return onError("Voice recording isn’t available here. You can attach an audio file.");
     }
     onError(null);
-    onRecording(true);
+    onRecording("starting");
     setStatus("starting");
     try {
       const input = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -74,7 +74,7 @@ export function ChatMediaPicker({ file, disabled, onFile, onError, onRecording }
         recorder.current = null;
         if (!mounted.current) return;
         setStatus("idle");
-        onRecording(false);
+        onRecording("idle");
         if (!failed && chunks.length) {
           const type = recording.mimeType || chunks[0].type;
           select(new File(chunks, "Voice message", { type }));
@@ -82,6 +82,7 @@ export function ChatMediaPicker({ file, disabled, onFile, onError, onRecording }
       };
       recording.start();
       setStatus("recording");
+      onRecording("recording");
       timer.current = window.setTimeout(() => {
         if (recording.state === "recording") recording.stop();
       }, 60_000);
@@ -90,7 +91,7 @@ export function ChatMediaPicker({ file, disabled, onFile, onError, onRecording }
       stream.current = null;
       if (!mounted.current) return;
       setStatus("idle");
-      onRecording(false);
+      onRecording("idle");
       onError("Couldn’t access the microphone. Allow it in your browser or attach an audio file.");
     }
   }
@@ -122,7 +123,6 @@ export function ChatMediaPicker({ file, disabled, onFile, onError, onRecording }
           <Button type="button" variant="ghost" className="justify-start" onClick={() => { setShowAudio(false); audio.current?.click(); }}><Upload aria-hidden /> Attach audio</Button>
         </div>
       )}
-      <span className="sr-only" role="status">{status === "recording" ? "Recording voice, up to one minute." : status === "starting" ? "Waiting for microphone." : ""}</span>
       {file && <span className="sr-only">Attachment ready to send.</span>}
     </div>
   );

@@ -1,3 +1,4 @@
+import { ChatPresence, ChatReceipt, formatChatTime, isChatPeerOnline } from "@/components/messages/chat-status";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -27,7 +28,7 @@ export default async function MessagesInboxPage() {
   const listingIds = [...new Set(threads.map((c) => c.listing_id))];
   const otherIds = [...new Set(threads.map((c) => c.seller_id === user.id ? c.buyer_id : c.seller_id))];
   const threadIds = threads.map((c) => c.id);
-  const [{ data: listings }, { data: people }, { data: recentMessages }, { data: unread }] =
+  const [{ data: listings }, { data: people }, { data: recentMessages }, { data: unread }, { data: presence }] =
     await Promise.all([
       listingIds.length
         ? supabase.from("auctions").select("id, title").in("id", listingIds)
@@ -37,11 +38,11 @@ export default async function MessagesInboxPage() {
         : Promise.resolve({ data: [] as { id: string; display_name: string; username: string; avatar_path: string | null }[] }),
       threadIds.length
         ? supabase.from("listing_messages")
-          .select("conversation_id, body, created_at")
+          .select("conversation_id, body, created_at, sender_id, read_at")
           .in("conversation_id", threadIds)
           .order("created_at", { ascending: false })
           .limit(200)
-        : Promise.resolve({ data: [] as { conversation_id: string; body: string; created_at: string }[] }),
+        : Promise.resolve({ data: [] as { conversation_id: string; body: string; created_at: string; sender_id: string; read_at: string | null }[] }),
       threadIds.length
         ? supabase.from("listing_messages")
           .select("conversation_id")
@@ -49,13 +50,16 @@ export default async function MessagesInboxPage() {
           .neq("sender_id", user.id)
           .is("read_at", null)
         : Promise.resolve({ data: [] as { conversation_id: string }[] }),
+      threadIds.length ? supabase.rpc("listing_chat_peer_presence", { p_conversation_ids: threadIds }) : Promise.resolve({ data: [] as { conversation_id: string; last_seen_at: string }[] }),
     ]);
 
   const titles = new Map((listings ?? []).map((item) => [item.id, item.title]));
   const profiles = new Map((people ?? []).map((person) => [person.id, person]));
-  const latest = new Map<string, string>();
+  const now = Date.now();
+  const presenceByThread = new Map<string, string>((presence ?? []).map((peer: { conversation_id: string; last_seen_at: string }) => [peer.conversation_id, peer.last_seen_at]));
+  const latest = new Map<string, NonNullable<typeof recentMessages>[number]>();
   for (const message of recentMessages ?? []) {
-    if (!latest.has(message.conversation_id)) latest.set(message.conversation_id, message.body);
+    if (!latest.has(message.conversation_id)) latest.set(message.conversation_id, message);
   }
   const unreadCounts = new Map<string, number>();
   for (const message of unread ?? []) {
@@ -89,24 +93,31 @@ export default async function MessagesInboxPage() {
             {threads.map((thread) => {
               const other = thread.seller_id === user.id ? thread.buyer_id : thread.seller_id;
               const peer = profiles.get(other);
+              const lastSeen = presenceByThread.get(thread.id);
+              const preview = latest.get(thread.id);
               const count = unreadCounts.get(thread.id) ?? 0;
               return (
                 <li key={thread.id} className="flex items-center gap-3 px-4 hover:bg-muted/40">
                   {peer?.username && (
-                    <Link href={`/profile/${peer.username}`} aria-label={`View ${peer.display_name}’s profile`} className="shrink-0 rounded-full focus-visible:outline-2">
+                    <Link href={`/profile/${peer.username}`} aria-label={`View ${peer.display_name}’s profile`} className="relative shrink-0 rounded-full focus-visible:outline-2">
                       <UserAvatar name={peer.display_name} avatarPath={peer.avatar_path} pixelSize={48} className="size-11" />
+                      <ChatPresence lastSeen={lastSeen} now={now} compact />
                     </Link>
                   )}
                   <Link href={`/messages/${thread.id}`}
-                    className="flex min-h-20 min-w-0 flex-1 items-center justify-between gap-4 py-4 hover:bg-muted/50 focus-visible:outline-2 focus-visible:outline-ring">
+                    className="flex min-h-20 min-w-0 flex-1 items-center justify-between gap-2 py-4 hover:bg-muted/50 focus-visible:outline-2 focus-visible:outline-ring">
                     <div className="min-w-0 space-y-1">
                       <p className="truncate font-semibold">{peer?.display_name ?? "Marketplace member"}</p>
                       <p className="text-sm text-muted-foreground">
                         {titles.get(thread.listing_id) ?? "Listing"} · {thread.seller_id === user.id ? "Selling" : "Buying"}
                       </p>
-                      <p className="truncate text-sm text-muted-foreground">{latest.get(thread.id) ?? "Open conversation"}</p>
+                      <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                        {preview?.sender_id === user.id && <ChatReceipt seen={Boolean(preview.read_at)} peerOnline={isChatPeerOnline(lastSeen, now)} />}
+                        <span className="truncate">{preview?.body ?? "Open conversation"}</span>
+                      </p>
                     </div>
-                    <div className="flex shrink-0 items-center gap-3">
+                    <div className="flex shrink-0 flex-col items-end gap-1.5">
+                      {preview && <time dateTime={preview.created_at} className="text-xs tabular-nums text-muted-foreground">{formatChatTime(preview.created_at, now)}</time>}
                       {count > 0 && <span aria-label={`${count} unread messages`} className="rounded-md bg-primary px-2 py-1 text-xs font-bold text-primary-foreground">{count > 99 ? "99+" : count}</span>}
                       <ArrowRight className="size-4 text-muted-foreground" aria-hidden />
                     </div>

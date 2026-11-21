@@ -18,6 +18,31 @@ export function MarketplaceMessageAlerts({ userId }: { userId: string }) {
 
   useEffect(() => {
     const supabase = createClient();
+    let lastAttempt = 0;
+    const heartbeat = () => {
+      if (document.visibilityState !== "visible" || Date.now() - lastAttempt < 45_000) return;
+      lastAttempt = Date.now();
+      void Promise.resolve(supabase.rpc("touch_marketplace_presence", {})).catch(() => {});
+    };
+    heartbeat();
+    const interval = window.setInterval(heartbeat, 60_000);
+    document.addEventListener("visibilitychange", heartbeat);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", heartbeat);
+    };
+  }, [userId]);
+
+  useEffect(() => {
+    if (pathname !== "/messages") return;
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "visible") router.refresh();
+    }, 30_000);
+    return () => window.clearInterval(interval);
+  }, [pathname, router]);
+
+  useEffect(() => {
+    const supabase = createClient();
     const channel = supabase
       .channel(`marketplace-alerts:${userId}:${++alertSequence}`)
       .on("postgres_changes", {
