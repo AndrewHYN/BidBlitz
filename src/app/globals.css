@@ -598,3 +598,105 @@
 .notification-detail { display: block; color: var(--muted-foreground); font-size: .875rem; line-height: 1.5; margin-bottom: .35rem; }
 .notification-chevron { width: 1rem; height: 1rem; color: var(--muted-foreground); }
 .notification-action { font-weight: 650; }
+
+
+/* BidBlitz sign-in — scoped so signup, account settings and product forms
+   retain their existing design. The page always uses the midnight palette,
+   including when the rest of the application is in light theme. */
+.login-stage {
+  background:
+    radial-gradient(ellipse at 9% 27%, rgba(186, 104, 32, .13), transparent 37%),
+    radial-gradient(ellipse at 96% 85%, rgba(36, 92, 176, .22), transparent 43%),
+    linear-gradient(145deg, #070e1a 0%, #0b1423 56%, #0a1528 100%);
+}
+
+.login-panel {
+  background: linear-gradient(147deg, #172840 0%, #0d192b 32%, #0a1423 100%);
+  box-shadow:
+    0 27px 86px -37px rgba(0, 0, 0, .83),
+    0 7px 26px -18px rgba(66, 128, 213, .38),
+    inset 0 1px rgba(212, 227, 252, .15);
+}
+
+.login-panel [data-slot="input"] {
+  min-height: 3.125rem;
+  border: 1px solid #536985;
+  border-radius: .8rem;
+  background: #131f30;
+  color: #f8fafc;
+  font-size: 1rem;
+  box-shadow: inset 0 1px rgba(255, 255, 255, .02), 0 2px 9px rgba(0, 0, 0, .13);
+}
+
+.login-panel [data-slot="input"]::placeholder {
+  color: #aab8cb;
+}
+
+.login-panel [data-slot="input"]:hover {
+  border-color: #8ba3c2;
+}
+
+.login-panel [data-slot="input"]:focus-visible {
+  border-color: #ffbf62;
+  outline: 2px solid #ffbf62;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(244, 158, 42, .13);
+}
+
+.login-panel [data-testid="google-sign-in-button"] {
+  min-height: 3.25rem;
+  width: 100%;
+  border: 1px solid #506783;
+  border-radius: .85rem;
+  background: linear-gradient(180deg, #213047, #17263c);
+  color: #f8fafc;
+  font-size: .98rem;
+  font-weight: 700;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .13), inset 0 1px rgba(255, 255, 255, .08);
+}
+
+.login-panel [data-testid="google-sign-in-button"]:hover:not(:disabled),
+.login-panel .login-secondary-action:hover:not(:disabled) {
+  border-color: #93aaca;
+  background: #283a55;
+  color: #fff;
+  box-shadow: 0 6px 17px rgba(0, 0, 0, .22);
+}
+
+.login-panel .login-primary-action {
+  border: 1px solid #ffc979;
+  background: linear-gradient(120deg, #ffbd52, #f39818 76%, #ffb83b);
+  color: #101b2a;
+  font-size: 1rem;
+  box-shadow: 0 13px 27px -13px rgba(248, 149, 26, .62), inset 0 1px rgba(255, 255, 255, .33);
+}
+
+.login-panel .login-primary-action:hover:not(:disabled) {
+  border-color: #ffe0a4;
+  background: linear-gradient(120deg, #ffca70, #ffab31 80%, #ffca70);
+  color: #101b2a;
+  box-shadow: 0 17px 32px -13px rgba(248, 149, 26, .66);
+}
+
+.login-panel .login-secondary-action {
+  border: 1px solid #536985;
+  background: #16243a;
+  color: #f8fafc;
+  box-shadow: inset 0 1px rgba(255, 255, 255, .04);
+}
+
+.login-panel :is(.login-primary-action, .login-secondary-action, [data-testid="google-sign-in-button"]):focus-visible {
+  outline: 2px solid #ffd18c;
+  outline-offset: 3px;
+}
+
+.login-panel :is(.login-primary-action, .login-secondary-action, [data-testid="google-sign-in-button"]):disabled {
+  cursor: progress;
+  opacity: .68;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-panel :is(button, input) {
+    transition: none !important;
+  }
+}
