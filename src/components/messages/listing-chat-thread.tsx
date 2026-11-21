@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ReportDialog } from "@/components/auction/report-dialog";
 import { UserAvatar } from "@/components/profile/user-avatar";
 import { markListingChatReadAction, sendListingChatAction } from "@/server/actions/listing-chat";
+import { ChatMediaPicker, ChatMediaPreview } from "./chat-media-picker";
 import { createClient } from "@/lib/supabase/client";
 
 export type ListingChatMessage = {
@@ -16,6 +17,7 @@ export type ListingChatMessage = {
   body: string;
   created_at: string;
   read_at: string | null;
+  attachment_kind?: "image" | "audio" | null;
 };
 
 const dayLabel = new Intl.DateTimeFormat("en-ZW", { day: "numeric", month: "short", year: "numeric", timeZone: "Africa/Harare" });
@@ -30,6 +32,8 @@ export function ListingChatThread({ conversationId, viewerId, initial, peerName,
 }) {
   const router = useRouter();
   const [body, setBody] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [recording, setRecording] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const busy = useRef(false);
@@ -86,13 +90,27 @@ export function ListingChatThread({ conversationId, viewerId, initial, peerName,
 
   function send(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (busy.current) return;
+    if (busy.current || recording) return;
     const text = body.trim();
-    if (!text) return setError("Write a message first.");
+    if (!text && !file) return setError("Write a message first.");
     busy.current = true;
     setError(null);
     startTransition(async () => {
       try {
+        if (file) {
+          const response = await fetch(`/api/messages/${conversationId}/media`, {
+            method: "POST", headers: { "Content-Type": file.type }, body: file,
+          });
+          if (!response.ok) {
+            const result = await response.json().catch(() => null);
+            setError(result?.message ?? "Couldn’t send the attachment. Try again.");
+            return;
+          }
+          setFile(null);
+          followLatest.current = true;
+          router.refresh();
+          return;
+        }
         const result = await sendListingChatAction({ conversationId, body: text });
         if (result.ok) {
           followLatest.current = true;
@@ -129,7 +147,14 @@ export function ListingChatThread({ conversationId, viewerId, initial, peerName,
                   <div className={`min-w-0 max-w-[min(75%,36rem)] rounded-2xl px-3.5 py-2 shadow-xs ${mine
                     ? "rounded-br-sm bg-blue-700 text-white dark:bg-blue-800"
                     : "rounded-bl-sm border bg-card text-card-foreground"}`}>
-                    <p className="whitespace-pre-wrap text-[0.9375rem] leading-relaxed [overflow-wrap:anywhere]">{message.body}</p>
+                    {message.attachment_kind === "image" ? (
+                      <a href={`/api/messages/media/${message.id}`} target="_blank" rel="noreferrer" aria-label="Open chat photo">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={`/api/messages/media/${message.id}`} alt="Photo shared in chat" loading="lazy" className="max-h-64 w-56 max-w-full rounded-lg object-contain" />
+                      </a>
+                    ) : message.attachment_kind === "audio" ? (
+                      <audio controls preload="none" src={`/api/messages/media/${message.id}`} aria-label="Play audio message" className="h-10 w-64 max-w-full" />
+                    ) : <p className="whitespace-pre-wrap text-[0.9375rem] leading-relaxed [overflow-wrap:anywhere]">{message.body}</p>}
                     <div className={`mt-1 flex items-center justify-end gap-1.5 text-[0.6875rem] tabular-nums ${mine ? "text-blue-100" : "text-muted-foreground"}`}>
                       <time dateTime={message.created_at} title={day}>{timeLabel.format(date)}</time>
                       {mine && <span className="inline-flex items-center gap-1">{message.read_at ? <CheckCheck className="size-3.5" aria-hidden /> : <Check className="size-3.5" aria-hidden />}{message.read_at ? "Seen" : "Sent"}</span>}
@@ -143,11 +168,13 @@ export function ListingChatThread({ conversationId, viewerId, initial, peerName,
         </ol>
       </div>
       <form method="post" onSubmit={send} className="shrink-0 border-t bg-card px-3 py-2.5 sm:px-5">
+        {file && <ChatMediaPreview file={file} disabled={pending} onRemove={() => setFile(null)} />}
         <label htmlFor="listing-chat-body" className="sr-only">Reply</label>
-        <div className="flex items-end gap-2">
+        <div className="flex items-end gap-1 sm:gap-2">
+          <ChatMediaPicker file={file} disabled={pending} onFile={setFile} onError={setError} onRecording={setRecording} />
           <Textarea id="listing-chat-body" value={body} onChange={event => setBody(event.target.value.slice(0, 2000))}
-            maxLength={2000} required rows={1} placeholder="Write a message…" className="max-h-28 min-h-11 flex-1 resize-none" />
-          <Button type="submit" size="icon" className="size-11 rounded-xl" title="Send message" aria-label="Send message" disabled={pending || !body.trim()} aria-busy={pending}>
+            maxLength={2000} rows={1} placeholder="Write a message…" className="max-h-28 min-h-11 min-w-0 flex-1 resize-none" />
+          <Button type="submit" size="icon" className="size-11 rounded-xl" title={file ? "Send attachment" : "Send message"} aria-label={file ? "Send attachment" : "Send message"} disabled={pending || recording || (!file && !body.trim())} aria-busy={pending}>
             <Send className="size-5" aria-hidden />
           </Button>
         </div>

@@ -39,7 +39,7 @@ export default async function ListingConversationPage({
       .order("position", { referencedTable: "auction_images" }).limit(1, { referencedTable: "auction_images" }).maybeSingle(),
     supabase.from("profiles").select("display_name, username, avatar_path").eq("id", otherId).maybeSingle(),
     supabase.from("listing_messages")
-      .select("id, sender_id, body, created_at, read_at")
+      .select("id, sender_id, body, created_at, read_at, attachment_kind")
       .eq("conversation_id", chat.id)
       .order("created_at", { ascending: false }).limit(100),
     supabase.from("listing_offers").select("id,amount_minor,status,buyer_id,seller_id,created_at")
