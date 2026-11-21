@@ -9,6 +9,7 @@ import { LiveStatus } from "@/components/auction/live-status";
 import { isClosed } from "@/lib/auction-status";
 import { ConditionBadge } from "@/components/auction/status-badge";
 import { publicListingLocation } from "@/lib/listing-display";
+import { listedAge } from "@/lib/discovery";
 
 /**
  * The one card used on home, browse, watchlist, dashboards and profiles.
@@ -52,6 +53,7 @@ export function AuctionCard({
   // The badge (LiveStatus above) already says Paused.
   const clockStopped = closed || auction.status === "PAUSED";
   const hasBids = auction.currentBidMinor !== null || auction.bidCount > 0;
+  const age = listedAge(auction.listedAt);
 
   return (
     <Link
@@ -111,7 +113,7 @@ export function AuctionCard({
             <Money minor={auction.currentBidMinor ?? auction.startingBidMinor} compact={false} />
           </p>
           <Heading className="line-clamp-2 text-sm font-medium leading-snug [overflow-wrap:anywhere]">{auction.title}</Heading>
-          {auction.location && <p className="truncate text-xs text-muted-foreground">{publicListingLocation(auction.location)}</p>}
+          <p className="truncate text-xs text-muted-foreground">{auction.location ? publicListingLocation(auction.location) : ""}{age ? (auction.location ? " · " : "") + age : ""}</p>
         </div>
       ) : (
         <div className="flex flex-1 flex-col gap-2.5 p-4">
@@ -159,6 +161,8 @@ export function AuctionCard({
               <span>{auction.bidCount === 1 ? "bid" : "bids"}</span>
             </div>}
           </div>
+
+          {age && <time dateTime={auction.listedAt ?? undefined} className="text-xs text-muted-foreground">Listed {age}</time>}
 
           {meta && <div className="border-t pt-2 text-[11px]">{meta}</div>}
 
