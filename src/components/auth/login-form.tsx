@@ -179,7 +179,6 @@ export function LoginForm({
     <form
       onSubmit={handleSubmit}
       ref={formRef}
-      // Native fallback must POST so credentials are never serialized into a URL.
       method="post"
       data-testid="login-form"
       data-hydrated={hydrated ? "true" : undefined}
