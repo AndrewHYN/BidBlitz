@@ -124,7 +124,7 @@ export function ListingDealButtons({
           </DialogDescription>
         </DialogHeader>
 
-        <form id={formId} onSubmit={submit} className="deal-sheet__scroll" data-testid="deal-sheet-form">
+        <form id={formId} method="post" onSubmit={submit} className="deal-sheet__scroll" data-testid="deal-sheet-form">
           <div className="deal-sheet__listing">
             <div className="deal-sheet__photo">
               <ImageWithFallback src={thumbnailSrc} alt={title}
