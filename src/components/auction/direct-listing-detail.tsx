@@ -74,7 +74,11 @@ export function DirectListingDetail({ detail, images, related, moreFromSeller }:
                     <MessageCircle aria-hidden /> Message seller
                   </Link>
                 </Button>
-                <ListingDealButtons listingId={auction.id} kind={auction.listing_kind === "SERVICE" ? "SERVICE" : "SALE"} />
+                <ListingDealButtons listingId={auction.id}
+                  kind={auction.listing_kind === "SERVICE" ? "SERVICE" : "SALE"}
+                  title={auction.title} location={publicListingLocation(auction.location)}
+                  thumbnailSrc={images[0]?.url ?? null} askingMinor={String(auction.starting_bid_minor)}
+                  currency={auction.currency} signedIn={Boolean(viewerId)} />
               </div>
             )}
             {isOwner ? (

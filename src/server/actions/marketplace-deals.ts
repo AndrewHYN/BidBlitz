@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { notifyListingChatRecipient } from "@/server/email/notify";
 
 type DealError = { ok: false; message: string };
 type DealSuccess = { ok: true; conversationId?: string; status?: string };
@@ -23,6 +24,24 @@ function refresh() {
   revalidatePath("/messages");
   revalidatePath("/browse");
   revalidatePath("/dashboard/selling");
+}
+
+/** A deal RPC writes a chat message itself; mirror normal chat email alerts.
+ * Resolve the recipient from the DB row, never from the browser payload.
+ * Email is best-effort and must not undo a committed offer or hire request. */
+async function alertDealRecipient(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  listingId: string,
+  conversationId: string | null | undefined,
+  recipientId: string | null | undefined,
+) {
+  if (!conversationId || !recipientId) return;
+  try {
+    const { data } = await supabase.from("auctions").select("title").eq("id", listingId).maybeSingle();
+    await notifyListingChatRecipient(recipientId, data?.title ?? "your listing", conversationId);
+  } catch {
+    // In-app notifications are already created by the database trigger.
+  }
 }
 
 const offerInput = z.object({
@@ -62,8 +81,9 @@ export async function makeListingOfferAction(input: unknown): Promise<DealResult
   });
   if (error || !data) return failure(error?.message);
   const { data: offer } = await supabase.from("listing_offers")
-    .select("conversation_id").eq("id", data).single();
+    .select("conversation_id,seller_id").eq("id", data).single();
   refresh();
+  await alertDealRecipient(supabase, parsed.data.listingId, offer?.conversation_id, offer?.seller_id);
   return { ok: true, conversationId: offer?.conversation_id };
 }
 
@@ -76,7 +96,10 @@ export async function respondListingOfferAction(input: unknown): Promise<DealRes
     p_offer_id: parsed.data.offerId, p_accept: parsed.data.accept,
   });
   if (error) return failure(error.message);
+  const { data: offer } = await supabase.from("listing_offers")
+    .select("conversation_id,buyer_id,listing_id").eq("id", parsed.data.offerId).maybeSingle();
   refresh();
+  if (offer) await alertDealRecipient(supabase, offer.listing_id, offer.conversation_id, offer.buyer_id);
   return { ok: true, status: data };
 }
 
@@ -93,8 +116,9 @@ export async function requestServiceHireAction(input: unknown): Promise<DealResu
   });
   if (error || !data) return failure(error?.message);
   const { data: request } = await supabase.from("service_requests")
-    .select("conversation_id").eq("id", data).single();
+    .select("conversation_id,provider_id").eq("id", data).single();
   refresh();
+  await alertDealRecipient(supabase, parsed.data.listingId, request?.conversation_id, request?.provider_id);
   return { ok: true, conversationId: request?.conversation_id };
 }
 
@@ -110,7 +134,13 @@ export async function respondServiceHireAction(input: unknown): Promise<DealResu
     p_request_id: parsed.data.requestId, p_action: parsed.data.action,
   });
   if (error) return failure(error.message);
+  const { data: request } = await supabase.from("service_requests")
+    .select("conversation_id,listing_id,client_id,provider_id").eq("id", parsed.data.requestId).maybeSingle();
   refresh();
+  if (request) {
+    await alertDealRecipient(supabase, request.listing_id, request.conversation_id,
+      request.provider_id === user.id ? request.client_id : request.provider_id);
+  }
   return { ok: true, status: data };
 }
 
