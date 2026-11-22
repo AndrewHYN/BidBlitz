@@ -42,7 +42,7 @@ export function CloseDirectListing({ auctionId, kind }: { auctionId: string; kin
       <ConfirmDialog
         open={decision !== null}
         onOpenChange={(open) => { if (!open) setDecision(null); }}
-        title={decision === "sold" ? "Mark this item as sold?" : kind === "SERVICE" ? "Remove this service listing?" : "Remove this listing?"
+        title={decision === "sold" ? "Mark this item as sold?" : kind === "SERVICE" ? "Remove this service listing?" : "Remove this listing?"}
         description={kind === "SERVICE"
           ? "Customers will no longer find this service in search, and your contact number will be hidden. Completed service requests remain in chat history."
           : "Buyers will stop seeing the item in listings and your contact number will be hidden."}
