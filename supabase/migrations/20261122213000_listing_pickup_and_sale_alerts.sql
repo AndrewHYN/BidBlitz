@@ -44,9 +44,11 @@ begin
   if p_conversation_id is null then
     if v_current.listing_id is not null then
       delete from public.listing_pickup_reservations where listing_id=p_listing_id;
-      if not exists (
+      if exists (
+        select 1 from public.listing_conversations where id=v_current.conversation_id and left_by is null
+      ) and not exists (
         select 1 from public.listing_chat_preferences
-        where conversation_id=v_current.conversation_id and user_id=v_current.buyer_id and muted
+        where conversation_id=v_current.conversation_id and user_id=v_current.buyer_id and (muted or hidden)
       ) then
         insert into public.notifications(user_id,type,auction_id,payload)
           values(v_current.buyer_id,'NEW_MESSAGE',p_listing_id,
@@ -68,7 +70,7 @@ begin
     values(p_listing_id,v_chat.id,v_actor,v_chat.buyer_id);
   if not exists (
     select 1 from public.listing_chat_preferences
-    where conversation_id=v_chat.id and user_id=v_chat.buyer_id and muted
+    where conversation_id=v_chat.id and user_id=v_chat.buyer_id and (muted or hidden)
   ) then
     insert into public.notifications(user_id,type,auction_id,payload)
       values(v_chat.buyer_id,'NEW_MESSAGE',p_listing_id,
@@ -114,7 +116,8 @@ begin
       left join public.listing_chat_preferences pref
         on pref.conversation_id=c.id and pref.user_id=c.buyer_id
       where c.listing_id=p_auction_id and c.seller_id=v_seller
-        and not coalesce(pref.muted,false)
+        and c.left_by is null and not coalesce(pref.muted,false)
+        and not coalesce(pref.hidden,false)
       order by c.buyer_id,c.last_message_at desc;
   end if;
   -- No stale "pending pickup" state survives removal or sale.
