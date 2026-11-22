@@ -30,6 +30,17 @@ describe("marketplace notifications", () => {
     expect(message).not.toContain("Reply");
     expect(row({ type: "NEW_MESSAGE", payload: { transactionId: "tx" } })).toContain('/dashboard/transactions/tx#messages');
   });
+  it("distinguishes pickup and sold updates without claiming a completed purchase", () => {
+    const pickup = row({ type: "NEW_MESSAGE", payload: { listingChatId: "thread-1", title: "Laptop", event: "pickup_pending" } });
+    expect(pickup).toContain("Pickup being arranged");
+    expect(pickup).toContain('href="/messages/thread-1"');
+    expect(pickup).not.toContain("New message about");
+    const cancelled = row({ type: "NEW_MESSAGE", payload: { listingChatId: "thread-1", title: "Laptop", event: "pickup_cancelled" } });
+    expect(cancelled).toContain("Pickup arrangement cancelled");
+    const sold = row({ type: "NEW_MESSAGE", payload: { listingChatId: "thread-1", title: "Laptop", event: "listing_sold" } });
+    expect(sold).toContain("has been marked sold");
+    expect(sold).toContain("does not mean you purchased");
+  });
   it("distinguishes staff moderation, seller decisions and trader feedback", () => {
     expect(row({ type: "STAFF_REVIEW_REQUIRED", payload: { review_id: "r1" } })).toContain('/admin/listings#review-r1');
     expect(row({ type: "REVIEW_APPROVED" })).toContain('href="/listing/listing-1"');
