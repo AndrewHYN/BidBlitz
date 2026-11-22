@@ -45,6 +45,7 @@ describe("Service enquiries", () => {
     expect(composeServiceRequest({ description: "Too short" })).toBeNull();
     expect(composeServiceRequest({ description: "x".repeat(1501) })).toBeNull();
     expect(composeServiceRequest({ description: "Repair my laptop.", preferredDate: "tomorrow" })).toBeNull();
+    expect(composeServiceRequest({ description: "Repair my laptop.", preferredDate: "2026-02-30" })).toBeNull();
     expect(composeServiceRequest({ description: "Repair my laptop.", location: "x".repeat(121) })).toBeNull();
     expect(composeServiceRequest({ description: "Repair my laptop.", budget: "0.50" })).toBeNull();
   });
