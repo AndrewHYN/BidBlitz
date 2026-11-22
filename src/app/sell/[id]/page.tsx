@@ -135,7 +135,7 @@ export default async function SellDraftPage({
               {isDraft && <DeleteDraftButton auctionId={id} />}
               {auction.status === "PENDING_REVIEW" && <WithdrawReviewButton auctionId={id} />}
             </section>}
-            {auction.status === "LISTED" && <CloseDirectListing auctionId={id} />}
+            {auction.status === "LISTED" && <CloseDirectListing auctionId={id} kind={auction.listing_kind === "SERVICE" ? "SERVICE" : "SALE"} />}
           </div>
         </div>
       </div>
