@@ -353,9 +353,25 @@ function describe(
     case "NEW_MESSAGE": {
       const transactionId = typeof p.transactionId === "string" ? p.transactionId : null;
       const chatId = typeof p.listingChatId === "string" ? p.listingChatId : null;
+      const statusEvent = typeof p.event === "string" ? p.event : null;
+      const updates: Record<string, { heading: string; detail: string }> = {
+        pickup_pending: {
+          heading: `Pickup being arranged for ${headline}`,
+          detail: "The seller has reserved this item while you arrange a safe handover. No payment has been processed by BidBlitz.",
+        },
+        pickup_cancelled: {
+          heading: `Pickup arrangement cancelled for ${headline}`,
+          detail: "The seller released the pickup reservation. Ask about availability in your conversation.",
+        },
+        listing_sold: {
+          heading: `${headline} has been marked sold`,
+          detail: "The seller closed this listing. This does not mean you purchased the item or that BidBlitz processed payment.",
+        },
+      };
+      const update = statusEvent ? updates[statusEvent] : null;
       return {
-        headline: `New message about ${headline}`,
-        detail: null,
+        headline: update?.heading ?? `New message about ${headline}`,
+        detail: update?.detail ?? null,
         href: chatId ? `/messages/${encodeURIComponent(chatId)}` : transactionId ? `/dashboard/transactions/${encodeURIComponent(transactionId)}#messages` : "/messages",
       };
     }

@@ -29,6 +29,28 @@ const offerInput = z.object({
   listingId: z.uuid(),
   amountMinor: z.number().int().min(100).max(999999999999999),
 });
+/**
+ * Seller-only RPC: a reservation is a reversible handover plan, not payment.
+ * The browser never supplies the buyer ID; the RPC verifies the conversation.
+ */
+export async function setListingPickupAction(input: unknown): Promise<DealResult> {
+  const parsed = z.object({ listingId: z.uuid(), conversationId: z.uuid().nullable() }).safeParse(input);
+  if (!parsed.success) return { ok: false, message: "Invalid pickup request." };
+  const { supabase, user } = await signedIn();
+  if (!user) return { ok: false, message: "Sign in to manage pickup." };
+  const { data, error } = await supabase.rpc("set_listing_pickup", {
+    p_listing_id: parsed.data.listingId, p_conversation_id: parsed.data.conversationId,
+  });
+  if (error) {
+    if (error.message.includes("already_reserved")) return { ok: false, message: "Pickup is already pending with another buyer. Release that reservation before choosing someone else." };
+    return { ok: false, message: "Could not change the pickup arrangement. Check that the listing and chat are still active." };
+  }
+  refresh();
+  revalidatePath(`/listing/${parsed.data.listingId}`);
+  if (parsed.data.conversationId) revalidatePath(`/messages/${parsed.data.conversationId}`);
+  return { ok: true, status: data };
+}
+
 export async function makeListingOfferAction(input: unknown): Promise<DealResult> {
   const parsed = offerInput.safeParse(input);
   if (!parsed.success) return { ok: false, message: "Enter a valid offer of at least US$1." };

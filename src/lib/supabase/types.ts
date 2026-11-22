@@ -394,6 +394,10 @@ export interface Database {
         Insert: never;
         Update: never;
       };
+      listing_pickup_reservations: {
+        Row: { listing_id: string; conversation_id: string; seller_id: string; buyer_id: string; created_at: string };
+        Insert: never; Update: never;
+      };
       listing_chat_preferences: {
         Row: { conversation_id: string; user_id: string; pinned: boolean; archived: boolean;
           muted: boolean; manual_unread: boolean; hidden: boolean; cleared_at: string | null };
@@ -469,6 +473,7 @@ export interface Database {
           pinned: boolean; muted: boolean; last_body: string | null; last_sender: string | null;
           last_at: string | null; last_read: string | null; manual_unread: boolean; unread_count: number }[];
       };
+      set_listing_pickup: { Args: { p_listing_id: string; p_conversation_id: string | null }; Returns: "PENDING" | "AVAILABLE" };
       set_listing_chat_action: { Args: { p_conversation_id: string; p_action: string }; Returns: undefined };
       mark_listing_conversation_read: {
         Args: { p_conversation_id: string };

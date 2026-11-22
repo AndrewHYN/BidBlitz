@@ -57,21 +57,29 @@ export function MarketplaceMessageAlerts({ userId }: { userId: string }) {
         const conversationId = data.listingChatId;
         if (typeof conversationId !== "string") return;
         const title = typeof data.title === "string" ? data.title : "your listing";
+        const event = typeof data.event === "string" ? data.event : null;
+        const update = event === "pickup_pending"
+          ? { heading: "Pickup being arranged", detail: `Seller reserved ${title} while you arrange collection.` }
+          : event === "pickup_cancelled"
+            ? { heading: "Pickup arrangement cancelled", detail: `Seller released the reservation for ${title}.` }
+            : event === "listing_sold"
+              ? { heading: "Listing marked sold", detail: `${title} is no longer available. This is not a purchase confirmation.` }
+              : { heading: "New marketplace message", detail: `New message about ${title}` };
         const url = `/messages/${conversationId}`;
         if (pathname !== url) {
           toast(
             <Link href={url} onClick={() => toast.dismiss(row.id)}
               className="flex items-center gap-3 rounded-lg p-1 focus-visible:ring-2">
               <MessageCircle aria-hidden className="size-5 shrink-0 text-blue-600 dark:text-blue-400" />
-              <span><strong className="block">New marketplace message</strong>
-                <span className="text-sm font-normal">New enquiry about {title}</span></span>
+              <span><strong className="block">{update.heading}</strong>
+                <span className="text-sm font-normal">{update.detail}</span></span>
             </Link>, { id: row.id }
           );
           if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
             if ("serviceWorker" in navigator) {
               void navigator.serviceWorker.register("/message-alert-sw.js").then((registration) =>
-                registration.showNotification("New BidBlitz message", {
-                  body: `New enquiry about ${title}`,
+                registration.showNotification(update.heading, {
+                  body: update.detail,
                   tag: `listing-chat-${conversationId}`,
                   data: { url },
                 })
@@ -80,8 +88,8 @@ export function MarketplaceMessageAlerts({ userId }: { userId: string }) {
               });
             } else {
               try {
-                const alert = new Notification("New BidBlitz message", {
-                  body: `New enquiry about ${title}`,
+                const alert = new Notification(update.heading, {
+                  body: update.detail,
                   tag: `listing-chat-${conversationId}`,
                 });
                 alert.onclick = () => { window.focus(); router.push(url); alert.close(); };
