@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { ReportDialog } from "@/components/auction/report-dialog";
 import { ListingChatThread, type ListingChatMessage } from "@/components/messages/listing-chat-thread";
 import { MarketplaceDealPanels } from "@/components/messages/marketplace-deal-panels";
+import { ListingPickupControls } from "@/components/messages/listing-pickup-controls";
 
 export const metadata: Metadata = {
   title: "Conversation",
@@ -35,8 +36,8 @@ export default async function ListingConversationPage({
   if (!chat) notFound();
 
   const otherId = chat.seller_id === user.id ? chat.buyer_id : chat.seller_id;
-  const [{ data: listing }, { data: person }, { data: messages }, { data: offers }, { data: hires }, { data: presence }] = await Promise.all([
-    supabase.from("auctions").select("id, title, status, auction_images(storage_path)").eq("id", chat.listing_id)
+  const [{ data: listing }, { data: person }, { data: messages }, { data: offers }, { data: hires }, { data: presence }, { data: pickup }] = await Promise.all([
+    supabase.from("auctions").select("id, title, status, listing_kind, auction_images(storage_path)").eq("id", chat.listing_id)
       .order("position", { referencedTable: "auction_images" }).limit(1, { referencedTable: "auction_images" }).maybeSingle(),
     supabase.from("profiles").select("display_name, username, avatar_path").eq("id", otherId).maybeSingle(),
     supabase.from("listing_messages")
@@ -48,6 +49,7 @@ export default async function ListingConversationPage({
     supabase.from("service_requests").select("id,details,status,client_id,provider_id,created_at")
       .eq("conversation_id", chat.id).order("created_at", { ascending: false }).limit(30),
     supabase.rpc("listing_chat_peer_presence", { p_conversation_ids: [chat.id] }),
+    supabase.from("listing_pickup_reservations").select("conversation_id").eq("listing_id", chat.listing_id).maybeSingle(),
   ]);
   const requestIds = (hires ?? []).map((request) => request.id);
   const { data: existingReviews } = requestIds.length
@@ -84,6 +86,11 @@ export default async function ListingConversationPage({
         </span>
         <ChevronRight className="size-4 text-muted-foreground" aria-hidden />
       </Link>
+      {listing?.listing_kind === "SALE" && (
+        <ListingPickupControls listingId={chat.listing_id} conversationId={chat.id}
+          isSeller={chat.seller_id === user.id} reservedConversationId={pickup?.conversation_id ?? null}
+          isListed={listing.status === "LISTED"} isSold={listing.status === "SOLD_DIRECT"} />
+      )}
       <MarketplaceDealPanels viewerId={user.id} offers={offers ?? []} hires={hires ?? []}
         reviewedRequestIds={(existingReviews ?? []).map((review) => review.request_id)} />
       <ListingChatThread key={chat.id} leftBy={chat.left_by} conversationId={chat.id} viewerId={user.id} initial={ordered} peerOnline={isChatPeerOnline(lastSeen, now)}
