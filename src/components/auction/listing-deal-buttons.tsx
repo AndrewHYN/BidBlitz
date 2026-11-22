@@ -212,7 +212,7 @@ export function ListingDealButtons({
               {choice === "custom" && (
                 <div className="space-y-2 rounded-xl bg-muted/60 p-3">
                   <label htmlFor={`${formId}-custom`} className="block text-sm font-semibold">Your amount (US$)</label>
-                  <Input id={`${formId}-custom`} inputMode="decimal" autoFocus
+                  <Input id={`${formId}-custom`} inputMode="decimal"
                     value={customAmount} onChange={(event) => setCustomAmount(event.target.value)}
                     className="min-h-12 rounded-xl text-base tabular-nums" placeholder="e.g. 145.00" required />
                   {customAmount && !customOfferMinor(customAmount) && (
