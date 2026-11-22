@@ -50,7 +50,7 @@ export function composeServiceRequest(input: ServiceRequestFields): string | nul
   const budget = input.budget?.trim() ?? "";
   if (description.length < 10 || description.length > 1500 || location.length > 120) return null;
   if (date) {
-    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date)) return null;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
     const parsed = new Date(date + "T00:00:00Z");
     if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date) return null;
   }
