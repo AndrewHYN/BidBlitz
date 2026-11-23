@@ -7,7 +7,7 @@ import { ListingTypeChooser } from "@/components/sell/listing-type-chooser";
 import { marketplaceLocation } from "@/lib/marketplace-location";
 
 export const metadata: Metadata = {
-  title: "Sell an item",
+  title: "Create a listing",
   description: "Choose Sale, Auction or Service and post your listing.",
   robots: { index: false, follow: false },
 };
@@ -30,7 +30,7 @@ export default async function SellPage() {
           <PageHeader
             className="gap-1 border-0 pb-0"
             title="Create a listing"
-            description="Find your category in seconds, set your price and get paid directly by your buyer or client. Add photos before publishing."
+            description="Choose Sale or Service, set a price and add photos before publishing. Sellers get paid directly by buyers or clients. Service requests and quotes are agreed through chat."
           />
         </div>
         {profile?.is_banned ? (

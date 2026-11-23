@@ -11,7 +11,7 @@ import { parseMoneyToMinor } from "@/lib/money";
 import { editDirectListingAction } from "@/server/actions/auction";
 
 export function EditDirectListing({
-  id, title, description, price, updatedAt, reviewRequired,
+  id, title, description, price, updatedAt, reviewRequired, kind = "SALE",
 }: {
   id: string;
   title: string;
@@ -19,6 +19,7 @@ export function EditDirectListing({
   price: string;
   updatedAt: string;
   reviewRequired: boolean;
+  kind?: "SALE" | "SERVICE";
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -73,7 +74,7 @@ export function EditDirectListing({
               <Textarea name="description" defaultValue={description} rows={6} minLength={10} maxLength={5000} required />
             </label>
             <label className="block max-w-48 space-y-1.5 text-sm font-medium">
-              <span>Asking price (USD)</span>
+              <span>{kind === "SERVICE" ? "Starting service price (USD)" : "Asking price (USD)"}</span>
               <Input name="price" inputMode="decimal" defaultValue={price} required />
             </label>
             {reviewRequired && <p className="text-sm text-muted-foreground">Your first edit after publishing needs admin approval. The listing is hidden while it’s under review.</p>}

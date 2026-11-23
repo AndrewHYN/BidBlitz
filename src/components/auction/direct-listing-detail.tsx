@@ -30,7 +30,9 @@ export function DirectListingDetail({ detail, images, related, moreFromSeller }:
 }) {
   const { auction, viewerId, watched } = detail;
   const isOwner = viewerId === auction.seller_id;
-  const isAvailable = auction.status === "LISTED";
+  const serviceUnavailable = auction.listing_kind === "SERVICE" && auction.service_availability === "UNAVAILABLE";
+  const serviceBusy = auction.listing_kind === "SERVICE" && auction.service_availability === "BUSY";
+  const isAvailable = auction.status === "LISTED" && !serviceUnavailable;
   const age = listedAge(auction.listed_at);
 
   return (
@@ -51,13 +53,21 @@ export function DirectListingDetail({ detail, images, related, moreFromSeller }:
           <div className="space-y-3">
             <h1 data-testid="auction-title" className="text-3xl font-bold tracking-tight break-words">{auction.title}</h1>
             <div className="flex flex-wrap items-center gap-2">
-              <StatusBadge status={auction.status} />
+              {!(auction.listing_kind === "SERVICE" && (serviceUnavailable || serviceBusy)) && <StatusBadge status={auction.status} />}
+              {serviceUnavailable && <span className="rounded-md bg-muted px-2.5 py-1 text-xs font-semibold text-foreground">Service unavailable</span>}
+              {serviceBusy && <span className="rounded-md bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-950">Busy · accepting future work</span>}
               {auction.listing_kind !== "SERVICE" && <ConditionBadge condition={auction.condition} />}
 
             </div>
           </div>
 
           <section aria-labelledby="listing-price" className="space-y-3">
+            {serviceUnavailable && (
+              <div role="status" className="rounded-xl border border-border bg-muted/70 px-4 py-3">
+                <p className="font-semibold text-foreground">This service is temporarily unavailable.</p>
+                <p className="mt-1 text-sm text-muted-foreground">The provider is not accepting new requests right now. The listing and its reviews remain visible.</p>
+              </div>
+            )}
             {auction.status === "SOLD_DIRECT" && (
               <div role="status" className="rounded-xl border border-border bg-muted/70 px-4 py-3">
                 <p className="font-semibold text-foreground">Sold. This item is no longer available.</p>
@@ -96,7 +106,7 @@ export function DirectListingDetail({ detail, images, related, moreFromSeller }:
                 signedIn={Boolean(viewerId)}
               />
             ) : (
-              <p className="text-sm text-muted-foreground">{auction.status === "SOLD_DIRECT" ? "Sold. No new enquiries are being accepted." : "This listing is no longer available."}</p>
+              <p className="text-sm text-muted-foreground">{serviceUnavailable ? "Not accepting new service requests." : auction.status === "SOLD_DIRECT" ? "Sold. No new enquiries are being accepted." : "This listing is no longer available."}</p>
             )}
             <section aria-labelledby="listing-description" className="space-y-2 border-t pt-5">
               <h2 id="listing-description" className="font-semibold">{auction.listing_kind === "SERVICE" ? "About this service" : "About this item"}</h2>
@@ -108,13 +118,15 @@ export function DirectListingDetail({ detail, images, related, moreFromSeller }:
           {auction.listing_kind === "SERVICE" && <ServiceReviewList listingId={auction.id} />}
 
           {auction.fulfilment_method && <section className="space-y-1" aria-labelledby="listing-handover">
-            <h2 id="listing-handover" className="font-semibold">{fulfilmentMethodLabels[auction.fulfilment_method]}</h2>
+            <h2 id="listing-handover" className="font-semibold">{auction.listing_kind === "SERVICE" ? "Service delivery arrangements" : fulfilmentMethodLabels[auction.fulfilment_method]}</h2>
             {auction.fulfilment_notes && <p className="break-words text-sm text-muted-foreground">{auction.fulfilment_notes}</p>}
           </section>}
 
           {isAvailable && !isOwner && <p className="flex gap-2 text-sm leading-6 text-muted-foreground">
             <ShieldCheck className="mt-0.5 size-5 shrink-0 text-primary" aria-hidden />
-            Meet in a public place, inspect the item before paying, and keep your mobile wallet PIN private.
+            {auction.listing_kind === "SERVICE"
+              ? "Discuss the scope, price and delivery schedule before paying the provider directly. BidBlitz does not collect service payments."
+              : "Meet in a public place, inspect the item before paying, and keep your mobile wallet PIN private."}
           </p>}
           <ReportDialog auctionId={auction.id} />
         </div>

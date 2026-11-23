@@ -77,7 +77,8 @@ export const CATEGORY_SECTIONS: readonly CategorySection[] = [
     { slug: "food-groceries", search: "groceries snacks drinks baked goods food" },
   ] },
   { label: "Services", service: true, entries: [
-    { slug: "tech-services", search: "computer repair web development software phone repair" },
+    { slug: "web-app-development", search: "web developer web design software development websites web apps portfolio ecommerce coding programming" },
+    { slug: "tech-services", search: "computer repair phone repair laptop repair IT help" },
     { slug: "home-services", search: "cleaning plumbing electrical handyman gardening" },
     { slug: "transport-services", search: "delivery courier moving transport taxi" },
     { slug: "beauty-services", search: "hair braiding barber nails makeup beauty" },
@@ -134,7 +135,8 @@ export function categoryMatches(category: CategoryOption, term: string): boolean
 export function suggestedCategorySlugs(title: string, kind: "SALE" | "AUCTION" | "SERVICE"): string[] {
   const normalized = title.toLowerCase();
   if (kind === "SERVICE") {
-    if (/repair|developer|website|software|computer|phone/.test(normalized)) return ["tech-services"];
+    if (/developer|website|software|web app|web design|programming|coding/.test(normalized)) return ["web-app-development"];
+    if (/repair|computer|phone/.test(normalized)) return ["tech-services"];
     if (/delivery|transport|moving/.test(normalized)) return ["transport-services"];
     if (/hair|braid|makeup|nails|barber/.test(normalized)) return ["beauty-services"];
     if (/plumb|clean|electric|paint|garden/.test(normalized)) return ["home-services"];

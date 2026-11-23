@@ -92,7 +92,7 @@ export function DirectListingForm({ categories, listingKind = "SALE", defaultLoc
     <form method="post" onSubmit={submit} data-testid="sell-form" className="space-y-4 sm:space-y-5">
       <section className={sectionClass} aria-label="Listing details">
         <SectionHead number="01" title={listingKind === "SERVICE" ? "Describe your service" : "Describe your item"}
-          detail="Give buyers the details they will actually search for." />
+          detail={listingKind === "SERVICE" ? "Explain what you deliver, your packages, turnaround time and how clients can contact you." : "Give buyers the details they will actually search for."} />
         <div className="space-y-5 p-4 sm:p-6">
           <div className={fieldClass}>
             <Label htmlFor="sell-title" className="text-sm font-semibold">{listingKind === "SERVICE" ? "Service title" : "Item title"}</Label>
@@ -108,7 +108,7 @@ export function DirectListingForm({ categories, listingKind = "SALE", defaultLoc
               minLength={10} maxLength={5000} rows={4}
               className="min-h-28 resize-y rounded-xl border-input bg-background px-3 py-3 text-base shadow-sm"
               placeholder={listingKind === "SERVICE"
-                ? "Explain your service, experience, area served and what is included."
+                ? "Describe the packages, exactly what is included, expected turnaround and how you deliver. Explain any hosting or domain costs."
                 : "Include the specifications, condition, faults and what comes with the item."} />
             {error("description")}
           </div>
@@ -140,9 +140,10 @@ export function DirectListingForm({ categories, listingKind = "SALE", defaultLoc
             </Label>
             <div className="relative">
               <span aria-hidden className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 font-semibold text-muted-foreground">$</span>
-              <Input id="sell-price" name="price" inputMode="decimal" placeholder="150.00" required className={inputClass + " pl-8"} />
+              <Input id="sell-price" name="price" inputMode="decimal" placeholder={listingKind === "SERVICE" ? "20.00" : "150.00"} required className={inputClass + " pl-8"} />
             </div>
             {error("priceMinor")}
+            {listingKind === "SERVICE" && <p className="text-xs leading-5 text-muted-foreground">This is your starting price, not an instant checkout. You and the client can agree on a final quote after discussing the work.</p>}
           </div>
           {listingKind === "SERVICE" ? (
             <input type="hidden" name="condition" value="new" />
@@ -173,12 +174,12 @@ export function DirectListingForm({ categories, listingKind = "SALE", defaultLoc
             <>
               <input type="hidden" name="fulfilmentMethod" value="BOTH" />
               <div className={fieldClass}>
-                <Label htmlFor="sell-notes" className="text-sm font-semibold">Availability (optional)</Label>
+                <Label htmlFor="sell-notes" className="text-sm font-semibold">Working hours & delivery details (optional)</Label>
                 <Input id="sell-notes" name="fulfilmentNotes" maxLength={500} className={inputClass}
-                  placeholder="e.g. Mon–Sat, house calls" />
+                  placeholder="e.g. Remote work, 3–5 business days, Mon–Sat" />
                 {error("fulfilmentNotes")}
               </div>
-              <p className="text-xs leading-5 text-muted-foreground sm:col-span-2">Clients can request to hire you through BidBlitz chat. Reviews require a completed and confirmed service.</p>
+              <p className="text-xs leading-5 text-muted-foreground sm:col-span-2">Clients send service requests and agree on quotes through BidBlitz chat. After publishing, you can mark the service Available, Busy or Unavailable without deleting it. Reviews require confirmed completion.</p>
             </>
           ) : (
             <>
@@ -204,7 +205,7 @@ export function DirectListingForm({ categories, listingKind = "SALE", defaultLoc
       </section>
 
       <section className={sectionClass} aria-label="Contact details">
-        <SectionHead number="03" title="How buyers can reach you" detail="Share contact details when you’re ready to discuss a sale." />
+        <SectionHead number="03" title={listingKind === "SERVICE" ? "How clients can reach you" : "How buyers can reach you"} detail={listingKind === "SERVICE" ? "Customers can explain their project through BidBlitz chat before agreeing on scope." : "Share contact details when you’re ready to discuss a sale."} />
         <div className="space-y-4 p-4 sm:p-6">
           <div className={fieldClass}>
             <Label htmlFor="sell-phone" className="text-sm font-semibold">Phone / WhatsApp number</Label>

@@ -101,6 +101,7 @@ export interface Database {
           currency: string;
           is_direct: boolean;
           listing_kind: "SALE" | "SERVICE" | "AUCTION";
+          service_availability: "AVAILABLE" | "BUSY" | "UNAVAILABLE";
           starting_bid_minor: number;
           bid_increment_minor: number;
           status: AuctionStatus;
@@ -494,6 +495,10 @@ export interface Database {
       };
       request_service_hire: {
         Args: { p_listing_id: string; p_details: string }; Returns: string;
+      };
+      set_service_availability: {
+        Args: { p_listing_id: string; p_availability: "AVAILABLE" | "BUSY" | "UNAVAILABLE" };
+        Returns: "AVAILABLE" | "BUSY" | "UNAVAILABLE";
       };
       respond_service_hire: {
         Args: { p_request_id: string; p_action: "ACCEPT" | "DECLINE" | "DELIVER" | "CONFIRM" | "CANCEL" }; Returns: string;

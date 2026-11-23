@@ -41,11 +41,12 @@ export type AuctionCardData = {
   businessSlug: string | null;
   isDirect?: boolean;
   listingKind?: "SALE" | "AUCTION" | "SERVICE";
+  serviceAvailability?: "AVAILABLE" | "BUSY" | "UNAVAILABLE";
   listedAt?: string | null;
 };
 
 const CARD_SELECT = `
-  id, title, is_direct, listing_kind, current_bid_minor, starting_bid_minor, bid_count,
+  id, title, is_direct, listing_kind, service_availability, current_bid_minor, starting_bid_minor, bid_count,
   ends_at, status, location, condition, listed_at, featured, featured_until,
   categories:category_id(slug, name),
   business:business_id(slug, display_name),
@@ -56,6 +57,7 @@ type CardJoin = {
   id: string;
   is_direct?: boolean;
   listing_kind?: "SALE" | "AUCTION" | "SERVICE";
+  service_availability?: "AVAILABLE" | "BUSY" | "UNAVAILABLE";
   title: string;
   current_bid_minor: number | null;
   starting_bid_minor: number;
@@ -110,6 +112,7 @@ function toCard(row: CardJoin): AuctionCardData {
     title: row.title,
     isDirect: row.is_direct === true,
     listingKind: row.listing_kind ?? (row.is_direct ? "SALE" : "AUCTION"),
+    serviceAvailability: row.service_availability ?? "AVAILABLE",
     imageUrl: imageUrlFor(sorted[0]?.storage_path),
     currentBidMinor: row.current_bid_minor,
     startingBidMinor: row.starting_bid_minor,

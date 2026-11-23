@@ -224,6 +224,37 @@ export async function editDirectListingAction(input: z.input<typeof editDirectLi
   return { ok: true, status: data };
 }
 
+/** Set a service provider's availability without closing or deleting their listing. */
+export async function setServiceAvailabilityAction(input: unknown): Promise<
+  | { ok: true; availability: "AVAILABLE" | "BUSY" | "UNAVAILABLE" }
+  | { ok: false; message: string }
+> {
+  const parsed = z.object({
+    listingId: z.uuid(),
+    availability: z.enum(["AVAILABLE", "BUSY", "UNAVAILABLE"]),
+  }).safeParse(input);
+  if (!parsed.success) return { ok: false, message: "Choose a valid availability." };
+
+  const { supabase, user } = await requireUser();
+  if (!user) return { ok: false, message: "Sign in to manage your service." };
+
+  const { data, error } = await supabase.rpc("set_service_availability", {
+    p_listing_id: parsed.data.listingId,
+    p_availability: parsed.data.availability,
+  });
+  if (error || !data) {
+    return { ok: false, message: "Couldn't update availability. Confirm that this is your published service." };
+  }
+
+  revalidatePath("/");
+  revalidatePath("/browse");
+  revalidatePath("/services-zimbabwe");
+  revalidatePath(`/listing/${parsed.data.listingId}`);
+  revalidatePath(`/sell/${parsed.data.listingId}`);
+  revalidatePath("/dashboard/selling");
+  return { ok: true, availability: data };
+}
+
 export async function closeDirectListingAction(input: {
   auctionId: string;
   sold: boolean;
