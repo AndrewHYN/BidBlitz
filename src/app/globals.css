@@ -849,18 +849,17 @@
 
 @media (min-width: 640px) {
   .deal-sheet[data-slot="dialog-content"] {
-    inset: auto;
-    top: 50%;
-    left: 50%;
-    bottom: auto;
+    /* With a definite max-content height and four zero insets, CSS auto
+       margins center this fixed panel on both axes without translation.
+       This avoids interference from Tailwind/Radix enter/exit animations. */
+    inset: 0;
+    margin: auto;
+    height: max-content;
     width: min(calc(100vw - 3rem), 34rem);
     max-height: min(84dvh, 800px);
     border: 1px solid var(--border);
     border-radius: 1.5rem;
-    /* CSS animations may own `transform`. Center using the independent
-       `translate` property; unlike the old shared utility, this applies
-       only above the small-screen breakpoint. */
-    translate: -50% -50%;
+    translate: none;
     transform: none;
     box-shadow: 0 24px 88px rgba(5, 16, 31, .35);
   }
