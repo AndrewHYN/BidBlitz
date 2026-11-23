@@ -25,7 +25,7 @@ export default defineConfig({
   // token. Restrict its file set here so the cleanup exemption cannot include
   // the auction/bid/upload suites that write to the database.
   testMatch: readOnly
-    ? ["**/release-smoke.spec.ts", "**/not-found.spec.ts", "**/indexing.spec.ts"]
+    ? ["**/release-smoke.spec.ts", "**/not-found.spec.ts", "**/indexing.spec.ts", "**/deal-sheet-responsive.spec.ts", "**/viewports.spec.ts"]
     : undefined,
   fullyParallel: false,
   // The machine has ~3.9 GB RAM: never run two browsers side by side.

@@ -721,6 +721,14 @@
   background: var(--popover);
   color: var(--popover-foreground);
   box-shadow: 0 -18px 70px rgba(7, 16, 34, .25);
+  /*
+   * Tailwind v4's -translate-x/y-1/2 utilities set the CSS `translate`
+   * property independently of `transform`. The shared dialog uses both
+   * utilities to center itself; overriding only `transform` left those
+   * translations active and shifted this bottom sheet half its width/height
+   * off-screen (also double-shifting the desktop centered dialog).
+   */
+  translate: none;
   transform: none;
   overflow: hidden;
 }
