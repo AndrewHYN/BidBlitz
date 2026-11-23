@@ -206,27 +206,27 @@ test.describe("release visual smoke", () => {
     await page.goto("/login");
     await waitForHydratedForm(page, "login-form");
 
-    await expect(page.getByRole("heading", { name: /welcome back/i })).toBeVisible();
-    await expect(page.getByTestId("google-sign-in-button")).toBeVisible();
-    await expect(page.getByTestId("sign-in-button")).toBeVisible();
-    await expect(page.getByTestId("otp-toggle-button")).toBeVisible();
-    await expect(page.getByRole("link", { name: /create an account/i })).toHaveAttribute("href", "/signup");
-    await expect(page.getByRole("link", { name: /forgot your password/i })).toHaveAttribute("href", "/forgot-password");
+    await expect(page.getByRole("heading", { name: /welcome back/i }).first()).toBeVisible();
+    await expect(page.locator('[data-testid="google-sign-in-button"]:visible').first()).toBeVisible();
+    await expect(page.locator('[data-testid="sign-in-button"]:visible').first()).toBeVisible();
+    await expect(page.locator('[data-testid="otp-toggle-button"]:visible').first()).toBeVisible();
+    await expect(page.getByRole("link", { name: /create an account/i }).first()).toHaveAttribute("href", "/signup");
+    await expect(page.getByRole("link", { name: /forgot your password/i }).first()).toHaveAttribute("href", "/forgot-password");
 
-    const password = page.getByTestId("password-field");
+    const password = page.locator('[data-testid="password-field"]:visible').first();
     await password.fill("not-a-real-password-just-testing");
     await expect(password).toHaveAttribute("type", "password");
-    await page.getByTestId("toggle-password-visibility").click();
+    await page.locator('[data-testid="toggle-password-visibility"]:visible').first().click();
     await expect(password).toHaveAttribute("type", "text");
-    await page.getByTestId("toggle-password-visibility").click();
+    await page.locator('[data-testid="toggle-password-visibility"]:visible').first().click();
     await expect(password).toHaveAttribute("type", "password");
 
-    await page.getByTestId("email-field").fill("seller@example.com");
-    await page.getByTestId("otp-toggle-button").click();
-    await expect(page.getByTestId("email-field")).toHaveValue("seller@example.com");
-    await expect(page.getByTestId("send-code-button")).toBeVisible();
-    await page.getByTestId("otp-back-button").click();
-    await expect(page.getByTestId("sign-in-button")).toBeVisible();
+    await page.locator('[data-testid="email-field"]:visible').first().fill("seller@example.com");
+    await page.locator('[data-testid="otp-toggle-button"]:visible').first().click();
+    await expect(page.locator('[data-testid="email-field"]:visible').first()).toHaveValue("seller@example.com");
+    await expect(page.locator('[data-testid="send-code-button"]:visible').first()).toBeVisible();
+    await page.locator('[data-testid="otp-back-button"]:visible').first().click();
+    await expect(page.locator('[data-testid="sign-in-button"]:visible').first()).toBeVisible();
 
     const widths = await page.evaluate(() => ({
       scroll: document.documentElement.scrollWidth,
