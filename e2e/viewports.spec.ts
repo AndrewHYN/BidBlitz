@@ -1,17 +1,9 @@
 import { expect, test } from "@playwright/test";
 
 /**
- * Public-page viewport sweep: the pages anyone can open, at the four widths
- * the release checklist names, must render without sideways scrolling, dead
- * landmarks or missing content. No account, no fixtures, no writes: these
- * tests create nothing, so they can run in any order against production.
- *
- * The homepage Recently Listed rail is covered structurally here (it renders
- * its cards or its honest empty state, never stale filler), while the
- * freshness RULE itself is proven at the database boundary in
- * scripts/db/verify-engine.mjs (the RL: checks) and as a pure predicate in
- * src/lib/auction-status.test.ts. A browser cannot time-travel 72 hours, so
- * the browser asserts what a browser can: layout integrity.
+ * Public viewport sweep: verify actual current marketplace landmarks and
+ * horizontal layout integrity across phone, tablet, and desktop sizes.
+ * This suite is read-only and does not depend on inventory being present.
  */
 
 const VIEWPORTS = [
@@ -32,8 +24,11 @@ for (const vp of VIEWPORTS) {
 
     for (const path of PUBLIC_PAGES) {
       test(`${path} has no horizontal overflow`, async ({ page }) => {
+        // Next pages may continue background requests after hydration; waiting
+        // for networkidle can stall for 30s without improving layout coverage.
+        // page.goto waits for the load event, so CSS and SSR markup are ready.
         await page.goto(path);
-        await page.waitForLoadState("networkidle").catch(() => undefined);
+        await expect(page.locator("body")).toBeVisible();
         const overflow = await page.evaluate(
           () => document.documentElement.scrollWidth - document.documentElement.clientWidth
         );
@@ -41,13 +36,14 @@ for (const vp of VIEWPORTS) {
       });
     }
 
-    test("homepage renders the recent rail section", async ({ page }) => {
+    test("homepage renders its current listing and discovery landmarks", async ({ page }) => {
       await page.goto("/");
-      await expect(page.getByTestId("home-hero")).toBeVisible({ timeout: 30_000 });
-      // The rail section always renders (cards or its own empty state); the
-      // rule about WHAT fills it - only fresh rows, never stale filler - is
-      // proven at the boundary in db:verify and in unit tests.
-      await expect(page.getByTestId("home-recent")).toBeVisible({ timeout: 30_000 });
+      // The former 'home-recent' rail no longer exists; current home renders
+      // a latest-listings section and a data-backed discovery section instead.
+      // Restrict to main to avoid matching preloaded/duplicate route content.
+      const main = page.locator("main#main");
+      await expect(main.locator("#latest-listings").first()).toBeVisible();
+      await expect(main.getByTestId("home-discovery").first()).toBeVisible();
     });
   });
 }

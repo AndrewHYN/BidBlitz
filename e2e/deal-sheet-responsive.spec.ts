@@ -41,9 +41,11 @@ async function expectDialogInsideViewport(page: Page, kind: "SALE" | "SERVICE") 
   });
 
   expect(bounds.position).toBe("fixed");
-  expect(bounds.translate, "the dialog must not inherit Tailwind's centered translation").toBe("none");
+  // Neither the bottom sheet nor the centered dialog should depend on
+  // translation; desktop centering is achieved by inset:0 + auto margins.
+  expect(bounds.translate, "deal sheet must not inherit translation").toBe("none");
   expect(bounds.left, "dialog clipped on the left").toBeGreaterThanOrEqual(-2);
-  expect(bounds.top, "dialog clipped above the viewport").toBeGreaterThanOrEqual(-2);
+  expect(bounds.top, `dialog clipped above ${bounds.viewportWidth}x${bounds.viewportHeight}: ${JSON.stringify(bounds)}`).toBeGreaterThanOrEqual(-2);
   expect(bounds.right, "dialog clipped on the right").toBeLessThanOrEqual(bounds.viewportWidth + 2);
   expect(bounds.bottom, "dialog clipped below the viewport").toBeLessThanOrEqual(bounds.viewportHeight + 2);
   expect(bounds.width, "dialog too narrow to be usable").toBeGreaterThanOrEqual(
@@ -93,6 +95,11 @@ for (const kind of ["SALE", "SERVICE"] as const) {
 
     for (const size of VIEWPORTS) {
       await page.setViewportSize(size);
+      // Resize and dynamic viewport styles settle on the next paint; an
+      // immediate read can capture the previous height for one frame.
+      await page.evaluate(() => new Promise<void>((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+      }));
       await expectDialogInsideViewport(page, kind);
     }
 
