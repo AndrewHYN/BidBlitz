@@ -857,7 +857,11 @@
     max-height: min(84dvh, 800px);
     border: 1px solid var(--border);
     border-radius: 1.5rem;
-    transform: translate(-50%, -50%);
+    /* CSS animations may own `transform`. Center using the independent
+       `translate` property; unlike the old shared utility, this applies
+       only above the small-screen breakpoint. */
+    translate: -50% -50%;
+    transform: none;
     box-shadow: 0 24px 88px rgba(5, 16, 31, .35);
   }
   .deal-sheet__footer { padding-bottom: 1.15rem; }
