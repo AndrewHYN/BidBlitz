@@ -45,7 +45,9 @@ export function CloseDirectListing({ auctionId, kind }: { auctionId: string; kin
         title={decision === "sold" ? "Mark this item as sold?" : kind === "SERVICE" ? "Remove this service listing?" : "Remove this listing?"}
         description={kind === "SERVICE"
           ? "Customers will no longer find this service in search, and your contact number will be hidden. Completed service requests remain in chat history."
-          : "Buyers will stop seeing the item in listings and your contact number will be hidden."}
+          : decision === "sold"
+            ? "Your listing will display SOLD on its detail page and seller profile, stop appearing in available search results, and stop accepting new offers. This records your report of a sale, not a payment through BidBlitz."
+            : "Buyers will stop seeing this item in available listings and your contact number will be hidden."}
         confirmLabel={decision === "sold" ? "Mark as sold" : kind === "SERVICE" ? "Remove service" : "Remove listing"}
         pending={pending}
         error={null}

@@ -810,7 +810,9 @@ export const getProfileByUsername = cache(async (username: string) => {
       .from("auctions")
       .select(CARD_SELECT)
       .eq("seller_id", data.id)
-      .or(publicListingFilter)
+      // Seller history should show sold direct items with a visible SOLD badge.
+      // Home and Browse continue to show available inventory only.
+      .or(`${publicListingFilter},and(is_direct.eq.true,status.eq.SOLD_DIRECT)`)
       .is("archived_at", null)
       .order("created_at", { ascending: false })
       .limit(12),

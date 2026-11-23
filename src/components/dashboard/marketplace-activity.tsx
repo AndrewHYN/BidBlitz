@@ -14,7 +14,7 @@ const summary = z.object({
 });
 
 const stateNames: Record<string, string> = {
-  LISTED: "Available", LIVE: "Live auction", SOLD_DIRECT: "Marked sold by seller",
+  LISTED: "Available", LIVE: "Live auction", SOLD_DIRECT: "Sold (direct sale · seller-reported)",
   DRAFT: "Draft", PENDING_REVIEW: "Awaiting review",
   SOLD: "Auction sold", UNSOLD: "Unsold", CANCELLED: "Cancelled",
 };
@@ -136,10 +136,11 @@ export async function MarketplaceActivity() {
     <section id="marketplace-activity" aria-labelledby="marketplace-activity-heading" className="space-y-4 scroll-mt-24">
       <h2 id="marketplace-activity-heading" className="text-xl font-semibold tracking-tight">Marketplace activity</h2>
       {!activity ? <p role="alert">Marketplace activity could not be loaded.</p> : <>
-        <dl className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
+        <dl className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
           {([
             ["Accounts", activity.accounts],
             ["Confirmed accounts", activity.confirmed],
+            ["Direct sales marked sold", activity.states.SOLD_DIRECT ?? 0],
             ["Public page views · 14 days", activity.days.reduce((sum, day) => sum + day.views, 0)],
           ] as const).map(([label, value]) => (
             <div key={label} className="rounded-xl border bg-card p-3 last:col-span-2 sm:p-4 sm:last:col-span-1">
@@ -148,11 +149,13 @@ export async function MarketplaceActivity() {
             </div>
           ))}
         </dl>
-        <p className="text-sm text-muted-foreground">Page views count visits to Home, Browse and listing pages from when tracking started. Repeat visits count again.</p>
+        <p className="text-sm text-muted-foreground">Direct sales marked sold are seller-reported; they do not verify payment or represent platform revenue. Page views count visits to Home, Browse and listing pages from when tracking started. Repeat visits count again.</p>
         <div className="grid gap-4 md:grid-cols-2">
           <DailyChart title="Daily sign-ups · 14 days" items={activity.days.map(day => [dateLabel(day.day), day.signups])} />
           <DailyChart title="Daily page views · 14 days" items={activity.days.map(day => [dateLabel(day.day), day.views])} />
-          <StatusChart title="Listing status" items={Object.entries(activity.states).map(([state, count]) => [stateLabel(state), count])} />
+          <StatusChart title="Listing status" items={Object.entries({
+            LISTED: 0, SOLD_DIRECT: 0, SOLD: 0, UNSOLD: 0, CANCELLED: 0, ...activity.states,
+          }).map(([state, count]) => [stateLabel(state), count])} />
           <CountChart title="Published or marked sold by category" items={Object.entries(activity.categories)} />
         </div>
         <section className="space-y-3 rounded-xl border bg-card p-4">
