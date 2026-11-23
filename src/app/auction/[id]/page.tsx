@@ -58,7 +58,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const coverUrl = cover ? imageUrlFor(cover.storage_path) : null;
 
   return {
-    title: detail.auction.title,
+    title: detail.auction.is_direct && listingLocation !== "Location not specified"
+      ? `${detail.auction.title} in ${listingLocation}`
+      : detail.auction.title,
     // Launch search discovery is classifieds-only. Legacy auction histories,
     // including old QA/payment fixtures, remain accessible but not indexable.
     ...(!detail.auction.is_direct || detail.auction.status !== "LISTED" ? { robots: { index: false, follow: false } } : {}),

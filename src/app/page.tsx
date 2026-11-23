@@ -49,6 +49,19 @@ export default async function HomePage() {
         )}
       </section>
       <HomeDiscovery listings={[...listings, ...otherListings]} categories={categories} />
+      <section aria-labelledby="browse-zimbabwe" className="rounded-2xl border bg-card/70 p-5 sm:p-7">
+        <h2 id="browse-zimbabwe" className="text-lg font-bold tracking-tight sm:text-xl">Find buyers, items and services near you</h2>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
+          Explore items for sale in Harare, discover independent service providers around Zimbabwe,
+          or post your own item for local buyers to find. Listings come from individual sellers;
+          confirm details and arrange payment directly with them.
+        </p>
+        <div className="mt-4 flex flex-wrap gap-3 text-sm font-semibold">
+          <Link href="/marketplace/harare" className="rounded-lg border bg-background px-4 py-3 hover:border-primary hover:text-primary">Harare marketplace</Link>
+          <Link href="/services-zimbabwe" className="rounded-lg border bg-background px-4 py-3 hover:border-primary hover:text-primary">Services in Zimbabwe</Link>
+          <Link href="/for-sellers" className="rounded-lg border bg-background px-4 py-3 hover:border-primary hover:text-primary">Sell online in Zimbabwe</Link>
+        </div>
+      </section>
       {otherError && <p role="alert">Listings from other areas couldn’t load. <Link href="/browse" className="underline">Browse all listings</Link></p>}
       {otherListings.length > 0 && (
         <section aria-labelledby="other-listings" className="space-y-4">
