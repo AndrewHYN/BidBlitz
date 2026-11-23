@@ -53,7 +53,7 @@ export function DirectListingDetail({ detail, images, related, moreFromSeller }:
           <div className="space-y-3">
             <h1 data-testid="auction-title" className="text-3xl font-bold tracking-tight break-words">{auction.title}</h1>
             <div className="flex flex-wrap items-center gap-2">
-              <StatusBadge status={auction.status} />
+              {!(auction.listing_kind === "SERVICE" && (serviceUnavailable || serviceBusy)) && <StatusBadge status={auction.status} />}
               {serviceUnavailable && <span className="rounded-md bg-muted px-2.5 py-1 text-xs font-semibold text-foreground">Service unavailable</span>}
               {serviceBusy && <span className="rounded-md bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-950">Busy · accepting future work</span>}
               {auction.listing_kind !== "SERVICE" && <ConditionBadge condition={auction.condition} />}
