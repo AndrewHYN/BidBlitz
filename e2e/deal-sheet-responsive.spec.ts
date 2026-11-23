@@ -45,7 +45,7 @@ async function expectDialogInsideViewport(page: Page, kind: "SALE" | "SERVICE") 
   // translation; desktop centering is achieved by inset:0 + auto margins.
   expect(bounds.translate, "deal sheet must not inherit translation").toBe("none");
   expect(bounds.left, "dialog clipped on the left").toBeGreaterThanOrEqual(-2);
-  expect(bounds.top, "dialog clipped above the viewport").toBeGreaterThanOrEqual(-2);
+  expect(bounds.top, `dialog clipped above ${bounds.viewportWidth}x${bounds.viewportHeight}: ${JSON.stringify(bounds)}`).toBeGreaterThanOrEqual(-2);
   expect(bounds.right, "dialog clipped on the right").toBeLessThanOrEqual(bounds.viewportWidth + 2);
   expect(bounds.bottom, "dialog clipped below the viewport").toBeLessThanOrEqual(bounds.viewportHeight + 2);
   expect(bounds.width, "dialog too narrow to be usable").toBeGreaterThanOrEqual(
