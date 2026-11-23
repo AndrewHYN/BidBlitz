@@ -96,7 +96,7 @@ export function AuctionCard({
               </span>
             ))
           ) : <LiveStatus status={auction.status} endsAt={auction.endsAt} />}
-          {auction.listingKind === "SERVICE" && auction.status === "LISTED" && auction.serviceAvailability !== "AVAILABLE" && (
+          {auction.listingKind === "SERVICE" && auction.status === "LISTED" && (auction.serviceAvailability === "BUSY" || auction.serviceAvailability === "UNAVAILABLE") && (
             <span className="rounded-md bg-slate-950/95 px-2.5 py-1 text-[11px] font-semibold text-white shadow-md">
               {auction.serviceAvailability === "UNAVAILABLE" ? "Unavailable" : "Busy"}
             </span>
