@@ -12,6 +12,8 @@ const STATIC_ROUTES: MetadataRoute.Sitemap = [
   { url: `${siteUrl}/browse`, changeFrequency: "hourly", priority: 0.9 },
   { url: `${siteUrl}/how-it-works`, changeFrequency: "monthly", priority: 0.7 },
   { url: `${siteUrl}/for-sellers`, changeFrequency: "monthly", priority: 0.8 },
+  { url: `${siteUrl}/marketplace/harare`, changeFrequency: "daily", priority: 0.8 },
+  { url: `${siteUrl}/services-zimbabwe`, changeFrequency: "daily", priority: 0.8 },
   { url: `${siteUrl}/about`, changeFrequency: "monthly", priority: 0.6 },
   { url: `${siteUrl}/faq`, changeFrequency: "monthly", priority: 0.6 },
   { url: `${siteUrl}/help`, changeFrequency: "monthly", priority: 0.5 },
