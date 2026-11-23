@@ -41,7 +41,11 @@ async function expectDialogInsideViewport(page: Page, kind: "SALE" | "SERVICE") 
   });
 
   expect(bounds.position).toBe("fixed");
-  expect(bounds.translate, "the dialog must not inherit Tailwind's centered translation").toBe("none");
+  if (bounds.viewportWidth < 640) {
+    expect(bounds.translate, "mobile sheet must not inherit dialog centering").toBe("none");
+  } else {
+    expect(bounds.translate, "tablet/desktop sheet needs deliberate centering").toBe("-50% -50%");
+  }
   expect(bounds.left, "dialog clipped on the left").toBeGreaterThanOrEqual(-2);
   expect(bounds.top, "dialog clipped above the viewport").toBeGreaterThanOrEqual(-2);
   expect(bounds.right, "dialog clipped on the right").toBeLessThanOrEqual(bounds.viewportWidth + 2);
