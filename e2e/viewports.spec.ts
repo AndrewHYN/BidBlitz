@@ -15,9 +15,13 @@ import { expect, test } from "@playwright/test";
  */
 
 const VIEWPORTS = [
+  { name: "320", width: 320, height: 640 },
+  { name: "360", width: 360, height: 740 },
   { name: "390", width: 390, height: 844 },
   { name: "768", width: 768, height: 1024 },
+  { name: "1024", width: 1024, height: 768 },
   { name: "1440", width: 1440, height: 900 },
+  { name: "1920", width: 1920, height: 1080 },
 ] as const;
 
 const PUBLIC_PAGES = ["/", "/browse", "/help/rules", "/terms"] as const;
