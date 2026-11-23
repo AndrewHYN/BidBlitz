@@ -18,6 +18,7 @@ import { DURATIONS, conditionLabels, fulfilmentMethodLabels } from "@/lib/valida
 import { isClosed } from "@/lib/auction-status";
 import { ImageUploader } from "@/components/sell/image-uploader";
 import { CloseDirectListing } from "@/components/sell/close-direct-listing";
+import { ServiceAvailabilityControl } from "@/components/sell/service-availability-control";
 import { PublishButton } from "@/components/sell/publish-button";
 import { FulfilmentEditor } from "@/components/sell/fulfilment-editor";
 import { CancelAuctionButton } from "@/components/sell/cancel-auction-button";
@@ -95,7 +96,7 @@ export default async function SellDraftPage({
         </header>
         {isListed && (
           <div className="mt-4 flex flex-wrap items-center gap-2">
-            <span className="mr-auto rounded-md bg-muted px-2.5 py-1.5 text-sm font-medium">Available</span>
+            <span className="mr-auto rounded-md bg-muted px-2.5 py-1.5 text-sm font-medium">{auction.listing_kind === "SERVICE" ? auction.service_availability === "UNAVAILABLE" ? "Unavailable" : auction.service_availability === "BUSY" ? "Busy" : "Available" : "For sale"}</span>
             <Button asChild variant="outline" className="min-h-11">
               <Link href={`/listing/${id}`}>View listing <ArrowUpRight aria-hidden /></Link>
             </Button>
@@ -121,7 +122,7 @@ export default async function SellDraftPage({
             </section>
             {isDraft && <section className="space-y-3 rounded-xl border bg-card p-5" aria-labelledby="direct-photos">
               <h2 id="direct-photos" className="font-semibold">Listing photos</h2>
-              <p className="text-sm text-muted-foreground">Add at least one photo of the actual item.</p>
+              <p className="text-sm text-muted-foreground">{auction.listing_kind === "SERVICE" ? "Add a clear portfolio image or sample of your work." : "Add at least one photo of the actual item."}</p>
               <ImageUploader auctionId={id} images={images} />
             </section>}
           </div>
@@ -135,6 +136,9 @@ export default async function SellDraftPage({
               {isDraft && <DeleteDraftButton auctionId={id} />}
               {auction.status === "PENDING_REVIEW" && <WithdrawReviewButton auctionId={id} />}
             </section>}
+            {auction.status === "LISTED" && auction.listing_kind === "SERVICE" && (
+              <ServiceAvailabilityControl listingId={id} initialAvailability={auction.service_availability} />
+            )}
             {auction.status === "LISTED" && <CloseDirectListing auctionId={id} kind={auction.listing_kind === "SERVICE" ? "SERVICE" : "SALE"} />}
           </div>
         </div>
