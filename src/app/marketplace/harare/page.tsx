@@ -23,7 +23,7 @@ export default async function HarareMarketplacePage() {
         <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Buy and sell locally in Harare</h1>
         <p className="text-base leading-7 text-muted-foreground">
           Looking for an item close to home? Browse listings posted by independent sellers in Harare.
-          Contact the seller through BidBlitz, ask about the item's condition and availability,
+          Contact the seller through BidBlitz, ask about the item&apos;s condition and availability,
           and agree on a suitable meeting place before paying. BidBlitz does not collect payment
           for these direct sales.
         </p>
