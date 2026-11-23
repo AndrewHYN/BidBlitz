@@ -74,7 +74,7 @@ export function AuctionCard({
           alt={`${auction.title}, photo 1`}
           loading="lazy"
           responsive={{ width: 480, height: 360, sizes: "(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw" }}
-          className="size-full object-cover transition-[transform,filter] duration-700 ease-[cubic-bezier(.16,1,.3,1)] group-hover:scale-[1.055]"
+          className={cn("size-full object-cover transition-[transform,filter,opacity] duration-700 ease-[cubic-bezier(.16,1,.3,1)] group-hover:scale-[1.055]", auction.status === "SOLD_DIRECT" && "grayscale-[0.35] opacity-75")}
           fallback={
             <div className="grid size-full place-items-center bg-muted">
               <ImageIcon className="size-8 text-muted-foreground/60" aria-hidden />
@@ -86,10 +86,15 @@ export function AuctionCard({
 
         <div className="absolute left-2 top-2 flex flex-wrap gap-1.5">
           {auction.isDirect ? (
-            (!compact || auction.listingKind === "SERVICE") &&
-            <span className="rounded-md bg-background/95 px-2 py-1 text-[11px] font-semibold">
-              {auction.listingKind === "SERVICE" ? "Service" : "For sale"}
-            </span>
+            auction.status === "SOLD_DIRECT" ? (
+              <span data-status="SOLD_DIRECT" className="rounded-md bg-slate-950/95 px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wide text-white shadow-md">
+                Sold
+              </span>
+            ) : ((!compact || auction.listingKind === "SERVICE") && (
+              <span className="rounded-md bg-background/95 px-2 py-1 text-[11px] font-semibold">
+                {auction.listingKind === "SERVICE" ? "Service" : "For sale"}
+              </span>
+            ))
           ) : <LiveStatus status={auction.status} endsAt={auction.endsAt} />}
           {auction.featured && (
             <span className="rounded-md border border-primary/20 bg-primary px-2 py-0.5 text-[11px] font-bold text-primary-foreground shadow-md shadow-primary/10">
@@ -176,7 +181,7 @@ export function AuctionCard({
               <span />
             )}
             <span className="inline-flex shrink-0 items-center gap-1 font-semibold text-primary">
-              {auction.listingKind === "SERVICE" ? "View service" : auction.isDirect ? "View item" : "View listing"}
+              {auction.status === "SOLD_DIRECT" ? "View sold item" : auction.listingKind === "SERVICE" ? "View service" : auction.isDirect ? "View item" : "View listing"}
               <ArrowUpRight className="size-3.5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" aria-hidden />
             </span>
           </div>
