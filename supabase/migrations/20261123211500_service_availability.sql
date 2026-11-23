@@ -68,3 +68,8 @@ revoke all on function private.require_available_service() from public,anon,auth
 
 comment on column public.auctions.service_availability is
   'Provider-controlled state for SERVICE listings. UNAVAILABLE keeps the listing public but blocks new service requests.';
+
+-- Make software services findable without choosing a generic repair category.
+insert into public.categories (slug, name, emoji, sort_order)
+values ('web-app-development', 'Websites & App Development', '💻', 10)
+on conflict (slug) do nothing;
