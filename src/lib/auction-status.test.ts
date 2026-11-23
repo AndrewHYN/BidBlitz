@@ -107,6 +107,7 @@ describe("isRecentlyListed()", () => {
       "PENDING_REVIEW",
       "PAUSED",
       "SOLD",
+      "SOLD_DIRECT",
       "UNSOLD",
       "CANCELLED",
       "ENDED",
