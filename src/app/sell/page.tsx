@@ -30,7 +30,7 @@ export default async function SellPage() {
           <PageHeader
             className="gap-1 border-0 pb-0"
             title="Create a listing"
-            description="Choose Sale or Service, set a price and add photos before publishing. Service clients request quotes through chat; direct payments are arranged between users."
+            description="Choose Sale or Service, set a price and add photos before publishing. Sellers get paid directly by buyers or clients. Service requests and quotes are agreed through chat."
           />
         </div>
         {profile?.is_banned ? (
