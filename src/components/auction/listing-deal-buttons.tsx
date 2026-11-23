@@ -104,7 +104,7 @@ export function ListingDealButtons({
         </Button>
       </DialogTrigger>
 
-      <DialogContent showCloseButton={false} overlayClassName="!bg-slate-950/60 !backdrop-blur-[3px]"
+      <DialogContent centered={false} showCloseButton={false} overlayClassName="!bg-slate-950/60 !backdrop-blur-[3px]"
         className="deal-sheet" data-testid={isService ? "service-request-sheet" : "sale-offer-sheet"}>
         <DialogHeader className="deal-sheet__header">
           <div className="mx-auto mb-2 h-1.5 w-10 rounded-full bg-foreground/15 sm:hidden" aria-hidden />
