@@ -84,7 +84,7 @@ for (const kind of ["SALE", "SERVICE"] as const) {
       test.skip(true, `No public ${kind.toLowerCase()} listing available; do not create test listings`);
     }
     const listingUrl = await cards.first().getAttribute("href");
-    expect(listingUrl).toMatch(/^\\/listing\\//);
+    expect(listingUrl?.startsWith("/listing/")).toBe(true);
     await page.goto(listingUrl!);
 
     const trigger = page.getByTestId("listing-deal-trigger");
