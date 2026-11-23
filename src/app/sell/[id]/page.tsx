@@ -106,7 +106,8 @@ export default async function SellDraftPage({
         {canEdit && (
           <div className="mt-4">
             <EditDirectListing id={id} title={auction.title} description={auction.description}
-              price={(auction.starting_bid_minor / 100).toFixed(2)} updatedAt={auction.updated_at} reviewRequired={reviewRequired} />
+              price={(auction.starting_bid_minor / 100).toFixed(2)} updatedAt={auction.updated_at} reviewRequired={reviewRequired}
+              kind={auction.listing_kind === "SERVICE" ? "SERVICE" : "SALE"} />
           </div>
         )}
         <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,24rem)]">
