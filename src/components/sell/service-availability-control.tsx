@@ -55,9 +55,9 @@ export function ServiceAvailabilityControl({ listingId, initialAvailability }: {
         onChange={(event) => setAvailability(event.target.value as Availability)}
         disabled={pending}
       >
-        <option value="AVAILABLE">Available — accepting requests</option>
-        <option value="BUSY">Busy — accepting future work</option>
-        <option value="UNAVAILABLE">Unavailable — no new requests</option>
+        <option value="AVAILABLE">Available: accepting requests</option>
+        <option value="BUSY">Busy: accepting future work</option>
+        <option value="UNAVAILABLE">Unavailable: no new requests</option>
       </select>
       <p className="text-xs leading-5 text-muted-foreground" role="status">{descriptions[availability]}</p>
       <Button type="button" onClick={save} disabled={pending || availability === savedAvailability} className="min-h-11">
