@@ -42,6 +42,7 @@ describe("marketplace categories", () => {
   it("suggests a specific category based on the listing title", () => {
     expect(suggestedCategorySlugs("Custom gaming PC RTX 4060", "SALE")).toEqual(["gaming-pcs"]);
     expect(suggestedCategorySlugs("New Zealand rabbits", "SALE")).toEqual(["livestock"]);
-    expect(suggestedCategorySlugs("Website development Harare", "SERVICE")).toEqual(["tech-services"]);
+    expect(suggestedCategorySlugs("Website development Harare", "SERVICE")).toEqual(["web-app-development"]);
+    expect(suggestedCategorySlugs("Laptop repair Harare", "SERVICE")).toEqual(["tech-services"]);
   });
 });
