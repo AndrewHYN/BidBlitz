@@ -32,8 +32,11 @@ for (const vp of VIEWPORTS) {
 
     for (const path of PUBLIC_PAGES) {
       test(`${path} has no horizontal overflow`, async ({ page }) => {
+        // Next pages may continue background requests after hydration; waiting
+        // for networkidle can stall for 30s without improving layout coverage.
+        // page.goto waits for the load event, so CSS and SSR markup are ready.
         await page.goto(path);
-        await page.waitForLoadState("networkidle").catch(() => undefined);
+        await expect(page.locator("body")).toBeVisible();
         const overflow = await page.evaluate(
           () => document.documentElement.scrollWidth - document.documentElement.clientWidth
         );
