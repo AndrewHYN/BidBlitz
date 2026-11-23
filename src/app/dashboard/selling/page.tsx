@@ -156,7 +156,9 @@ export default async function SellingPage({ searchParams }: { searchParams: Prom
                       meta={
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <span className="text-muted-foreground">
-                            {item.isDirect ? "Direct sale" : item.bidCount === 0 ? "No bids yet" : `${item.bidCount} bid${item.bidCount === 1 ? "" : "s"}`}
+                            {item.isDirect
+                              ? item.status === "SOLD_DIRECT" ? "Sold · direct sale" : item.listingKind === "SERVICE" ? "Service" : "Direct sale"
+                              : item.bidCount === 0 ? "No bids yet" : `${item.bidCount} bid${item.bidCount === 1 ? "" : "s"}`}
                           </span>
                           {draftHref && (
                             <span className="font-medium text-primary">Manage listing</span>
