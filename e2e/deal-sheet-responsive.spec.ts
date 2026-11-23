@@ -95,6 +95,11 @@ for (const kind of ["SALE", "SERVICE"] as const) {
 
     for (const size of VIEWPORTS) {
       await page.setViewportSize(size);
+      // Resize and dynamic viewport styles settle on the next paint; an
+      // immediate read can capture the previous height for one frame.
+      await page.evaluate(() => new Promise<void>((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+      }));
       await expectDialogInsideViewport(page, kind);
     }
 
