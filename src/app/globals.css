@@ -856,7 +856,8 @@
     margin: auto;
     height: max-content;
     width: min(calc(100vw - 3rem), 34rem);
-    max-height: min(84dvh, 800px);
+    /* Use layout viewport units above mobile: stable during desktop resize. */
+    max-height: min(84vh, 800px);
     border: 1px solid var(--border);
     border-radius: 1.5rem;
     translate: none;
