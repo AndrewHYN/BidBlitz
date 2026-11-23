@@ -58,6 +58,12 @@ export function DirectListingDetail({ detail, images, related, moreFromSeller }:
           </div>
 
           <section aria-labelledby="listing-price" className="space-y-3">
+            {auction.status === "SOLD_DIRECT" && (
+              <div role="status" className="rounded-xl border border-border bg-muted/70 px-4 py-3">
+                <p className="font-semibold text-foreground">Sold — this item is no longer available.</p>
+                <p className="mt-1 text-sm text-muted-foreground">The seller has marked this listing as sold. You can still view the details, but new offers and contact requests are closed.</p>
+              </div>
+            )}
             <div>
               <h2 id="listing-price" className="text-sm font-medium text-muted-foreground">{auction.listing_kind === "SERVICE" ? "Starting price" : "Asking price"}</h2>
               <p className="text-3xl font-bold tracking-tight"><Money minor={auction.starting_bid_minor} currency={auction.currency} /></p>
@@ -90,7 +96,7 @@ export function DirectListingDetail({ detail, images, related, moreFromSeller }:
                 signedIn={Boolean(viewerId)}
               />
             ) : (
-              <p className="text-sm text-muted-foreground">This item is no longer available.</p>
+              <p className="text-sm text-muted-foreground">{auction.status === "SOLD_DIRECT" ? "Sold — no new enquiries are being accepted." : "This listing is no longer available."}</p>
             )}
             <section aria-labelledby="listing-description" className="space-y-2 border-t pt-5">
               <h2 id="listing-description" className="font-semibold">{auction.listing_kind === "SERVICE" ? "About this service" : "About this item"}</h2>
