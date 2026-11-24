@@ -363,7 +363,7 @@ export const EMAIL_TEMPLATES: Record<string, EmailTemplate> = {
   },
   listing_message: {
     key: "listing_message",
-    // Private marketplace enquiries are opt-in; essential transaction emails stay critical.
+    // Private marketplace enquiries default on; recipients can disable them. Promotional mail requires separate consent.
     critical: false,
     preference: "marketplace_activity",
     subject: (d) => `New BidBlitz message about ${d.title}`,
