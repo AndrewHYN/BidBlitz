@@ -25,7 +25,7 @@ const OPTIONAL = [
   {
     key: "marketplace_activity",
     title: "Marketplace email alerts",
-    description: "New marketplace messages and optional updates. Off unless you opt in.",
+    description: "New messages about your marketplace listings. On by default; turn off anytime.",
   },
 ] as const;
 

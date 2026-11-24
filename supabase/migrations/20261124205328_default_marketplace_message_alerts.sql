@@ -1,0 +1,2 @@
+-- Superseded by 20261124205352_separate_message_alerts_from_marketing_consent.sql.
+-- The original production backfill was corrected in that migration; do not replay the old marketing-coupled change.

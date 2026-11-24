@@ -101,20 +101,21 @@ type DispatchSummary = {
 async function preferencesFor(
   admin: ReturnType<typeof createAdminClient>,
   userId: string | null
-): Promise<{ outbid: boolean; ending_soon: boolean; marketplace_activity: boolean }> {
-  const defaults = { outbid: true, ending_soon: true, marketplace_activity: false };
+): Promise<{ outbid: boolean; ending_soon: boolean; listing_message_alerts: boolean }> {
+  const defaults = { outbid: true, ending_soon: true, listing_message_alerts: false };
   if (!userId) return defaults;
-  const { data } = await admin
+  const { data, error } = await admin
     .from("notification_preferences")
-    .select("outbid, ending_soon, marketplace_activity")
+    .select("outbid, ending_soon, listing_message_alerts")
     .eq("user_id", userId)
     .maybeSingle();
-  if (!data) return defaults;
+  if (error) return defaults;
+  if (!data) return { ...defaults, listing_message_alerts: true };
   const row = data as Record<string, unknown>;
   return {
     outbid: row.outbid !== false,
     ending_soon: row.ending_soon !== false,
-    marketplace_activity: row.marketplace_activity === true,
+    listing_message_alerts: row.listing_message_alerts === true,
   };
 }
 

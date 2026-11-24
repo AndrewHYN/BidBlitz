@@ -121,7 +121,7 @@ describe("dispatchEmailOutbox", () => {
       values.status === "SENDING" ? claim : statusUpdate
     );
     mockFrom.mockImplementation((table: string) => table === "notification_preferences"
-      ? { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { marketplace_activity: true } }) }) }) }
+      ? { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { listing_message_alerts: true } }) }) }) }
       : { update });
     const fetchSpy = vi.fn(async () => ({
       ok: true,
@@ -158,7 +158,7 @@ describe("dispatchEmailOutbox", () => {
       return values.status === "SENDING" ? claim : statusUpdate;
     });
     mockFrom.mockImplementation((table: string) => table === "notification_preferences"
-      ? { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { marketplace_activity: true } }) }) }) }
+      ? { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { listing_message_alerts: true } }) }) }) }
       : { update });
     vi.stubGlobal("fetch", vi.fn(async () => ({
       ok: false,
@@ -178,7 +178,7 @@ describe("dispatchEmailOutbox", () => {
     delete process.env.RESEND_API_KEY;
   });
 
-  it("skips marketplace messages without explicit email opt-in", async () => {
+  it("skips marketplace messages when the user has disabled alerts", async () => {
     process.env.RESEND_API_KEY = "re_test";
     mockRpc.mockResolvedValue({ data: [job({
       template_key: "listing_message",
@@ -186,7 +186,7 @@ describe("dispatchEmailOutbox", () => {
     })], error: null });
     const update = vi.fn(() => ({ eq: vi.fn(async () => ({})) }));
     mockFrom.mockImplementation((table: string) => table === "notification_preferences"
-      ? { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { marketplace_activity: false } }) }) }) }
+      ? { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { listing_message_alerts: false } }) }) }) }
       : { update });
     const fetchSpy = vi.fn();
     vi.stubGlobal("fetch", fetchSpy);
@@ -194,6 +194,23 @@ describe("dispatchEmailOutbox", () => {
     expect(summary.skipped).toBe(1);
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(update).toHaveBeenCalledWith(expect.objectContaining({ status: "SKIPPED" }));
+  });
+
+  it("sends marketplace message alerts by default for a known user with no preferences row", async () => {
+    process.env.RESEND_API_KEY = "re_test";
+    mockRpc.mockResolvedValue({ data: [job({
+      template_key: "listing_message",
+      payload: { title: "Laptop", conversationId: "c-1", recipientId: "u-9" },
+    })], error: null });
+    const update = vi.fn(() => ({ eq: vi.fn(async () => ({})) }));
+    mockFrom.mockImplementation((table: string) => table === "notification_preferences"
+      ? { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null, error: null }) }) }) }
+      : { update });
+    const fetchSpy = vi.fn(async () => ({ ok: true, json: async () => ({ id: "message-id" }) }));
+    vi.stubGlobal("fetch", fetchSpy);
+    const summary = await dispatchEmailOutbox(10);
+    expect(summary.sent).toBe(1);
+    expect(fetchSpy).toHaveBeenCalledOnce();
   });
 
   it("marks optional mail SKIPPED when the recipient disabled it, without calling Resend", async () => {
@@ -210,7 +227,7 @@ describe("dispatchEmailOutbox", () => {
             select: () => ({
               eq: () => ({
                 maybeSingle: async () => ({
-                  data: { outbid: false, ending_soon: true, marketplace_activity: false },
+                  data: { outbid: false, ending_soon: true, listing_message_alerts: false },
                   error: null,
                 }),
               }),
