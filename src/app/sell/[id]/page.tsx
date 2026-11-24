@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { ShareButton } from "@/components/auction/share-button";
 import { EditDirectListing } from "@/components/sell/edit-direct-listing";
+import { EditListingContact } from "@/components/sell/edit-listing-contact";
 import { BackLink } from "@/components/ui/back-link";
 import { ImageWithFallback } from "@/components/auction/image-with-fallback";
 import type { Metadata } from "next";
@@ -116,9 +117,10 @@ export default async function SellDraftPage({
               <h2 id="direct-details" className="font-semibold">Listing details</h2>
               <p className="break-words whitespace-pre-line text-sm text-muted-foreground">{auction.description}</p>
               <dl className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,9rem),1fr))] gap-3 border-t pt-3 text-sm">
-                <div><dt className="text-muted-foreground">Public contact number</dt><dd className="font-medium">{detail.contactPhone ? <a className="inline-flex min-h-9 items-center underline decoration-border underline-offset-4 hover:decoration-current" href={`tel:${detail.contactPhone}`}>{detail.contactPhone}</a> : "Unavailable"}</dd></div>
+                <div><dt className="text-muted-foreground">Phone / WhatsApp number</dt><dd className="font-medium">{detail.contactPhone ? <a className="inline-flex min-h-9 items-center underline decoration-border underline-offset-4 hover:decoration-current" href={`tel:${detail.contactPhone}`}>{detail.contactPhone}</a> : "Unavailable"}</dd></div>
                 <div><dt className="text-muted-foreground">Handover</dt><dd className="font-medium">{auction.fulfilment_method ? fulfilmentMethodLabels[auction.fulfilment_method] : "Choose handover"}</dd></div>
               </dl>
+              {canEdit && detail.contactPhone && <EditListingContact listingId={id} phone={detail.contactPhone} />}
               {auction.fulfilment_notes && <p className="break-words text-sm text-muted-foreground">{auction.fulfilment_notes}</p>}
             </section>
             {isDraft && <section className="space-y-3 rounded-xl border bg-card p-5" aria-labelledby="direct-photos">

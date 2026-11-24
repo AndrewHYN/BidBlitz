@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
 const mocks = vi.hoisted(() => ({
   getUser: vi.fn(),
@@ -47,5 +48,33 @@ describe("contact reveal server action", () => {
     mocks.rpc.mockResolvedValue({ data: "javascript:alert(1)", error: null });
     const { revealListingContactAction } = await import("./listing-contact");
     expect(await revealListingContactAction({ listingId: "00000000-0000-4000-8000-000000000000" })).toMatchObject({ ok: false });
+  });
+});
+
+describe("seller contact update", () => {
+  const listingId = "00000000-0000-4000-8000-000000000000";
+  const input = { listingId, expectedPhone: "+263771234567", phone: "+27 82 123 4567", consent: true };
+  it("requires authentication and explicit consent", async () => {
+    const { updateListingContactAction } = await import("./listing-contact");
+    expect(await updateListingContactAction(input)).toMatchObject({ ok: false });
+    expect(await updateListingContactAction({ ...input, consent: false })).toMatchObject({ ok: false });
+    expect(mocks.rpc).not.toHaveBeenCalled();
+  });
+  it("normalizes and saves an international number using the owner-checked RPC", async () => {
+    mocks.getUser.mockResolvedValue({ data: { user: { id: "seller" } } });
+    mocks.rpc.mockResolvedValue({ data: "+27821234567", error: null });
+    const { updateListingContactAction } = await import("./listing-contact");
+    expect(await updateListingContactAction(input)).toEqual({ ok: true, phone: "+27821234567" });
+    expect(mocks.rpc).toHaveBeenCalledWith("update_listing_contact", {
+      p_listing_id: listingId, p_phone: "+27821234567", p_expected_phone: "+263771234567",
+    });
+  });
+  it("refuses unauthorized and stale writes", async () => {
+    mocks.getUser.mockResolvedValue({ data: { user: { id: "buyer" } } });
+    mocks.rpc.mockResolvedValueOnce({ data: null, error: { message: "listing_unavailable" } });
+    mocks.rpc.mockResolvedValueOnce({ data: null, error: { message: "contact_changed" } });
+    const { updateListingContactAction } = await import("./listing-contact");
+    expect(await updateListingContactAction(input)).toMatchObject({ ok: false });
+    expect(await updateListingContactAction(input)).toMatchObject({ ok: false, message: expect.stringContaining("Refresh") });
   });
 });
