@@ -40,7 +40,7 @@ export function EditListingContact({ listingId, phone }: { listingId: string; ph
         <Phone aria-hidden /> Edit phone / WhatsApp
       </Button>
       <div id="listing-contact-editor" hidden={!open}>
-        {open && <form onSubmit={save} className="space-y-3 rounded-xl border bg-muted/20 p-3 sm:p-4">
+        {open && <form method="post" onSubmit={save} className="space-y-3 rounded-xl border bg-muted/20 p-3 sm:p-4">
           <label className="block space-y-1.5 text-sm font-medium">
             <span>Phone / WhatsApp number</span>
             <Input name="phone" type="tel" autoComplete="tel" defaultValue={phone} maxLength={32}
