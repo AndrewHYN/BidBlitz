@@ -33,7 +33,7 @@ export async function SiteHeader() {
       p_permission: "admin.access",
     });
 
-    const { data: emailPreferences } = await supabase
+    const { data: emailPreferences, error: emailPreferencesError } = await supabase
       .from("notification_preferences")
       .select("marketplace_activity")
       .eq("user_id", user.id)
@@ -48,7 +48,7 @@ export async function SiteHeader() {
       avatarPath: profile?.avatar_path ?? null,
       email: user.email ?? null,
       isAdmin: canAdmin === true,
-      marketplaceEmailAlerts: emailPreferences?.marketplace_activity === true,
+      marketplaceEmailAlerts: !emailPreferencesError && emailPreferences?.marketplace_activity !== false,
     };
 
     try {
