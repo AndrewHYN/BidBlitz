@@ -514,6 +514,10 @@ export interface Database {
         };
         Returns: string;
       };
+      update_listing_contact: {
+        Args: { p_listing_id: string; p_phone: string; p_expected_phone: string };
+        Returns: string;
+      };
       edit_direct_listing: {
         Args: { p_auction_id: string; p_title: string; p_description: string; p_price_minor: number; p_expected_updated_at: string };
         Returns: "DRAFT" | "LISTED" | "PENDING_REVIEW";

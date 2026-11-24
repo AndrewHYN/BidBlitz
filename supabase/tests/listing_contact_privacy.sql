@@ -11,3 +11,12 @@ begin
     raise exception 'authenticated callers need the rate-limited contact reveal function';
   end if;
 end $$;
+
+do $$
+begin
+  if has_function_privilege('anon', 'public.update_listing_contact(uuid,text,text)', 'execute')
+     or not has_function_privilege('authenticated', 'public.update_listing_contact(uuid,text,text)', 'execute')
+     or has_table_privilege('authenticated', 'public.listing_contacts', 'update') then
+    raise exception 'incorrect listing contact edit privileges';
+  end if;
+end $$;
