@@ -181,7 +181,9 @@ export async function dispatchEmailOutbox(limit = 25, specificJobId?: string): P
         continue;
       }
       if (!template.critical && template.preference) {
-        const uid = await userIdForEmail(admin, job.recipient);
+        const uid = job.template_key === "listing_message" && job.payload.recipientId
+          ? job.payload.recipientId
+          : await userIdForEmail(admin, job.recipient);
         const prefs = await preferencesFor(admin, uid);
         if (prefs[template.preference] === false) {
           await admin

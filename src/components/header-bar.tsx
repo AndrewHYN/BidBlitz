@@ -3,34 +3,22 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { AccountMenu } from "@/components/account-menu";
 import { useTheme } from "next-themes";
 import { useMounted } from "@/hooks/use-mounted";
 import {
   Bell,
   Bookmark,
-  Gavel,
   MessageCircle,
   Home,
   Moon,
   Plus,
   Search,
-  ShieldAlert,
   Sun,
-  User as UserIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { BrandMark } from "@/components/brand-mark";
-import { UserAvatar } from "@/components/profile/user-avatar";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { signOutAction } from "@/server/actions/auth";
 import { createClient } from "@/lib/supabase/client";
 import { shouldRefreshHeaderOnAuthEvent } from "@/lib/auth-events";
 import { cn } from "@/lib/utils";
@@ -50,6 +38,7 @@ export type HeaderUser = {
    * the current source of truth.
    */
   isAdmin: boolean;
+  marketplaceEmailAlerts?: boolean;
 };
 
 const NAV = [
@@ -404,75 +393,7 @@ export function HeaderBar({
                 </Link>
               </Button>
 
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="gap-2 px-2" aria-label="Account menu">
-                    <UserAvatar
-                      avatarPath={user.avatarPath}
-                      name={user.displayName}
-                      // `size-7` is 28px; the default stock size (32px) is
-                      // asked for, which over-delivers slightly rather than
-                      // upscaling a 28px image across 32px.
-                      pixelSize={32}
-                      className="size-7"
-                    />
-                    <span className="hidden max-w-28 truncate text-sm md:inline">
-                      {user.displayName}
-                    </span>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuLabel className="truncate">
-                    <span className="block truncate">{user.displayName}</span>
-                    {user.email && (
-                      <span className="block truncate text-xs font-normal text-muted-foreground">
-                        {user.email}
-                      </span>
-                    )}
-                  </DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem asChild>
-                    <Link
-                      href="/settings"
-                      onClick={closeMenu}
-                    >
-                      <UserIcon className="size-4" /> Profile &amp; account settings
-                    </Link>
-                  </DropdownMenuItem>
-
-                  <DropdownMenuItem asChild><Link href="/dashboard/selling" onClick={closeMenu}><Bookmark className="size-4" /> My listings</Link></DropdownMenuItem>
-                  <DropdownMenuItem asChild><Link href="/dashboard/watchlist" onClick={closeMenu}><Bookmark className="size-4" /> Saved items</Link></DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => {
-                    if (typeof window !== "undefined" && "Notification" in window) {
-                      void Notification.requestPermission();
-                    }
-                  }}>Enable message alerts</DropdownMenuItem>
-                  <DropdownMenuItem asChild><Link href="/help" onClick={closeMenu}>Help and safety</Link></DropdownMenuItem>
-                  <DropdownMenuItem asChild><Link href="/dashboard/account" onClick={closeMenu}>Previous sales account</Link></DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href="/dashboard/transactions" onClick={closeMenu}>
-                      <Gavel className="size-4" /> Transactions
-                    </Link>
-                  </DropdownMenuItem>
-                  {user.isAdmin && (
-                    <DropdownMenuItem asChild>
-                      <Link href="/admin" onClick={closeMenu} data-testid="admin-menu-link">
-                        <ShieldAlert className="size-4" /> Admin
-                      </Link>
-                    </DropdownMenuItem>
-                  )}
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onSelect={(e) => {
-                      e.preventDefault();
-                      closeMenu();
-                      void signOutAction();
-                    }}
-                  >
-                    Sign out
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <AccountMenu key={user.id} user={user} />
             </>
           ) : (
             <>

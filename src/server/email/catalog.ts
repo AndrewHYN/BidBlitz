@@ -363,9 +363,9 @@ export const EMAIL_TEMPLATES: Record<string, EmailTemplate> = {
   },
   listing_message: {
     key: "listing_message",
-    // Transactional enquiry notification. A rate limit in notify.ts prevents
-    // a message burst from flooding a buyer or seller's inbox.
-    critical: true,
+    // Private marketplace enquiries are opt-in; essential transaction emails stay critical.
+    critical: false,
+    preference: "marketplace_activity",
     subject: (d) => `New BidBlitz message about ${d.title}`,
     content: (d, appUrl) => ({
       subject: `New BidBlitz message about ${d.title}`,

@@ -66,3 +66,20 @@ export async function updatePreferencesAction(
   revalidatePath("/settings");
   return { ok: true };
 }
+
+/** Update only the marketplace opt-in, preserving the other email categories. */
+export async function setMarketplaceEmailAlertsAction(
+  enabled: boolean
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  if (typeof enabled !== "boolean") return { ok: false, message: "Invalid preference." };
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, message: "Sign in." };
+  const { error } = await supabase.from("notification_preferences").upsert(
+    { user_id: user.id, marketplace_activity: enabled, updated_at: new Date().toISOString() },
+    { onConflict: "user_id" }
+  );
+  if (error) return { ok: false, message: "Could not save email preferences. Try again." };
+  revalidatePath("/settings");
+  return { ok: true };
+}

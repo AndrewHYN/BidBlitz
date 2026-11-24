@@ -173,7 +173,7 @@ export async function notifyListingChatRecipient(
     const jobId = await queueEmail({
       to: contact.email,
       template: "listing_message",
-      data: { name: contact.name, title, conversationId },
+      data: { name: contact.name, title, conversationId, recipientId },
       idempotencyKey: emailKey("listing_message", conversationId, recipientId, windowIndex),
     });
     if (jobId) await dispatchEmailOutbox(1, jobId);
