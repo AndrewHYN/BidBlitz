@@ -85,7 +85,7 @@ describe("email catalog", () => {
     expect(critical).toContain("auction_cancelled");
     const optional = Object.values(EMAIL_TEMPLATES).filter((t) => !t.critical);
     expect(optional.map((t) => t.key)).toEqual(["outbid", "listing_message"]);
-    expect(EMAIL_TEMPLATES.listing_message.preference).toBe("marketplace_activity");
+    expect(EMAIL_TEMPLATES.listing_message.preference).toBe("listing_message_alerts");
     for (const t of optional) {
       expect(t.preference, `${t.key} gates on a preference`).toBeTruthy();
     }
