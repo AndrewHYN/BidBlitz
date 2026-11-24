@@ -35,7 +35,7 @@ export async function SiteHeader() {
 
     const { data: emailPreferences, error: emailPreferencesError } = await supabase
       .from("notification_preferences")
-      .select("marketplace_activity")
+      .select("listing_message_alerts")
       .eq("user_id", user.id)
       .maybeSingle();
 
@@ -48,7 +48,7 @@ export async function SiteHeader() {
       avatarPath: profile?.avatar_path ?? null,
       email: user.email ?? null,
       isAdmin: canAdmin === true,
-      marketplaceEmailAlerts: !emailPreferencesError && emailPreferences?.marketplace_activity !== false,
+      marketplaceEmailAlerts: !emailPreferencesError && emailPreferences?.listing_message_alerts !== false,
     };
 
     try {
