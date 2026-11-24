@@ -81,14 +81,15 @@ export default async function SellDraftPage({
     const reviewRequired = canEdit && Boolean(auction.listed_at) && !approvedEdit;
 
     return (
-      <div className="page-container py-8 sm:py-12">
+      <div className="page-container pb-24 pt-5 sm:py-10">
         <BackLink href="/dashboard/selling">My listings</BackLink>
-        <header className="mt-4 flex items-center gap-4 border-b pb-5">
+        <header className="mt-4 flex items-center gap-4 rounded-2xl border bg-card p-4 shadow-sm sm:p-6">
           <div className="grid size-20 shrink-0 place-items-center overflow-hidden rounded-xl border bg-muted sm:size-24">
             <ImageWithFallback src={images[0]?.url ?? null} alt="" className="size-full object-cover" fallback={<Package className="size-7 text-muted-foreground" aria-hidden />} />
           </div>
           <div className="min-w-0">
-            <h1 className="text-2xl font-bold tracking-tight [overflow-wrap:anywhere] sm:text-3xl">{auction.title}</h1>
+            <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Manage listing</p>
+            <h1 className="text-xl font-bold tracking-tight [overflow-wrap:anywhere] sm:text-3xl">{auction.title}</h1>
             <p className="mt-1 flex flex-wrap items-baseline gap-x-2 text-sm">
               <strong><Money minor={auction.starting_bid_minor} currency={auction.currency} /></strong>
               <span className="text-muted-foreground [overflow-wrap:anywhere]">{auction.location}</span>
@@ -105,7 +106,15 @@ export default async function SellDraftPage({
           </div>
         )}
         {canEdit && (
-          <div className="mt-4">
+          <div className="mt-5 space-y-4">
+            {detail.contactPhone ? (
+              <EditListingContact key={detail.contactPhone} listingId={id} phone={detail.contactPhone} />
+            ) : (
+              <section id="edit-contact" className="scroll-mt-24 rounded-2xl border bg-card p-4 sm:p-5">
+                <h2 className="font-semibold">Phone / WhatsApp number</h2>
+                <p className="mt-1 text-sm text-muted-foreground">We couldn&apos;t load your existing contact number. Refresh this page or contact support before editing it.</p>
+              </section>
+            )}
             <EditDirectListing id={id} title={auction.title} description={auction.description}
               price={(auction.starting_bid_minor / 100).toFixed(2)} updatedAt={auction.updated_at} reviewRequired={reviewRequired}
               kind={auction.listing_kind === "SERVICE" ? "SERVICE" : "SALE"} />
@@ -117,10 +126,9 @@ export default async function SellDraftPage({
               <h2 id="direct-details" className="font-semibold">Listing details</h2>
               <p className="break-words whitespace-pre-line text-sm text-muted-foreground">{auction.description}</p>
               <dl className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,9rem),1fr))] gap-3 border-t pt-3 text-sm">
-                <div><dt className="text-muted-foreground">Phone / WhatsApp number</dt><dd className="font-medium">{detail.contactPhone ? <a className="inline-flex min-h-9 items-center underline decoration-border underline-offset-4 hover:decoration-current" href={`tel:${detail.contactPhone}`}>{detail.contactPhone}</a> : "Unavailable"}</dd></div>
+                {!canEdit && <div><dt className="text-muted-foreground">Phone / WhatsApp number</dt><dd className="font-medium">{detail.contactPhone ?? "Unavailable"}</dd></div>}
                 <div><dt className="text-muted-foreground">Handover</dt><dd className="font-medium">{auction.fulfilment_method ? fulfilmentMethodLabels[auction.fulfilment_method] : "Choose handover"}</dd></div>
               </dl>
-              {canEdit && detail.contactPhone && <EditListingContact listingId={id} phone={detail.contactPhone} />}
               {auction.fulfilment_notes && <p className="break-words text-sm text-muted-foreground">{auction.fulfilment_notes}</p>}
             </section>
             {isDraft && <section className="space-y-3 rounded-xl border bg-card p-5" aria-labelledby="direct-photos">
