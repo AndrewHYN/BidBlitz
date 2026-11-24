@@ -121,7 +121,7 @@ describe("dispatchEmailOutbox", () => {
       values.status === "SENDING" ? claim : statusUpdate
     );
     mockFrom.mockImplementation((table: string) => table === "notification_preferences"
-      ? { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { marketplace_activity: true } }) }) }) }
+      ? { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { listing_message_alerts: true } }) }) }) }
       : { update });
     const fetchSpy = vi.fn(async () => ({
       ok: true,
@@ -158,7 +158,7 @@ describe("dispatchEmailOutbox", () => {
       return values.status === "SENDING" ? claim : statusUpdate;
     });
     mockFrom.mockImplementation((table: string) => table === "notification_preferences"
-      ? { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { marketplace_activity: true } }) }) }) }
+      ? { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { listing_message_alerts: true } }) }) }) }
       : { update });
     vi.stubGlobal("fetch", vi.fn(async () => ({
       ok: false,
@@ -186,7 +186,7 @@ describe("dispatchEmailOutbox", () => {
     })], error: null });
     const update = vi.fn(() => ({ eq: vi.fn(async () => ({})) }));
     mockFrom.mockImplementation((table: string) => table === "notification_preferences"
-      ? { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { marketplace_activity: false } }) }) }) }
+      ? { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { listing_message_alerts: false } }) }) }) }
       : { update });
     const fetchSpy = vi.fn();
     vi.stubGlobal("fetch", fetchSpy);
@@ -227,7 +227,7 @@ describe("dispatchEmailOutbox", () => {
             select: () => ({
               eq: () => ({
                 maybeSingle: async () => ({
-                  data: { outbid: false, ending_soon: true, marketplace_activity: false },
+                  data: { outbid: false, ending_soon: true, listing_message_alerts: false },
                   error: null,
                 }),
               }),
