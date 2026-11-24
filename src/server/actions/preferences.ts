@@ -19,17 +19,18 @@ const preferencesSchema = z.object({
 export type EmailPreferences = z.infer<typeof preferencesSchema>;
 
 export async function getPreferencesAction(): Promise<EmailPreferences> {
-  const fallback = { outbid: true, ending_soon: true, marketplace_activity: false };
+  const fallback = { outbid: true, ending_soon: true, marketplace_activity: true };
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return fallback;
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("notification_preferences")
     .select("outbid, ending_soon, marketplace_activity")
     .eq("user_id", user.id)
     .maybeSingle();
+  if (error) return { ...fallback, marketplace_activity: false };
   if (!data) return fallback;
   const row = data as Partial<EmailPreferences>;
   return {
@@ -67,7 +68,7 @@ export async function updatePreferencesAction(
   return { ok: true };
 }
 
-/** Update only the marketplace opt-in, preserving the other email categories. */
+/** Update only the marketplace message alert preference, preserving the other email categories. */
 export async function setMarketplaceEmailAlertsAction(
   enabled: boolean
 ): Promise<{ ok: true } | { ok: false; message: string }> {
