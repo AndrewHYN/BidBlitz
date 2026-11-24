@@ -104,12 +104,13 @@ async function preferencesFor(
 ): Promise<{ outbid: boolean; ending_soon: boolean; marketplace_activity: boolean }> {
   const defaults = { outbid: true, ending_soon: true, marketplace_activity: false };
   if (!userId) return defaults;
-  const { data } = await admin
+  const { data, error } = await admin
     .from("notification_preferences")
     .select("outbid, ending_soon, marketplace_activity")
     .eq("user_id", userId)
     .maybeSingle();
-  if (!data) return defaults;
+  if (error) return defaults;
+  if (!data) return { ...defaults, marketplace_activity: true };
   const row = data as Record<string, unknown>;
   return {
     outbid: row.outbid !== false,
