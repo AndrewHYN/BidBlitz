@@ -210,7 +210,8 @@ export function DirectListingForm({ categories, listingKind = "SALE", defaultLoc
           <div className={fieldClass}>
             <Label htmlFor="sell-phone" className="text-sm font-semibold">Phone / WhatsApp number</Label>
             <Input id="sell-phone" name="contactPhone" type="tel" autoComplete="tel"
-              maxLength={24} placeholder="e.g. 0772 123 456" required className={inputClass} />
+              maxLength={32} placeholder="0772 123 456 or +27 82 123 4567" required className={inputClass} aria-describedby="sell-phone-help" />
+            <p id="sell-phone-help" className="text-xs leading-5 text-muted-foreground">Any country is welcome. Zimbabwean local numbers work as before; international numbers need the country code, e.g. +27 (South Africa), +268 (Eswatini), or +44 (UK). Enter the number registered with WhatsApp if you want WhatsApp enquiries.</p>
             {error("contactPhone")}
           </div>
           <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border/70 bg-muted/25 p-3.5 text-sm leading-5 hover:border-primary/35">

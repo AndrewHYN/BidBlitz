@@ -1,6 +1,7 @@
 "use server";
 
 import { z } from "zod";
+import { isInternationalContactPhone } from "@/lib/phone";
 import { createClient } from "@/lib/supabase/server";
 
 const inputSchema = z.object({ listingId: z.uuid() });
@@ -25,7 +26,7 @@ export async function revealListingContactAction(input: unknown): Promise<Contac
     }
     return { ok: false, message: "Seller contact is not available for this listing." };
   }
-  if (typeof data !== "string" || !/^\+263\d{9}$/.test(data)) {
+  if (typeof data !== "string" || !isInternationalContactPhone(data)) {
     return { ok: false, message: "Seller contact is unavailable right now." };
   }
   return { ok: true, phone: data };

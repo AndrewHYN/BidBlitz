@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeZimbabwePhone } from "./phone";
+import { normalizeZimbabwePhone, normalizeListingContactPhone } from "./phone";
 
 describe("normalizeZimbabwePhone", () => {
   it.each([
@@ -18,4 +18,22 @@ describe("normalizeZimbabwePhone", () => {
       expect(normalizeZimbabwePhone(input)).toBeNull();
     }
   );
+});
+
+describe("international listing contact numbers", () => {
+  it.each([
+    ["077 123 4567", "+263771234567"],
+    ["263771234567", "+263771234567"],
+    ["+27 82 123 4567", "+27821234567"],
+    ["0027 (82) 123-4567", "+27821234567"],
+    ["+268 78 123 456", "+26878123456"],
+    ["+44 7700 900123", "+447700900123"],
+    ["+1 (202) 555-0123", "+12025550123"],
+  ])("normalizes %s", (input, expected) => {
+    expect(normalizeListingContactPhone(input)).toBe(expected);
+  });
+
+  it.each(["", "821234567", "+27abc1234567", "+0123456789", "+27", "+1234567890123456", "+27+821234567", "tel:+27821234567"])("rejects %s", (input) => {
+    expect(normalizeListingContactPhone(input)).toBeNull();
+  });
 });
