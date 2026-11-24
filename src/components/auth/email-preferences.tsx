@@ -25,7 +25,7 @@ const OPTIONAL = [
   {
     key: "marketplace_activity",
     title: "Marketplace activity",
-    description: "Occasional new listings and product news. Off unless you ask.",
+    description: "Daily new listings in categories you save, plus sold or closed items you saved or enquired about. Off unless you opt in.",
   },
 ] as const;
 

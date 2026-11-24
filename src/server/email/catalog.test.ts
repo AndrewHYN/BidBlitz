@@ -39,6 +39,8 @@ const DATA: Record<string, Record<string, string>> = {
   payment_received: { title: "Radio", auctionId: "a-1", name: "Buyer", amount: "$30.00" },
   payment_expired: { title: "Radio", name: "Buyer", isSeller: "false" },
   team_invite: { role: "MODERATOR", token: "abc" },
+  marketplace_listing_closed: { title: "Radio", status: "SOLD_DIRECT" },
+  marketplace_daily_match: { title: "Radio", listingId: "a-1" },
   listing_message: { title: "Radio", name: "Seller", conversationId: "c-1" },
   new_message: { title: "Radio", name: "Buyer", senderName: "Seller", transactionId: "t-1" },
 };
@@ -84,7 +86,7 @@ describe("email catalog", () => {
     expect(critical).toContain("dispute_staff_required");
     expect(critical).toContain("auction_cancelled");
     const optional = Object.values(EMAIL_TEMPLATES).filter((t) => !t.critical);
-    expect(optional.map((t) => t.key)).toEqual(["outbid"]);
+    expect(optional.map((t) => t.key)).toEqual(["outbid", "marketplace_listing_closed", "marketplace_daily_match"]);
     for (const t of optional) {
       expect(t.preference, `${t.key} gates on a preference`).toBeTruthy();
     }
@@ -102,6 +104,12 @@ describe("email catalog", () => {
         expect(joined, `${key}`).not.toContain("abc");
       }
     }
+  });
+
+  it("links marketplace matches to the canonical listing and closed alerts to browse", () => {
+    const origin = "https://bidblitz.co.zw";
+    expect(getTemplate("marketplace_daily_match")?.content({title:"Radio", listingId:"a-1"}, origin).cta?.href).toBe(origin + "/listing/a-1");
+    expect(getTemplate("marketplace_listing_closed")?.content({title:"Radio & TV", status:"CANCELLED"}, origin).cta?.href).toBe(origin + "/browse?q=Radio%20%26%20TV");
   });
 
   it("derives deterministic idempotency keys per event", () => {

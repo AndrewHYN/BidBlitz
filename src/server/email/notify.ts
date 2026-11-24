@@ -181,3 +181,22 @@ export async function notifyListingChatRecipient(
     // Alerts are best-effort; the buyer/seller message must never roll back.
   }
 }
+
+/** Queue opted-in saved/interested buyer alerts after a successful close.
+ * A small inline batch is best-effort; the cron handles remaining jobs. */
+export async function notifyClosedDirectListing(listingId: string): Promise<void> {
+  try {
+    if (!hasAdminCredentials()) return;
+    const admin = createAdminClient();
+    const { data, error } = await admin.rpc("queue_marketplace_closed_email", { p_listing_id: listingId });
+    if (error) {
+      console.warn("[email] closed listing enqueue failed", error.code);
+      return;
+    }
+    for (const id of ((data ?? []) as string[]).slice(0, 3)) {
+      await dispatchEmailOutbox(1, id);
+    }
+  } catch {
+    console.warn("[email] closed listing alert unavailable");
+  }
+}
