@@ -101,7 +101,7 @@ export function AccountMenu({ user }: { user: HeaderUser }) {
           onSelect={(event) => event.preventDefault()}
           className={cn(row, "pr-3 [&>[data-slot=dropdown-menu-checkbox-item-indicator]]:hidden")}>
           <Mail className={icon} />
-          <span className="min-w-0 flex-1"><span className="block">Marketplace email alerts</span><span className="block text-xs font-normal text-muted-foreground">{pending ? "Saving…" : "Messages and marketplace updates"}</span></span>
+          <span className="min-w-0 flex-1"><span className="block">Marketplace email alerts</span><span className="block text-xs font-normal text-muted-foreground">{pending ? "Saving…" : "New marketplace messages"}</span></span>
           <span aria-hidden className={cn("relative h-5 w-9 shrink-0 rounded-full transition-colors", email ? "bg-blue-600" : "bg-muted-foreground/40")}><span className={cn("absolute left-0.5 top-0.5 size-4 rounded-full bg-white shadow-sm transition-transform", email && "translate-x-4")} /></span>
         </DropdownMenuCheckboxItem>
         <DropdownMenuSeparator />
