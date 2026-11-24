@@ -19,7 +19,7 @@ import type { EmailContent } from "./layout";
  * hand-format.
  */
 
-export type EmailPreferenceKey = "outbid" | "ending_soon" | "marketplace_activity";
+export type EmailPreferenceKey = "outbid" | "ending_soon" | "listing_message_alerts";
 
 export type EmailTemplate = {
   key: string;
@@ -365,7 +365,7 @@ export const EMAIL_TEMPLATES: Record<string, EmailTemplate> = {
     key: "listing_message",
     // Private marketplace enquiries default on; recipients can disable them. Promotional mail requires separate consent.
     critical: false,
-    preference: "marketplace_activity",
+    preference: "listing_message_alerts",
     subject: (d) => `New BidBlitz message about ${d.title}`,
     content: (d, appUrl) => ({
       subject: `New BidBlitz message about ${d.title}`,
