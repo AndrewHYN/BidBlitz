@@ -27,16 +27,16 @@ export async function getPreferencesAction(): Promise<EmailPreferences> {
   if (!user) return fallback;
   const { data, error } = await supabase
     .from("notification_preferences")
-    .select("outbid, ending_soon, marketplace_activity")
+    .select("outbid, ending_soon, listing_message_alerts")
     .eq("user_id", user.id)
     .maybeSingle();
   if (error) return { ...fallback, marketplace_activity: false };
   if (!data) return fallback;
-  const row = data as Partial<EmailPreferences>;
+  const row = data as { outbid?: boolean; ending_soon?: boolean; listing_message_alerts?: boolean };
   return {
     outbid: row.outbid !== false,
     ending_soon: row.ending_soon !== false,
-    marketplace_activity: row.marketplace_activity === true,
+    marketplace_activity: row.listing_message_alerts !== false,
   };
 }
 
@@ -58,7 +58,7 @@ export async function updatePreferencesAction(
       user_id: user.id,
       outbid: parsed.data.outbid,
       ending_soon: parsed.data.ending_soon,
-      marketplace_activity: parsed.data.marketplace_activity,
+      listing_message_alerts: parsed.data.marketplace_activity,
       updated_at: new Date().toISOString(),
     },
     { onConflict: "user_id" }
@@ -77,7 +77,7 @@ export async function setMarketplaceEmailAlertsAction(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, message: "Sign in." };
   const { error } = await supabase.from("notification_preferences").upsert(
-    { user_id: user.id, marketplace_activity: enabled, updated_at: new Date().toISOString() },
+    { user_id: user.id, listing_message_alerts: enabled, updated_at: new Date().toISOString() },
     { onConflict: "user_id" }
   );
   if (error) return { ok: false, message: "Could not save email preferences. Try again." };
