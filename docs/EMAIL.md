@@ -137,3 +137,11 @@ fall back to safe defaults.
 
 Private message email copy links to the conversation without revealing the
 message body. Background push, browser alerts and email are separate checks.
+
+## Marketplace engagement (first release)
+- Opt-in via Settings → Email notifications → Marketplace activity; no emails are sent to non-opted-in users.
+- Closed or sold direct sales: saved-listing users and active, unmuted interested buyers receive a deduplicated alert, linked to browse. A small batch is attempted inline; the remaining queue runs on the existing daily backstop.
+- Daily match at 05:00 UTC (07:00 CAT): one new available sale in a category the user saved, no empty email, no self-listing, no reserved or banned-seller match. Links directly to the listing.
+- Optional emails include a settings link. Current recipient and preferences are checked again when dispatching.
+- Deploy the migration before enabling the new code. Run provider acceptance and actual recipient inbox tests before advertising the feature.
+- Next release: explicitly saved search terms and price/location filters, approved price-drop events (never notify while edits await moderation), back-in-stock/service availability, per-user reminder scheduling, unsubscribe tokens, email event webhooks, more frequent retry scheduling and delivery monitoring. Never fabricate discounts; use verified old/new asking prices.

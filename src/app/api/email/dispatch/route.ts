@@ -1,3 +1,4 @@
+import { createAdminClient, hasAdminCredentials } from "@/lib/supabase/admin";
 import { dispatchEmailOutbox } from "@/server/email/sender";
 
 /**
@@ -5,8 +6,8 @@ import { dispatchEmailOutbox } from "@/server/email/sender";
  *
  * The daily Hobby cron calls this route (`vercel.json`, 05:00 UTC).
  * Direct listing chat alerts can now deliver inline for timely notification;
- * any other queued emails still wait for this sweep. This route never creates
- * mail, only delivers what the outbox holds.
+ * other queued emails still wait for this sweep. It also queues daily opted-in
+ * marketplace recommendations before dispatch.
  *
  * Auth mirrors /api/cron/settle: Vercel cron sends the shared secret, and an
  * unset secret denies rather than defaulting.
@@ -27,6 +28,17 @@ export async function GET(request: Request): Promise<Response> {
   if (!secret || header !== `Bearer ${secret}`) {
     return json({ ok: false, error: "unauthorized" }, 401);
   }
+  let marketplaceQueued = 0;
+  let marketplaceError = false;
+  if (hasAdminCredentials()) {
+    try {
+      const { data, error } = await createAdminClient().rpc("queue_marketplace_daily_match");
+      marketplaceError = Boolean(error);
+      if (!error) marketplaceQueued = Number(data ?? 0);
+    } catch {
+      marketplaceError = true;
+    }
+  }
   const summary = await dispatchEmailOutbox(100);
-  return json({ ok: true, ...summary });
+  return json({ ok: !marketplaceError && !summary.held, marketplaceQueued, marketplaceError, ...summary });
 }

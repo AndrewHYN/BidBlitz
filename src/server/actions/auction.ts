@@ -21,7 +21,7 @@ import {
 } from "@/lib/validation";
 import { normalizeEngineError, type BidRejection } from "@/server/errors";
 import { AUCTION_CREATE_LIMIT, rateLimit } from "@/server/rate-limit";
-import { notifyAdmins, notifySeller } from "@/server/email/notify";
+import { notifyAdmins, notifySeller, notifyClosedDirectListing } from "@/server/email/notify";
 import { emailKey } from "@/server/email/sender";
 
 export type ActionResult<T = unknown> =
@@ -280,6 +280,7 @@ export async function closeDirectListingAction(input: {
   revalidatePath(`/listing/${input.auctionId}`);
   revalidatePath(`/sell/${input.auctionId}`);
   revalidatePath("/dashboard/selling");
+  await notifyClosedDirectListing(input.auctionId);
   return { ok: true, status: data as string };
 }
 

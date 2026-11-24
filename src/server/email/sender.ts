@@ -122,11 +122,14 @@ async function userIdForEmail(
   admin: ReturnType<typeof createAdminClient>,
   email: string
 ): Promise<string | null> {
-  const { data } = await admin.auth.admin.listUsers();
-  const match = (data?.users ?? []).find(
-    (u) => (u.email ?? "").toLowerCase() === email.toLowerCase()
-  );
-  return match?.id ?? null;
+  for (let page = 1; ; page++) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 1000 });
+    if (error) throw new Error("Email preference lookup failed");
+    const users = data?.users ?? [];
+    const match = users.find((u) => (u.email ?? "").toLowerCase() === email.toLowerCase());
+    if (match) return match.id;
+    if (users.length < 1000) return null;
+  }
 }
 
 /**
@@ -181,7 +184,16 @@ export async function dispatchEmailOutbox(limit = 25, specificJobId?: string): P
         continue;
       }
       if (!template.critical && template.preference) {
-        const uid = await userIdForEmail(admin, job.recipient);
+        // New marketplace jobs carry a server-generated user ID. Verify the
+        // current address so a changed address cannot receive stale mail.
+        let uid: string | null;
+        if (job.payload.userId) {
+          const { data, error } = await admin.auth.admin.getUserById(job.payload.userId);
+          if (error) throw new Error("Email recipient verification failed");
+          uid = data.user?.email?.toLowerCase() === job.recipient.toLowerCase() ? data.user.id : null;
+        } else {
+          uid = await userIdForEmail(admin, job.recipient);
+        }
         const prefs = await preferencesFor(admin, uid);
         if (prefs[template.preference] === false) {
           await admin
@@ -194,7 +206,7 @@ export async function dispatchEmailOutbox(limit = 25, specificJobId?: string): P
       }
       const content = template.content(job.payload, url);
       const rendered = renderEmail(
-        { ...content, subject: template.subject(job.payload) },
+        { ...content, subject: template.subject(job.payload), managePreferences: !template.critical },
         url
       );
       const res = await fetch("https://api.resend.com/emails", {

@@ -361,6 +361,32 @@ export const EMAIL_TEMPLATES: Record<string, EmailTemplate> = {
       cta: { label: "Accept the invitation", href: `${appUrl}/admin/team/accept?token=${d.token}` },
     }),
   },
+  marketplace_listing_closed: {
+    key: "marketplace_listing_closed",
+    critical: false,
+    preference: "marketplace_activity",
+    subject: (d) => d.status === "SOLD_DIRECT" ? `Sold: ${d.title}` : `Listing closed: ${d.title}`,
+    content: (d, appUrl) => ({
+      subject: d.status === "SOLD_DIRECT" ? `Sold: ${d.title}` : `Listing closed: ${d.title}`,
+      name: null,
+      headline: d.status === "SOLD_DIRECT" ? "An item you were interested in has sold" : "An item you were interested in is no longer available",
+      paragraphs: [`“${d.title}” is no longer available. This is a listing update, not a purchase or payment confirmation.`, "Browse similar listings from independent sellers."],
+      cta: { label: "Find similar listings", href: `${appUrl}/browse?q=${encodeURIComponent(d.title)}` },
+    }),
+  },
+  marketplace_daily_match: {
+    key: "marketplace_daily_match",
+    critical: false,
+    preference: "marketplace_activity",
+    subject: (d) => `New on BidBlitz: ${d.title}`,
+    content: (d, appUrl) => ({
+      subject: `New on BidBlitz: ${d.title}`,
+      name: null,
+      headline: "A new listing you might like",
+      paragraphs: [`“${d.title}” was recently listed in a category you saved.`, "Availability and asking price can change; check the listing and contact the seller directly."],
+      cta: { label: "View listing", href: `${appUrl}/listing/${encodeURIComponent(d.listingId)}` },
+    }),
+  },
   listing_message: {
     key: "listing_message",
     // Transactional enquiry notification. A rate limit in notify.ts prevents
