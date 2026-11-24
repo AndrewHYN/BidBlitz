@@ -68,6 +68,7 @@ export function ListingContactReveal({
       <Button asChild variant="outline" size="lg" className="min-h-11 w-full">
         <a href={`tel:${phone}`}><Phone aria-hidden /> Call {phone}</a>
       </Button>
+      {!phone.startsWith("+263") && <p className="text-xs leading-5 text-muted-foreground">International number: WhatsApp uses internet data; normal calls may incur international charges.</p>}
       <p className="text-sm leading-6 text-muted-foreground">
         Agree on cash, EcoCash, O&apos;mari or InnBucks with the seller. Payments go directly to the seller.
       </p>

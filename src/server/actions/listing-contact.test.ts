@@ -35,4 +35,17 @@ describe("contact reveal server action", () => {
     expect(mocks.rpc).toHaveBeenCalledWith("reveal_listing_contact", { p_listing_id: "00000000-0000-4000-8000-000000000000" });
     expect(result).toEqual({ ok: true, phone: "+263771234567" });
   });
+  it.each(["+27821234567", "+26878123456", "+447700900123"])("reveals international contact %s after authorization", async (phone) => {
+    mocks.getUser.mockResolvedValue({ data: { user: { id: "viewer" } } });
+    mocks.rpc.mockResolvedValue({ data: phone, error: null });
+    const { revealListingContactAction } = await import("./listing-contact");
+    expect(await revealListingContactAction({ listingId: "00000000-0000-4000-8000-000000000000" })).toEqual({ ok: true, phone });
+  });
+
+  it("rejects unsafe contact values even after RPC authorization", async () => {
+    mocks.getUser.mockResolvedValue({ data: { user: { id: "viewer" } } });
+    mocks.rpc.mockResolvedValue({ data: "javascript:alert(1)", error: null });
+    const { revealListingContactAction } = await import("./listing-contact");
+    expect(await revealListingContactAction({ listingId: "00000000-0000-4000-8000-000000000000" })).toMatchObject({ ok: false });
+  });
 });
