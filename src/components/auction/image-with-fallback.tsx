@@ -47,7 +47,8 @@ export function ImageWithFallback({
       srcSet={optimized?.srcSet}
       src={optimized?.src ?? src}
       alt={alt}
-      loading={loading}
+      loading={loading ?? "lazy"}
+      decoding="async"
       ref={node => {
         // A cached 404 can finish before React attaches its error listener.
         if (node?.complete && node.naturalWidth === 0) onFailure();

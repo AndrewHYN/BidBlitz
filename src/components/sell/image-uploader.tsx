@@ -11,6 +11,7 @@ import { renderRejectionMessage } from "@/server/errors";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { preparePhoto } from "@/lib/prepare-photo";
 
 /**
  * Photos for a draft.
@@ -114,12 +115,18 @@ export function ImageUploader({
         const added: UploaderImage[] = [];
 
         for (let i = 0; i < usable.length; i++) {
-          const file = usable[i];
+          const original = usable[i];
           setUploadStep({ index: i + 1, total: usable.length });
-          const storagePath = `${auctionId}/${lowestFreeIndex([...base, ...added])}.${extensionFor(file)}`;
+          let file: File;
+          try { file = await preparePhoto(original, "listing"); }
+          catch (error) {
+            setNotice(error instanceof Error ? error.message : "Could not prepare that photo.");
+            break;
+          }
+          const storagePath = `${auctionId}/${lowestFreeIndex([...base, ...added])}-${crypto.randomUUID()}.${extensionFor(file)}`;
           const { error } = await supabase.storage
             .from(BUCKET)
-            .upload(storagePath, file, { upsert: true, contentType: file.type });
+            .upload(storagePath, file, { upsert: false, contentType: file.type, cacheControl: "3600" });
           if (error) {
             // The storage message can leak internals (policies, bucket
             // config). Log it for us; say something actionable to the seller.
@@ -195,6 +202,8 @@ export function ImageUploader({
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={entry.url}
+                loading="lazy"
+                decoding="async"
                 alt={`Photo ${index + 1} of ${entries.length}`}
                 className="size-full object-cover"
               />
@@ -248,7 +257,7 @@ export function ImageUploader({
             data-testid="upload-progress"
             className="text-xs font-medium text-muted-foreground"
           >
-            Uploading photo {uploadStep.index} of {uploadStep.total}…
+            Preparing and uploading photo {uploadStep.index} of {uploadStep.total}…
           </p>
         )}
       </div>
