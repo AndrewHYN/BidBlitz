@@ -1,4 +1,5 @@
 import "server-only";
+import { after } from "next/server";
 import { createAdminClient, hasAdminCredentials } from "@/lib/supabase/admin";
 import { dispatchEmailOutbox, emailKey, queueEmail } from "./sender";
 
@@ -9,6 +10,34 @@ import { dispatchEmailOutbox, emailKey, queueEmail } from "./sender";
  * marketplace action that called it. A missed email is a missing email, not
  * a rolled-back bid.
  */
+
+const immediateReviewTemplates = new Set([
+  "review_submitted",
+  "staff_review_required",
+  "review_approved",
+  "review_rejected",
+  "review_changes",
+]);
+
+/** Persist first; attempt only this review email after the response.
+ * The daily dispatcher remains the fallback if scheduling or delivery fails.
+ */
+async function queueNotification(input: Parameters<typeof queueEmail>[0]): Promise<void> {
+  const jobId = await queueEmail(input);
+  if (!jobId || !immediateReviewTemplates.has(input.template)) return;
+  try {
+    after(async () => {
+      try {
+        await dispatchEmailOutbox(1, jobId);
+      } catch {
+        console.warn("[email] immediate review dispatch failed");
+      }
+    });
+  } catch {
+    // Outside a request context the persisted job remains eligible for cron.
+    console.warn("[email] immediate review scheduling unavailable");
+  }
+}
 
 async function userContact(userId: string): Promise<{ email: string; name: string } | null> {
   try {
@@ -83,7 +112,7 @@ export async function notifySeller(
 ): Promise<void> {
   const contact = await userContact(sellerId);
   if (!contact) return;
-  await queueEmail({
+  await queueNotification({
     to: contact.email,
     template,
     data: { ...data, name: contact.name },
@@ -105,7 +134,7 @@ export async function notifyAuctionAudience(
   for (const id of audience) {
     const contact = await userContact(id);
     if (!contact) continue;
-    await queueEmail({
+    await queueNotification({
       to: contact.email,
       template,
       data: {
@@ -126,7 +155,7 @@ export async function notifyAdmins(
   permission?: string
 ): Promise<void> {
   for (const contact of await adminContacts(permission)) {
-    await queueEmail({
+    await queueNotification({
       to: contact.email,
       template,
       data: { ...data, name: contact.name },
@@ -144,7 +173,7 @@ export async function notifyUser(
 ): Promise<void> {
   const contact = await userContact(userId);
   if (!contact) return;
-  await queueEmail({
+  await queueNotification({
     to: contact.email,
     template,
     data: { ...data, name: contact.name },
