@@ -38,3 +38,21 @@ describe("listing review staff alert contract", () => {
     expect(catalog).toContain('/admin#admin-review-heading');
   });
 });
+
+describe("immediate review email dispatch contract", () => {
+  const notify = readFileSync(join(process.cwd(), "src/server/email/notify.ts"), "utf8");
+
+  it("persists a review job before scheduling only its own dispatch", () => {
+    const helper = notify.slice(notify.indexOf("async function queueNotification"), notify.indexOf("async function userContact"));
+    expect(helper.indexOf("await queueEmail(input)")).toBeLessThan(helper.indexOf("after(async"));
+    expect(helper).toContain("!jobId || !immediateReviewTemplates.has(input.template)");
+    expect(helper).toContain("dispatchEmailOutbox(1, jobId)");
+  });
+
+  it("includes staff and seller review alerts in the immediate delivery policy", () => {
+    const policy = notify.slice(notify.indexOf("const immediateReviewTemplates"), notify.indexOf("async function queueNotification"));
+    for (const template of ["review_submitted", "staff_review_required", "review_approved", "review_rejected", "review_changes"]) {
+      expect(policy).toContain(`"${template}"`);
+    }
+  });
+});
