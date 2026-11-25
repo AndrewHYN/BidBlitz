@@ -90,10 +90,10 @@ export function ImageGallery({
             }}>
             <DialogTitle className="pr-9">{title}</DialogTitle>
             <div className="grid h-[min(70dvh,calc(100dvh-10rem))] place-items-center overflow-hidden rounded-lg bg-muted">
-              <ImageWithFallback key={active.id} src={active.url}
+              {viewerOpen && <ImageWithFallback key={active.id} src={active.url}
                 alt={`${title}, photo ${activeIndex + 1} of ${images.length}`}
                 className="size-full min-h-0 object-contain"
-                fallback={<p className="text-muted-foreground">Photo unavailable</p>} />
+                fallback={<p className="text-muted-foreground">Photo unavailable</p>} />}
             </div>
             <div className="flex items-center justify-center gap-4">
               <Button type="button" variant="outline" size="icon" aria-label="Previous photo" disabled={images.length < 2} onClick={() => move(-1)}>
@@ -152,6 +152,7 @@ export function ImageGallery({
               <ImageWithFallback
                 key={img.id}
                 src={img.url}
+                loading="lazy"
                 responsive={{ width: 64, height: 64 }}
                 alt=""
                 className="size-full object-cover"

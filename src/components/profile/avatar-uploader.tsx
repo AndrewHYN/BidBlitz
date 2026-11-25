@@ -5,7 +5,8 @@ import Image from "next/image";
 import { Camera, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { removeAvatarAction, uploadAvatarAction } from "@/server/actions/avatar";
-import { AVATAR_ACCEPT, AVATAR_MAX_BYTES, avatarUrlFor } from "@/lib/avatar";
+import { AVATAR_ACCEPT, avatarUrlFor } from "@/lib/avatar";
+import { preparePhoto, PHOTO_SOURCE_LIMIT } from "@/lib/prepare-photo";
 import { UserAvatar } from "@/components/profile/user-avatar";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -105,20 +106,19 @@ export function AvatarUploader({
 
     setError(null);
 
-    if (file.size > AVATAR_MAX_BYTES) {
+    if (file.size > PHOTO_SOURCE_LIMIT) {
       setError(
-        "That image is larger than 2 MB. Try a smaller picture. A phone photo resized to fit works well."
+        "That image is larger than 20 MB. Choose a smaller picture."
       );
       return;
     }
 
     setPreview({ url: URL.createObjectURL(file), replaces: null });
 
-    const form = new FormData();
-    form.set("avatar", file);
-
     startTransition(async () => {
       try {
+        const form = new FormData();
+        form.set("avatar", await preparePhoto(file, "avatar"));
         const result = await uploadAvatarAction(form);
         if (!result.ok) {
           setError(result.message);

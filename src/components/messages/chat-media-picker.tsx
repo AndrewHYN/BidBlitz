@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AudioLines, ImagePlus, Mic, Square, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CHAT_AUDIO_TYPES, CHAT_IMAGE_TYPES, CHAT_MEDIA_LIMIT, chatMediaType } from "@/lib/chat-media";
+import { preparePhoto, PHOTO_SOURCE_LIMIT } from "@/lib/prepare-photo";
 
 export type ChatMediaStatus = "idle" | "preparing" | "starting" | "recording";
 
@@ -35,8 +36,9 @@ export function ChatMediaPicker({ file, disabled, onFile, onError, onStatus }: {
   }, []);
 
   async function select(selected: File) {
-    if (!chatMediaType(selected.type)) return onError("Choose a JPEG, PNG, WebP or supported audio file.");
-    if (selected.size > CHAT_MEDIA_LIMIT) return onError("Choose a file under 3 MB.");
+    const media = chatMediaType(selected.type);
+    if (!media) return onError("Choose a JPEG, PNG, WebP or supported audio file.");
+    if (selected.size > (media.kind === "image" ? PHOTO_SOURCE_LIMIT : CHAT_MEDIA_LIMIT)) return onError("Choose a photo under 20 MB or audio under 3 MB.");
     setStatus("preparing");
     onStatus("preparing");
     onError(null);
@@ -46,8 +48,9 @@ export function ChatMediaPicker({ file, disabled, onFile, onError, onStatus }: {
       const bytes = await selected.arrayBuffer();
       if (bytes.byteLength !== selected.size || !bytes.byteLength) throw new Error("Unreadable file");
       if (mounted.current) {
-        onFile(new File([bytes], selected.name, { type: selected.type }));
-        setShowAudio(false);
+        const copied = new File([bytes], selected.name, { type: selected.type });
+        const prepared = media.kind === "image" ? await preparePhoto(copied, "chat") : copied;
+        if (mounted.current) { onFile(prepared); setShowAudio(false); }
       }
     } catch {
       if (mounted.current) onError("Couldn’t read that file. Choose it again from your device.");
