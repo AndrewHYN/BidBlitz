@@ -1,0 +1,14 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "zw.co.bidblitz.app",
+      "sha256_cert_fingerprints": [
+        "C3:7A:70:AB:2F:21:40:5D:D9:F4:E7:F2:A4:C5:C0:2A:95:A1:C3:04:A7:DE:13:71:0E:15:0C:6B:BB:4E:8B:31"
+      ]
+    }
+  }
+]
