@@ -4,7 +4,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowRight,ClipboardCheck,FileSearch,TriangleAlert } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { hasPermission } from "@/server/permissions";
+import { hasPermission, effectivePermissions } from "@/server/permissions";
 import { AdminNav } from "@/components/dashboard/admin-nav";
 import { ListingReviewControls } from "@/components/dashboard/listing-review-controls";
 import { formatMoney,money } from "@/lib/money";
@@ -17,18 +17,21 @@ export default async function AdminListingReviews(){
  const supabase=await createClient();
  const {data:{user}}=await supabase.auth.getUser();
  if(!user)redirect("/login?next=/admin/listings");
- const [canView,canApprove,canReject,canChanges,canTeam]=await Promise.all([
+ const [canView,canApprove,canReject,canChanges,canTeam,permissions]=await Promise.all([
   hasPermission(user.id,"listings.review"),
   hasPermission(user.id,"listings.approve"),
   hasPermission(user.id,"listings.reject"),
   hasPermission(user.id,"listings.request_changes"),
-  hasPermission(user.id,"admin.manage_team")
+  hasPermission(user.id,"admin.manage_team"),
+  effectivePermissions(user.id)
  ]);
  if(!canView)redirect("/");
+ const isOwner=permissions.includes("*");
  const {data,error}=await supabase.rpc("staff_listing_review_queue",{p_limit:60});
  const reviews:Review[]=Array.isArray(data)?data as Review[]:[];
  const {data:kinds}=reviews.length ? await supabase.from("auctions")
-  .select("id,listing_kind").in("id",reviews.map(r=>r.auctionId)) : {data:[]};
+  .select("id,listing_kind,seller_id").in("id",reviews.map(r=>r.auctionId)) : {data:[]};
+ const ownIds=new Set((kinds??[]).filter(row=>row.seller_id===user.id).map(row=>row.id));
  const kindById=new Map((kinds??[]).map(row=>[row.id,row.listing_kind]));
  return <main className="page-container space-y-7 py-8 sm:py-12" data-testid="staff-listing-reviews">
   <header className="relative overflow-hidden rounded-[1.75rem] border border-orange-500/20 bg-[#151719] p-7 text-white shadow-xl sm:p-10">
@@ -55,6 +58,7 @@ export default async function AdminListingReviews(){
      <ul className="grid gap-4 lg:grid-cols-2">
       {reviews.map(r=>{
        const kind=kindById.get(r.auctionId);
+       const own=ownIds.has(r.auctionId);
        return <li key={r.reviewId} id={`review-${r.reviewId}`} className="scroll-mt-24 target:ring-2 target:ring-blue-500 space-y-4 rounded-2xl border bg-card p-5 shadow-sm" data-testid="listing-review-row">
        <div className="flex flex-wrap justify-between gap-2">
         <p className="text-xs font-black uppercase tracking-widest text-primary">{r.condition.replaceAll("_"," ")}</p>
@@ -70,13 +74,13 @@ export default async function AdminListingReviews(){
        </div>
        <p className="line-clamp-5 whitespace-pre-wrap text-sm leading-6 text-muted-foreground">{r.description}</p>
        <Link href={`/listing/${r.auctionId}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs font-bold text-primary hover:underline">Inspect listing details <ArrowRight className="size-3.5" aria-hidden/></Link>
-       <ListingReviewControls reviewId={r.reviewId} canApprove={canApprove} canReject={canReject} canRequestChanges={canChanges}/>
+       {own&&!isOwner?<p className="text-xs font-bold text-muted-foreground">Another reviewer must review your own listing.</p>:<ListingReviewControls reviewId={r.reviewId} canApprove={canApprove} canReject={canReject&&!own} canRequestChanges={canChanges&&!own} ownerOverride={own&&isOwner}/>}
       </li>})}
      </ul>}
    </>}
   <p className="flex gap-2 rounded-xl border border-amber-500/20 bg-amber-500/5 p-4 text-xs leading-5">
    <TriangleAlert className="size-4 shrink-0 text-amber-700 dark:text-amber-300" aria-hidden/>
-   Never approve your own listing or misrepresent an item&apos;s condition. Listing approval does not bypass auction rules, payment settlement or dispute holds.
+   Only the platform owner may approve their own listing, with a recorded reason. Never misrepresent an item&apos;s condition. Listing approval does not bypass auction rules, payment settlement or dispute holds.
   </p>
  </main>;
 }

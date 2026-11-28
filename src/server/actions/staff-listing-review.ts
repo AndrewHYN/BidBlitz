@@ -26,8 +26,9 @@ export async function staffDecideListingAction(input:unknown):Promise<Outcome>{
   p_review_id:reviewId,p_decision:decision,p_reason:reason||null
  });
  if(error||data?.ok!==true){
-  return {ok:false,message:error?.message?.includes("self_review_forbidden")?
-   "Staff cannot approve their own listings. Assign another reviewer.":
+  return {ok:false,message:error?.message?.includes("owner_override_reason_required")?
+   "Enter a reason of at least 5 characters for your owner override.":error?.message?.includes("self_review_forbidden")?
+   "Only the active platform owner can approve their own listing. Assign another reviewer.":
    "The review was refused or was already decided. Refresh the queue."};
  }
  revalidatePath("/admin/listings");
