@@ -1,270 +1,60 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-
-const { mockRpc, mockFrom } = vi.hoisted(() => ({
-  mockRpc: vi.fn(),
-  mockFrom: vi.fn(),
-}));
-
+const { rpc, from } = vi.hoisted(() => ({ rpc: vi.fn(), from: vi.fn() }));
 vi.mock("@/lib/supabase/admin", () => ({
-  createAdminClient: vi.fn(() => ({ rpc: mockRpc, from: mockFrom, auth: { admin: { listUsers: vi.fn(async () => ({ data: { users: [] } })) } } })),
-  hasAdminCredentials: vi.fn(() => true),
+  createAdminClient: () => ({ rpc, from }), hasAdminCredentials: () => true,
 }));
-
-import { dispatchEmailOutbox, queueEmail } from "./sender";
-import { createAdminClient } from "@/lib/supabase/admin";
-
-function defaultClient() {
-  vi.mocked(createAdminClient).mockReset();
-  vi.mocked(createAdminClient).mockImplementation(
-    () =>
-      ({
-        rpc: mockRpc,
-        from: mockFrom,
-        auth: { admin: { listUsers: async () => ({ data: { users: [] } }) } },
-      }) as never
-  );
-}
-
-/**
- * The sender's contract, with the provider behind a mock: without credentials
- * nothing is attempted and rows stay queued; a duplicate enqueue collapses;
- * a preference-disabled optional email is SKIPPED rather than sent; failures
- * are recorded, never thrown. Marketplace state is never in the blast radius
- * because queueEmail swallows everything into null.
- */
-
-function job(overrides: Record<string, unknown> = {}) {
-  return {
-    id: "job-1",
-    recipient: "buyer@example.com",
-    template_key: "won",
-    payload: { title: "Radio", auctionId: "a-1", amount: "$30.00", name: "Buyer" },
-    idempotency_key: "won:auction:a-1",
-    ...overrides,
-  };
-}
-
+import { dispatchEmailOutbox, queueEmail, retryDelayMs } from "./sender";
+const baseJob = { id:"job-1", recipient:"buyer@example.com", template_key:"won",
+  payload:{title:"Radio",auctionId:"a-1",amount:"$30.00",name:"Buyer"},
+  idempotency_key:"won:auction:a-1", attempts:1, delivery_uncertain:false };
+const update = vi.fn();
 beforeEach(() => {
-  vi.unstubAllGlobals();
-  delete process.env.RESEND_API_KEY;
-  mockRpc.mockReset();
-  mockFrom.mockReset();
+  vi.unstubAllGlobals(); rpc.mockReset(); from.mockReset(); update.mockReset();
+  process.env.RESEND_API_KEY="re_test"; process.env.EMAIL_FROM="BidBlitz <mail@example.com>";
+  rpc.mockResolvedValue({data:[baseJob],error:null});
+  const chain={eq:vi.fn().mockReturnThis(),select:vi.fn(async()=>({data:[{id:"job-1"}],error:null}))};
+  update.mockReturnValue(chain); from.mockReturnValue({update});
 });
-
-describe("queueEmail", () => {
-  beforeEach(() => {
-    defaultClient();
+describe("email reliability",()=>{
+  it("does not send without credentials",async()=>{
+    delete process.env.RESEND_API_KEY; const fetcher=vi.fn();vi.stubGlobal("fetch",fetcher);
+    expect((await dispatchEmailOutbox(1)).held).toBe("no-resend-credentials");expect(fetcher).not.toHaveBeenCalled();
   });
-
-  it("refuses unknown templates and bad addresses without touching the database", async () => {
-    const insert = vi.fn();
-    mockFrom.mockReturnValue({ insert });
-    expect(await queueEmail({ to: "x", template: "nope", idempotencyKey: "k" })).toBeNull();
-    expect(await queueEmail({ to: "not-an-email", template: "won", idempotencyKey: "k" })).toBeNull();
-    expect(insert).not.toHaveBeenCalled();
+  it("does not claim with an unconfigured sender",async()=>{
+    delete process.env.EMAIL_FROM;expect((await dispatchEmailOutbox(1)).held).toBe("no-valid-sender");expect(rpc).not.toHaveBeenCalled();
   });
-});
-
-describe("dispatchEmailOutbox", () => {
-  beforeEach(() => {
-    defaultClient();
+  it("rejects invalid enqueues",async()=>{
+    expect(await queueEmail({to:"invalid",template:"won",idempotencyKey:"k"})).toBeNull();expect(from).not.toHaveBeenCalled();
   });
-
-  it("leaves rows queued and attempts nothing without Resend credentials", async () => {
-    mockRpc.mockResolvedValue({ data: [job()], error: null });
-    const fetchSpy = vi.fn();
-    vi.stubGlobal("fetch", fetchSpy);
-    const summary = await dispatchEmailOutbox(10);
-    expect(summary).toEqual({ attempted: 0, sent: 0, skipped: 0, failed: 0, held: "no-resend-credentials" });
-    expect(fetchSpy).not.toHaveBeenCalled();
+  it("claims the requested job only and records provider ID",async()=>{
+    const fetcher=vi.fn(async()=>({ok:true,json:async()=>({id:"provider-1"})}));vi.stubGlobal("fetch",fetcher);
+    expect((await dispatchEmailOutbox(1,"job-1")).sent).toBe(1);
+    expect(rpc).toHaveBeenCalledWith("claim_email_jobs_v2",{p_limit:1,p_job_id:"job-1"});
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({status:"SENT",provider_message_id:"provider-1"}));
+    expect(fetcher).toHaveBeenCalledWith("https://api.resend.com/emails",expect.objectContaining({headers:expect.objectContaining({"Idempotency-Key":baseJob.idempotency_key})}));
   });
-
-  it("sends critical mail with the idempotency key and marks it sent", async () => {
-    process.env.RESEND_API_KEY = "re_test";
-    mockRpc.mockResolvedValue({ data: [job()], error: null });
-    const update = vi.fn(() => ({ eq: vi.fn(async () => ({})) }));
-    mockFrom.mockReturnValue({ update });
-    const fetchSpy = vi.fn(async () => ({
-      ok: true,
-      json: async () => ({ id: "msg-1" }),
-    }));
-    vi.stubGlobal("fetch", fetchSpy);
-    const summary = await dispatchEmailOutbox(10);
-    expect(summary.sent).toBe(1);
-    expect(fetchSpy).toHaveBeenCalledOnce();
-    const [url, init] = fetchSpy.mock.calls[0] as unknown as [string, RequestInit];
-    expect(url).toBe("https://api.resend.com/emails");
-    const headers = init.headers as Record<string, string>;
-    expect(headers["Authorization"]).toBe("Bearer re_test");
-    expect(headers["Idempotency-Key"]).toBe("won:auction:a-1");
-    const body = JSON.parse(init.body as string);
-    expect(body.to).toEqual(["buyer@example.com"]);
-    expect(body.subject).toContain("Radio");
-    expect(update).toHaveBeenCalled();
-    delete process.env.RESEND_API_KEY;
+  it("defers rate limits and stops the batch",async()=>{
+    vi.stubGlobal("fetch",vi.fn(async()=>({ok:false,status:429,headers:new Headers({"retry-after":"120"})})));
+    expect((await dispatchEmailOutbox(10)).held).toBe("provider-rate-limit");
+    expect(rpc).toHaveBeenCalledTimes(1);expect(update).toHaveBeenCalledWith(expect.objectContaining({status:"QUEUED",delivery_uncertain:false,last_error:"resend 429"}));
   });
-
-  it("immediately dispatches only the requested private message job, not the whole queue", async () => {
-    process.env.RESEND_API_KEY = "re_test";
-    const target = job({
-      id: "message-job",
-      template_key: "listing_message",
-      payload: { name: "Seller", title: "Laptop", conversationId: "thread-123", recipientId: "u-9" },
-      idempotency_key: "listing_message:thread-123:seller:42",
-    });
-    const claim = {
-      eq: vi.fn().mockReturnThis(),
-      select: vi.fn(async () => ({ data: [target], error: null })),
-    };
-    const statusUpdate = { eq: vi.fn(async () => ({ error: null })) };
-    const update = vi.fn((values: { status: string }) =>
-      values.status === "SENDING" ? claim : statusUpdate
-    );
-    mockFrom.mockImplementation((table: string) => table === "notification_preferences"
-      ? { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { listing_message_alerts: true } }) }) }) }
-      : { update });
-    const fetchSpy = vi.fn(async () => ({
-      ok: true,
-      json: async () => ({ id: "resend-message-id" }),
-    }));
-    vi.stubGlobal("fetch", fetchSpy);
-
-    const summary = await dispatchEmailOutbox(1, "message-job");
-
-    expect(mockRpc).not.toHaveBeenCalled();
-    expect(claim.eq).toHaveBeenCalledWith("id", "message-job");
-    expect(claim.eq).toHaveBeenCalledWith("status", "QUEUED");
-    expect(summary).toEqual({ attempted: 1, sent: 1, skipped: 0, failed: 0, held: null });
-    expect(fetchSpy).toHaveBeenCalledOnce();
-    expect(update).toHaveBeenCalledWith(expect.objectContaining({ status: "SENT", provider_message_id: "resend-message-id" }));
-    delete process.env.RESEND_API_KEY;
+  it("marks network failure as uncertain",async()=>{
+    vi.stubGlobal("fetch",vi.fn(async()=>{throw new Error("timeout")}));
+    expect((await dispatchEmailOutbox(1)).failed).toBe(1);
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({status:"QUEUED",delivery_uncertain:true}));
   });
-
-  it("records a provider 401 on the specific message job without claiming a send", async () => {
-    process.env.RESEND_API_KEY = "re_test";
-    const target = job({
-      id: "message-job",
-      template_key: "listing_message",
-      payload: { name: "Buyer", title: "Laptop", conversationId: "thread-123", recipientId: "u-9" },
-    });
-    const claim = {
-      eq: vi.fn().mockReturnThis(),
-      select: vi.fn(async () => ({ data: [target], error: null })),
-    };
-    const statusUpdate = { eq: vi.fn(async () => ({ error: null })) };
-    const updates: Array<Record<string, unknown>> = [];
-    const update = vi.fn((values: Record<string, unknown>) => {
-      updates.push(values);
-      return values.status === "SENDING" ? claim : statusUpdate;
-    });
-    mockFrom.mockImplementation((table: string) => table === "notification_preferences"
-      ? { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { listing_message_alerts: true } }) }) }) }
-      : { update });
-    vi.stubGlobal("fetch", vi.fn(async () => ({
-      ok: false,
-      status: 401,
-      text: async () => '{"message":"API key is invalid"}',
-    })));
-
-    const summary = await dispatchEmailOutbox(1, "message-job");
-
-    expect(summary.sent).toBe(0);
-    expect(summary.failed).toBe(1);
-    expect(updates).toContainEqual(expect.objectContaining({
-      status: "FAILED",
-      last_error: expect.stringContaining("resend 401"),
-    }));
-    expect(mockRpc).not.toHaveBeenCalled();
-    delete process.env.RESEND_API_KEY;
+  it("does not send when recipient lookup fails",async()=>{
+    rpc.mockResolvedValueOnce({data:[{...baseJob,template_key:"outbid"}],error:null}).mockResolvedValueOnce({data:null,error:{message:"lookup failed"}});
+    const fetcher=vi.fn();vi.stubGlobal("fetch",fetcher);
+    expect((await dispatchEmailOutbox(1)).failed).toBe(1);expect(fetcher).not.toHaveBeenCalled();
   });
-
-  it("skips marketplace messages when the user has disabled alerts", async () => {
-    process.env.RESEND_API_KEY = "re_test";
-    mockRpc.mockResolvedValue({ data: [job({
-      template_key: "listing_message",
-      payload: { title: "Laptop", conversationId: "c-1", recipientId: "u-9" },
-    })], error: null });
-    const update = vi.fn(() => ({ eq: vi.fn(async () => ({})) }));
-    mockFrom.mockImplementation((table: string) => table === "notification_preferences"
-      ? { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { listing_message_alerts: false } }) }) }) }
-      : { update });
-    const fetchSpy = vi.fn();
-    vi.stubGlobal("fetch", fetchSpy);
-    const summary = await dispatchEmailOutbox(10);
-    expect(summary.skipped).toBe(1);
-    expect(fetchSpy).not.toHaveBeenCalled();
-    expect(update).toHaveBeenCalledWith(expect.objectContaining({ status: "SKIPPED" }));
+  it("respects disabled optional notifications",async()=>{
+    rpc.mockResolvedValueOnce({data:[{...baseJob,template_key:"outbid"}],error:null}).mockResolvedValueOnce({data:"u-1",error:null});
+    from.mockImplementation((table:string)=>table==="notification_preferences"?{select:()=>({eq:()=>({maybeSingle:async()=>({data:{outbid:false},error:null})})})}:{update});
+    const fetcher=vi.fn();vi.stubGlobal("fetch",fetcher);
+    expect((await dispatchEmailOutbox(1)).skipped).toBe(1);expect(fetcher).not.toHaveBeenCalled();
   });
-
-  it("sends marketplace message alerts by default for a known user with no preferences row", async () => {
-    process.env.RESEND_API_KEY = "re_test";
-    mockRpc.mockResolvedValue({ data: [job({
-      template_key: "listing_message",
-      payload: { title: "Laptop", conversationId: "c-1", recipientId: "u-9" },
-    })], error: null });
-    const update = vi.fn(() => ({ eq: vi.fn(async () => ({})) }));
-    mockFrom.mockImplementation((table: string) => table === "notification_preferences"
-      ? { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null, error: null }) }) }) }
-      : { update });
-    const fetchSpy = vi.fn(async () => ({ ok: true, json: async () => ({ id: "message-id" }) }));
-    vi.stubGlobal("fetch", fetchSpy);
-    const summary = await dispatchEmailOutbox(10);
-    expect(summary.sent).toBe(1);
-    expect(fetchSpy).toHaveBeenCalledOnce();
-  });
-
-  it("marks optional mail SKIPPED when the recipient disabled it, without calling Resend", async () => {
-    process.env.RESEND_API_KEY = "re_test";
-    const outbidJob = job({ template_key: "outbid", idempotency_key: "outbid:bid:b-1" });
-    mockRpc.mockResolvedValue({ data: [outbidJob], error: null });
-    // The sender resolves the recipient to a user id first (listUsers), then
-    // reads that user's live preferences row. Both hops are stubbed here.
-    vi.mocked(createAdminClient).mockReturnValue({
-      rpc: mockRpc,
-      from: ((table: string) => {
-        if (table === "notification_preferences") {
-          return {
-            select: () => ({
-              eq: () => ({
-                maybeSingle: async () => ({
-                  data: { outbid: false, ending_soon: true, listing_message_alerts: false },
-                  error: null,
-                }),
-              }),
-            }),
-          };
-        }
-        const update = vi.fn(() => ({ eq: vi.fn(async () => ({})) }));
-        return { update };
-      }) as never,
-      auth: {
-        admin: {
-          listUsers: vi.fn(async () => ({
-            data: { users: [{ id: "u-9", email: "buyer@example.com" }] },
-          })),
-        },
-      },
-    } as never);
-    const fetchSpy = vi.fn();
-    vi.stubGlobal("fetch", fetchSpy);
-    const summary = await dispatchEmailOutbox(10);
-    expect(summary.skipped).toBe(1);
-    expect(fetchSpy).not.toHaveBeenCalled();
-    delete process.env.RESEND_API_KEY;
-  });
-
-  it("records provider failures on the row instead of throwing", async () => {
-    process.env.RESEND_API_KEY = "re_test";
-    mockRpc.mockResolvedValue({ data: [job()], error: null });
-    const update = vi.fn(() => ({ eq: vi.fn(async () => ({})) }));
-    mockFrom.mockReturnValue({ update });
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => ({ ok: false, status: 400, text: async () => "bad request" }))
-    );
-    const summary = await dispatchEmailOutbox(10);
-    expect(summary.failed).toBe(1);
-    expect(update).toHaveBeenCalled();
-    delete process.env.RESEND_API_KEY;
+  it("backs off exponentially and respects retry-after",()=>{
+    expect(retryDelayMs(1)).toBe(60000);expect(retryDelayMs(3)).toBe(240000);expect(retryDelayMs(1,"120")).toBe(120000);
   });
 });

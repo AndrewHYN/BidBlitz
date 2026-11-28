@@ -46,10 +46,6 @@ function appUrl(): string {
   );
 }
 
-function emailFrom(): string {
-  return process.env.EMAIL_FROM ?? "BidBlitz <noreply@bidblitz.test>";
-}
-
 /** Enqueue one email. Never throws: returns null when it cannot. */
 export async function queueEmail(input: QueueEmailInput): Promise<string | null> {
   try {
@@ -97,166 +93,116 @@ type DispatchSummary = {
   held: string | null;
 };
 
-/** Optional preference flags with safe defaults when no row exists. */
-async function preferencesFor(
-  admin: ReturnType<typeof createAdminClient>,
-  userId: string | null
-): Promise<{ outbid: boolean; ending_soon: boolean; listing_message_alerts: boolean }> {
-  const defaults = { outbid: true, ending_soon: true, listing_message_alerts: false };
-  if (!userId) return defaults;
-  const { data, error } = await admin
-    .from("notification_preferences")
-    .select("outbid, ending_soon, listing_message_alerts")
-    .eq("user_id", userId)
-    .maybeSingle();
-  if (error) return defaults;
-  if (!data) return { ...defaults, listing_message_alerts: true };
-  const row = data as Record<string, unknown>;
+type Job = {
+  id: string; recipient: string; template_key: string;
+  payload: Record<string, string>; idempotency_key: string;
+  attempts: number; delivery_uncertain: boolean;
+};
+
+export function retryDelayMs(attempt: number, retryAfter: string | null = null): number {
+  const backoff = Math.min(60 * 60_000, 60_000 * 2 ** Math.max(0, attempt - 1));
+  const seconds = retryAfter && /^\d+$/.test(retryAfter) ? Number(retryAfter) * 1000 : 0;
+  return Math.max(backoff, Math.min(seconds, 24 * 60 * 60_000));
+}
+
+async function preferencesFor(admin: ReturnType<typeof createAdminClient>, userId: string) {
+  const { data, error } = await admin.from("notification_preferences")
+    .select("outbid, ending_soon, listing_message_alerts").eq("user_id", userId).maybeSingle();
+  if (error) throw new Error("preference lookup unavailable");
   return {
-    outbid: row.outbid !== false,
-    ending_soon: row.ending_soon !== false,
-    listing_message_alerts: row.listing_message_alerts === true,
+    outbid: data?.outbid !== false,
+    ending_soon: data?.ending_soon !== false,
+    listing_message_alerts: data?.listing_message_alerts !== false,
   };
 }
 
-async function userIdForEmail(
-  admin: ReturnType<typeof createAdminClient>,
-  email: string
-): Promise<string | null> {
-  const { data } = await admin.auth.admin.listUsers();
-  const match = (data?.users ?? []).find(
-    (u) => (u.email ?? "").toLowerCase() === email.toLowerCase()
-  );
-  return match?.id ?? null;
-}
-
-/**
- * Send due outbox rows. Bounded, idempotent, and incapable of throwing into
- * the caller: every path ends in a row update or a summary.
- */
+/** Atomic one-job claims keep a timeout from stranding an entire batch. */
 export async function dispatchEmailOutbox(limit = 25, specificJobId?: string): Promise<DispatchSummary> {
   const summary: DispatchSummary = { attempted: 0, sent: 0, skipped: 0, failed: 0, held: null };
-  if (!hasAdminCredentials()) {
-    summary.held = "no-service-credentials";
-    return summary;
-  }
+  if (!hasAdminCredentials()) { summary.held = "no-service-credentials"; return summary; }
   const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) {
-    // Nothing to send with, so nothing is attempted. Rows stay QUEUED for the
-    // retry sweep; claiming them would only burn attempts for no reason.
-    summary.held = "no-resend-credentials";
-    return summary;
-  }
-
+  if (!apiKey) { summary.held = "no-resend-credentials"; return summary; }
+  const from = process.env.EMAIL_FROM;
+  if (!from || from.includes("@bidblitz.test")) { summary.held = "no-valid-sender"; return summary; }
   const admin = createAdminClient();
-  // For a new marketplace message, send that specific queued job immediately.
-  // The daily cron continues using the existing batch claim RPC.
-  const { data: claimed, error: claimError } = specificJobId
-    ? await admin
-      .from("email_outbox")
-      .update({ status: "SENDING", attempts: 1 })
-      .eq("id", specificJobId)
-      .eq("status", "QUEUED")
-      .select("id, recipient, template_key, payload, idempotency_key")
-    : await admin.rpc("claim_email_jobs", { p_limit: limit });
-  if (claimError || !claimed) return summary;
-
-  const url = appUrl();
-  const from = emailFrom();
-  for (const job of claimed as Array<{
-    id: string;
-    recipient: string;
-    template_key: string;
-    payload: Record<string, string>;
-    idempotency_key: string;
-  }>) {
-    summary.attempted += 1;
-    try {
-      const template = getTemplate(job.template_key);
-      if (!template) {
-        await admin
-          .from("email_outbox")
-          .update({ status: "FAILED", last_error: "unknown template" })
-          .eq("id", job.id);
-        summary.failed += 1;
-        continue;
-      }
-      if (!template.critical && template.preference) {
-        const uid = job.template_key === "listing_message" && job.payload.recipientId
-          ? job.payload.recipientId
-          : await userIdForEmail(admin, job.recipient);
-        const prefs = await preferencesFor(admin, uid);
-        if (prefs[template.preference] === false) {
-          await admin
-            .from("email_outbox")
-            .update({ status: "SKIPPED", last_error: "disabled in preferences" })
-            .eq("id", job.id);
-          summary.skipped += 1;
-          continue;
+  const deadline = Date.now() + 42_000;
+  const max = specificJobId ? 1 : Math.min(100, Math.max(1, limit));
+  try {
+    for (let i = 0; i < max && Date.now() < deadline; i++) {
+      const { data, error } = await admin.rpc("claim_email_jobs_v2", { p_limit: 1, p_job_id: specificJobId ?? null });
+      if (error) { summary.held = "claim-failed"; break; }
+      const job = (data as Job[] | null)?.[0];
+      if (!job) break;
+      summary.attempted++;
+      const update = async (values: Record<string, unknown>) => {
+        const result = await admin.from("email_outbox").update(values).eq("id", job.id)
+          .eq("status", "SENDING").eq("attempts", job.attempts).select("id");
+        if (result.error || !result.data?.length) throw new Error("outbox update failed");
+      };
+      const retry = async (reason: string, uncertain: boolean, after: string | null = null) => {
+        const exhausted = job.attempts >= 6;
+        await update({ status: exhausted ? "FAILED" : "QUEUED",
+          next_attempt_at: new Date(Date.now() + retryDelayMs(job.attempts, after)).toISOString(),
+          delivery_uncertain: job.delivery_uncertain || uncertain,
+          last_error: exhausted ? "retry limit reached: " + reason : reason });
+      };
+      let providerAttempted = false;
+      try {
+        const template = getTemplate(job.template_key);
+        if (!template) { await update({ status: "FAILED", last_error: "unknown template" }); summary.failed++; continue; }
+        if (!template.critical && template.preference) {
+          // Resolve the CURRENT verified recipient, even for old rows. Do not
+          // send optional mail if we cannot establish whose preferences apply.
+          const { data: uid, error: lookupError } = await admin.rpc("email_recipient_id", { p_email: job.recipient });
+          if (lookupError) throw new Error("recipient lookup unavailable");
+          if (typeof uid !== "string" || (job.payload.recipientId && job.payload.recipientId !== uid)) {
+            await update({ status: "SKIPPED", last_error: "recipient no longer verified" }); summary.skipped++; continue;
+          }
+          const prefs = await preferencesFor(admin, uid);
+          if (!prefs[template.preference]) {
+            await update({ status: "SKIPPED", last_error: "disabled in preferences" }); summary.skipped++; continue;
+          }
+          if (job.template_key === "listing_message" && job.payload.conversationId) {
+            const { data: chat, error: chatError } = await admin.from("listing_chat_preferences")
+              .select("muted").eq("user_id", uid).eq("conversation_id", job.payload.conversationId).maybeSingle();
+            if (chatError) throw new Error("chat preference lookup unavailable");
+            if (chat?.muted) { await update({ status: "SKIPPED", last_error: "chat muted" }); summary.skipped++; continue; }
+          }
         }
+        const url = appUrl();
+        const rendered = renderEmail({ ...template.content(job.payload, url), subject: template.subject(job.payload) }, url);
+        providerAttempted = true;
+        const res = await fetch("https://api.resend.com/emails", {
+          method: "POST", signal: AbortSignal.timeout(8000),
+          headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json", "Idempotency-Key": job.idempotency_key },
+          body: JSON.stringify({ from, to: [job.recipient], subject: template.subject(job.payload), html: rendered.html, text: rendered.text }),
+        });
+        if (res.ok) {
+          const body = (await res.json()) as { id?: string };
+          if (!body.id) throw new Error("provider accepted without ID");
+          await update({ status: "SENT", provider_message_id: body.id, sent_at: new Date().toISOString(), last_error: null, delivery_uncertain: false });
+          summary.sent++;
+        } else if (res.status === 429 || res.status >= 500 || res.status === 408) {
+          await retry(`resend ${res.status}`, res.status !== 429, res.headers?.get("retry-after") ?? null);
+          summary.failed++;
+          if (res.status === 429) { summary.held = "provider-rate-limit"; break; }
+        } else {
+          // Never store raw provider error bodies: they may contain PII.
+          const body = await res.json().catch(() => null) as { name?: string } | null;
+          if (res.status === 409 && body?.name === "concurrent_idempotent_requests") {
+            await retry("resend 409: concurrent request", true); summary.failed++;
+          } else {
+            await update({ status: "FAILED", last_error: `resend ${res.status}` }); summary.failed++;
+            if (res.status === 401 || res.status === 403) { summary.held = "provider-configuration"; break; }
+          }
+        }
+      } catch {
+        try { await retry(providerAttempted ? "delivery uncertain: provider or write failure" : "temporary pre-send failure", providerAttempted); }
+        catch { summary.held = "outbox-write-failed"; }
+        summary.failed++;
+        if (summary.held) break;
       }
-      const content = template.content(job.payload, url);
-      const rendered = renderEmail(
-        { ...content, subject: template.subject(job.payload) },
-        url
-      );
-      const res = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-          "Idempotency-Key": job.idempotency_key,
-        },
-        body: JSON.stringify({
-          from,
-          to: [job.recipient],
-          subject: template.subject(job.payload),
-          html: rendered.html,
-          text: rendered.text,
-        }),
-      });
-      if (res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { id?: string };
-        await admin
-          .from("email_outbox")
-          .update({
-            status: "SENT",
-            provider_message_id: body.id ?? null,
-            sent_at: new Date().toISOString(),
-            last_error: null,
-          })
-          .eq("id", job.id);
-        summary.sent += 1;
-      } else if (res.status === 429 || res.status >= 500) {
-        // Transient: back to the queue with the provider's complaint attached.
-        const text = await res.text().catch(() => "");
-        await admin
-          .from("email_outbox")
-          .update({ status: "QUEUED", last_error: `resend ${res.status}: ${text.slice(0, 200)}` })
-          .eq("id", job.id);
-        summary.failed += 1;
-      } else {
-        const text = await res.text().catch(() => "");
-        await admin
-          .from("email_outbox")
-          .update({ status: "FAILED", last_error: `resend ${res.status}: ${text.slice(0, 200)}` })
-          .eq("id", job.id);
-        summary.failed += 1;
-      }
-    } catch (e) {
-      await admin
-        .from("email_outbox")
-        .update({
-          status: "QUEUED",
-          last_error: e instanceof Error ? e.message.slice(0, 200) : "dispatch threw",
-        })
-        .eq("id", job.id)
-        .then(
-          () => undefined,
-          () => undefined
-        );
-      summary.failed += 1;
     }
-  }
+  } catch { summary.held = "dispatcher-unavailable"; }
   return summary;
 }
