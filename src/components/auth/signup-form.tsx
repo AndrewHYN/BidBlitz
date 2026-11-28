@@ -6,6 +6,7 @@ import { MailCheck } from "lucide-react";
 import { resendConfirmationAction, signUpAction } from "@/server/actions/auth";
 import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
 import { useMounted } from "@/hooks/use-mounted";
+import { PROMO_EVENT } from "@/lib/android-app-promotion";
 import { MIN_PASSWORD_LENGTH } from "@/lib/validation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -86,6 +87,7 @@ export function SignupForm() {
         // Email confirmation is ON: no session means the account exists but
         // is not usable yet — say exactly that, never "you're all set".
         setSentTo(email);
+        window.dispatchEvent(new CustomEvent(PROMO_EVENT, { detail: "signup-complete" }));
       } catch (err) {
         if (isNextRedirect(err)) throw err; // session created + confirmed: navigate
         setError("Account creation failed. Please try again.");

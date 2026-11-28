@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { Bell, BellRing, Bookmark, ChevronDown, ChevronRight, CircleHelp, Gavel, History, LogOut, Mail, Package, ShieldAlert, UserRound } from "lucide-react";
+import { Download, Bell, BellRing, Bookmark, ChevronDown, ChevronRight, CircleHelp, Gavel, History, LogOut, Mail, Package, ShieldAlert, UserRound } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { UserAvatar } from "@/components/profile/user-avatar";
@@ -11,6 +11,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { signOutAction } from "@/server/actions/auth";
 import { setMarketplaceEmailAlertsAction } from "@/server/actions/preferences";
 import { cn } from "@/lib/utils";
+import { useAndroidAppContext } from "@/hooks/use-android-app-context";
+import { APK_PATH } from "@/lib/android-app-promotion";
 import type { HeaderUser } from "@/components/header-bar";
 
 const row = "min-h-11 cursor-pointer gap-3 rounded-xl px-3 py-2 text-sm font-medium focus:bg-accent";
@@ -23,6 +25,8 @@ function currentPermission(): BrowserPermission {
 
 export function AccountMenu({ user }: { user: HeaderUser }) {
   const router = useRouter();
+  const appContext = useAndroidAppContext();
+  const showDownload = appContext === "android-browser" || appContext === "other-browser";
   const [email, setEmail] = useState(user.marketplaceEmailAlerts === true);
   const [permission, setPermission] = useState<BrowserPermission>("unsupported");
   const [pending, startTransition] = useTransition();
@@ -85,6 +89,11 @@ export function AccountMenu({ user }: { user: HeaderUser }) {
             {user.email && <span className="block truncate text-xs font-normal text-muted-foreground">{user.email}</span>}
           </span>
         </DropdownMenuLabel>
+        {showDownload && (
+          <DropdownMenuItem asChild className="mb-2 min-h-14 cursor-pointer gap-3 rounded-xl bg-orange-600 px-3 py-2 text-sm font-bold text-white hover:bg-orange-700 focus:bg-orange-700 focus:text-white [&_svg]:text-white">
+            <a href={APK_PATH} download data-testid="android-apk-menu"><Download className="size-5" /><span className="min-w-0 flex-1"><span className="block">Download Android app</span><span className="block text-xs font-normal text-white/90">Free APK · 3.7 MB</span></span><ChevronRight className="size-4" /></a>
+          </DropdownMenuItem>
+        )}
         <DropdownMenuLabel className={section}>Your account</DropdownMenuLabel>
         <DropdownMenuItem asChild className={row}><Link href="/settings"><UserRound className={icon} /> <span className="flex-1">Profile &amp; account settings</span><ChevronRight className="size-4 text-muted-foreground" /></Link></DropdownMenuItem>
         <DropdownMenuItem asChild className={row}><Link href="/dashboard/selling"><Package className={icon} />My listings</Link></DropdownMenuItem>

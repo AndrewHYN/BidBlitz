@@ -17,5 +17,20 @@ export function isPromotionPath(path: string) {
     .some((prefix) => path === prefix || path.startsWith(prefix + "/"));
 }
 export function isReminderPath(path: string) {
-  return path === "/" || path === "/browse" || path === "/marketplace" || path === "/services-zimbabwe";
+  return path === "/login" || path === "/signup" || path === "/" || path === "/browse" || path === "/marketplace" || path === "/services-zimbabwe";
+}
+
+export type PromoMoment = "login" | "signup" | "signup-complete" | "listing-published" | "browse";
+export const PROMO_EVENT = "bidblitz:download-promotion";
+export function promoMoment(path: string): PromoMoment | null {
+  if (path === "/login") return "login";
+  if (path === "/signup") return "signup";
+  return isReminderPath(path) ? "browse" : null;
+}
+export function isInstalledContext(referrer: string, appDisplay: boolean, appSession: boolean) {
+  return appDisplay || appSession || isAppReferrer(referrer);
+}
+export function showAppPromotion(moment: PromoMoment, lastShown: number, dismissedAt: number, now: number) {
+  const cooldown = moment === "browse" ? DAY_MS : 6 * 60 * 60 * 1000;
+  return now - dismissedAt >= DISMISS_MS && now - lastShown >= cooldown;
 }

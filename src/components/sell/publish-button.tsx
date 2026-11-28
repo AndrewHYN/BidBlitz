@@ -13,6 +13,7 @@ import { ConfirmDialog } from "@/components/sell/confirm-dialog";
 import { isClosed } from "@/lib/auction-status";
 import { formatMoney, money } from "@/lib/money";
 import { renderRejectionMessage } from "@/server/errors";
+import { PROMO_EVENT } from "@/lib/android-app-promotion";
 
 /**
  * Publish gate.
@@ -75,6 +76,7 @@ export function PublishButton({
             description: isDirect ? "Buyers can now contact you directly." : "Share it to get your first bids in.",
           });
         }
+        window.dispatchEvent(new CustomEvent(PROMO_EVENT, { detail: "listing-published" }));
         router.refresh();
       } catch {
         setError("Something went wrong while publishing. Please try again.");
