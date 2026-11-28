@@ -50,3 +50,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Assembled from the hash-verified public Android release parts
+/public/downloads/BidBlitz-1.0.0.apk

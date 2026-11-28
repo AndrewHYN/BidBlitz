@@ -4,6 +4,7 @@ import "./globals.css";
 import { Providers } from "@/components/providers";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
+import { AndroidAppPromotion } from "@/components/android-app-promotion";
 import { MarketplaceViewTracker } from "@/components/marketplace-view-tracker";
 import { CANONICAL_SITE_URL as SITE_URL } from "@/lib/site-url";
 import { serializeJsonLd, siteStructuredData } from "@/lib/structured-data";
@@ -33,6 +34,7 @@ const siteUrl = SITE_URL;
  */
 const baseMetadata: Metadata = {
   metadataBase: new URL(siteUrl),
+  manifest: "/app-promotion.webmanifest",
   title: {
     default: "Buy and Sell in Zimbabwe | BidBlitz Marketplace",
     template: "%s · BidBlitz",
@@ -130,6 +132,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             Skip to content
           </a>
           <SiteHeader />
+          <AndroidAppPromotion />
           <main id="main" className="flex-1">
             {children}
           </main>

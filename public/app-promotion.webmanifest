@@ -1,0 +1,11 @@
+{
+  "name": "BidBlitz",
+  "scope": "/",
+  "start_url": "/",
+  "related_applications": [
+    {
+      "platform": "play",
+      "id": "zw.co.bidblitz.app"
+    }
+  ]
+}
