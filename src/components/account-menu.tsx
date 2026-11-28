@@ -46,7 +46,7 @@ export function AccountMenu({ user }: { user: HeaderUser }) {
   async function enableBrowserAlerts() {
     const status = currentPermission();
     if (status === "unsupported") {
-      toast.info("Browser alerts are unavailable on this device. In-app notifications still work.");
+      toast.info("System alerts are unavailable on this device. In-app notifications still work.");
       return;
     }
     if (status === "denied") {
@@ -54,13 +54,13 @@ export function AccountMenu({ user }: { user: HeaderUser }) {
       return;
     }
     if (status === "granted") {
-      toast.info("Browser message alerts are already enabled while BidBlitz is open.");
+      toast.info("System message alerts are already enabled while BidBlitz is open.");
       return;
     }
     try {
       const result = await Notification.requestPermission();
       setPermission(result);
-      if (result === "granted") toast.success("Message alerts enabled while BidBlitz is open.");
+      if (result === "granted") toast.success("System message alerts enabled while BidBlitz is open.");
       else if (result === "denied") toast.info("Notifications are blocked. Change your browser site permissions to enable them.");
       else toast.info("Permission was not granted. You can try again.");
     } catch { toast.error("This browser could not enable alerts. In-app notifications still work."); }
@@ -103,7 +103,7 @@ export function AccountMenu({ user }: { user: HeaderUser }) {
         <DropdownMenuItem asChild className={row}><Link href="/notifications"><Bell className={icon} /><span className="flex-1">In-app notifications</span><ChevronRight className="size-4 text-muted-foreground" /></Link></DropdownMenuItem>
         <DropdownMenuItem className={row} onSelect={(event) => { event.preventDefault(); void enableBrowserAlerts(); }}>
           <BellRing className={icon} />
-          <span className="min-w-0 flex-1"><span className="block">{permission === "granted" ? "Browser message alerts" : "Enable message alerts"}</span><span className="block text-xs font-normal text-muted-foreground">While BidBlitz is open</span></span>
+          <span className="min-w-0 flex-1"><span className="block">{permission === "granted" ? "System message alerts" : "Enable system alerts"}</span><span className="block text-xs font-normal text-muted-foreground">While BidBlitz is open</span></span>
           <span className={cn("rounded-md px-1.5 py-1 text-[10px] font-semibold", permission === "granted" ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" : "bg-muted text-muted-foreground")}>{permission === "granted" ? "On" : permission === "denied" ? "Blocked" : permission === "unsupported" ? "Unavailable" : "Off"}</span>
         </DropdownMenuItem>
         <DropdownMenuCheckboxItem checked={email} disabled={pending} onCheckedChange={toggleEmail}

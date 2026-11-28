@@ -26,6 +26,12 @@ export function AndroidAppPromotion() {
   const path = usePathname() ?? "";
   const context = useAndroidAppContext();
   const [dismissed, setDismissed] = useState(false);
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      if (Date.now() - stamp(DISMISSED) < DISMISS_MS) setDismissed(true);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
   const [active, setActive] = useState<{ moment: PromoMoment; path: string } | null>(null);
   const browser = context === "android-browser" || context === "other-browser";
   const mobile = context === "android-browser";
@@ -35,8 +41,8 @@ export function AndroidAppPromotion() {
     if (!mobile || dismissed || !moment) return;
     const timer = window.setTimeout(() => {
       if (document.visibilityState !== "visible" || document.querySelector("input:focus, textarea:focus, [contenteditable=true]:focus")) return;
-      if (!showAppPromotion(moment, stamp(SHOWN), stamp(DISMISSED), Date.now())) return;
-      save(SHOWN);
+      if (!showAppPromotion(moment, stamp(SHOWN + ":" + moment), stamp(DISMISSED), Date.now())) return;
+      save(SHOWN + ":" + moment);
       setActive({ moment, path });
     }, moment === "browse" ? 20000 : 1500);
     return () => window.clearTimeout(timer);
@@ -47,8 +53,8 @@ export function AndroidAppPromotion() {
     function onMoment(e: Event) {
       const next = (e as CustomEvent<PromoMoment>).detail;
       if (next !== "listing-published" && next !== "signup-complete") return;
-      if (!showAppPromotion(next, stamp(SHOWN), stamp(DISMISSED), Date.now())) return;
-      save(SHOWN);
+      if (!showAppPromotion(next, stamp(SHOWN + ":" + next), stamp(DISMISSED), Date.now())) return;
+      save(SHOWN + ":" + next);
       setActive({ moment: next, path });
     }
     window.addEventListener(PROMO_EVENT, onMoment);

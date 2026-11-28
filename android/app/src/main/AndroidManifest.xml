@@ -1,4 +1,6 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <application
         android:allowBackup="false"
         android:icon="@mipmap/bidblitz"
@@ -10,13 +12,28 @@
         <activity android:name="com.google.androidbrowserhelper.trusted.LauncherActivity"
             android:exported="true">
             <meta-data android:name="android.support.customtabs.trusted.DEFAULT_URL"
-                android:value="https://www.bidblitz.co.zw/" />
+                android:value="https://www.bidblitz.co.zw/?source=bidblitz-android" />
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="www.bidblitz.co.zw" android:pathPrefix="/messages" />
+            </intent-filter>
         </activity>
         <activity android:name="com.google.androidbrowserhelper.trusted.FocusActivity"
             android:exported="false" />
+        <!-- Android Browser Helper verifies the trusted browser token before
+             accepting notification delegation requests. -->
+        <service android:name="com.google.androidbrowserhelper.trusted.DelegationService"
+            android:exported="true" tools:ignore="ExportedService">
+            <intent-filter>
+                <action android:name="android.support.customtabs.trusted.TRUSTED_WEB_ACTIVITY_SERVICE" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </service>
     </application>
 </manifest>

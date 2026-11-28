@@ -80,6 +80,7 @@ export function MarketplaceMessageAlerts({ userId }: { userId: string }) {
               void navigator.serviceWorker.register("/message-alert-sw.js").then((registration) =>
                 registration.showNotification(update.heading, {
                   body: update.detail,
+                  icon: "/brand/bidblitz-logo-512.png",
                   tag: `listing-chat-${conversationId}`,
                   data: { url },
                 })
@@ -90,6 +91,7 @@ export function MarketplaceMessageAlerts({ userId }: { userId: string }) {
               try {
                 const alert = new Notification(update.heading, {
                   body: update.detail,
+                  icon: "/brand/bidblitz-logo-512.png",
                   tag: `listing-chat-${conversationId}`,
                 });
                 alert.onclick = () => { window.focus(); router.push(url); alert.close(); };
