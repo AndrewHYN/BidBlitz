@@ -11,6 +11,7 @@ const ITEMS = [
   { href: "/admin/finance", label: "Finance", icon: Banknote, key: "finance" },
   { href: "/admin/marketing", label: "Marketing", icon: Megaphone, key: "marketing" },
   { href: "/admin/support", label: "Support", icon: Headset, key: "support" },
+  { href: "/admin/infrastructure", label: "Health", icon: Activity, key: "infrastructure" },
   { href: "/admin/guide", label: "Guide", icon: BookOpen, key: "guide" },
   { href: "/admin/team", label: "Team", icon: Users, key: "team" },
 ] as const;
@@ -23,7 +24,7 @@ export async function AdminNav({
   showListings = false,
   disputeCount = 0,
 }: {
-  active?: "listings" | "command" | "overview" | "disputes" | "finance" | "marketing" | "support" | "guide" | "team";
+  active?: "listings" | "command" | "overview" | "disputes" | "finance" | "marketing" | "support" | "guide" | "team" | "infrastructure";
   showTeam?: boolean;
   showMarketing?: boolean;
   showSupport?: boolean;
@@ -43,6 +44,7 @@ export async function AdminNav({
     overview: true,
     command: true,
     guide: true,
+    infrastructure: can("analytics.view"),
   };
 
   return (
@@ -57,6 +59,7 @@ export async function AdminNav({
             <Link
               key={href}
               href={href}
+              prefetch={false}
               aria-current={selected ? "page" : undefined}
               className={cn(
                 "inline-flex min-h-11 min-w-0 items-center gap-1.5 rounded-lg px-2 text-sm font-medium text-muted-foreground transition lg:px-3",
